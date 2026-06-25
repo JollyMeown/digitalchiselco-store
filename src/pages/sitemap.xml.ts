@@ -7,12 +7,15 @@ export async function GET() {
   let products: { slug: string }[] = [];
   let cats: { slug: string }[] = [];
   try {
-    const [p, c] = await Promise.all([
-      supabase.from('products').select('slug').eq('active', true),
-      supabase.from('categories').select('slug'),
-    ]);
-    products = p.data ?? [];
-    cats = c.data ?? [];
+    const { data: c } = await supabase.from('categories').select('slug');
+    cats = c ?? [];
+    // paginate past Supabase's 1000-row cap so every product is in the sitemap
+    for (let from = 0; ; from += 1000) {
+      const { data } = await supabase.from('products').select('slug').eq('active', true).range(from, from + 999);
+      if (!data || data.length === 0) break;
+      products.push(...data);
+      if (data.length < 1000) break;
+    }
   } catch (e) { console.error('sitemap query failed', e); }
 
   const staticPages = ['', 'catalog', 'collections', 'free', 'about', 'blog'];
