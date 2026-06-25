@@ -67,6 +67,7 @@ const jsonld = {
         cart.push({ id: d.id, slug: d.slug, title: d.title, price: Number(d.price), img: d.img });
         localStorage.setItem('cart', JSON.stringify(cart));
       }
+      window.dispatchEvent(new Event('cart-changed'));
       document.getElementById('added')?.classList.remove('hidden');
     });
   </script>

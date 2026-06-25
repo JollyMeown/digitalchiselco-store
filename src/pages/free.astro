@@ -1,0 +1,55 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+<Base title="Get 5 Free Premium STL Files | DigitalChiselCo" description="Join our list and get 5 premium bas-relief STL files free, plus the CNC woodcarving guide. For CNC routers, 3D printers and laser engravers.">
+  <Header />
+  <main class="bg-cream">
+    <section class="max-w-2xl mx-auto px-6 py-16 text-center">
+      <p class="text-xs tracking-widest text-bronze-600 mb-3">FREE STARTER PACK</p>
+      <h1 class="text-3xl md:text-4xl text-bronze-800 leading-tight">Get <em class="italic">5 premium STL files</em> — free</h1>
+      <p class="mt-4 text-bronze-700">Plus our CNC woodcarving guide. Drop your email and we'll send your free bas-relief pack, ready for CNC routers, 3D printers and laser engravers.</p>
+
+      <form id="sub" class="mt-8 flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+        <input id="email" type="email" required placeholder="you@email.com"
+          class="flex-1 px-4 py-3 rounded-md border border-bronze-600/30 focus:outline-none focus:border-bronze-600 bg-white" />
+        <button type="submit" class="bg-bronze-600 text-cream px-6 py-3 rounded-md hover:bg-bronze-700 transition whitespace-nowrap">Send my files</button>
+      </form>
+      <p id="msg" class="mt-4 text-sm hidden"></p>
+
+      <ul class="mt-10 text-sm text-bronze-700 space-y-2 text-left max-w-sm mx-auto">
+        <li>✅ 5 hand-picked premium bas-relief STL files</li>
+        <li>✅ CNC woodcarving guide (PDF)</li>
+        <li>✅ Tested in Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360</li>
+        <li>✅ No spam — unsubscribe anytime</li>
+      </ul>
+    </section>
+  </main>
+  <Footer />
+  <script is:inline>
+    const form = document.getElementById('sub');
+    const msg = document.getElementById('msg');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      msg.className = 'mt-4 text-sm text-bronze-700';
+      msg.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
+        const data = await res.json();
+        if (res.ok) {
+          msg.className = 'mt-4 text-sm text-green-700';
+          msg.textContent = '✓ You’re in! Your free STL pack is on its way to your inbox.';
+          form.reset();
+        } else {
+          msg.className = 'mt-4 text-sm text-red-600';
+          msg.textContent = data.error || 'Something went wrong.';
+        }
+      } catch {
+        msg.className = 'mt-4 text-sm text-red-600';
+        msg.textContent = 'Network error. Please try again.';
+      }
+    });
+  </script>
+</Base>

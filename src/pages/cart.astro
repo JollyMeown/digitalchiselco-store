@@ -34,7 +34,7 @@ import Footer from '../components/Footer.astro';
       document.getElementById('total').textContent = fmt(c.reduce((s, x) => s + x.price, 0));
       document.querySelectorAll('.rm').forEach((b) => b.addEventListener('click', () => {
         const next = JSON.parse(localStorage.getItem('cart') || '[]').filter((y) => y.id !== b.dataset.id);
-        localStorage.setItem('cart', JSON.stringify(next)); render();
+        localStorage.setItem('cart', JSON.stringify(next)); window.dispatchEvent(new Event('cart-changed')); render();
       }));
     }
     render();

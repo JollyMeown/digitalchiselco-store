@@ -1,54 +1,43 @@
 ---
 import Base from '../layouts/Base.astro';
-import { getCategories } from '../lib/queries';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import ProductCard from '../components/ProductCard.astro';
+import { getCategories, getProducts } from '../lib/queries';
 
-// Live trust stats (from Etsy). Wire to DB later.
 const stats = { rating: '4.9', reviews: 577, sales: 4543, designs: 1235 };
-
-// Real categories from the DB (slugs always match the collection pages).
 const collections = (await getCategories()).slice(0, 6);
+const { products } = await getProducts(1, 24);
+const withImg = products.filter((p) => p.image_url);
+const heroImg = withImg[0]?.image_url;
+const bestsellers = withImg.slice(1, 6);
+
+const reviews = [
+  { name: 'Vickie', text: 'The value of this purchase is amazing. They are all top quality. Easy downloads, works perfectly with the Vcarve software. Thank you so much!' },
+  { name: 'Diane', text: 'Love these, and seller is very good with help! Would definitely recommend! And they are awesome with the customized files.' },
+  { name: 'Clyde', text: "Nice finish carving with great detail. Quality, new products for this CNC wood carver. I will get more." },
+];
 ---
 <Base>
-  <!-- top utility bar -->
-  <div class="bg-bronze-800 text-cream text-xs text-center py-1.5">
-    Instant digital download · 50% of every sale donated to charity · Trusted by 440+ makers
-  </div>
-
-  <!-- nav -->
-  <nav class="flex items-center justify-between px-6 py-4 border-b border-black/10">
-    <a href="/" class="flex items-center gap-2">
-      <span class="font-serif text-lg tracking-wide text-bronze-800">Digital Chisel</span>
-    </a>
-    <div class="hidden md:flex gap-6 text-sm text-ink-700">
-      <a href="/collections">Collections</a>
-      <a href="/catalog">Catalog</a>
-      <a href="/free" class="text-bronze-600">Free files</a>
-      <a href="/about">Our story</a>
-      <a href="/blog">Blog</a>
-    </div>
-    <div class="flex gap-4 text-ink-700">
-      <a href="/account" aria-label="Account">Account</a>
-      <a href="/cart" aria-label="Cart">Cart</a>
-    </div>
-  </nav>
+  <Header />
 
   <!-- hero -->
-  <header class="bg-cream text-center px-6 py-16">
-    <p class="text-xs tracking-widest text-bronze-600 mb-3">PREMIUM STL FILES · CNC · LASER · 3D PRINT</p>
-    <h1 class="text-4xl md:text-5xl text-bronze-800 leading-tight">
-      Art that carves with <em class="italic">purpose</em>
-    </h1>
-    <p class="mt-5 max-w-xl mx-auto text-bronze-700">
-      Hundreds of museum-grade bas-relief designs, instantly downloadable.
-      Half of every purchase goes to charity.
-    </p>
-    <div class="mt-7 flex gap-3 justify-center">
-      <a href="/catalog" class="bg-bronze-600 text-cream text-sm px-6 py-3 rounded-md">Shop collections</a>
-      <a href="/free" class="border border-bronze-600 text-bronze-800 text-sm px-6 py-3 rounded-md">Get free STL pack</a>
+  <header class="bg-cream">
+    <div class="max-w-6xl mx-auto px-6 py-14 grid md:grid-cols-2 gap-10 items-center">
+      <div>
+        <p class="text-xs tracking-widest text-bronze-600 mb-3">PREMIUM STL FILES · CNC · LASER · 3D PRINT</p>
+        <h1 class="text-4xl md:text-5xl text-bronze-800 leading-tight">Art that carves with <em class="italic">purpose</em></h1>
+        <p class="mt-5 text-bronze-700 max-w-md">Hundreds of museum-grade bas-relief designs, instantly downloadable. Half of every purchase goes to charity.</p>
+        <div class="mt-7 flex gap-3 flex-wrap">
+          <a href="/catalog" class="bg-bronze-600 text-cream text-sm px-6 py-3 rounded-md hover:bg-bronze-700 transition">Shop collections</a>
+          <a href="/free" class="border border-bronze-600 text-bronze-800 text-sm px-6 py-3 rounded-md hover:bg-bronze-600/10 transition">Get 5 free STL files</a>
+        </div>
+        <p class="mt-5 text-sm text-bronze-700">★★★★★ &nbsp;{stats.rating} from {stats.reviews} reviews · {stats.sales.toLocaleString()} sales</p>
+      </div>
+      <div class="aspect-square rounded-xl overflow-hidden shadow-sm bg-white/40">
+        {heroImg && <img src={heroImg} alt="Featured bas-relief STL design" width="700" height="700" class="w-full h-full object-cover" />}
+      </div>
     </div>
-    <p class="mt-5 text-sm text-bronze-700">
-      ★★★★★ &nbsp;{stats.rating} from {stats.reviews} reviews · {stats.sales.toLocaleString()} sales
-    </p>
   </header>
 
   <!-- trust strip -->
@@ -60,7 +49,7 @@ const collections = (await getCategories()).slice(0, 6);
   </div>
 
   <!-- collections -->
-  <section class="px-6 py-12 max-w-5xl mx-auto">
+  <section class="px-6 py-12 max-w-6xl mx-auto">
     <div class="flex justify-between items-baseline mb-5">
       <h2 class="text-2xl">Shop by collection</h2>
       <a href="/collections" class="text-sm text-bronze-600">View all →</a>
@@ -68,23 +57,41 @@ const collections = (await getCategories()).slice(0, 6);
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
       {collections.map((c) => (
         <a href={`/collections/${c.slug}`} class="border border-black/10 rounded-md overflow-hidden hover:shadow-sm transition">
-          <div class="h-24 bg-cream flex items-center justify-center font-serif text-bronze-600/50">{c.name}</div>
-          <div class="p-3">
-            <div class="text-sm">{c.name}</div>
-          </div>
+          <div class="h-24 bg-cream flex items-center justify-center font-serif text-bronze-600/50 text-center px-2">{c.name}</div>
+          <div class="p-3 text-sm">{c.name}</div>
         </a>
       ))}
     </div>
   </section>
 
-  <!-- charity -->
-  <section class="bg-bronze-800 text-cream text-center py-8 px-6">
-    <p class="text-sm">Together we've donated</p>
-    <p class="font-serif text-3xl text-[#FAC775] my-1">$18,540 &amp; counting</p>
-    <p class="text-xs opacity-80">50% of every sale supports charitable causes</p>
+  <!-- bestsellers -->
+  {bestsellers.length > 0 && (
+    <section class="px-6 pb-12 max-w-6xl mx-auto">
+      <h2 class="text-2xl mb-5">Popular designs</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {bestsellers.map((p) => <ProductCard product={p} />)}
+      </div>
+    </section>
+  )}
+
+  <!-- reviews -->
+  <section class="bg-cream/60 py-12">
+    <div class="max-w-5xl mx-auto px-6">
+      <div class="text-center mb-8">
+        <h2 class="text-2xl">Loved by makers</h2>
+        <p class="text-sm text-bronze-700 mt-1">★★★★★ {stats.rating} average · {stats.reviews}+ verified reviews</p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-5">
+        {reviews.map((r) => (
+          <figure class="bg-white border border-black/10 rounded-lg p-5">
+            <div class="text-bronze-600 mb-2">★★★★★</div>
+            <blockquote class="text-sm text-ink-700 leading-relaxed">“{r.text}”</blockquote>
+            <figcaption class="mt-3 text-sm font-medium">— {r.name}</figcaption>
+          </figure>
+        ))}
+      </div>
+    </div>
   </section>
 
-  <footer class="px-6 py-10 text-center text-xs text-ink-700/60">
-    © {new Date().getFullYear()} DigitalChiselCo · {stats.designs.toLocaleString()} premium STL designs
-  </footer>
+  <Footer />
 </Base>

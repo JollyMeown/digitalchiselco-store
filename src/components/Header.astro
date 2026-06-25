@@ -17,6 +17,13 @@ const links = [
   </div>
   <div class="flex gap-4 text-sm text-ink-700">
     <a href="/account">Account</a>
-    <a href="/cart">Cart</a>
+    <a href="/cart">Cart <span id="cart-count" class="text-bronze-600 font-medium"></span></a>
   </div>
 </nav>
+<script is:inline>
+  function cartCount() { try { return JSON.parse(localStorage.getItem('cart') || '[]').length; } catch { return 0; } }
+  function renderCartCount() { const el = document.getElementById('cart-count'); if (el) { const n = cartCount(); el.textContent = n > 0 ? `(${n})` : ''; } }
+  renderCartCount();
+  window.addEventListener('cart-changed', renderCartCount);
+  window.addEventListener('storage', renderCartCount);
+</script>
