@@ -29,6 +29,11 @@ export default function Media() {
     }).eq('id', 1);
     setMsg(error ? 'Error: ' + error.message : '✓ Hero saved');
   }
+  async function saveBanner(url: string) {
+    const { error } = await supabase.from('site_settings').update({ banner_image_url: url || null }).eq('id', 1);
+    if (error) alert(error.message);
+    else setS({ ...s, banner_image_url: url });
+  }
   async function saveCategoryImage(id: string, url: string) {
     const { error } = await supabase.from('categories').update({ image_url: url || null }).eq('id', id);
     if (error) alert(error.message);
@@ -39,6 +44,13 @@ export default function Media() {
 
   return (
     <div className="space-y-5">
+      <Card title="Site banner">
+        <p className="text-xs text-ink-700/60 mb-3">
+          Wide brand banner shown at the top of every storefront page (except cart). Best at ~1700×720, lightweight JPG/WebP. Mobile auto-scales to full width.
+        </p>
+        <ImageUpload value={s.banner_image_url} onChange={saveBanner} folder="banner" />
+      </Card>
+
       <Card title="Homepage hero">
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-3">

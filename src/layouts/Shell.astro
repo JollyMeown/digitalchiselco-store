@@ -5,12 +5,14 @@ import Base from './Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import SideMenu from '../components/SideMenu.astro';
+import SiteBanner from '../components/SiteBanner.astro';
 
-interface Props { title?: string; description?: string; image?: string; noindex?: boolean; fullWidth?: boolean; }
-const { title, description, image, noindex, fullWidth = false } = Astro.props;
+interface Props { title?: string; description?: string; image?: string; noindex?: boolean; fullWidth?: boolean; hideBanner?: boolean; }
+const { title, description, image, noindex, fullWidth = false, hideBanner = false } = Astro.props;
 ---
 <Base title={title} description={description} image={image} noindex={noindex}>
   <Header />
+  {!hideBanner && <SiteBanner />}
   {fullWidth ? (
     <slot />
   ) : (

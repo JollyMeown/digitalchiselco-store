@@ -12,6 +12,7 @@ export type SiteSettings = {
   sales_count: number; products_count: number; admirers_count: number; experience_years: number;
   discount_percent: number; hero_image_url: string | null; hero_headline: string;
   hero_subhead: string; featured_product_id: string | null; admin_email: string;
+  banner_image_url: string | null;
 };
 
 const SETTINGS_FALLBACK: SiteSettings = {
@@ -21,6 +22,7 @@ const SETTINGS_FALLBACK: SiteSettings = {
   hero_headline: 'Art that carves with purpose',
   hero_subhead: 'Hundreds of museum-grade bas-relief designs, instantly downloadable. Half of every purchase goes to charity.',
   featured_product_id: null, admin_email: 'jolly@digitalchiselco.com',
+  banner_image_url: null,
 };
 
 export async function getSettings(): Promise<SiteSettings> {

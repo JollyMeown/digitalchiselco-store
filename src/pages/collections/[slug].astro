@@ -14,13 +14,20 @@ const pages = Math.ceil(total / perPage);
 ---
 <Shell title={`${category.name} STL Files | DigitalChiselCo`} description={`Browse ${total} ${category.name} bas-relief STL files for CNC, 3D printing and laser engraving.`}>
   <Breadcrumbs crumbs={[{ label: 'Collections', href: '/collections' }, { label: category.name }]} />
-  {category.image_url && (
-    <div class="h-40 md:h-56 mb-6 overflow-hidden rounded-lg">
-      <img src={category.image_url} alt={`${category.name} collection`} class="w-full h-full object-cover" />
-    </div>
+  {category.image_url ? (
+    <>
+      <div class="mb-5 overflow-hidden rounded-lg">
+        <img src={category.image_url} alt={category.name} class="w-full h-auto block" loading="eager" />
+      </div>
+      <h1 class="sr-only">{category.name}</h1>
+      <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} designs</p>
+    </>
+  ) : (
+    <>
+      <h1 class="text-3xl mb-1">{category.name}</h1>
+      <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} designs</p>
+    </>
   )}
-  <h1 class="text-3xl mb-1">{category.name}</h1>
-  <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} designs</p>
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
     {products.map((p) => <ProductCard product={p} />)}
   </div>

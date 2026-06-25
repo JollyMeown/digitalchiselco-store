@@ -1,0 +1,22 @@
+---
+import { getSettings } from '../lib/queries';
+const s = await getSettings();
+if (!s.banner_image_url) return null;
+---
+<div class="bg-cream/40 border-b border-black/5">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 md:py-5">
+    <a href="/" class="block rounded-lg overflow-hidden">
+      <picture>
+        <img
+          src={s.banner_image_url}
+          alt="DigitalChiselCo — From Vision to Timeless Craft"
+          loading="eager"
+          fetchpriority="high"
+          width="1700"
+          height="720"
+          class="w-full h-auto block"
+        />
+      </picture>
+    </a>
+  </div>
+</div>
