@@ -1,17 +1,12 @@
 ---
 import Base from '../layouts/Base.astro';
+import { getCategories } from '../lib/queries';
 
 // Live trust stats (from Etsy). Wire to DB later.
 const stats = { rating: '4.9', reviews: 577, sales: 4543, designs: 1235 };
 
-const collections = [
-  { name: 'Religious & Christian', slug: 'christian-religious-stl-files', count: 154 },
-  { name: 'Cowboy & Western', slug: 'cowboy-western-stl-files', count: 137 },
-  { name: 'Wildlife & Nature', slug: 'wildlife-nature-stl-files', count: 133 },
-  { name: 'Fish & Fishing', slug: 'fishing-fish-stl-files', count: 104 },
-  { name: 'Skulls & Gothic', slug: 'skull-gothic-stl-files', count: 101 },
-  { name: 'Ducks, Owls & Birds', slug: 'duck-waterfowl-stl-files', count: 93 },
-];
+// Real categories from the DB (slugs always match the collection pages).
+const collections = (await getCategories()).slice(0, 6);
 ---
 <Base>
   <!-- top utility bar -->
@@ -73,10 +68,9 @@ const collections = [
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
       {collections.map((c) => (
         <a href={`/collections/${c.slug}`} class="border border-black/10 rounded-md overflow-hidden hover:shadow-sm transition">
-          <div class="h-24 bg-cream"></div>
+          <div class="h-24 bg-cream flex items-center justify-center font-serif text-bronze-600/50">{c.name}</div>
           <div class="p-3">
             <div class="text-sm">{c.name}</div>
-            <div class="text-xs text-ink-700/70">{c.count} designs</div>
           </div>
         </a>
       ))}
