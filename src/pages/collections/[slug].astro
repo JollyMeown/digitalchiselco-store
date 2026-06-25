@@ -1,7 +1,5 @@
 ---
-import Base from '../../layouts/Base.astro';
-import Header from '../../components/Header.astro';
-import Footer from '../../components/Footer.astro';
+import Shell from '../../layouts/Shell.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import { getCategoryBySlug, getProductsByCategory } from '../../lib/queries';
@@ -14,22 +12,23 @@ const page = Math.max(1, Number(Astro.url.searchParams.get('page') || '1'));
 const { products, total, perPage } = await getProductsByCategory(category.id, page);
 const pages = Math.ceil(total / perPage);
 ---
-<Base title={`${category.name} STL Files | DigitalChiselCo`} description={`Browse ${total} ${category.name} bas-relief STL files for CNC, 3D printing and laser engraving.`}>
-  <Header />
+<Shell title={`${category.name} STL Files | DigitalChiselCo`} description={`Browse ${total} ${category.name} bas-relief STL files for CNC, 3D printing and laser engraving.`}>
   <Breadcrumbs crumbs={[{ label: 'Collections', href: '/collections' }, { label: category.name }]} />
-  <main class="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
-    <h1 class="text-3xl mb-1">{category.name}</h1>
-    <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} designs</p>
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-      {products.map((p) => <ProductCard product={p} />)}
+  {category.image_url && (
+    <div class="h-40 md:h-56 mb-6 overflow-hidden rounded-lg">
+      <img src={category.image_url} alt={`${category.name} collection`} class="w-full h-full object-cover" />
     </div>
-    {pages > 1 && (
-      <nav class="flex justify-center gap-2 mt-10 text-sm">
-        {page > 1 && <a href={`/collections/${slug}?page=${page - 1}`} class="px-3 py-1.5 border border-black/10 rounded">← Prev</a>}
-        <span class="px-3 py-1.5">Page {page} of {pages}</span>
-        {page < pages && <a href={`/collections/${slug}?page=${page + 1}`} class="px-3 py-1.5 border border-black/10 rounded">Next →</a>}
-      </nav>
-    )}
-  </main>
-  <Footer />
-</Base>
+  )}
+  <h1 class="text-3xl mb-1">{category.name}</h1>
+  <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} designs</p>
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+    {products.map((p) => <ProductCard product={p} />)}
+  </div>
+  {pages > 1 && (
+    <nav class="flex justify-center gap-2 mt-10 text-sm">
+      {page > 1 && <a href={`/collections/${slug}?page=${page - 1}`} class="px-3 py-1.5 border border-black/10 rounded">← Prev</a>}
+      <span class="px-3 py-1.5">Page {page} of {pages}</span>
+      {page < pages && <a href={`/collections/${slug}?page=${page + 1}`} class="px-3 py-1.5 border border-black/10 rounded">Next →</a>}
+    </nav>
+  )}
+</Shell>

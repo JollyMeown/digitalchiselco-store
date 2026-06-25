@@ -1,15 +1,33 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import Overview from './tabs/Overview';
+import Products from './tabs/Products';
+import Categories from './tabs/Categories';
+import Orders from './tabs/Orders';
+import Subscribers from './tabs/Subscribers';
+import Media from './tabs/Media';
+import Settings from './tabs/Settings';
+import Links from './tabs/Links';
+import { inputCls, btnPrimary } from './ui';
 
-const C: Record<string, string> = {
-  certain: '#1d9e75', verified: '#1d9e75', likely: '#ba7517',
-  review: '#e24b4a', bundle_manual: '#e24b4a', broken: '#e24b4a',
-};
+type Tab = { key: string; label: string; icon: string; Component: any };
+
+const TABS: Tab[] = [
+  { key: 'overview',    label: 'Overview',     icon: '◎', Component: Overview },
+  { key: 'products',    label: 'Products',     icon: '▦', Component: Products },
+  { key: 'categories',  label: 'Categories',   icon: '☷', Component: Categories },
+  { key: 'orders',      label: 'Orders',       icon: '⊞', Component: Orders },
+  { key: 'subscribers', label: 'Subscribers',  icon: '✉', Component: Subscribers },
+  { key: 'media',       label: 'Media & Hero', icon: '◰', Component: Media },
+  { key: 'settings',    label: 'Settings',     icon: '⚙', Component: Settings },
+  { key: 'links',       label: 'Download Links', icon: '↗', Component: Links },
+];
 
 export default function AdminApp() {
   const [session, setSession] = useState<any>(undefined);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [tab, setTab] = useState('settings');
+  const [tab, setTab] = useState<string>(() => (typeof window !== 'undefined' && window.location.hash.slice(1)) || 'overview');
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -19,39 +37,63 @@ export default function AdminApp() {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s); if (s) check(s.user.id); else setIsAdmin(false);
     });
-    return () => sub.subscription.unsubscribe();
+    const onHash = () => { const h = window.location.hash.slice(1); if (h) setTab(h); };
+    window.addEventListener('hashchange', onHash);
+    return () => { sub.subscription.unsubscribe(); window.removeEventListener('hashchange', onHash); };
   }, []);
+
+  useEffect(() => { if (typeof window !== 'undefined') window.location.hash = tab; }, [tab]);
 
   async function check(uid: string) {
     const { data } = await supabase.from('profiles').select('is_admin').eq('id', uid).maybeSingle();
     setIsAdmin(!!data?.is_admin);
   }
 
-  if (session === undefined) return <P>Loading…</P>;
+  if (session === undefined) return <div className="p-16 text-center text-ink-700/60">Loading…</div>;
   if (!session) return <Login />;
-  if (!isAdmin) return <P>Not authorized for admin. <a onClick={() => supabase.auth.signOut()} style={{ color: '#854F0B', cursor: 'pointer' }}>Sign out</a></P>;
+  if (!isAdmin) return (
+    <div className="p-16 text-center text-ink-700/70">
+      Not authorized for admin.{' '}
+      <button onClick={() => supabase.auth.signOut()} className="text-bronze-600 underline">Sign out</button>
+    </div>
+  );
+
+  const Active = TABS.find((t) => t.key === tab)?.Component || Overview;
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: 24 }}>Admin Dashboard</h1>
-        <span style={{ fontSize: 13 }}>{session.user.email} · <a onClick={() => supabase.auth.signOut()} style={{ color: '#854F0B', cursor: 'pointer' }}>Sign out</a></span>
-      </div>
-      <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid #0002', marginBottom: 16 }}>
-        {['settings', 'links'].map((t) => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer',
-            borderBottom: tab === t ? '2px solid #854F0B' : '2px solid transparent',
-            color: tab === t ? '#412402' : '#666', fontWeight: tab === t ? 600 : 400,
-          }}>{t === 'settings' ? 'Settings & Stats' : 'Download Links'}</button>
-        ))}
-      </div>
-      {tab === 'settings' ? <Settings /> : <Links />}
+    <div className="min-h-screen flex bg-cream/40">
+      <aside className={`${collapsed ? 'w-14' : 'w-56'} transition-all flex-shrink-0 bg-white border-r border-black/10 flex flex-col`}>
+        <div className="px-3 py-3 border-b border-black/10 flex items-center gap-2">
+          <button onClick={() => setCollapsed(!collapsed)} className="text-bronze-700 text-lg w-8 h-8 hover:bg-cream rounded">☰</button>
+          {!collapsed && <span className="font-serif text-bronze-700 text-sm">Admin</span>}
+        </div>
+        <nav className="flex-1 py-2">
+          {TABS.map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-cream transition ${tab === t.key ? 'bg-cream text-bronze-700 border-l-2 border-bronze-600' : 'text-ink-700'}`}
+              title={t.label}>
+              <span className="text-base w-5 text-center">{t.icon}</span>
+              {!collapsed && <span>{t.label}</span>}
+            </button>
+          ))}
+        </nav>
+        <div className="border-t border-black/10 p-3 text-xs">
+          {!collapsed && <div className="text-ink-700/60 mb-2 truncate">{session.user.email}</div>}
+          <button onClick={() => supabase.auth.signOut()} className="text-bronze-600 hover:underline text-xs">{collapsed ? '↪' : 'Sign out'}</button>
+        </div>
+      </aside>
+      <main className="flex-1 overflow-x-auto">
+        <div className="px-6 py-5 max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-5">
+            <h1 className="font-serif text-2xl text-ink-800">{TABS.find((t) => t.key === tab)?.label}</h1>
+            <a href="/" className="text-sm text-bronze-600 hover:underline">View storefront ↗</a>
+          </div>
+          <Active />
+        </div>
+      </main>
     </div>
   );
 }
-
-const P = ({ children }: any) => <div style={{ padding: 40, textAlign: 'center', color: '#666' }}>{children}</div>;
 
 function Login() {
   const [email, setEmail] = useState('jolly@digitalchiselco.com');
@@ -65,102 +107,19 @@ function Login() {
     setBusy(false);
   }
   return (
-    <form onSubmit={submit} style={{ maxWidth: 360, margin: '60px auto', padding: 24, border: '1px solid #0002', borderRadius: 12 }}>
-      <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: 22, marginBottom: 16 }}>Admin sign in</h1>
-      <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" style={inp} />
-      <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password" style={inp} />
-      {err && <p style={{ color: '#c00', fontSize: 13, margin: '8px 0' }}>{err}</p>}
-      <button disabled={busy} style={btn}>{busy ? 'Signing in…' : 'Sign in'}</button>
-    </form>
-  );
-}
-
-function Settings() {
-  const [s, setS] = useState<any>(null);
-  const [msg, setMsg] = useState('');
-  useEffect(() => { supabase.from('site_settings').select('*').eq('id', 1).maybeSingle().then(({ data }) => setS(data)); }, []);
-  if (!s) return <P>Loading settings…</P>;
-  const fields: [string, string][] = [
-    ['donation_total', 'Donation total ($)'], ['rating', 'Star rating'], ['reviews_count', 'Number of reviews'],
-    ['sales_count', 'Number of sales'], ['products_count', 'Number of products'], ['admirers_count', 'Admirers'],
-    ['experience_years', 'Years of experience'],
-  ];
-  async function save() {
-    setMsg('Saving…');
-    const { error } = await supabase.from('site_settings').update(s).eq('id', 1);
-    setMsg(error ? 'Error: ' + error.message : '✓ Saved — live on the site.');
-  }
-  return (
-    <div>
-      <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>These power the homepage stats and the charity counter.</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
-        {fields.map(([k, label]) => (
-          <label key={k} style={{ fontSize: 13 }}>{label}
-            <input value={s[k] ?? ''} onChange={(e) => setS({ ...s, [k]: e.target.value })} style={inp} />
-          </label>
-        ))}
-      </div>
-      <button onClick={save} style={{ ...btn, width: 'auto', padding: '10px 24px', marginTop: 16 }}>Save changes</button>
-      {msg && <span style={{ marginLeft: 12, fontSize: 13, color: msg.startsWith('✓') ? '#1d9e75' : '#666' }}>{msg}</span>}
+    <div className="min-h-screen flex items-center justify-center bg-cream/50">
+      <form onSubmit={submit} className="bg-white max-w-sm w-full mx-4 p-6 rounded-lg shadow-sm border border-black/10">
+        <h1 className="font-serif text-xl text-bronze-700 mb-1">Admin sign in</h1>
+        <p className="text-xs text-ink-700/60 mb-5">DigitalChiselCo dashboard</p>
+        <label className="text-xs block mb-2">Email
+          <input value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls + ' mt-1'} />
+        </label>
+        <label className="text-xs block mb-3">Password
+          <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" className={inputCls + ' mt-1'} />
+        </label>
+        {err && <p className="text-xs text-red-600 mb-2">{err}</p>}
+        <button disabled={busy} className={btnPrimary + ' w-full justify-center'}>{busy ? 'Signing in…' : 'Sign in'}</button>
+      </form>
     </div>
   );
 }
-
-function Links() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [filter, setFilter] = useState('needs'); // needs | all
-  const [loading, setLoading] = useState(true);
-  async function load() {
-    setLoading(true);
-    let q = supabase.from('products').select('id,title,slug,link_status,link_verified,product_downloads(download_link)').order('link_status').limit(200);
-    if (filter === 'needs') q = q.in('link_status', ['review', 'bundle_manual', 'likely']);
-    const { data } = await q;
-    setRows(data ?? []); setLoading(false);
-  }
-  useEffect(() => { load(); }, [filter]);
-  async function mark(id: string, status: string) {
-    await supabase.from('products').update({ link_status: status, link_verified: status === 'verified' }).eq('id', id);
-    setRows((r) => r.map((x) => (x.id === id ? { ...x, link_status: status, link_verified: status === 'verified' } : x)));
-  }
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
-        <span style={{ fontSize: 13, color: '#666' }}>Filter:</span>
-        {['needs', 'all'].map((f) => (
-          <button key={f} onClick={() => setFilter(f)} style={{ ...chip, background: filter === f ? '#854F0B' : '#fff', color: filter === f ? '#fff' : '#412402' }}>
-            {f === 'needs' ? 'Needs review (red/yellow)' : 'All'}
-          </button>
-        ))}
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#999' }}>{rows.length} shown</span>
-      </div>
-      {loading ? <P>Loading…</P> : (
-        <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-          <thead><tr style={{ textAlign: 'left', color: '#888' }}><th style={th}></th><th style={th}>Product</th><th style={th}>Link</th><th style={th}>Status</th><th style={th}>Action</th></tr></thead>
-          <tbody>
-            {rows.map((r) => {
-              const link = r.product_downloads?.[0]?.download_link;
-              return (
-                <tr key={r.id} style={{ borderTop: '1px solid #0001' }}>
-                  <td style={td}><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 5, background: C[r.link_status] || '#999' }} /></td>
-                  <td style={td}><a href={`/product/${r.slug}`} target="_blank" style={{ color: '#412402' }}>{r.title.slice(0, 50)}</a></td>
-                  <td style={td}>{link ? <a href={link} target="_blank" style={{ color: '#854F0B' }}>open ↗</a> : <span style={{ color: '#c00' }}>none</span>}</td>
-                  <td style={td}>{r.link_status}{r.link_verified ? ' ✓' : ''}</td>
-                  <td style={td}>
-                    <button onClick={() => mark(r.id, 'verified')} style={{ ...chip, borderColor: '#1d9e75', color: '#1d9e75' }}>✓ Works</button>
-                    <button onClick={() => mark(r.id, 'broken')} style={{ ...chip, borderColor: '#e24b4a', color: '#e24b4a', marginLeft: 4 }}>✕ Broken</button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
-
-const inp: any = { display: 'block', width: '100%', padding: '8px 10px', margin: '4px 0 10px', border: '1px solid #0003', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' };
-const btn: any = { width: '100%', padding: 10, background: '#854F0B', color: '#FAEEDA', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 };
-const chip: any = { padding: '4px 10px', border: '1px solid #0003', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12 };
-const th: any = { padding: '6px 8px', fontWeight: 500 };
-const td: any = { padding: '6px 8px', verticalAlign: 'middle' };

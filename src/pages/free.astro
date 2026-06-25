@@ -1,12 +1,9 @@
 ---
-import Base from '../layouts/Base.astro';
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
+import Shell from '../layouts/Shell.astro';
 ---
-<Base title="Get 5 Free Premium STL Files | DigitalChiselCo" description="Join our list and get 5 premium bas-relief STL files free, plus the CNC woodcarving guide. For CNC routers, 3D printers and laser engravers.">
-  <Header />
-  <main class="bg-cream">
-    <section class="max-w-2xl mx-auto px-6 py-16 text-center">
+<Shell title="Get 5 Free Premium STL Files | DigitalChiselCo" description="Join our list and get 5 premium bas-relief STL files free, plus the CNC woodcarving guide. For CNC routers, 3D printers and laser engravers.">
+  <main class="bg-cream rounded-lg">
+    <section class="max-w-2xl mx-auto px-6 py-14 text-center">
       <p class="text-xs tracking-widest text-bronze-600 mb-3">FREE STARTER PACK</p>
       <h1 class="text-3xl md:text-4xl text-bronze-800 leading-tight">Get <em class="italic">5 premium STL files</em> — free</h1>
       <p class="mt-4 text-bronze-700">Plus our CNC woodcarving guide. Drop your email and we'll send your free bas-relief pack, ready for CNC routers, 3D printers and laser engravers.</p>
@@ -26,7 +23,6 @@ import Footer from '../components/Footer.astro';
       </ul>
     </section>
   </main>
-  <Footer />
   <script is:inline>
     const form = document.getElementById('sub');
     const msg = document.getElementById('msg');
@@ -52,4 +48,4 @@ import Footer from '../components/Footer.astro';
       }
     });
   </script>
-</Base>
+</Shell>

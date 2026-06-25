@@ -16,3 +16,8 @@ drive_token.txt
 drive_stls.json
 drive_folders.json
 *.html
+
+# secrets / handoff doc — NEVER commit
+PROJECT_HANDOFF.md
+*HANDOFF*
+*SECRETS*

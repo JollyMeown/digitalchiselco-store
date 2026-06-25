@@ -1,7 +1,5 @@
 ---
-import Base from '../layouts/Base.astro';
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
+import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import ProductCard from '../components/ProductCard.astro';
 import { getProducts } from '../lib/queries';
@@ -12,29 +10,25 @@ const pages = Math.ceil(total / perPage);
 const around = Array.from({ length: pages }, (_, i) => i + 1)
   .filter((p) => p === 1 || p === pages || Math.abs(p - page) <= 2);
 ---
-<Base title="Catalog — All STL Files | DigitalChiselCo">
-  <Header />
+<Shell title="Catalog — All STL Files | DigitalChiselCo">
   <Breadcrumbs crumbs={[{ label: 'Catalog' }]} />
-  <main class="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
-    <h1 class="text-3xl mb-1">Every design, in one place</h1>
-    <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} premium bas-relief STL files · ready for CNC, 3D print &amp; laser.</p>
+  <h1 class="text-3xl mb-1">Every design, in one place</h1>
+  <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} premium bas-relief STL files · ready for CNC, 3D print &amp; laser.</p>
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-      {products.map((p) => <ProductCard product={p} />)}
-    </div>
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+    {products.map((p) => <ProductCard product={p} />)}
+  </div>
 
-    {pages > 1 && (
-      <nav class="flex justify-center items-center gap-2 mt-10 text-sm">
-        {page > 1 && <a href={`/catalog?page=${page - 1}`} class="px-3 py-1.5 border border-black/10 rounded">←</a>}
-        {around.map((p, i) => (
-          <Fragment>
-            {i > 0 && p - around[i - 1] > 1 && <span class="px-1 text-ink-700/40">…</span>}
-            <a href={`/catalog?page=${p}`} class={`px-3 py-1.5 border rounded ${p === page ? 'bg-bronze-600 text-cream border-bronze-600' : 'border-black/10'}`}>{p}</a>
-          </Fragment>
-        ))}
-        {page < pages && <a href={`/catalog?page=${page + 1}`} class="px-3 py-1.5 border border-black/10 rounded">→</a>}
-      </nav>
-    )}
-  </main>
-  <Footer />
-</Base>
+  {pages > 1 && (
+    <nav class="flex justify-center items-center gap-2 mt-10 text-sm">
+      {page > 1 && <a href={`/catalog?page=${page - 1}`} class="px-3 py-1.5 border border-black/10 rounded">←</a>}
+      {around.map((p, i) => (
+        <Fragment>
+          {i > 0 && p - around[i - 1] > 1 && <span class="px-1 text-ink-700/40">…</span>}
+          <a href={`/catalog?page=${p}`} class={`px-3 py-1.5 border rounded ${p === page ? 'bg-bronze-600 text-cream border-bronze-600' : 'border-black/10'}`}>{p}</a>
+        </Fragment>
+      ))}
+      {page < pages && <a href={`/catalog?page=${page + 1}`} class="px-3 py-1.5 border border-black/10 rounded">→</a>}
+    </nav>
+  )}
+</Shell>

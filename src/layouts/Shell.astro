@@ -1,0 +1,25 @@
+---
+// Two-column storefront shell: left category menu + content.
+// Use on every storefront page EXCEPT cart / checkout (those use Base directly).
+import Base from './Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import SideMenu from '../components/SideMenu.astro';
+
+interface Props { title?: string; description?: string; image?: string; noindex?: boolean; fullWidth?: boolean; }
+const { title, description, image, noindex, fullWidth = false } = Astro.props;
+---
+<Base title={title} description={description} image={image} noindex={noindex}>
+  <Header />
+  {fullWidth ? (
+    <slot />
+  ) : (
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex gap-8">
+      <SideMenu />
+      <div class="flex-1 min-w-0">
+        <slot />
+      </div>
+    </div>
+  )}
+  <Footer />
+</Base>

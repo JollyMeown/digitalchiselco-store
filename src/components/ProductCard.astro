@@ -1,9 +1,9 @@
 ---
 import type { ProductCard } from '../lib/queries';
-import { pricing, money } from '../lib/pricing';
-interface Props { product: ProductCard; }
-const { product } = Astro.props;
-const { price, original, percent } = pricing(product.price_usd);
+import { pricing, money, DEFAULT_DISCOUNT } from '../lib/pricing';
+interface Props { product: ProductCard; discount?: number; }
+const { product, discount = DEFAULT_DISCOUNT } = Astro.props;
+const { price, original, percent } = pricing(product.price_usd, discount);
 const title = product.title.split('|')[0].trim();
 ---
 <div class="group border border-black/10 rounded-md overflow-hidden hover:shadow-md transition flex flex-col">
@@ -21,8 +21,10 @@ const title = product.title.split('|')[0].trim();
     </a>
     <div class="mt-1 flex items-center gap-2 flex-wrap">
       <span class="text-bronze-600 text-sm font-medium">{money(price)}</span>
-      <span class="text-ink-700/40 text-xs line-through">{money(original)}</span>
-      <span class="text-[10px] text-green-700 font-medium">{percent}% off</span>
+      {percent > 0 && <>
+        <span class="text-ink-700/40 text-xs line-through">{money(original)}</span>
+        <span class="text-[10px] text-green-700 font-medium">{percent}% off</span>
+      </>}
     </div>
     <button class="add-to-cart mt-2 w-full text-xs border border-bronze-600 text-bronze-700 py-1.5 rounded hover:bg-bronze-600 hover:text-cream transition"
       data-id={product.id} data-slug={product.slug} data-title={title} data-price={price} data-img={product.image_url || ''}>

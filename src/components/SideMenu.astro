@@ -1,0 +1,26 @@
+---
+import { getCategories } from '../lib/queries';
+const categories = await getCategories();
+const path = Astro.url.pathname;
+const activeSlug = path.startsWith('/collections/') ? path.split('/').filter(Boolean)[1] : '';
+const isCatalog = path === '/catalog';
+---
+<aside class="hidden lg:block w-[220px] flex-shrink-0">
+  <div class="sticky top-[88px]">
+    <h2 class="text-xs font-medium text-ink-800 mb-3 uppercase tracking-wide">Categories</h2>
+    <nav class="text-sm space-y-0.5">
+      <a href="/catalog"
+        class={`block py-1.5 px-2 rounded ${isCatalog ? 'bg-cream text-bronze-700 font-medium' : 'text-bronze-700 font-medium hover:bg-cream'}`}>
+        All designs
+      </a>
+      {categories.map((c) => (
+        <a
+          href={`/collections/${c.slug}`}
+          class={`block py-1.5 px-2 rounded transition ${activeSlug === c.slug ? 'bg-cream text-bronze-700 font-medium' : 'text-ink-700 hover:bg-cream'}`}
+        >
+          {c.name}
+        </a>
+      ))}
+    </nav>
+  </div>
+</aside>

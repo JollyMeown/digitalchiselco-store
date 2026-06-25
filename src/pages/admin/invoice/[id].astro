@@ -1,0 +1,137 @@
+---
+import '../../../styles/global.css';
+const { id } = Astro.params;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Invoice · DigitalChiselCo</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      @media print {
+        .no-print { display: none !important; }
+        body { background: white !important; }
+        .invoice { box-shadow: none !important; border: none !important; }
+      }
+      body { font-family: 'Instrument Sans', system-ui, sans-serif; background: #f5f3ee; color: #2a1f0d; margin: 0; }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
+      .invoice { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 1px 8px rgba(0,0,0,.06); border: 1px solid rgba(0,0,0,.05); }
+      h1 { font-family: 'Fraunces', serif; color: #6b3d08; font-size: 28px; margin: 0 0 4px; }
+      h2 { font-family: 'Fraunces', serif; font-size: 18px; margin: 24px 0 8px; }
+      .muted { color: #6c604a; font-size: 13px; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+      th { text-align: left; font-weight: 500; font-size: 12px; color: #6c604a; padding: 8px 8px; border-bottom: 1px solid #eee; }
+      td { padding: 10px 8px; border-bottom: 1px solid #f3eddf; }
+      .right { text-align: right; }
+      .total td { border-bottom: none; font-weight: 600; padding-top: 16px; }
+      .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+      .paid { background: #d4f0d2; color: #15622a; }
+      .pending { background: #fff0bd; color: #7d5a00; }
+      .refunded { background: #ede0ff; color: #5d2b9b; }
+      .failed { background: #ffd9d3; color: #8a1d10; }
+      .canceled { background: #e5e5e5; color: #555; }
+      .btn { display: inline-block; padding: 8px 16px; background: #854F0B; color: #FAEEDA; border-radius: 6px; text-decoration: none; font-size: 13px; border: none; cursor: pointer; }
+      .btn-ghost { display: inline-block; padding: 8px 14px; background: white; color: #2a1f0d; border: 1px solid rgba(0,0,0,.15); border-radius: 6px; text-decoration: none; font-size: 13px; cursor: pointer; }
+      header.brand { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 16px; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 16px; }
+      .err { color: #b00020; font-size: 14px; padding: 24px; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <a href="/admin#orders" class="btn-ghost">← Back to admin</a>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-ghost" onclick="window.print()">🖨 Print</button>
+        </div>
+      </div>
+      <div id="invoice-target" class="invoice">
+        <div class="muted">Loading invoice…</div>
+      </div>
+    </div>
+
+    <script type="module" is:inline define:vars={{
+      orderId: id,
+      SUPABASE_URL: import.meta.env.PUBLIC_SUPABASE_URL,
+      SUPABASE_ANON_KEY: import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+    }}>
+      import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const target = document.getElementById('invoice-target');
+      const fmt = (n) => '$' + Number(n).toFixed(2);
+      const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+      (async () => {
+        const { data: sess } = await supabase.auth.getSession();
+        if (!sess.session) { target.innerHTML = '<div class="err">Sign in to the admin first, then reload this invoice.</div>'; return; }
+        const { data: prof } = await supabase.from('profiles').select('is_admin').eq('id', sess.session.user.id).maybeSingle();
+        if (!prof?.is_admin) { target.innerHTML = '<div class="err">Not authorized.</div>'; return; }
+
+        const { data: o, error } = await supabase
+          .from('orders')
+          .select('id,email,total,subtotal,currency,status,provider,provider_order_id,created_at,order_items(id,title,price_usd,qty)')
+          .eq('id', orderId).maybeSingle();
+        if (error || !o) { target.innerHTML = `<div class="err">Order not found.</div>`; return; }
+
+        const { data: settings } = await supabase.from('site_settings').select('admin_email').eq('id', 1).maybeSingle();
+        const adminEmail = settings?.admin_email || 'jolly@digitalchiselco.com';
+
+        const items = o.order_items || [];
+        const rows = items.map((it) => `
+          <tr>
+            <td>${esc(it.title)}</td>
+            <td class="right">${it.qty || 1}</td>
+            <td class="right">${fmt(it.price_usd)}</td>
+            <td class="right">${fmt(Number(it.price_usd) * (it.qty || 1))}</td>
+          </tr>`).join('');
+
+        target.innerHTML = `
+          <header class="brand">
+            <div>
+              <h1>DigitalChiselCo</h1>
+              <div class="muted">Premium STL files · Instant download · 50% to charity</div>
+            </div>
+            <div class="right">
+              <div style="font-family:Fraunces,serif;font-size:18px;color:#6b3d08;">Invoice</div>
+              <div class="muted">#${o.id.slice(0, 8).toUpperCase()}</div>
+              <span class="badge ${o.status}">${o.status}</span>
+            </div>
+          </header>
+
+          <div class="grid2">
+            <div>
+              <div class="muted" style="text-transform:uppercase;font-size:11px;letter-spacing:.05em;">Billed to</div>
+              <div style="margin-top:4px;">${esc(o.email)}</div>
+            </div>
+            <div class="right">
+              <div class="muted" style="text-transform:uppercase;font-size:11px;letter-spacing:.05em;">Date</div>
+              <div style="margin-top:4px;">${new Date(o.created_at).toLocaleString()}</div>
+              ${o.provider ? `<div class="muted" style="margin-top:4px;">${esc(o.provider)} ${o.provider_order_id ? '· ' + esc(o.provider_order_id) : ''}</div>` : ''}
+            </div>
+          </div>
+
+          <h2>Items</h2>
+          <table>
+            <thead><tr><th>Description</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Total</th></tr></thead>
+            <tbody>
+              ${rows || '<tr><td colspan="4" class="muted">No items recorded for this order.</td></tr>'}
+              <tr class="total"><td colspan="3" class="right">Subtotal</td><td class="right">${fmt(o.subtotal || o.total)}</td></tr>
+              <tr class="total"><td colspan="3" class="right">Total (${o.currency || 'USD'})</td><td class="right">${fmt(o.total)}</td></tr>
+            </tbody>
+          </table>
+
+          <p class="muted" style="margin-top:32px;font-size:12px;text-align:center;">
+            Thank you for supporting DigitalChiselCo. Download links were emailed to ${esc(o.email)}.<br/>
+            Questions? <a href="mailto:${esc(adminEmail)}" style="color:#854F0B;">${esc(adminEmail)}</a>
+          </p>
+        `;
+      })();
+    </script>
+  </body>
+</html>

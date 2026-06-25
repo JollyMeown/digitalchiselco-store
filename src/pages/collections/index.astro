@@ -1,22 +1,18 @@
 ---
-import Base from '../../layouts/Base.astro';
-import Header from '../../components/Header.astro';
-import Footer from '../../components/Footer.astro';
+import Shell from '../../layouts/Shell.astro';
 import { getCategories } from '../../lib/queries';
 const categories = await getCategories();
 ---
-<Base title="Collections | DigitalChiselCo">
-  <Header />
-  <main class="px-6 py-10 max-w-6xl mx-auto">
-    <h1 class="text-3xl mb-6">Shop by collection</h1>
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-      {categories.map((c) => (
-        <a href={`/collections/${c.slug}`} class="border border-black/10 rounded-md overflow-hidden hover:shadow-md transition">
-          <div class="h-28 bg-cream flex items-center justify-center text-bronze-600/50 font-serif text-lg">{c.name}</div>
-          <div class="p-3 text-sm">{c.name}</div>
-        </a>
-      ))}
-    </div>
-  </main>
-  <Footer />
-</Base>
+<Shell title="Collections | DigitalChiselCo">
+  <h1 class="text-3xl mb-6">Shop by collection</h1>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+    {categories.map((c) => (
+      <a href={`/collections/${c.slug}`} class="border border-black/10 rounded-md overflow-hidden hover:shadow-md transition">
+        <div class="h-28 bg-cream flex items-center justify-center text-bronze-600/50 font-serif text-lg overflow-hidden">
+          {c.image_url ? <img src={c.image_url} alt={c.name} class="w-full h-full object-cover" /> : c.name}
+        </div>
+        <div class="p-3 text-sm">{c.name}</div>
+      </a>
+    ))}
+  </div>
+</Shell>

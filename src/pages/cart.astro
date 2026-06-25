@@ -1,13 +1,11 @@
 ---
+// Cart deliberately does NOT use the Shell (no left menu) — focused checkout view.
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
-import ProductCard from '../components/ProductCard.astro';
-import { getProducts } from '../lib/queries';
-
-const { products } = await getProducts(1, 18);
-const upsell = products.filter((p) => p.image_url).slice(0, 5);
+import { pricing, money } from '../lib/pricing';
+const { percent } = pricing(1);
 ---
 <Base title="Cart | DigitalChiselCo">
   <Header />
@@ -17,45 +15,92 @@ const upsell = products.filter((p) => p.image_url).slice(0, 5);
     <div id="empty" class="text-ink-700/70 hidden">Your cart is empty. <a href="/catalog" class="text-bronze-600">Browse the catalog →</a></div>
     <div id="items" class="divide-y divide-black/10"></div>
     <div id="summary" class="mt-6 hidden">
-      <div class="flex justify-between text-lg font-medium"><span>Total</span><span id="total">$0.00</span></div>
+      <div class="flex justify-between text-sm text-ink-700/60"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
+      <div class="flex justify-between text-sm text-green-700"><span>Discount ({percent}% off)</span><span id="savings">$0.00</span></div>
+      <div class="flex justify-between text-lg font-medium mt-1"><span>Total</span><span id="total">$0.00</span></div>
       <button id="checkout" class="mt-4 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">Checkout</button>
       <p class="text-xs text-ink-700/60 mt-2 text-center">Secure checkout · instant download links emailed after purchase</p>
     </div>
   </main>
 
-  {upsell.length > 0 && (
-    <section class="px-6 pb-14 max-w-6xl mx-auto">
-      <h2 class="text-xl mb-1">Complete your collection</h2>
-      <p class="text-sm text-ink-700/60 mb-4">Makers who shopped these also loved…</p>
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {upsell.map((p) => <ProductCard product={p} />)}
-      </div>
-    </section>
-  )}
+  <!-- Relevant-to-cart upsell (filled by JS using /api/related) -->
+  <section id="upsell-wrap" class="px-6 pb-14 max-w-6xl mx-auto hidden">
+    <h2 id="upsell-title" class="text-xl mb-1">You may also like</h2>
+    <p class="text-sm text-ink-700/60 mb-4">Picked from the same collections as items in your cart.</p>
+    <div id="upsell" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+  </section>
 
   <Footer />
-  <script>
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    const items = document.getElementById('items');
-    const fmt = (n) => '$' + n.toFixed(2);
-    function render() {
+  <script is:inline define:vars={{ DISCOUNT: percent }}>
+    const fmt = (n) => '$' + Number(n).toFixed(2);
+    const itemsEl = document.getElementById('items');
+    const escAttr = (s) => String(s ?? '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+    function renderCart() {
       const c = JSON.parse(localStorage.getItem('cart') || '[]');
       document.getElementById('empty').classList.toggle('hidden', c.length > 0);
       document.getElementById('summary').classList.toggle('hidden', c.length === 0);
-      items.innerHTML = c.map((x) => `
+      itemsEl.innerHTML = c.map((x) => `
         <div class="flex items-center gap-4 py-4">
-          <div class="w-16 h-16 bg-cream rounded overflow-hidden flex-shrink-0">${x.img ? `<img src="${x.img}" class="w-full h-full object-cover">` : ''}</div>
-          <a href="/product/${x.slug}" class="flex-1 text-sm">${x.title}</a>
+          <div class="w-16 h-16 bg-cream rounded overflow-hidden flex-shrink-0">${x.img ? `<img src="${escAttr(x.img)}" class="w-full h-full object-cover">` : ''}</div>
+          <a href="/product/${escAttr(x.slug)}" class="flex-1 text-sm">${escAttr(x.title)}</a>
           <span class="text-sm">${fmt(x.price)}</span>
-          <button data-id="${x.id}" class="rm text-ink-700/50 hover:text-red-600">✕</button>
+          <button data-id="${escAttr(x.id)}" class="rm text-ink-700/50 hover:text-red-600">✕</button>
         </div>`).join('');
-      document.getElementById('total').textContent = fmt(c.reduce((s, x) => s + x.price, 0));
+      const subtotalRaw = c.reduce((s, x) => s + Number(x.price), 0);
+      // The store-wide discount is baked in: shown price IS the discounted price.
+      // So the "original" total = price / (1 - d/100); savings = original − total.
+      const original = subtotalRaw / (1 - DISCOUNT / 100);
+      const savings = original - subtotalRaw;
+      document.getElementById('subtotal').textContent = fmt(original);
+      document.getElementById('savings').textContent = '−' + fmt(savings);
+      document.getElementById('total').textContent = fmt(subtotalRaw);
       document.querySelectorAll('.rm').forEach((b) => b.addEventListener('click', () => {
         const next = JSON.parse(localStorage.getItem('cart') || '[]').filter((y) => y.id !== b.dataset.id);
-        localStorage.setItem('cart', JSON.stringify(next)); window.dispatchEvent(new Event('cart-changed')); render();
+        localStorage.setItem('cart', JSON.stringify(next)); window.dispatchEvent(new Event('cart-changed'));
+        renderCart(); loadUpsell();
       }));
     }
-    render();
+
+    function cardHtml(p) {
+      const original = (Number(p.price_usd) / (1 - DISCOUNT / 100)).toFixed(2);
+      return `
+        <div class="border border-black/10 rounded-md overflow-hidden hover:shadow transition flex flex-col">
+          <a href="/product/${escAttr(p.slug)}" class="block aspect-square bg-cream overflow-hidden">
+            ${p.image_url ? `<img src="${escAttr(p.image_url)}" alt="${escAttr(p.title)}" loading="lazy" class="w-full h-full object-cover">` : ''}
+          </a>
+          <div class="p-3 flex flex-col flex-1">
+            <a href="/product/${escAttr(p.slug)}" class="text-sm leading-snug text-ink-800 line-clamp-2 min-h-[2.5em]">${escAttr(p.title.split('|')[0].trim())}</a>
+            <div class="mt-1 flex items-center gap-2">
+              <span class="text-bronze-600 text-sm font-medium">${fmt(p.price_usd)}</span>
+              <span class="text-ink-700/40 text-xs line-through">$${original}</span>
+            </div>
+            <button class="add-to-cart mt-2 w-full text-xs border border-bronze-600 text-bronze-700 py-1.5 rounded hover:bg-bronze-600 hover:text-cream transition"
+              data-id="${escAttr(p.id)}" data-slug="${escAttr(p.slug)}" data-title="${escAttr(p.title.split('|')[0].trim())}" data-price="${Number(p.price_usd)}" data-img="${escAttr(p.image_url || '')}">Add to cart</button>
+          </div>
+        </div>`;
+    }
+
+    async function loadUpsell() {
+      const c = JSON.parse(localStorage.getItem('cart') || '[]');
+      const ids = c.map((x) => x.id);
+      try {
+        const res = await fetch('/api/related', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids }) });
+        const data = await res.json();
+        const wrap = document.getElementById('upsell-wrap');
+        const grid = document.getElementById('upsell');
+        const title = document.getElementById('upsell-title');
+        if (!data.products?.length) { wrap.classList.add('hidden'); return; }
+        title.textContent = ids.length ? 'Complete your collection' : 'You may also like';
+        grid.innerHTML = data.products.map(cardHtml).join('');
+        wrap.classList.remove('hidden');
+      } catch (e) { console.error('upsell load failed', e); }
+    }
+
+    renderCart();
+    loadUpsell();
+    window.addEventListener('cart-changed', () => { renderCart(); loadUpsell(); });
+
     document.getElementById('checkout')?.addEventListener('click', () => {
       alert('Checkout (Paddle) is being set up — coming next. Your cart is saved.');
     });
