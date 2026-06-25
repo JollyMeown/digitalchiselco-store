@@ -1,0 +1,73 @@
+---
+import Base from '../../layouts/Base.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { getProductBySlug } from '../../lib/queries';
+
+const { slug } = Astro.params;
+const p = await getProductBySlug(slug!);
+if (!p) return Astro.redirect('/catalog');
+
+const price = Number(p.price_usd).toFixed(2);
+const cats = (p.product_categories ?? []).map((pc: any) => pc.categories).filter(Boolean);
+const nFiles = (p.product_downloads ?? []).length;
+const cleanTitle = p.title.split('|')[0].trim();
+
+const jsonld = {
+  '@context': 'https://schema.org', '@type': 'Product',
+  name: cleanTitle, description: p.seo_description || `${cleanTitle} — premium bas-relief STL file for CNC routers, 3D printers and laser engravers. Instant digital download.`,
+  image: p.image_url ? [p.image_url] : undefined,
+  brand: { '@type': 'Brand', name: 'DigitalChiselCo' },
+  offers: { '@type': 'Offer', price, priceCurrency: 'USD', availability: 'https://schema.org/InStock', url: Astro.url.href },
+};
+---
+<Base title={`${cleanTitle} | DigitalChiselCo`} description={`${cleanTitle} — STL file for CNC, 3D print & laser. Instant download.`}>
+  <Header />
+  <main class="px-6 py-10 max-w-5xl mx-auto grid md:grid-cols-2 gap-10">
+    <div class="aspect-square bg-cream rounded-lg overflow-hidden">
+      {p.image_url
+        ? <img src={p.image_url} alt={cleanTitle} width="800" height="800" class="w-full h-full object-cover" />
+        : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 p-6 text-center font-serif">{cleanTitle}</div>}
+    </div>
+
+    <div>
+      <nav class="text-xs text-ink-700/60 mb-2">
+        {cats[0] && <a href={`/collections/${cats[0].slug}`}>{cats[0].name}</a>}
+      </nav>
+      <h1 class="text-2xl md:text-3xl leading-snug">{cleanTitle}</h1>
+      <p class="text-2xl text-bronze-600 font-medium mt-3">${price}</p>
+
+      <button id="add" data-id={p.id} data-slug={p.slug} data-title={cleanTitle} data-price={price} data-img={p.image_url || ''}
+        class="mt-5 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">
+        Add to cart
+      </button>
+      <p id="added" class="text-sm text-green-700 mt-2 hidden">✓ Added to cart</p>
+
+      <ul class="mt-6 text-sm text-ink-700 space-y-1.5">
+        <li>📦 Instant digital download {nFiles > 1 ? `(${nFiles} files)` : '(STL file)'}</li>
+        <li>🛠️ Tested in Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360</li>
+        <li>❤️ 50% of your purchase is donated to charity</li>
+        <li>✅ Personal &amp; commercial-use license</li>
+      </ul>
+
+      <div class="mt-6 text-sm text-ink-700/80 leading-relaxed border-t border-black/10 pt-4">
+        {p.description || `${cleanTitle} is a high-detail 3D relief STL designed for clean carving on CNC routers, laser engravers and 3D printers. After checkout you'll receive an instant download link by email and in your account.`}
+      </div>
+    </div>
+  </main>
+  <Footer />
+  <script set:html={`window.__PRODUCT_JSONLD=${JSON.stringify(jsonld)}`}></script>
+  <script type="application/ld+json" set:html={JSON.stringify(jsonld)} />
+  <script>
+    const btn = document.getElementById('add');
+    btn?.addEventListener('click', () => {
+      const d = btn.dataset;
+      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      if (!cart.find((x) => x.id === d.id)) {
+        cart.push({ id: d.id, slug: d.slug, title: d.title, price: Number(d.price), img: d.img });
+        localStorage.setItem('cart', JSON.stringify(cart));
+      }
+      document.getElementById('added')?.classList.remove('hidden');
+    });
+  </script>
+</Base>

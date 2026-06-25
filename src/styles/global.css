@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { --bronze: #854F0B; }
+  body { @apply bg-white text-ink-800 font-sans antialiased; }
+  h1, h2, h3 { @apply font-serif; }
+}

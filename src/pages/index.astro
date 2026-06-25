@@ -1,0 +1,96 @@
+---
+import Base from '../layouts/Base.astro';
+
+// Live trust stats (from Etsy). Wire to DB later.
+const stats = { rating: '4.9', reviews: 577, sales: 4543, designs: 1235 };
+
+const collections = [
+  { name: 'Religious & Christian', slug: 'christian-religious-stl-files', count: 154 },
+  { name: 'Cowboy & Western', slug: 'cowboy-western-stl-files', count: 137 },
+  { name: 'Wildlife & Nature', slug: 'wildlife-nature-stl-files', count: 133 },
+  { name: 'Fish & Fishing', slug: 'fishing-fish-stl-files', count: 104 },
+  { name: 'Skulls & Gothic', slug: 'skull-gothic-stl-files', count: 101 },
+  { name: 'Ducks, Owls & Birds', slug: 'duck-waterfowl-stl-files', count: 93 },
+];
+---
+<Base>
+  <!-- top utility bar -->
+  <div class="bg-bronze-800 text-cream text-xs text-center py-1.5">
+    Instant digital download · 50% of every sale donated to charity · Trusted by 440+ makers
+  </div>
+
+  <!-- nav -->
+  <nav class="flex items-center justify-between px-6 py-4 border-b border-black/10">
+    <a href="/" class="flex items-center gap-2">
+      <span class="font-serif text-lg tracking-wide text-bronze-800">Digital Chisel</span>
+    </a>
+    <div class="hidden md:flex gap-6 text-sm text-ink-700">
+      <a href="/collections">Collections</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/free" class="text-bronze-600">Free files</a>
+      <a href="/about">Our story</a>
+      <a href="/blog">Blog</a>
+    </div>
+    <div class="flex gap-4 text-ink-700">
+      <a href="/account" aria-label="Account">Account</a>
+      <a href="/cart" aria-label="Cart">Cart</a>
+    </div>
+  </nav>
+
+  <!-- hero -->
+  <header class="bg-cream text-center px-6 py-16">
+    <p class="text-xs tracking-widest text-bronze-600 mb-3">PREMIUM STL FILES · CNC · LASER · 3D PRINT</p>
+    <h1 class="text-4xl md:text-5xl text-bronze-800 leading-tight">
+      Art that carves with <em class="italic">purpose</em>
+    </h1>
+    <p class="mt-5 max-w-xl mx-auto text-bronze-700">
+      Hundreds of museum-grade bas-relief designs, instantly downloadable.
+      Half of every purchase goes to charity.
+    </p>
+    <div class="mt-7 flex gap-3 justify-center">
+      <a href="/catalog" class="bg-bronze-600 text-cream text-sm px-6 py-3 rounded-md">Shop collections</a>
+      <a href="/free" class="border border-bronze-600 text-bronze-800 text-sm px-6 py-3 rounded-md">Get free STL pack</a>
+    </div>
+    <p class="mt-5 text-sm text-bronze-700">
+      ★★★★★ &nbsp;{stats.rating} from {stats.reviews} reviews · {stats.sales.toLocaleString()} sales
+    </p>
+  </header>
+
+  <!-- trust strip -->
+  <div class="grid grid-cols-2 md:grid-cols-4 border-b border-black/10 text-center text-xs text-ink-700">
+    <div class="py-4 border-r border-black/10">Instant download</div>
+    <div class="py-4 border-r border-black/10">Secure checkout</div>
+    <div class="py-4 border-r border-black/10">50% to charity</div>
+    <div class="py-4">Commercial license</div>
+  </div>
+
+  <!-- collections -->
+  <section class="px-6 py-12 max-w-5xl mx-auto">
+    <div class="flex justify-between items-baseline mb-5">
+      <h2 class="text-2xl">Shop by collection</h2>
+      <a href="/collections" class="text-sm text-bronze-600">View all →</a>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+      {collections.map((c) => (
+        <a href={`/collections/${c.slug}`} class="border border-black/10 rounded-md overflow-hidden hover:shadow-sm transition">
+          <div class="h-24 bg-cream"></div>
+          <div class="p-3">
+            <div class="text-sm">{c.name}</div>
+            <div class="text-xs text-ink-700/70">{c.count} designs</div>
+          </div>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <!-- charity -->
+  <section class="bg-bronze-800 text-cream text-center py-8 px-6">
+    <p class="text-sm">Together we've donated</p>
+    <p class="font-serif text-3xl text-[#FAC775] my-1">$18,540 &amp; counting</p>
+    <p class="text-xs opacity-80">50% of every sale supports charitable causes</p>
+  </section>
+
+  <footer class="px-6 py-10 text-center text-xs text-ink-700/60">
+    © {new Date().getFullYear()} DigitalChiselCo · {stats.designs.toLocaleString()} premium STL designs
+  </footer>
+</Base>

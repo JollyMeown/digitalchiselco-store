@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.astro/
+.netlify/
+.env
+.env.local
+.DS_Store
+npm-debug.log*
+
+# data working files (keep out of the app repo; they live alongside for import)
+drive_token.txt
+*.stl
+
+# data artifacts — CONTAIN GOOGLE DRIVE DOWNLOAD LINKS / file IDs — never commit
+*.csv
+drive_stls.json
+drive_folders.json
+*.html

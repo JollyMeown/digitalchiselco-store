@@ -1,0 +1,45 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+<Base title="Cart | DigitalChiselCo">
+  <Header />
+  <main class="px-6 py-10 max-w-3xl mx-auto min-h-[50vh]">
+    <h1 class="text-3xl mb-6">Your cart</h1>
+    <div id="empty" class="text-ink-700/70 hidden">Your cart is empty. <a href="/catalog" class="text-bronze-600">Browse the catalog →</a></div>
+    <div id="items" class="divide-y divide-black/10"></div>
+    <div id="summary" class="mt-6 hidden">
+      <div class="flex justify-between text-lg font-medium"><span>Total</span><span id="total">$0.00</span></div>
+      <button id="checkout" class="mt-4 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">Checkout</button>
+      <p class="text-xs text-ink-700/60 mt-2 text-center">Secure checkout · instant download links emailed after purchase</p>
+    </div>
+  </main>
+  <Footer />
+  <script>
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const items = document.getElementById('items');
+    const fmt = (n) => '$' + n.toFixed(2);
+    function render() {
+      const c = JSON.parse(localStorage.getItem('cart') || '[]');
+      document.getElementById('empty').classList.toggle('hidden', c.length > 0);
+      document.getElementById('summary').classList.toggle('hidden', c.length === 0);
+      items.innerHTML = c.map((x) => `
+        <div class="flex items-center gap-4 py-4">
+          <div class="w-16 h-16 bg-cream rounded overflow-hidden flex-shrink-0">${x.img ? `<img src="${x.img}" class="w-full h-full object-cover">` : ''}</div>
+          <a href="/product/${x.slug}" class="flex-1 text-sm">${x.title}</a>
+          <span class="text-sm">${fmt(x.price)}</span>
+          <button data-id="${x.id}" class="rm text-ink-700/50 hover:text-red-600">✕</button>
+        </div>`).join('');
+      document.getElementById('total').textContent = fmt(c.reduce((s, x) => s + x.price, 0));
+      document.querySelectorAll('.rm').forEach((b) => b.addEventListener('click', () => {
+        const next = JSON.parse(localStorage.getItem('cart') || '[]').filter((y) => y.id !== b.dataset.id);
+        localStorage.setItem('cart', JSON.stringify(next)); render();
+      }));
+    }
+    render();
+    document.getElementById('checkout')?.addEventListener('click', () => {
+      alert('Checkout (Paddle) is being set up — coming next. Your cart is saved.');
+    });
+  </script>
+</Base>

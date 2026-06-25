@@ -1,0 +1,34 @@
+---
+import Base from '../../layouts/Base.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import { getCategoryBySlug, getProductsByCategory } from '../../lib/queries';
+
+const { slug } = Astro.params;
+const category = await getCategoryBySlug(slug!);
+if (!category) return Astro.redirect('/collections');
+
+const page = Math.max(1, Number(Astro.url.searchParams.get('page') || '1'));
+const { products, total, perPage } = await getProductsByCategory(category.id, page);
+const pages = Math.ceil(total / perPage);
+---
+<Base title={`${category.name} STL Files | DigitalChiselCo`} description={`Browse ${total} ${category.name} bas-relief STL files for CNC, 3D printing and laser engraving.`}>
+  <Header />
+  <main class="px-6 py-10 max-w-6xl mx-auto">
+    <nav class="text-xs text-ink-700/60 mb-2"><a href="/collections">Collections</a> / {category.name}</nav>
+    <h1 class="text-3xl mb-1">{category.name}</h1>
+    <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} designs</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      {products.map((p) => <ProductCard product={p} />)}
+    </div>
+    {pages > 1 && (
+      <nav class="flex justify-center gap-2 mt-10 text-sm">
+        {page > 1 && <a href={`/collections/${slug}?page=${page - 1}`} class="px-3 py-1.5 border border-black/10 rounded">← Prev</a>}
+        <span class="px-3 py-1.5">Page {page} of {pages}</span>
+        {page < pages && <a href={`/collections/${slug}?page=${page + 1}`} class="px-3 py-1.5 border border-black/10 rounded">Next →</a>}
+      </nav>
+    )}
+  </main>
+  <Footer />
+</Base>

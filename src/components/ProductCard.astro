@@ -1,0 +1,23 @@
+---
+import type { ProductCard } from '../lib/queries';
+interface Props { product: ProductCard; }
+const { product } = Astro.props;
+const price = Number(product.price_usd).toFixed(2);
+---
+<a href={`/product/${product.slug}`} class="group block border border-black/10 rounded-md overflow-hidden hover:shadow-md transition">
+  <div class="aspect-square bg-cream overflow-hidden">
+    {product.image_url ? (
+      <img src={product.image_url} alt={product.title} loading="lazy" width="400" height="400"
+           class="w-full h-full object-cover group-hover:scale-[1.03] transition" />
+    ) : (
+      <div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">{product.title.split('|')[0]}</div>
+    )}
+  </div>
+  <div class="p-3">
+    <h3 class="text-sm leading-snug line-clamp-2 text-ink-800">{product.title.split('|')[0].trim()}</h3>
+    <div class="mt-1 flex items-center gap-2">
+      <span class="text-bronze-600 text-sm font-medium">${price}</span>
+      {product.is_bundle && <span class="text-[10px] uppercase tracking-wide bg-cream text-bronze-700 px-1.5 py-0.5 rounded">Bundle</span>}
+    </div>
+  </div>
+</a>

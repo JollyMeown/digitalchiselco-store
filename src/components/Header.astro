@@ -1,0 +1,22 @@
+---
+const links = [
+  { href: '/collections', label: 'Collections' },
+  { href: '/catalog', label: 'Catalog' },
+  { href: '/free', label: 'Free files' },
+  { href: '/about', label: 'Our story' },
+  { href: '/blog', label: 'Blog' },
+];
+---
+<div class="bg-bronze-800 text-cream text-xs text-center py-1.5">
+  Instant digital download · 50% of every sale donated to charity · 4.9★ from 577 reviews
+</div>
+<nav class="flex items-center justify-between px-6 py-4 border-b border-black/10 sticky top-0 bg-white z-20">
+  <a href="/" class="font-serif text-lg tracking-wide text-bronze-800">Digital Chisel</a>
+  <div class="hidden md:flex gap-6 text-sm text-ink-700">
+    {links.map((l) => <a href={l.href} class={l.href === '/free' ? 'text-bronze-600' : ''}>{l.label}</a>)}
+  </div>
+  <div class="flex gap-4 text-sm text-ink-700">
+    <a href="/account">Account</a>
+    <a href="/cart">Cart</a>
+  </div>
+</nav>
