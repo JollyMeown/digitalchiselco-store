@@ -2,7 +2,7 @@
   command = "npm run build"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
   # The anon key is public by design (RLS-protected); service_role runs only in the
   # server function. Tell Netlify's secrets scanner these are intentional so the build
   # doesn't fail. (Without this, Netlify aborts the deploy when it sees the keys.)
