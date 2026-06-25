@@ -1,0 +1,25 @@
+---
+interface Crumb { label: string; href?: string; }
+interface Props { crumbs: Crumb[]; }
+const { crumbs } = Astro.props;
+const site = import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com';
+const items = [{ label: 'Home', href: '/' }, ...crumbs];
+const jsonld = {
+  '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+  itemListElement: items.map((c, i) => ({
+    '@type': 'ListItem', position: i + 1, name: c.label,
+    item: c.href ? new URL(c.href, site).href : undefined,
+  })),
+};
+---
+<nav class="text-xs text-ink-700/60 px-4 sm:px-6 py-3 max-w-7xl mx-auto flex items-center gap-1 flex-wrap" aria-label="Breadcrumb">
+  {items.map((c, i) => (
+    <Fragment>
+      {i > 0 && <span class="mx-1 opacity-50">/</span>}
+      {c.href && i < items.length - 1
+        ? <a href={c.href} class="hover:text-bronze-600">{c.label}</a>
+        : <span class="text-ink-800">{c.label}</span>}
+    </Fragment>
+  ))}
+</nav>
+<script type="application/ld+json" set:html={JSON.stringify(jsonld)} />

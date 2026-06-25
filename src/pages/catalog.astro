@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
 import ProductCard from '../components/ProductCard.astro';
 import { getProducts } from '../lib/queries';
 
@@ -13,7 +14,8 @@ const around = Array.from({ length: pages }, (_, i) => i + 1)
 ---
 <Base title="Catalog — All STL Files | DigitalChiselCo">
   <Header />
-  <main class="px-6 py-10 max-w-6xl mx-auto">
+  <Breadcrumbs crumbs={[{ label: 'Catalog' }]} />
+  <main class="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
     <h1 class="text-3xl mb-1">Every design, in one place</h1>
     <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} premium bas-relief STL files · ready for CNC, 3D print &amp; laser.</p>
 

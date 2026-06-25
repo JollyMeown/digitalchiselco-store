@@ -1,0 +1,27 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import ProductCard from '../components/ProductCard.astro';
+import { searchProducts } from '../lib/queries';
+
+const q = (Astro.url.searchParams.get('q') || '').trim();
+const results = q ? await searchProducts(q) : [];
+---
+<Base title={q ? `Search: ${q} | DigitalChiselCo` : 'Search STL Files | DigitalChiselCo'} noindex={true}>
+  <Header />
+  <Breadcrumbs crumbs={[{ label: 'Search' }]} />
+  <main class="px-4 sm:px-6 pb-12 max-w-7xl mx-auto">
+    <h1 class="text-2xl mb-1">{q ? `Results for “${q}”` : 'Search STL files'}</h1>
+    <p class="text-sm text-ink-700/70 mb-6">{q ? `${results.length} design${results.length === 1 ? '' : 's'} found` : 'Type in the search box above to find designs.'}</p>
+    {results.length > 0 ? (
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {results.map((p) => <ProductCard product={p} />)}
+      </div>
+    ) : q ? (
+      <p class="text-ink-700/70">No matches. Try a different keyword like “eagle”, “cross”, “deer” or “fish”. <a href="/catalog" class="text-bronze-600">Browse all →</a></p>
+    ) : null}
+  </main>
+  <Footer />
+</Base>

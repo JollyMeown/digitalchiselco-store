@@ -1,4 +1,5 @@
 ---
+import Logo from './Logo.astro';
 const links = [
   { href: '/collections', label: 'Collections' },
   { href: '/catalog', label: 'Catalog' },
@@ -6,24 +7,54 @@ const links = [
   { href: '/about', label: 'Our story' },
   { href: '/blog', label: 'Blog' },
 ];
+const q = Astro.url.searchParams.get('q') ?? '';
 ---
 <div class="bg-bronze-800 text-cream text-xs text-center py-1.5">
   Instant digital download · 50% of every sale donated to charity · 4.9★ from 577 reviews
 </div>
-<nav class="flex items-center justify-between px-6 py-4 border-b border-black/10 sticky top-0 bg-white z-20">
-  <a href="/" class="font-serif text-lg tracking-wide text-bronze-800">Digital Chisel</a>
-  <div class="hidden md:flex gap-6 text-sm text-ink-700">
-    {links.map((l) => <a href={l.href} class={l.href === '/free' ? 'text-bronze-600' : ''}>{l.label}</a>)}
-  </div>
-  <div class="flex gap-4 text-sm text-ink-700">
-    <a href="/account">Account</a>
-    <a href="/cart">Cart <span id="cart-count" class="text-bronze-600 font-medium"></span></a>
-  </div>
-</nav>
+<header class="sticky top-0 bg-white z-30 border-b border-black/10">
+  <nav class="flex items-center gap-4 px-4 sm:px-6 py-3 max-w-7xl mx-auto">
+    <Logo />
+    <form action="/search" method="get" role="search" class="hidden md:flex flex-1 max-w-md mx-2">
+      <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files"
+        class="flex-1 px-4 py-2 text-sm rounded-l-md border border-r-0 border-black/15 focus:outline-none focus:border-bronze-600" />
+      <button class="bg-bronze-600 text-cream px-4 rounded-r-md text-sm" aria-label="Search">Search</button>
+    </form>
+    <div class="hidden lg:flex gap-5 text-sm text-ink-700 ml-auto">
+      {links.map((l) => <a href={l.href} class={l.href === '/free' ? 'text-bronze-600' : ''}>{l.label}</a>)}
+    </div>
+    <div class="flex gap-4 text-sm text-ink-700 ml-auto lg:ml-4 items-center">
+      <a href="/account" aria-label="Account">Account</a>
+      <a href="/cart" aria-label="Cart">Cart <span id="cart-count" class="text-bronze-600 font-medium"></span></a>
+    </div>
+  </nav>
+  <form action="/search" method="get" role="search" class="md:hidden px-4 pb-3 flex">
+    <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files"
+      class="flex-1 px-4 py-2 text-sm rounded-l-md border border-r-0 border-black/15 focus:outline-none focus:border-bronze-600" />
+    <button class="bg-bronze-600 text-cream px-4 rounded-r-md text-sm">Go</button>
+  </form>
+</header>
 <script is:inline>
   function cartCount() { try { return JSON.parse(localStorage.getItem('cart') || '[]').length; } catch { return 0; } }
   function renderCartCount() { const el = document.getElementById('cart-count'); if (el) { const n = cartCount(); el.textContent = n > 0 ? `(${n})` : ''; } }
   renderCartCount();
   window.addEventListener('cart-changed', renderCartCount);
   window.addEventListener('storage', renderCartCount);
+
+  // Delegated "Add to cart" for any .add-to-cart button site-wide (product cards, etc.)
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.add-to-cart');
+    if (!btn) return;
+    e.preventDefault();
+    const d = btn.dataset;
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    if (!cart.find((x) => x.id === d.id)) {
+      cart.push({ id: d.id, slug: d.slug, title: d.title, price: Number(d.price), img: d.img });
+      localStorage.setItem('cart', JSON.stringify(cart));
+    }
+    window.dispatchEvent(new Event('cart-changed'));
+    const original = btn.textContent;
+    btn.textContent = '✓ Added';
+    setTimeout(() => { btn.textContent = original; }, 1400);
+  });
 </script>

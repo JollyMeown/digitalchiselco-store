@@ -7,6 +7,46 @@ export type ProductCard = {
 
 const CARD = 'id,title,slug,price_usd,image_url,is_bundle,link_status';
 
+export type SiteSettings = {
+  donation_total: number; rating: number; reviews_count: number;
+  sales_count: number; products_count: number; admirers_count: number; experience_years: number;
+};
+
+const SETTINGS_FALLBACK: SiteSettings = {
+  donation_total: 7670, rating: 4.9, reviews_count: 577,
+  sales_count: 4543, products_count: 1235, admirers_count: 505, experience_years: 20,
+};
+
+export async function getSettings(): Promise<SiteSettings> {
+  try {
+    const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    return { ...SETTINGS_FALLBACK, ...(data ?? {}) } as SiteSettings;
+  } catch (e) { console.error('getSettings failed:', e); return SETTINGS_FALLBACK; }
+}
+
+export async function searchProducts(q: string, limit = 60) {
+  const term = q.trim();
+  if (!term) return [];
+  try {
+    const { data, error } = await supabase
+      .from('products').select(CARD).eq('active', true)
+      .ilike('title', `%${term}%`).order('title').limit(limit);
+    if (error) throw error;
+    return (data ?? []) as ProductCard[];
+  } catch (e) { console.error('searchProducts failed:', e); return []; }
+}
+
+export async function getRelatedProducts(excludeId: string, limit = 5) {
+  try {
+    const { data, error } = await supabase
+      .from('products').select(CARD).eq('active', true).neq('id', excludeId)
+      .not('image_url', 'is', null).limit(limit);
+    if (error) throw error;
+    return (data ?? []) as ProductCard[];
+  } catch (e) { console.error('getRelatedProducts failed:', e); return []; }
+}
+
 export async function getCategories() {
   try {
     const { data, error } = await supabase.from('categories').select('*').order('sort_order');

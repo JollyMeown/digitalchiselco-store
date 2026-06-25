@@ -2,73 +2,105 @@
 import Base from '../../layouts/Base.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
-import { getProductBySlug } from '../../lib/queries';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import { getProductBySlug, getRelatedProducts } from '../../lib/queries';
+import { pricing, money } from '../../lib/pricing';
 
 const { slug } = Astro.params;
 const p = await getProductBySlug(slug!);
 if (!p) return Astro.redirect('/catalog');
 
-const price = Number(p.price_usd).toFixed(2);
+const { price, original, percent } = pricing(p.price_usd);
 const cats = (p.product_categories ?? []).map((pc: any) => pc.categories).filter(Boolean);
-const nFiles = (p.product_downloads ?? []).length;
+const cat = cats[0];
 const cleanTitle = p.title.split('|')[0].trim();
+const gallery: string[] = (Array.isArray(p.gallery) && p.gallery.length ? p.gallery : [p.image_url]).filter(Boolean);
+const related = await getRelatedProducts(p.id, 5);
+
+const desc = p.description || `${cleanTitle} is a high-detail 3D relief STL designed for clean carving on CNC routers, laser engravers and 3D printers. After checkout you'll receive an instant download link by email and in your account.`;
 
 const jsonld = {
   '@context': 'https://schema.org', '@type': 'Product',
-  name: cleanTitle, description: p.seo_description || `${cleanTitle} — premium bas-relief STL file for CNC routers, 3D printers and laser engravers. Instant digital download.`,
-  image: p.image_url ? [p.image_url] : undefined,
-  brand: { '@type': 'Brand', name: 'DigitalChiselCo' },
+  name: cleanTitle, description: (p.seo_description || desc).slice(0, 300),
+  image: gallery.length ? gallery : undefined,
+  sku: p.etsy_listing_id, brand: { '@type': 'Brand', name: 'DigitalChiselCo' },
   offers: { '@type': 'Offer', price, priceCurrency: 'USD', availability: 'https://schema.org/InStock', url: Astro.url.href },
 };
 ---
-<Base title={`${cleanTitle} | DigitalChiselCo`} description={`${cleanTitle} — STL file for CNC, 3D print & laser. Instant download.`}>
+<Base title={`${cleanTitle} | DigitalChiselCo`} description={desc.slice(0, 155)} image={gallery[0]}>
   <Header />
-  <main class="px-6 py-10 max-w-5xl mx-auto grid md:grid-cols-2 gap-10">
-    <div class="aspect-square bg-cream rounded-lg overflow-hidden">
-      {p.image_url
-        ? <img src={p.image_url} alt={cleanTitle} width="800" height="800" class="w-full h-full object-cover" />
-        : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 p-6 text-center font-serif">{cleanTitle}</div>}
+  <Breadcrumbs crumbs={[cat ? { label: cat.name, href: `/collections/${cat.slug}` } : { label: 'Catalog', href: '/catalog' }, { label: cleanTitle }]} />
+
+  <main class="px-4 sm:px-6 pb-12 max-w-6xl mx-auto grid md:grid-cols-2 gap-8 lg:gap-12">
+    <!-- gallery -->
+    <div>
+      <div class="aspect-square bg-cream rounded-lg overflow-hidden">
+        {gallery[0]
+          ? <img id="main-img" src={gallery[0]} alt={`${cleanTitle} bas-relief STL`} width="800" height="800" class="w-full h-full object-cover" />
+          : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 p-6 text-center font-serif">{cleanTitle}</div>}
+      </div>
+      {gallery.length > 1 && (
+        <div class="mt-3 grid grid-cols-5 gap-2">
+          {gallery.slice(0, 10).map((g, i) => (
+            <button class="thumb aspect-square bg-cream rounded overflow-hidden border-2 border-transparent" data-src={g} aria-label={`View image ${i + 1}`}>
+              <img src={g} alt={`${cleanTitle} view ${i + 1}`} loading="lazy" class="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
 
+    <!-- details -->
     <div>
-      <nav class="text-xs text-ink-700/60 mb-2">
-        {cats[0] && <a href={`/collections/${cats[0].slug}`}>{cats[0].name}</a>}
-      </nav>
-      <h1 class="text-2xl md:text-3xl leading-snug">{cleanTitle}</h1>
-      <p class="text-2xl text-bronze-600 font-medium mt-3">${price}</p>
+      {cat && <a href={`/collections/${cat.slug}`} class="text-xs text-ink-700/60">{cat.name}</a>}
+      <h1 class="text-2xl md:text-3xl leading-snug mt-1">{cleanTitle}</h1>
 
-      <button id="add" data-id={p.id} data-slug={p.slug} data-title={cleanTitle} data-price={price} data-img={p.image_url || ''}
-        class="mt-5 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">
+      <div class="mt-3 flex items-center gap-3 flex-wrap">
+        <span class="text-2xl text-bronze-600 font-medium">{money(price)}</span>
+        <span class="text-ink-700/40 line-through">{money(original)}</span>
+        <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">{percent}% off</span>
+      </div>
+
+      <button class="add-to-cart mt-5 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition"
+        data-id={p.id} data-slug={p.slug} data-title={cleanTitle} data-price={price} data-img={gallery[0] || ''}>
         Add to cart
       </button>
-      <p id="added" class="text-sm text-green-700 mt-2 hidden">✓ Added to cart</p>
+      <a href="/cart" class="mt-2 block text-center text-sm text-bronze-600">View cart →</a>
 
       <ul class="mt-6 text-sm text-ink-700 space-y-1.5">
-        <li>📦 Instant digital download {nFiles > 1 ? `(${nFiles} files)` : '(STL file)'}</li>
+        <li>📦 Instant digital download (STL file)</li>
         <li>🛠️ Tested in Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360</li>
         <li>❤️ 50% of your purchase is donated to charity</li>
         <li>✅ Personal &amp; commercial-use license</li>
       </ul>
 
-      <div class="mt-6 text-sm text-ink-700/80 leading-relaxed border-t border-black/10 pt-4">
-        {p.description || `${cleanTitle} is a high-detail 3D relief STL designed for clean carving on CNC routers, laser engravers and 3D printers. After checkout you'll receive an instant download link by email and in your account.`}
+      <div class="mt-6 border-t border-black/10 pt-4">
+        <h2 class="text-sm font-medium mb-2">About this design</h2>
+        <div class="text-sm text-ink-700/90 leading-relaxed whitespace-pre-line">{desc}</div>
       </div>
     </div>
   </main>
+
+  {related.length > 0 && (
+    <section class="px-4 sm:px-6 pb-14 max-w-6xl mx-auto">
+      <h2 class="text-xl mb-4">You may also like</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {related.map((r) => <ProductCard product={r} />)}
+      </div>
+    </section>
+  )}
+
   <Footer />
-  <script set:html={`window.__PRODUCT_JSONLD=${JSON.stringify(jsonld)}`}></script>
   <script type="application/ld+json" set:html={JSON.stringify(jsonld)} />
-  <script>
-    const btn = document.getElementById('add');
-    btn?.addEventListener('click', () => {
-      const d = btn.dataset;
-      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-      if (!cart.find((x) => x.id === d.id)) {
-        cart.push({ id: d.id, slug: d.slug, title: d.title, price: Number(d.price), img: d.img });
-        localStorage.setItem('cart', JSON.stringify(cart));
-      }
-      window.dispatchEvent(new Event('cart-changed'));
-      document.getElementById('added')?.classList.remove('hidden');
+  <script is:inline>
+    document.querySelectorAll('.thumb').forEach((t) => {
+      t.addEventListener('click', () => {
+        const main = document.getElementById('main-img');
+        if (main) main.src = t.dataset.src;
+        document.querySelectorAll('.thumb').forEach((x) => x.classList.remove('border-bronze-600'));
+        t.classList.add('border-bronze-600');
+      });
     });
   </script>
 </Base>

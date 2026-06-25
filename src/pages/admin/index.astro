@@ -1,0 +1,10 @@
+---
+import Base from '../../layouts/Base.astro';
+import AdminApp from '../../components/admin/AdminApp.tsx';
+---
+<Base title="Admin · DigitalChiselCo" noindex={true}>
+  <div style="border-bottom:1px solid #0001;padding:12px 16px;">
+    <a href="/" style="font-family:Fraunces,serif;color:#854F0B;font-size:18px;">← DigitalChiselCo</a>
+  </div>
+  <AdminApp client:only="react" />
+</Base>

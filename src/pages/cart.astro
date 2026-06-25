@@ -2,10 +2,17 @@
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import ProductCard from '../components/ProductCard.astro';
+import { getProducts } from '../lib/queries';
+
+const { products } = await getProducts(1, 18);
+const upsell = products.filter((p) => p.image_url).slice(0, 5);
 ---
 <Base title="Cart | DigitalChiselCo">
   <Header />
-  <main class="px-6 py-10 max-w-3xl mx-auto min-h-[50vh]">
+  <Breadcrumbs crumbs={[{ label: 'Cart' }]} />
+  <main class="px-6 pb-6 max-w-3xl mx-auto min-h-[40vh]">
     <h1 class="text-3xl mb-6">Your cart</h1>
     <div id="empty" class="text-ink-700/70 hidden">Your cart is empty. <a href="/catalog" class="text-bronze-600">Browse the catalog →</a></div>
     <div id="items" class="divide-y divide-black/10"></div>
@@ -15,6 +22,17 @@ import Footer from '../components/Footer.astro';
       <p class="text-xs text-ink-700/60 mt-2 text-center">Secure checkout · instant download links emailed after purchase</p>
     </div>
   </main>
+
+  {upsell.length > 0 && (
+    <section class="px-6 pb-14 max-w-6xl mx-auto">
+      <h2 class="text-xl mb-1">Complete your collection</h2>
+      <p class="text-sm text-ink-700/60 mb-4">Makers who shopped these also loved…</p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {upsell.map((p) => <ProductCard product={p} />)}
+      </div>
+    </section>
+  )}
+
   <Footer />
   <script>
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');

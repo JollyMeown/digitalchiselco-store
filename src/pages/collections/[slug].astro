@@ -2,6 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import { getCategoryBySlug, getProductsByCategory } from '../../lib/queries';
 
@@ -15,8 +16,8 @@ const pages = Math.ceil(total / perPage);
 ---
 <Base title={`${category.name} STL Files | DigitalChiselCo`} description={`Browse ${total} ${category.name} bas-relief STL files for CNC, 3D printing and laser engraving.`}>
   <Header />
-  <main class="px-6 py-10 max-w-6xl mx-auto">
-    <nav class="text-xs text-ink-700/60 mb-2"><a href="/collections">Collections</a> / {category.name}</nav>
+  <Breadcrumbs crumbs={[{ label: 'Collections', href: '/collections' }, { label: category.name }]} />
+  <main class="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
     <h1 class="text-3xl mb-1">{category.name}</h1>
     <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} designs</p>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">

@@ -1,10 +1,15 @@
 ---
 import '../styles/global.css';
-interface Props { title?: string; description?: string; }
+interface Props { title?: string; description?: string; image?: string; noindex?: boolean; }
 const {
   title = 'DigitalChiselCo — Premium STL Files for CNC, Laser & 3D Printing',
   description = 'Hundreds of museum-grade bas-relief STL files for CNC routers, 3D printers and laser engravers. Instant download. 50% of every sale donated to charity.',
+  image = '/og-default.jpg',
+  noindex = false,
 } = Astro.props;
+const site = import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com';
+const canonical = new URL(Astro.url.pathname, site).href;
+const ogImage = image.startsWith('http') ? image : new URL(image, site).href;
 ---
 <!doctype html>
 <html lang="en">
@@ -13,8 +18,25 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex,nofollow" />}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#854F0B" />
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:site_name" content="DigitalChiselCo" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://i.etsystatic.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Instrument+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"

@@ -1,23 +1,32 @@
 ---
 import type { ProductCard } from '../lib/queries';
+import { pricing, money } from '../lib/pricing';
 interface Props { product: ProductCard; }
 const { product } = Astro.props;
-const price = Number(product.price_usd).toFixed(2);
+const { price, original, percent } = pricing(product.price_usd);
+const title = product.title.split('|')[0].trim();
 ---
-<a href={`/product/${product.slug}`} class="group block border border-black/10 rounded-md overflow-hidden hover:shadow-md transition">
-  <div class="aspect-square bg-cream overflow-hidden">
+<div class="group border border-black/10 rounded-md overflow-hidden hover:shadow-md transition flex flex-col">
+  <a href={`/product/${product.slug}`} class="block aspect-square bg-cream overflow-hidden">
     {product.image_url ? (
-      <img src={product.image_url} alt={product.title} loading="lazy" width="400" height="400"
+      <img src={product.image_url} alt={`${title} bas-relief STL design`} loading="lazy" width="400" height="400"
            class="w-full h-full object-cover group-hover:scale-[1.03] transition" />
     ) : (
-      <div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">{product.title.split('|')[0]}</div>
+      <div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">{title}</div>
     )}
-  </div>
-  <div class="p-3">
-    <h3 class="text-sm leading-snug line-clamp-2 text-ink-800">{product.title.split('|')[0].trim()}</h3>
-    <div class="mt-1 flex items-center gap-2">
-      <span class="text-bronze-600 text-sm font-medium">${price}</span>
-      {product.is_bundle && <span class="text-[10px] uppercase tracking-wide bg-cream text-bronze-700 px-1.5 py-0.5 rounded">Bundle</span>}
+  </a>
+  <div class="p-3 flex flex-col flex-1">
+    <a href={`/product/${product.slug}`} class="block">
+      <h3 class="text-sm leading-snug line-clamp-2 text-ink-800 min-h-[2.5em]">{title}</h3>
+    </a>
+    <div class="mt-1 flex items-center gap-2 flex-wrap">
+      <span class="text-bronze-600 text-sm font-medium">{money(price)}</span>
+      <span class="text-ink-700/40 text-xs line-through">{money(original)}</span>
+      <span class="text-[10px] text-green-700 font-medium">{percent}% off</span>
     </div>
+    <button class="add-to-cart mt-2 w-full text-xs border border-bronze-600 text-bronze-700 py-1.5 rounded hover:bg-bronze-600 hover:text-cream transition"
+      data-id={product.id} data-slug={product.slug} data-title={title} data-price={price} data-img={product.image_url || ''}>
+      Add to cart
+    </button>
   </div>
-</a>
+</div>
