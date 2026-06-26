@@ -25,7 +25,6 @@ const [bestsellers, latest, reviews, faqs, plans, { products }] = await Promise.
 // fallback bestsellers if admin hasn't flagged any yet — use first 8 with images
 const showBest = bestsellers.length > 0 ? bestsellers : products.filter((p) => p.image_url).slice(0, 8);
 const featuredPlan = plans.find((p) => p.highlight) || plans[0];
-const donation = Math.round(Number(s.donation_total)).toLocaleString();
 ---
 <Base>
   <Header />
@@ -59,8 +58,8 @@ const donation = Math.round(Number(s.donation_total)).toLocaleString();
         <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Unique Designs</div>
       </div>
       <div>
-        <div class="font-serif text-2xl md:text-3xl text-bronze-700">50%</div>
-        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Donated to Charity</div>
+        <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.experience_years)}+</div>
+        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Years of Craftsmanship</div>
       </div>
     </div>
   </div>
@@ -220,28 +219,13 @@ const donation = Math.round(Number(s.donation_total)).toLocaleString();
     .dcc-free-img-wrap:hover .dcc-free-img { transform: scale(1.05); }
   </style>
 
-  <!-- Welfare strip (brand bronze, NOT blue) -->
+  <!-- Closing brand strip (product-focused) -->
   <section class="bg-bronze-800 text-cream">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid md:grid-cols-[1fr_1.4fr_auto] gap-8 items-center">
-      <div class="aspect-[4/3] rounded-lg overflow-hidden bg-bronze-700 border border-cream/10">
-        {s.welfare_image_url
-          ? <img src={s.welfare_image_url} alt="Charitable work supported by DigitalChiselCo" class="w-full h-full object-cover" />
-          : <div class="w-full h-full flex items-center justify-center text-cream/50 font-serif text-center px-4 text-sm">A photo of the welfare work supported by your purchases will appear here (admin → Media & Hero)</div>}
-      </div>
-      <div>
-        <p class="text-xs tracking-widest text-[#FAC775] mb-2">★ OUR PROMISE</p>
-        <p class="font-serif text-2xl md:text-3xl leading-snug">Half of every sale builds something bigger than a shop.</p>
-        <p class="mt-4 text-sm text-cream/80 leading-relaxed whitespace-pre-line">{s.welfare_text}</p>
-      </div>
-      <div class="text-center md:text-right">
-        <div class="font-serif text-4xl text-[#FAC775]">50%</div>
-        <div class="text-[11px] uppercase tracking-widest text-cream/70 mt-1">Donated · Every Sale · No Asterisks</div>
-        <div class="mt-4 inline-block bg-bronze-700/60 border border-cream/10 rounded-md px-4 py-3">
-          <div class="text-xs text-cream/70">Together we've donated</div>
-          <div class="font-serif text-2xl text-[#FAC775]">${donation}</div>
-          <div class="text-[10px] text-cream/60">&amp; counting</div>
-        </div>
-      </div>
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-10 text-center">
+      <p class="text-xs tracking-widest text-[#FAC775] mb-2">★ DIGITALCHISELCO STUDIO</p>
+      <p class="font-serif text-2xl md:text-3xl leading-snug max-w-3xl mx-auto">Hand-finished bas-relief STL designs built for serious CNC, laser, and 3D-print makers.</p>
+      <p class="mt-4 text-sm text-cream/80 max-w-2xl mx-auto">Every file is tested on real machines before it ships. Commercial use is included on every purchase — sell the pieces you carve.</p>
+      <a href="/catalog" class="mt-6 inline-block bg-[#FAC775] text-bronze-900 px-6 py-3 rounded-md text-sm font-medium hover:opacity-90 transition">Browse the catalog →</a>
     </div>
   </section>
 

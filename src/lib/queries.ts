@@ -24,7 +24,7 @@ const SETTINGS_FALLBACK: SiteSettings = {
   sales_count: 4543, products_count: 1235, admirers_count: 505, experience_years: 20,
   discount_percent: 20, hero_image_url: null,
   hero_headline: 'Art that carves with purpose',
-  hero_subhead: 'Hundreds of museum-grade bas-relief designs, instantly downloadable. Half of every purchase goes to charity.',
+  hero_subhead: 'Hundreds of museum-grade bas-relief designs, instantly downloadable. CNC-ready, commercial-use included.',
   featured_product_id: null, admin_email: 'jolly@digitalchiselco.com',
   banner_image_url: null,
   logo_image_url: null, favicon_image_url: null,

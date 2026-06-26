@@ -1,13 +1,5 @@
 ---
-import { getSettings } from '../lib/queries';
-const s = await getSettings();
-const donation = Math.round(Number(s.donation_total)).toLocaleString();
 ---
-<section class="bg-bronze-800 text-cream text-center py-8 px-6">
-  <p class="text-sm">Together we've donated</p>
-  <p class="font-serif text-3xl text-[#FAC775] my-1">${donation} &amp; counting</p>
-  <p class="text-xs opacity-80">50% of every sale supports charitable causes</p>
-</section>
 <footer class="px-6 py-10 text-center text-xs text-ink-700/60 border-t border-black/10">
   <div class="flex gap-4 justify-center mb-3 flex-wrap">
     <a href="/catalog">Catalog</a><a href="/collections">Collections</a><a href="/pricing">Pricing</a><a href="/free">Free files</a>
