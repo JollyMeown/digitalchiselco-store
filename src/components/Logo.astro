@@ -1,16 +1,27 @@
 ---
-interface Props { class?: string; }
-const { class: cls = '' } = Astro.props;
+import { getSettings } from '../lib/queries';
+interface Props { class?: string; size?: 'sm' | 'md' | 'lg'; hideWordmark?: boolean; }
+const { class: cls = '', size = 'md', hideWordmark = false } = Astro.props;
+const s = await getSettings();
+const px = size === 'sm' ? 34 : size === 'lg' ? 64 : 44;
 ---
 <a href="/" aria-label="DigitalChiselCo home" class={`inline-flex items-center gap-2.5 ${cls}`}>
-  <svg viewBox="0 0 48 48" width="34" height="34" role="img" aria-label="DigitalChiselCo emblem" class="flex-shrink-0">
-    <rect width="48" height="48" rx="10" fill="#854F0B"></rect>
-    <rect x="8" y="13" width="5" height="5" fill="#FAEEDA"></rect>
-    <rect x="8" y="21" width="5" height="5" fill="#FAEEDA" opacity="0.7"></rect>
-    <rect x="14" y="17" width="5" height="5" fill="#FAEEDA"></rect>
-    <path d="M19 13 H28 a11 11 0 0 1 0 22 H19 Z" fill="none" stroke="#FAEEDA" stroke-width="3.6"></path>
-    <rect x="34.5" y="12" width="4" height="18" rx="2" fill="#FAEEDA"></rect>
-    <path d="M34.5 30 h4 l-2 5 z" fill="#FAEEDA"></path>
-  </svg>
-  <span class="font-serif text-lg tracking-wide text-bronze-800 leading-none">DigitalChiselCo</span>
+  {s.logo_image_url ? (
+    <img src={s.logo_image_url} alt="DigitalChiselCo" width={px} height={px}
+         style={`width:${px}px;height:${px}px;`}
+         class="flex-shrink-0 object-contain" />
+  ) : (
+    <svg viewBox="0 0 48 48" width={px} height={px} role="img" aria-label="DigitalChiselCo emblem" class="flex-shrink-0">
+      <rect width="48" height="48" rx="10" fill="#854F0B"></rect>
+      <rect x="8" y="13" width="5" height="5" fill="#FAEEDA"></rect>
+      <rect x="8" y="21" width="5" height="5" fill="#FAEEDA" opacity="0.7"></rect>
+      <rect x="14" y="17" width="5" height="5" fill="#FAEEDA"></rect>
+      <path d="M19 13 H28 a11 11 0 0 1 0 22 H19 Z" fill="none" stroke="#FAEEDA" stroke-width="3.6"></path>
+      <rect x="34.5" y="12" width="4" height="18" rx="2" fill="#FAEEDA"></rect>
+      <path d="M34.5 30 h4 l-2 5 z" fill="#FAEEDA"></path>
+    </svg>
+  )}
+  {!hideWordmark && (
+    <span class="font-serif text-lg tracking-wide text-bronze-800 leading-none">DigitalChiselCo</span>
+  )}
 </a>

@@ -5,82 +5,83 @@ import Footer from '../components/Footer.astro';
 import SideMenu from '../components/SideMenu.astro';
 import SiteBanner from '../components/SiteBanner.astro';
 import ProductCard from '../components/ProductCard.astro';
-import { getCategories, getProducts, getSettings, getProductById } from '../lib/queries';
+import Marquee from '../components/Marquee.astro';
+import {
+  getCategories, getProducts, getSettings,
+  getBestSellers, getLatestProducts, getReviews, getFaqs, getMembershipPlans,
+} from '../lib/queries';
 
 const s = await getSettings();
 const categories = await getCategories();
-const { products } = await getProducts(1, 24);
-const withImg = products.filter((p) => p.image_url);
+const [bestsellers, latest, reviews, faqs, plans, { products }] = await Promise.all([
+  getBestSellers(12),
+  getLatestProducts(8),
+  getReviews(12),
+  getFaqs(20),
+  getMembershipPlans(),
+  getProducts(1, 24),
+]);
 
-// hero image: admin upload > featured product image > first product with image
-let heroImg = s.hero_image_url;
-if (!heroImg && s.featured_product_id) {
-  const featured = await getProductById(s.featured_product_id);
-  heroImg = featured?.image_url || null;
-}
-if (!heroImg) heroImg = withImg[0]?.image_url || null;
-
-const bestsellers = withImg.slice(0, 12).filter((p) => p.image_url !== heroImg).slice(0, 10);
-
-const reviews = [
-  { name: 'Vickie', text: 'The value of this purchase is amazing. They are all top quality. Easy downloads, works perfectly with the Vcarve software. Thank you so much!' },
-  { name: 'Diane', text: 'Love these, and seller is very good with help! Would definitely recommend! And they are awesome with the customized files.' },
-  { name: 'Clyde', text: 'Nice finish carving with great detail. Quality, new products for this CNC wood carver. I will get more.' },
-];
-const faqs = [
-  { q: 'What file format do I get?', a: 'High-detail STL files, ready for CNC routers, 3D printers and laser engravers. Tested in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360.' },
-  { q: 'How do I receive my files after buying?', a: 'Instantly. You get a secure download link by email the moment your payment clears, and the files also appear in your account dashboard to re-download anytime.' },
-  { q: 'Can I use the designs commercially?', a: 'Yes — every purchase includes a personal and commercial-use license, so you can sell the items you carve or print.' },
-  { q: 'What is the 50% donation?', a: `We donate 50% of every sale to people in need and animal welfare. Together our customers have already donated $${Math.round(Number(s.donation_total)).toLocaleString()}.` },
-  { q: 'Do you take custom orders?', a: 'Yes! We create custom bas-relief portraits and designs from your photos. See our Custom Commissions collection or contact us.' },
-];
+// fallback bestsellers if admin hasn't flagged any yet — use first 8 with images
+const showBest = bestsellers.length > 0 ? bestsellers : products.filter((p) => p.image_url).slice(0, 8);
+const featuredPlan = plans.find((p) => p.highlight) || plans[0];
+const donation = Math.round(Number(s.donation_total)).toLocaleString();
 ---
 <Base>
   <Header />
   <SiteBanner />
 
-  <!-- hero -->
-  <header class="bg-cream">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-12 md:py-16 grid md:grid-cols-2 gap-10 items-center">
-      <div>
-        <p class="text-xs tracking-widest text-bronze-600 mb-3">PREMIUM STL FILES · CNC · LASER · 3D PRINT</p>
-        <h1 class="text-4xl md:text-5xl text-bronze-800 leading-tight">{s.hero_headline}</h1>
-        <p class="mt-5 text-bronze-700 max-w-md">{s.hero_subhead}</p>
-        <div class="mt-7 flex gap-3 flex-wrap">
-          <a href="/catalog" class="bg-bronze-600 text-cream text-sm px-6 py-3 rounded-md hover:bg-bronze-700 transition">Shop collections</a>
-          <a href="/free" class="border border-bronze-600 text-bronze-800 text-sm px-6 py-3 rounded-md hover:bg-bronze-600/10 transition">Get 5 free STL files</a>
+  <!-- Trust strip -->
+  <div class="bg-cream/40 border-y border-black/5">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-center text-xs text-ink-700">
+      {s.trust_badges.map((b) => (
+        <div class="flex items-center justify-center gap-2 py-1">
+          <span class="text-lg leading-none text-bronze-600">{b.icon}</span>
+          <span class="font-medium">{b.label}</span>
         </div>
-        <p class="mt-5 text-sm text-bronze-700">★★★★★ &nbsp;{Number(s.rating)} from {s.reviews_count} reviews · {Number(s.sales_count).toLocaleString()} sales · {Number(s.admirers_count).toLocaleString()} admirers</p>
-      </div>
-      <div class="aspect-square rounded-xl overflow-hidden shadow-sm bg-white/40">
-        {heroImg && <img src={heroImg} alt="Featured bas-relief STL wood carving design" width="700" height="700" class="w-full h-full object-cover" />}
-      </div>
+      ))}
     </div>
-  </header>
-
-  <!-- trust strip -->
-  <div class="grid grid-cols-2 md:grid-cols-4 border-y border-black/10 text-center text-xs text-ink-700">
-    <div class="py-4 border-r border-black/10">Instant download</div>
-    <div class="py-4 border-r border-black/10">Secure checkout</div>
-    <div class="py-4 border-r border-black/10">50% to charity</div>
-    <div class="py-4">Commercial license</div>
   </div>
 
-  <!-- main: left category menu + content -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex gap-8">
+  <!-- Stats row -->
+  <div class="bg-white">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+      <div>
+        <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.sales_count).toLocaleString()}+</div>
+        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">STL Files Sold</div>
+      </div>
+      <div>
+        <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.rating)} <span class="text-yellow-500">★</span></div>
+        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Avg. Rating · {s.reviews_count}+ Reviews</div>
+      </div>
+      <div>
+        <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.products_count).toLocaleString()}+</div>
+        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Unique Designs</div>
+      </div>
+      <div>
+        <div class="font-serif text-2xl md:text-3xl text-bronze-700">50%</div>
+        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Donated to Charity</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main grid: side menu + content -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex gap-8">
     <SideMenu />
-    <div class="flex-1 min-w-0">
-      <section class="mb-12">
+    <div class="flex-1 min-w-0 space-y-14">
+
+      <!-- Shop by collection -->
+      <section>
         <div class="flex justify-between items-baseline mb-5">
-          <h2 class="text-2xl">Shop by collection</h2>
-          <a href="/collections" class="text-sm text-bronze-600">View all →</a>
+          <h2 class="font-serif text-2xl text-ink-800">Shop by collection</h2>
+          <a href="/collections" class="text-sm text-bronze-600 hover:underline">View all →</a>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
           {categories.slice(0, 6).map((c) => (
             <a href={`/collections/${c.slug}`} class="block border border-black/10 rounded-lg overflow-hidden hover:shadow-md transition group">
               <div class="aspect-[16/9] bg-cream overflow-hidden">
                 {c.image_url
-                  ? <img src={c.image_url} alt={c.name} loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.03] transition" />
+                  ? <img src={c.image_url} alt={c.name} loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.04] transition duration-500" />
                   : <div class="w-full h-full flex items-center justify-center font-serif text-bronze-600/50 text-center px-3">{c.name}</div>}
               </div>
               {!c.image_url && <div class="p-3 text-sm">{c.name}</div>}
@@ -89,54 +90,164 @@ const faqs = [
         </div>
       </section>
 
-      {bestsellers.length > 0 && (
+      <!-- Become a member CTA -->
+      {featuredPlan && (
+        <section class="border border-bronze-600/20 rounded-2xl bg-gradient-to-br from-cream to-white p-6 md:p-8">
+          <div class="grid md:grid-cols-2 gap-6 items-center">
+            <div>
+              <p class="text-xs tracking-widest text-bronze-600 mb-2">★ MOST POPULAR PLAN</p>
+              <h2 class="font-serif text-3xl text-bronze-800 leading-tight">{s.membership_title}</h2>
+              <p class="mt-3 text-ink-700/85 leading-relaxed">{s.membership_subtitle}</p>
+              <ul class="mt-4 text-sm text-ink-700 space-y-1.5">
+                {featuredPlan.features.slice(0, 4).map((f) => (
+                  <li class="flex gap-2"><span class="text-bronze-600">✓</span>{f}</li>
+                ))}
+              </ul>
+              <div class="mt-6 flex flex-wrap gap-3">
+                <a href="/membership" class="bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition shadow-sm">
+                  Become a member — ${Number(featuredPlan.price_usd).toFixed(2)}
+                </a>
+                <a href="/membership" class="border border-bronze-600 text-bronze-700 px-6 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">
+                  Lock in your low price →
+                </a>
+              </div>
+            </div>
+            <div class="order-first md:order-last">
+              {s.membership_image_url
+                ? <img src={s.membership_image_url} alt="Premium Membership poster" class="w-full h-auto rounded-lg shadow-md max-h-[440px] object-contain bg-cream" />
+                : <div class="aspect-[3/4] bg-cream rounded-lg flex items-center justify-center text-bronze-600/40 font-serif text-center px-6 max-h-[440px]">
+                    Upload the Premium Membership poster in admin → Media & Hero → "Membership card"
+                  </div>}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <!-- Best Sellers (admin-selected) — animated marquee -->
+      {showBest.length > 0 && (
         <section>
-          <h2 class="text-2xl mb-5">Popular designs</h2>
+          <div class="flex justify-between items-baseline mb-4">
+            <h2 class="font-serif text-2xl text-ink-800">★ Best Sellers</h2>
+            <a href="/catalog" class="text-sm text-bronze-600 hover:underline">Shop all →</a>
+          </div>
+          <Marquee duration={50}>
+            {showBest.map((p) => (
+              <div class="w-[200px] sm:w-[220px]"><ProductCard product={p} discount={s.discount_percent} /></div>
+            ))}
+          </Marquee>
+          <p class="text-xs text-ink-700/50 mt-2 text-right">Hover to pause · set bestsellers in admin → Products → "★ Best seller"</p>
+        </section>
+      )}
+
+      <!-- Latest 3D Designs -->
+      {latest.length > 0 && (
+        <section>
+          <div class="flex justify-between items-baseline mb-4">
+            <h2 class="font-serif text-2xl text-ink-800">Latest 3D Designs</h2>
+            <a href="/catalog" class="text-sm text-bronze-600 hover:underline">Browse catalog →</a>
+          </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {bestsellers.map((p) => <ProductCard product={p} discount={s.discount_percent} />)}
+            {latest.slice(0, 8).map((p) => <ProductCard product={p} discount={s.discount_percent} />)}
           </div>
         </section>
       )}
     </div>
   </div>
 
-  <!-- reviews -->
-  <section class="bg-cream/60 py-12">
-    <div class="max-w-5xl mx-auto px-6">
-      <div class="text-center mb-8">
-        <h2 class="text-2xl">Loved by makers</h2>
-        <p class="text-sm text-bronze-700 mt-1">★★★★★ {Number(s.rating)} average · {s.reviews_count}+ verified reviews</p>
+  <!-- Loved by makers — DB-driven, scrolling marquee -->
+  {reviews.length > 0 && (
+    <section class="bg-cream/60 py-12">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6">
+        <div class="text-center mb-7">
+          <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">Loved by makers</h2>
+          <p class="text-sm text-bronze-700 mt-2">★★★★★ {Number(s.rating)} average · {s.reviews_count}+ verified reviews</p>
+        </div>
+        <Marquee duration={60} direction="right">
+          {reviews.map((r) => (
+            <figure class="w-[300px] md:w-[340px] bg-white border border-black/10 rounded-lg p-5">
+              <div class="text-bronze-600 mb-2 text-sm">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</div>
+              <blockquote class="text-sm text-ink-700 leading-relaxed">"{r.text}"</blockquote>
+              <figcaption class="mt-3 text-sm font-medium text-ink-800">— {r.name}{r.source ? <span class="text-ink-700/50 font-normal"> · {r.source}</span> : null}</figcaption>
+            </figure>
+          ))}
+        </Marquee>
       </div>
-      <div class="grid md:grid-cols-3 gap-5">
-        {reviews.map((r) => (
-          <figure class="bg-white border border-black/10 rounded-lg p-5">
-            <div class="text-bronze-600 mb-2">★★★★★</div>
-            <blockquote class="text-sm text-ink-700 leading-relaxed">“{r.text}”</blockquote>
-            <figcaption class="mt-3 text-sm font-medium">— {r.name}</figcaption>
-          </figure>
+    </section>
+  )}
+
+  <!-- FAQ -->
+  {faqs.length > 0 && (
+    <section class="max-w-3xl mx-auto px-4 sm:px-6 py-14">
+      <h2 class="font-serif text-2xl text-center mb-8">Frequently asked questions</h2>
+      <div class="space-y-3">
+        {faqs.map((f) => (
+          <details class="dcc-faq border border-black/10 rounded-lg overflow-hidden bg-white">
+            <summary class="cursor-pointer font-medium text-ink-800 list-none flex justify-between items-center p-4 hover:bg-cream/50 transition">
+              <span>{f.question}</span>
+              <span class="text-bronze-600 text-xl leading-none transition-transform">+</span>
+            </summary>
+            <div class="px-4 pb-4 text-sm text-ink-700 leading-relaxed whitespace-pre-line">{f.answer}</div>
+          </details>
         ))}
+      </div>
+    </section>
+  )}
+  <style>
+    .dcc-faq[open] summary > span:last-child { transform: rotate(45deg); }
+    .dcc-faq > div { animation: dcc-fade 0.25s ease-out; }
+    @keyframes dcc-fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+
+  <!-- Free files lead magnet -->
+  <section class="bg-cream/40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid md:grid-cols-2 gap-8 items-center">
+      <div class="dcc-free-img-wrap aspect-[4/3] bg-cream rounded-lg overflow-hidden border border-black/10">
+        {s.free_image_url
+          ? <img src={s.free_image_url} alt="Free STL files pack" class="w-full h-full object-cover dcc-free-img" />
+          : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 font-serif text-center px-6">Upload a "free pack" image in admin → Media & Hero</div>}
+      </div>
+      <div>
+        <p class="text-xs tracking-widest text-bronze-600 mb-2">★ FREE FROM OUR STUDIO</p>
+        <h2 class="font-serif text-3xl text-bronze-800 leading-tight">Try five of our <em class="italic">most carved</em> files, on the house.</h2>
+        <p class="mt-4 text-ink-700">Drop your email and we'll send five hand-picked premium bas-relief STL files, plus a short PDF on scaling and finishing — everything tested on real CNC routers, 3D printers and laser engravers.</p>
+        <a href="/free" class="mt-6 inline-block bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Send me the pack →</a>
+        <p class="text-xs text-ink-700/50 mt-2">No spam. Unsubscribe anytime.</p>
       </div>
     </div>
   </section>
+  <style>
+    .dcc-free-img { transition: transform 0.6s ease; }
+    .dcc-free-img-wrap:hover .dcc-free-img { transform: scale(1.05); }
+  </style>
 
-  <!-- FAQ -->
-  <section class="max-w-3xl mx-auto px-6 py-14">
-    <h2 class="text-2xl text-center mb-8">Frequently asked questions</h2>
-    <div class="space-y-3">
-      {faqs.map((f) => (
-        <details class="border border-black/10 rounded-lg p-4 group">
-          <summary class="cursor-pointer font-medium text-ink-800 list-none flex justify-between items-center">
-            {f.q}<span class="text-bronze-600 group-open:rotate-45 transition">+</span>
-          </summary>
-          <p class="mt-3 text-sm text-ink-700 leading-relaxed">{f.a}</p>
-        </details>
-      ))}
+  <!-- Welfare strip (brand bronze, NOT blue) -->
+  <section class="bg-bronze-800 text-cream">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid md:grid-cols-[1fr_1.4fr_auto] gap-8 items-center">
+      <div class="aspect-[4/3] rounded-lg overflow-hidden bg-bronze-700 border border-cream/10">
+        {s.welfare_image_url
+          ? <img src={s.welfare_image_url} alt="Charitable work supported by DigitalChiselCo" class="w-full h-full object-cover" />
+          : <div class="w-full h-full flex items-center justify-center text-cream/50 font-serif text-center px-4 text-sm">A photo of the welfare work supported by your purchases will appear here (admin → Media & Hero)</div>}
+      </div>
+      <div>
+        <p class="text-xs tracking-widest text-[#FAC775] mb-2">★ OUR PROMISE</p>
+        <p class="font-serif text-2xl md:text-3xl leading-snug">Half of every sale builds something bigger than a shop.</p>
+        <p class="mt-4 text-sm text-cream/80 leading-relaxed whitespace-pre-line">{s.welfare_text}</p>
+      </div>
+      <div class="text-center md:text-right">
+        <div class="font-serif text-4xl text-[#FAC775]">50%</div>
+        <div class="text-[11px] uppercase tracking-widest text-cream/70 mt-1">Donated · Every Sale · No Asterisks</div>
+        <div class="mt-4 inline-block bg-bronze-700/60 border border-cream/10 rounded-md px-4 py-3">
+          <div class="text-xs text-cream/70">Together we've donated</div>
+          <div class="font-serif text-2xl text-[#FAC775]">${donation}</div>
+          <div class="text-[10px] text-cream/60">&amp; counting</div>
+        </div>
+      </div>
     </div>
   </section>
 
   <Footer />
   <script type="application/ld+json" set:html={JSON.stringify({
     '@context': 'https://schema.org', '@type': 'FAQPage',
-    mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+    mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.question, acceptedAnswer: { '@type': 'Answer', text: f.answer } })),
   })} />
 </Base>

@@ -8,6 +8,9 @@ import Subscribers from './tabs/Subscribers';
 import Media from './tabs/Media';
 import Settings from './tabs/Settings';
 import Links from './tabs/Links';
+import Reviews from './tabs/Reviews';
+import Faqs from './tabs/Faqs';
+import Membership from './tabs/Membership';
 import { inputCls, btnPrimary } from './ui';
 
 type Tab = { key: string; label: string; icon: string; Component: any };
@@ -17,6 +20,9 @@ const TABS: Tab[] = [
   { key: 'products',    label: 'Products',     icon: '▦', Component: Products },
   { key: 'categories',  label: 'Categories',   icon: '☷', Component: Categories },
   { key: 'orders',      label: 'Orders',       icon: '⊞', Component: Orders },
+  { key: 'membership',  label: 'Membership',   icon: '◆', Component: Membership },
+  { key: 'reviews',     label: 'Reviews',      icon: '★', Component: Reviews },
+  { key: 'faqs',        label: 'FAQs',         icon: '?', Component: Faqs },
   { key: 'subscribers', label: 'Subscribers',  icon: '✉', Component: Subscribers },
   { key: 'media',       label: 'Media & Hero', icon: '◰', Component: Media },
   { key: 'settings',    label: 'Settings',     icon: '⚙', Component: Settings },
@@ -67,7 +73,7 @@ export default function AdminApp() {
           <button onClick={() => setCollapsed(!collapsed)} className="text-bronze-700 text-lg w-8 h-8 hover:bg-cream rounded">☰</button>
           {!collapsed && <span className="font-serif text-bronze-700 text-sm">Admin</span>}
         </div>
-        <nav className="flex-1 py-2">
+        <nav className="flex-1 py-2 overflow-y-auto">
           {TABS.map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-cream transition ${tab === t.key ? 'bg-cream text-bronze-700 border-l-2 border-bronze-600' : 'text-ink-700'}`}

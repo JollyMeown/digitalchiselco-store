@@ -13,6 +13,10 @@ export type SiteSettings = {
   discount_percent: number; hero_image_url: string | null; hero_headline: string;
   hero_subhead: string; featured_product_id: string | null; admin_email: string;
   banner_image_url: string | null;
+  logo_image_url: string | null; favicon_image_url: string | null;
+  membership_image_url: string | null; membership_title: string; membership_subtitle: string;
+  free_image_url: string | null; welfare_image_url: string | null; welfare_text: string;
+  trust_badges: { icon: string; label: string }[];
 };
 
 const SETTINGS_FALLBACK: SiteSettings = {
@@ -23,6 +27,19 @@ const SETTINGS_FALLBACK: SiteSettings = {
   hero_subhead: 'Hundreds of museum-grade bas-relief designs, instantly downloadable. Half of every purchase goes to charity.',
   featured_product_id: null, admin_email: 'jolly@digitalchiselco.com',
   banner_image_url: null,
+  logo_image_url: null, favicon_image_url: null,
+  membership_image_url: null,
+  membership_title: 'Become a Member — $6.70/month',
+  membership_subtitle: 'Get 8 fresh bas-relief STL designs every month — 24 carving files for $20. Lock in your low price now.',
+  free_image_url: null, welfare_image_url: null,
+  welfare_text: "Half of every sale builds something bigger than a shop. We donate 50% of our profits to families in need and to animal welfare. Every time you download a file, you're helping us make that happen.",
+  trust_badges: [
+    { icon: '⬇', label: 'Instant Download' },
+    { icon: '👍', label: '99% Positive Feedback' },
+    { icon: '♾', label: 'Unlimited Time Download' },
+    { icon: '🔒', label: '100% Payment Security' },
+    { icon: '💬', label: 'Contact Us for Help' },
+  ],
 };
 
 export async function getSettings(): Promise<SiteSettings> {
@@ -116,6 +133,64 @@ export async function getProductById(id: string) {
 
 // Given a set of product IDs the user currently has in cart, return products
 // from the same categories (excluding those already in the cart).
+export async function getBestSellers(limit = 8): Promise<ProductCard[]> {
+  try {
+    const { data, error } = await supabase
+      .from('products').select(CARD).eq('active', true).eq('is_bestseller', true)
+      .not('image_url', 'is', null).order('title').limit(limit);
+    if (error) throw error;
+    return (data ?? []) as ProductCard[];
+  } catch (e) { console.error('getBestSellers failed:', e); return []; }
+}
+
+export async function getLatestProducts(limit = 8): Promise<ProductCard[]> {
+  try {
+    const { data, error } = await supabase
+      .from('products').select(CARD).eq('active', true)
+      .not('image_url', 'is', null).order('created_at', { ascending: false }).limit(limit);
+    if (error) throw error;
+    return (data ?? []) as ProductCard[];
+  } catch (e) { console.error('getLatestProducts failed:', e); return []; }
+}
+
+export type Review = { id: string; name: string; text: string; rating: number; source: string | null; sort_order: number };
+export async function getReviews(limit = 12): Promise<Review[]> {
+  try {
+    const { data, error } = await supabase
+      .from('reviews').select('id,name,text,rating,source,sort_order').eq('active', true)
+      .order('sort_order').order('created_at').limit(limit);
+    if (error) throw error;
+    return (data ?? []) as Review[];
+  } catch (e) { console.error('getReviews failed:', e); return []; }
+}
+
+export type Faq = { id: string; question: string; answer: string; sort_order: number };
+export async function getFaqs(limit = 20): Promise<Faq[]> {
+  try {
+    const { data, error } = await supabase
+      .from('faqs').select('id,question,answer,sort_order').eq('active', true)
+      .order('sort_order').order('created_at').limit(limit);
+    if (error) throw error;
+    return (data ?? []) as Faq[];
+  } catch (e) { console.error('getFaqs failed:', e); return []; }
+}
+
+export type MembershipPlan = {
+  id: string; slug: string; name: string; months: number; files_per_month: number;
+  price_usd: number; original_price_usd: number | null; features: string[];
+  highlight: boolean; sort_order: number;
+};
+export async function getMembershipPlans(): Promise<MembershipPlan[]> {
+  try {
+    const { data, error } = await supabase
+      .from('membership_plans')
+      .select('id,slug,name,months,files_per_month,price_usd,original_price_usd,features,highlight,sort_order')
+      .eq('active', true).order('sort_order');
+    if (error) throw error;
+    return (data ?? []).map((p: any) => ({ ...p, features: Array.isArray(p.features) ? p.features : [] })) as MembershipPlan[];
+  } catch (e) { console.error('getMembershipPlans failed:', e); return []; }
+}
+
 export async function getRelatedToProducts(productIds: string[], limit = 8): Promise<ProductCard[]> {
   if (!productIds.length) return [];
   try {

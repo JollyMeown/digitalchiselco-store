@@ -1,0 +1,30 @@
+---
+// CSS marquee — content scrolls left→right or right→left infinitely,
+// pauses on hover. Use a single child <div> with display flex/gap and put N items in it;
+// this component duplicates the children once to make the loop seamless.
+interface Props { duration?: number; direction?: 'left' | 'right'; pauseOnHover?: boolean; gapClass?: string; }
+const { duration = 40, direction = 'left', pauseOnHover = true, gapClass = 'gap-4' } = Astro.props;
+---
+<div class={`dcc-marquee ${pauseOnHover ? 'dcc-marquee-pausable' : ''}`} style={`--dcc-duration:${duration}s; --dcc-direction:${direction === 'left' ? 'normal' : 'reverse'};`}>
+  <div class={`dcc-marquee-track ${gapClass}`}>
+    <div class={`dcc-marquee-group flex ${gapClass} flex-shrink-0`}>
+      <slot />
+    </div>
+    <div class={`dcc-marquee-group flex ${gapClass} flex-shrink-0`} aria-hidden="true">
+      <slot />
+    </div>
+  </div>
+</div>
+<style is:global>
+  .dcc-marquee { overflow: hidden; position: relative; mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent); }
+  .dcc-marquee-track { display: flex; width: max-content; animation: dcc-scroll var(--dcc-duration) linear infinite; animation-direction: var(--dcc-direction); }
+  .dcc-marquee-pausable:hover .dcc-marquee-track { animation-play-state: paused; }
+  @keyframes dcc-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dcc-marquee-track { animation: none; }
+    .dcc-marquee { mask-image: none; }
+  }
+</style>

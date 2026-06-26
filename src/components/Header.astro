@@ -25,7 +25,8 @@ const q = Astro.url.searchParams.get('q') ?? '';
       {links.map((l) => <a href={l.href} class={l.href === '/free' ? 'text-bronze-600' : ''}>{l.label}</a>)}
     </div>
     <div class="flex gap-4 text-sm text-ink-700 ml-auto lg:ml-4 items-center">
-      <a href="/account" aria-label="Account">Account</a>
+      <a href="/membership" class="hidden md:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
+      <a href="/account" class="hidden lg:inline-block" aria-label="Account">Account</a>
       <a href="/cart" aria-label="Cart">Cart <span id="cart-count" class="text-bronze-600 font-medium"></span></a>
     </div>
   </nav>

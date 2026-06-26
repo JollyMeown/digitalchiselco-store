@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import { getSettings } from '../lib/queries';
 interface Props { title?: string; description?: string; image?: string; noindex?: boolean; }
 const {
   title = 'DigitalChiselCo — Premium STL Files for CNC, Laser & 3D Printing',
@@ -10,6 +11,14 @@ const {
 const site = import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com';
 const canonical = new URL(Astro.url.pathname, site).href;
 const ogImage = image.startsWith('http') ? image : new URL(image, site).href;
+const settings = await getSettings();
+const faviconUrl = settings.favicon_image_url || '/favicon.svg';
+const faviconType = settings.favicon_image_url
+  ? (settings.favicon_image_url.endsWith('.svg') ? 'image/svg+xml'
+    : settings.favicon_image_url.endsWith('.png') ? 'image/png'
+    : settings.favicon_image_url.endsWith('.ico') ? 'image/x-icon'
+    : 'image/jpeg')
+  : 'image/svg+xml';
 ---
 <!doctype html>
 <html lang="en">
@@ -20,7 +29,8 @@ const ogImage = image.startsWith('http') ? image : new URL(image, site).href;
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     {noindex && <meta name="robots" content="noindex,nofollow" />}
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type={faviconType} href={faviconUrl} />
+    {settings.favicon_image_url && <link rel="apple-touch-icon" href={settings.favicon_image_url} />}
     <meta name="theme-color" content="#854F0B" />
     <!-- Open Graph -->
     <meta property="og:type" content="website" />

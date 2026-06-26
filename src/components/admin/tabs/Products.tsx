@@ -18,12 +18,13 @@ export default function Products() {
   const [q, setQ] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [bestsellerOnly, setBestsellerOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Row | null>(null);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => { loadCats(); load(); }, []);
-  useEffect(() => { load(); }, [q, catFilter, statusFilter]);
+  useEffect(() => { load(); }, [q, catFilter, statusFilter, bestsellerOnly]);
 
   async function loadCats() {
     const { data } = await supabase.from('categories').select('id,name,slug').order('name');
@@ -33,23 +34,25 @@ export default function Products() {
     setLoading(true);
     let qb = supabase
       .from('products')
-      .select('id,title,slug,price_usd,image_url,link_status,active,is_bundle,product_categories(categories(id,name,slug))')
+      .select('id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,product_categories(categories(id,name,slug))')
       .order('title')
       .limit(200);
     if (q.trim()) qb = qb.ilike('title', `%${q.trim()}%`);
     if (statusFilter === 'active') qb = qb.eq('active', true);
     if (statusFilter === 'inactive') qb = qb.eq('active', false);
+    if (bestsellerOnly) qb = qb.eq('is_bestseller', true);
     if (catFilter) {
       // filter by category via the join — need inner
       qb = supabase
         .from('products')
-        .select('id,title,slug,price_usd,image_url,link_status,active,is_bundle,product_categories!inner(categories(id,name,slug))')
+        .select('id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,product_categories!inner(categories(id,name,slug))')
         .eq('product_categories.category_id', catFilter)
         .order('title')
         .limit(200);
       if (q.trim()) qb = qb.ilike('title', `%${q.trim()}%`);
       if (statusFilter === 'active') qb = qb.eq('active', true);
       if (statusFilter === 'inactive') qb = qb.eq('active', false);
+      if (bestsellerOnly) qb = qb.eq('is_bestseller', true);
     }
     const { data, error } = await qb;
     if (error) console.error(error);
@@ -79,6 +82,9 @@ export default function Products() {
             <option value="active">Active only</option>
             <option value="inactive">Inactive only</option>
           </select>
+          <label className="flex items-center gap-1.5 text-xs text-ink-700 cursor-pointer">
+            <input type="checkbox" checked={bestsellerOnly} onChange={(e) => setBestsellerOnly(e.target.checked)} /> ★ Bestsellers only
+          </label>
           <span className="text-xs text-ink-700/60 ml-auto">{totalFiltered} shown</span>
           <button className={btnPrimary} onClick={() => setCreating(true)}>+ New product</button>
         </div>
@@ -99,7 +105,10 @@ export default function Products() {
                 <tr key={r.id} className="border-t border-black/5 hover:bg-cream/30">
                   <td className="p-2"><span className={`inline-block w-2.5 h-2.5 rounded-full ${linkColor[r.link_status] || 'bg-gray-400'}`} /></td>
                   <td className="p-2">{r.image_url ? <img src={r.image_url} className="w-10 h-10 object-cover rounded" /> : <div className="w-10 h-10 bg-cream rounded" />}</td>
-                  <td className="p-2"><a href={`/product/${r.slug}`} target="_blank" className="text-ink-800 hover:text-bronze-600">{r.title.slice(0, 60)}</a></td>
+                  <td className="p-2">
+                    {(r as any).is_bestseller && <span className="text-yellow-500 mr-1" title="Best seller">★</span>}
+                    <a href={`/product/${r.slug}`} target="_blank" className="text-ink-800 hover:text-bronze-600">{r.title.slice(0, 60)}</a>
+                  </td>
                   <td className="p-2 text-xs text-ink-700/70">{(r.product_categories ?? []).map((pc) => pc.categories?.name).filter(Boolean).join(', ') || '—'}</td>
                   <td className="p-2">${Number(r.price_usd).toFixed(2)}</td>
                   <td className="p-2">{r.active ? '✓' : '—'}</td>
@@ -128,7 +137,7 @@ export default function Products() {
 function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
   const blank = useMemo(() => ({
     title: '', slug: '', description: '', price_usd: 9.99, image_url: '',
-    gallery: '', is_bundle: false, active: true, link_status: 'review',
+    gallery: '', is_bundle: false, is_bestseller: false, active: true, link_status: 'review',
     seo_title: '', seo_description: '', download_link: '', category_ids: [] as string[],
   }), []);
   const [f, setF] = useState<any>(blank);
@@ -155,7 +164,7 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
       title: p.title || '', slug: p.slug || '', description: p.description || '',
       price_usd: p.price_usd || 0, image_url: p.image_url || '',
       gallery: Array.isArray(p.gallery) ? p.gallery.join('\n') : '',
-      is_bundle: !!p.is_bundle, active: p.active !== false,
+      is_bundle: !!p.is_bundle, is_bestseller: !!p.is_bestseller, active: p.active !== false,
       link_status: p.link_status || 'review',
       seo_title: p.seo_title || '', seo_description: p.seo_description || '',
       download_link: p.product_downloads?.[0]?.download_link || '',
@@ -179,7 +188,7 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
     const payload: any = {
       title: f.title.trim(), slug: f.slug.trim(), description: f.description || null,
       price_usd: Number(f.price_usd) || 0, image_url: f.image_url || null,
-      gallery, is_bundle: !!f.is_bundle, active: !!f.active,
+      gallery, is_bundle: !!f.is_bundle, is_bestseller: !!f.is_bestseller, active: !!f.active,
       link_status: f.link_status, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
     };
     let id = existing?.id;
@@ -259,9 +268,10 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
           <input value={f.download_link} onChange={(e) => set('download_link', e.target.value)} placeholder="https://drive.google.com/uc?export=download&id=…" className={inputCls} />
           <p className="text-xs text-ink-700/50 mt-1">Customers receive this after purchase. Server-only — never shown publicly.</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.active} onChange={(e) => set('active', e.target.checked)} /> Active (visible in catalog)</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_bundle} onChange={(e) => set('is_bundle', e.target.checked)} /> Bundle</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_bestseller} onChange={(e) => set('is_bestseller', e.target.checked)} /> ★ Best seller (shows in homepage marquee)</label>
         </div>
       </div>
       <div className="mt-5 flex items-center gap-3 border-t border-black/10 pt-4">
