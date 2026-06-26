@@ -141,16 +141,23 @@ async function handleTransactionCompleted(db: any, txn: any) {
 
   // Resolve each line item → our product (by paddle_price_id) and create order_items + entitlements.
   const items = Array.isArray(txn.items) ? txn.items : [];
-  for (const it of items) {
+  // custom_data.cart_ids is the array our checkout-init pushed: the DB UUID per
+  // cart item, in the same order as the Paddle items (with non-product cart
+  // entries like 'membership:slug' preserved). Used as a fallback when an
+  // item came through as ad-hoc (no paddle_price_id) and so title-matching is
+  // the only handle we have.
+  const cartIds: string[] = Array.isArray(txn.custom_data?.cart_ids) ? txn.custom_data.cart_ids : [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
     const priceId = it.price?.id;
     const lineTotal = Number(it.totals?.total ?? it.totals?.subtotal ?? 0) / 100;
     const lineUnit = Number(it.price?.unit_price?.amount ?? 0) / 100;
     const qty = Number(it.quantity ?? 1);
 
-    // Try to find a matching product by paddle_price_id (may be null for ad-hoc items)
     let productId: string | null = null;
     let title: string = String(it.price?.description || it.price?.name || '').slice(0, 240);
 
+    // (1) Catalog match: synced products carry a paddle_price_id in our DB.
     if (priceId) {
       const { data: p } = await db
         .from('products')
@@ -158,6 +165,25 @@ async function handleTransactionCompleted(db: any, txn: any) {
         .eq('paddle_price_id', priceId)
         .maybeSingle();
       if (p) { productId = p.id; title = p.title; }
+    }
+    // (2) cart_ids positional fallback — works for ad-hoc items added before
+    //     the product was synced to Paddle's catalog.
+    if (!productId && cartIds[i] && !cartIds[i].startsWith('membership:')) {
+      const { data: p } = await db
+        .from('products')
+        .select('id, title')
+        .eq('id', cartIds[i])
+        .maybeSingle();
+      if (p) { productId = p.id; title = p.title; }
+    }
+    // (3) Last resort: match the inline title against products.title.
+    if (!productId && title) {
+      const { data: p } = await db
+        .from('products')
+        .select('id, title')
+        .eq('title', title)
+        .maybeSingle();
+      if (p) { productId = p.id; }
     }
 
     await db.from('order_items').insert({
@@ -226,10 +252,11 @@ async function handleTransactionCompleted(db: any, txn: any) {
         last4: card.last4 || null,
       } : null;
       const invoiceNumber = txn.invoice_number || null;
-      // Build the hosted invoice URL Paddle exposes per transaction.
-      const paddleEnvName = process.env.PADDLE_ENV === 'production' ? 'production' : 'sandbox';
-      const paddleHost = paddleEnvName === 'production' ? 'https://my.paddle.com' : 'https://sandbox-my.paddle.com';
-      const paddleInvoiceUrl = invoiceNumber ? `${paddleHost}/invoice/${txn.id}` : null;
+      // Permanent redirect endpoint on OUR domain. The endpoint fetches a
+      // fresh pre-signed invoice URL from Paddle on each click — Paddle's
+      // direct URLs expire after 1 hour, so emailing them directly breaks.
+      const siteUrl = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
+      const paddleInvoiceUrl = invoiceNumber ? `${siteUrl}/api/invoice/${txn.id}` : null;
 
       const { subject, html, text } = orderConfirmation({
         email,

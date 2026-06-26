@@ -67,6 +67,19 @@ export async function GET() {
     }
   } catch (e) { console.error('sitemap products failed:', e); }
 
+  // Blog posts
+  try {
+    const { data: posts } = await supabase
+      .from('posts')
+      .select('slug, updated_at, published_at')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(500);
+    for (const p of posts || []) {
+      urls.push(entry(`${SITE}/blog/${p.slug}`, p.updated_at || p.published_at, 'monthly', 0.7));
+    }
+  } catch (e) { console.error('sitemap posts failed:', e); }
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.join('\n')}
