@@ -13,6 +13,8 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { verifyWebhookSignature, paddleApi } from '../../../lib/paddle';
+import { send as sendEmail } from '../../../lib/resend';
+import { orderConfirmation } from '../../../lib/email-templates';
 
 export const prerender = false;
 
@@ -160,6 +162,73 @@ async function handleTransactionCompleted(db: any, txn: any) {
     }
   }
 
-  // TODO: send the buyer an email with their download links, once email provider is chosen.
   console.log(`Order ${order.id} created for txn ${txn.id} (${email}, $${total}).`);
+
+  // ── Send branded confirmation email with download links ──────────────
+  // Pulls download links from product_downloads for each ordered product, then
+  // hands off to Resend. Failure here does NOT roll back the order (the customer
+  // can still see their order on /account); we just log so we can resend later.
+  if (email && email !== 'unknown@digitalchiselco.com') {
+    try {
+      // Fetch order items + their download links + brand logo in parallel
+      const [{ data: orderItems }, { data: settings }] = await Promise.all([
+        db.from('order_items')
+          .select('title, qty, price_usd, product_id')
+          .eq('order_id', order.id),
+        db.from('site_settings').select('logo_image_url').eq('id', 1).maybeSingle(),
+      ]);
+      const productIds = (orderItems || []).map((it: any) => it.product_id).filter(Boolean);
+      const downloadsByProduct: Record<string, { name?: string; url: string }[]> = {};
+      if (productIds.length) {
+        const { data: dls } = await db
+          .from('product_downloads')
+          .select('product_id, file_name, download_link')
+          .in('product_id', productIds);
+        for (const dl of dls || []) {
+          (downloadsByProduct[dl.product_id] ||= []).push({ name: dl.file_name || undefined, url: dl.download_link });
+        }
+      }
+
+      const emailItems = (orderItems || []).map((it: any) => ({
+        title: it.title || 'Item',
+        qty: it.qty || 1,
+        price_usd: Number(it.price_usd) || 0,
+        download_links: it.product_id ? downloadsByProduct[it.product_id] : undefined,
+      }));
+
+      const customerName: string | null =
+        txn.customer?.name || (txn.custom_data && txn.custom_data.customer_name) || null;
+
+      const { subject, html, text } = orderConfirmation({
+        email,
+        customerName,
+        orderId: order.id,
+        orderShortId: String(order.id).slice(0, 8),
+        createdAt: new Date().toISOString(),
+        total,
+        currency,
+        items: emailItems,
+        logoUrl: settings?.logo_image_url || null,
+      });
+
+      const sendResult = await sendEmail({
+        to: email,
+        subject,
+        html,
+        text,
+        idempotencyKey: `order:${order.id}`,   // Resend dedupes if we accidentally retry
+      });
+
+      if (sendResult.ok && !sendResult.skipped) {
+        console.log(`[email] Order ${order.id.slice(0, 8)} confirmation sent to ${email} (id=${sendResult.id})`);
+      } else if (sendResult.skipped) {
+        console.log(`[email] skipped (Resend not configured) — order ${order.id.slice(0, 8)}`);
+      } else {
+        console.error(`[email] failed for order ${order.id.slice(0, 8)}: ${sendResult.error}`);
+      }
+    } catch (e) {
+      // Don't throw — the order is already saved, the customer can refetch via /account
+      console.error(`[email] threw for order ${order.id}:`, e);
+    }
+  }
 }
