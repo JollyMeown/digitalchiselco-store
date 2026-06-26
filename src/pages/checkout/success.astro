@@ -60,10 +60,25 @@ if (txnId) {
           <h1 class="font-serif text-3xl text-bronze-800">We're processing your order…</h1>
           <p class="text-ink-700/70 mt-3 max-w-lg mx-auto">
             Payment confirmed. We're preparing your downloads now — this usually takes a few seconds.
-            Refresh this page in a moment, or check your email for the download links.
+            <span id="auto-refresh-note">This page will refresh automatically.</span>
           </p>
-          <button onclick="location.reload()" class="mt-6 bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Refresh</button>
+          <button id="refresh-btn" onclick="location.reload()" class="mt-6 bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Refresh now</button>
+          <p class="mt-4 text-xs text-ink-700/50">Still nothing? Your receipt with download links has also been emailed to you.</p>
         </div>
+        <script is:inline>
+          (function () {
+            var url = new URL(location.href);
+            var retry = parseInt(url.searchParams.get('retry') || '0', 10);
+            // Cap at ~50s so a stuck webhook doesn't pin the tab forever.
+            if (retry < 20) {
+              url.searchParams.set('retry', String(retry + 1));
+              setTimeout(function () { location.replace(url.toString()); }, 2500);
+            } else {
+              var note = document.getElementById('auto-refresh-note');
+              if (note) note.textContent = 'Click refresh when ready — or just check your email.';
+            }
+          })();
+        </script>
       </>
     )}
   </main>
