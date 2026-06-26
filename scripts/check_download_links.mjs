@@ -44,17 +44,34 @@ const REPORT_PATH = flag('out') || 'download-link-report.csv';
 const TIMEOUT_MS = 12_000;
 const UA = 'Mozilla/5.0 (compatible; DigitalChiselCo-Linkcheck/1.0)';
 
-// --- pull rows --------------------------------------------------------------
+// --- pull rows (paginated — Supabase caps single SELECT at 1000) -----------
 console.log('Fetching product_downloads rows…');
-let query = db
-  .from('product_downloads')
-  .select('id, product_id, file_name, download_link, products(slug, title, active, link_status)')
-  .not('download_link', 'is', null)
-  .order('product_id');
-if (LIMIT) query = query.limit(LIMIT);
-const { data: rows, error } = await query;
-if (error) { console.error('✗ DB query failed:', error.message); process.exit(1); }
-const links = (rows || []).filter((r) => (r.download_link || '').trim());
+const SELECT = 'id, product_id, file_name, download_link, products(slug, title, active, link_status)';
+let rows = [];
+if (LIMIT) {
+  const { data, error } = await db
+    .from('product_downloads')
+    .select(SELECT)
+    .not('download_link', 'is', null)
+    .order('product_id')
+    .limit(LIMIT);
+  if (error) { console.error('✗ DB query failed:', error.message); process.exit(1); }
+  rows = data || [];
+} else {
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from('product_downloads')
+      .select(SELECT)
+      .not('download_link', 'is', null)
+      .order('product_id')
+      .range(from, from + PAGE - 1);
+    if (error) { console.error('✗ DB query failed:', error.message); process.exit(1); }
+    rows.push(...data);
+    if (data.length < PAGE) break;
+  }
+}
+const links = rows.filter((r) => (r.download_link || '').trim());
 console.log(`Got ${links.length} links. Concurrency=${CONCURRENCY}, timeout=${TIMEOUT_MS}ms`);
 
 // --- check one --------------------------------------------------------------
