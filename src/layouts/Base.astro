@@ -9,6 +9,9 @@ const {
   noindex = false,
 } = Astro.props;
 const site = import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com';
+// GA4 — defaults to the project's measurement ID. Override per-environment via
+// the Netlify env var PUBLIC_GA_MEASUREMENT_ID (e.g. a staging stream).
+const gaId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || 'G-MB5KF3D03Y';
 const canonical = new URL(Astro.url.pathname, site).href;
 const ogImage = image.startsWith('http') ? image : new URL(image, site).href;
 const settings = await getSettings();
@@ -52,6 +55,17 @@ const faviconType = settings.favicon_image_url
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Instrument+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    {gaId && (
+      <>
+        <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script>
+        <script is:inline define:vars={{ gaId }}>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', gaId);
+        </script>
+      </>
+    )}
   </head>
   <body>
     <slot />
