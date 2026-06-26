@@ -255,6 +255,208 @@ function esc(s: string): string {
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// Free-pack DELIVERY email. Sent by /free/confirm immediately after the
+// HMAC-verified click. Mirrors the MailerLite welcome automation design
+// but lives in our own Resend pipeline so we control the link target,
+// branding, and timing — and so customers stop receiving duplicates
+// from MailerLite's parallel welcome automation.
+// ──────────────────────────────────────────────────────────────────────
+
+const FREE_PACK_DOWNLOAD_URL = 'https://drive.google.com/drive/folders/15MNatyebOXkw-C27j4Kt4TX4purvTduE';
+
+const NAVY = '#1c2c3d';
+const NAVY_MUTED = '#a8c5e0';
+const NAVY_TEXT = '#cfd9e8';
+const BORDER_CREAM = '#d9c9a8';
+
+type FreePackFile = { n: string; cat: string; title: string; desc: string };
+
+const FREE_PACK_FILES: FreePackFile[] = [
+  {
+    n: '01',
+    cat: 'RELIGIOUS · FAITH FRAMED',
+    title: 'Crowned Christ Portrait STL.',
+    desc: 'A reverent portrait with crown-of-thorns detail — the file our buyers reorder most. Works in any wood from a soft maple to a brutal mesquite to a statement plaque.',
+  },
+  {
+    n: '02',
+    cat: 'RELIGIOUS · PROTECTION & PEACE',
+    title: 'Good Shepherd with Lambs STL.',
+    desc: 'A deeply tooled Christ-inspired design surrounded by sheep, capturing warmth, protection, and spiritual serenity in a natural hand-carved wood style.',
+  },
+  {
+    n: '03',
+    cat: 'RELIGIOUS · TENDER MOMENTS',
+    title: 'Christ with Lamb Embrace STL.',
+    desc: 'A tender carved scene of the shepherd carrying the lost lamb, sculpted with flowing robes, warm tonal grain, and quiet emotion. One of our quieter files — in a good way.',
+  },
+  {
+    n: '04',
+    cat: 'RELIGIOUS · ENDURING DEVOTION',
+    title: 'Pietà & Relief Panel STL.',
+    desc: 'A powerful seated carving of Mary, Joseph and the newborn child, wrapped in flowing drapery and warm wood grain for a timeless devotional feel.',
+  },
+  {
+    n: '05',
+    cat: 'RELIGIOUS · SACRED SURRENDER',
+    title: 'Crucifixion Hands touching Jesus Feet STL.',
+    desc: 'A powerful devotional carving showing a faithful hand reaching toward the wounded feet of Christ — perfect for practicing at a mid-tier depth, or as an exam piece on larger panels.',
+  },
+];
+
+export type FreePackDeliveryData = {
+  email: string;
+  name?: string | null;
+  /** Override the default Drive folder URL — handy for staging or A/B tests. */
+  downloadUrl?: string;
+};
+
+export function freePackDelivery(d: FreePackDeliveryData): { subject: string; html: string; text: string } {
+  const url = d.downloadUrl || FREE_PACK_DOWNLOAD_URL;
+  const greeting = d.name ? `Hi ${esc(d.name.split(/\s+/)[0])},` : 'Hi there,';
+  const subject = 'Your 5 free STL files are here 🎁';
+
+  const statsHtml = [
+    { v: '3,200+', l: 'DOWNLOADS' },
+    { v: '416', l: 'REVIEWS' },
+    { v: '4.9★', l: 'AVG RATING' },
+    { v: '1,076', l: 'FILES SOLD' },
+    { v: '50%', l: 'BUNDLE SAVE' },
+  ].map((s, i) => `
+    <td style="text-align:center;padding:18px 6px;${i > 0 ? `border-left:1px solid ${BORDER_CREAM};` : ''}">
+      <div style="font-family:Georgia,serif;font-size:22px;color:${BRAND_BRONZE_DARK};font-weight:600;">${s.v}</div>
+      <div style="font-size:9px;color:#777;letter-spacing:1.5px;margin-top:4px;">${s.l}</div>
+    </td>`).join('');
+
+  const filesHtml = FREE_PACK_FILES.map((f) => `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND_CREAM};border-radius:8px;margin:0 0 14px;">
+      <tr>
+        <td style="padding:18px 22px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="vertical-align:top;width:54px;">
+                <div style="font-family:Georgia,serif;font-size:30px;color:${BRAND_BRONZE};font-weight:600;line-height:1;">${f.n}</div>
+              </td>
+              <td style="vertical-align:top;">
+                <div style="font-size:10px;letter-spacing:1.5px;color:${BRAND_BRONZE};">${f.cat}</div>
+                <div style="font-family:Georgia,serif;font-size:16px;color:${BRAND_BRONZE_DARK};margin:4px 0 8px;">${f.title}</div>
+                <div style="font-size:13px;line-height:1.55;color:#555;">${f.desc}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>`).join('');
+
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f7f4ee;font-family:Helvetica,Arial,sans-serif;color:${BRAND_INK};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f4ee;padding:24px 8px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #eee;">
+
+        <!-- Hero -->
+        <tr><td style="background:${BRAND_CREAM};padding:36px 32px 28px;border-top:6px solid ${BRAND_BRONZE};">
+          <div style="font-size:11px;letter-spacing:2.5px;color:${BRAND_BRONZE};">FROM OUR STUDIO</div>
+          <h1 style="font-family:Georgia,serif;font-size:32px;color:${BRAND_BRONZE_DARK};margin:10px 0 4px;line-height:1.15;">Your free files<br>have arrived,</h1>
+          <div style="height:3px;width:32px;background:${BRAND_BRONZE};margin:18px 0;"></div>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 22px;color:#3a2a1c;">
+            ${greeting}<br><br>
+            Thank you for trusting our work enough to try it on your machine. Everything you need is one click away — five bas-relief STL files and a short scaling guide, tested on real CNC routers, 3D printers, and laser engravers.
+          </p>
+          <a href="${esc(url)}" style="display:inline-block;background:${NAVY};color:#fff;text-decoration:none;padding:14px 30px;border-radius:8px;font-size:14px;font-weight:500;">Download your files →</a>
+          <p style="font-size:11px;color:#666;margin:14px 0 0;">Delivered via Google Drive · No login required · Personal-use license</p>
+        </td></tr>
+
+        <!-- Stats row -->
+        <tr><td style="background:${BRAND_CREAM};padding:0 24px 28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid ${BORDER_CREAM};">
+            <tr>${statsHtml}</tr>
+          </table>
+        </td></tr>
+
+        <!-- Navy divider -->
+        <tr><td style="background:${NAVY};color:${NAVY_MUTED};text-align:center;padding:14px;">
+          <div style="font-size:10px;letter-spacing:4px;">• • • • •</div>
+          <div style="font-size:11px;letter-spacing:2.5px;margin-top:6px;">FIVE FILES, FROM US TO YOU</div>
+        </td></tr>
+
+        <!-- Pack contents -->
+        <tr><td style="padding:32px 28px 18px;">
+          <div style="font-size:11px;letter-spacing:2px;color:${BRAND_BRONZE};">INSIDE THE PACK</div>
+          <h2 style="font-family:Georgia,serif;font-size:22px;color:${BRAND_BRONZE_DARK};margin:6px 0 12px;line-height:1.25;">Five files, hand-picked<br>from our Christian collection.</h2>
+          <p style="font-size:14px;line-height:1.6;color:#555;margin:0 0 22px;">Each one tested on our own machines before we shipped it. Scale, orient, and carve with confidence — the PDF guide walks you through it.</p>
+          ${filesHtml}
+        </td></tr>
+
+        <!-- Bonus PDF -->
+        <tr><td style="background:${NAVY};color:#fff;padding:30px 32px;text-align:center;">
+          <div style="font-size:10px;letter-spacing:2.5px;color:${NAVY_MUTED};">BONUS · 7-PAGE PDF</div>
+          <h3 style="font-family:Georgia,serif;font-size:22px;margin:10px 0 10px;color:#fff;">Our CNC Scaling Guide</h3>
+          <p style="font-size:13px;color:${NAVY_TEXT};margin:0 0 20px;line-height:1.55;">Recommended depths, software settings for Aspire, VCarve Pro & Carveco, and a quick reference for wood species — written by us, for you.</p>
+          <a href="${esc(url)}" style="display:inline-block;background:#fff;color:${NAVY};text-decoration:none;padding:13px 26px;border-radius:8px;font-size:14px;font-weight:500;">Open the Google Drive folder →</a>
+        </td></tr>
+
+        <!-- Note from us -->
+        <tr><td style="padding:30px 32px 36px;">
+          <div style="font-size:11px;letter-spacing:2px;color:${BRAND_BRONZE};">— A NOTE FROM US —</div>
+          <p style="font-size:14px;line-height:1.65;margin:14px 0 12px;color:#3a2a1c;">
+            You have five of the free car buyers have ever loved most this year. They're yours for <strong>personal use</strong> — carve them, print them, engrave them, give them as gifts.
+          </p>
+          <p style="font-size:14px;line-height:1.65;margin:0 0 12px;color:#3a2a1c;">
+            Over the next two weeks, we'll send you a few short emails — our story, a quick Aspire walkthrough, and first-look access to new pieces before they go on Etsy. If that's not your thing, there's an unsubscribe link at the bottom; no hard feelings.
+          </p>
+          <p style="font-size:14px;line-height:1.65;margin:0 0 12px;color:#3a2a1c;">
+            Half of every sale we make is donated to feed families in need and care for animals in our community. Your trust in downloading these files is, quietly, part of that too. Thank you.
+          </p>
+          <p style="font-family:Georgia,serif;font-size:22px;color:${BRAND_BRONZE_DARK};margin:24px 0 4px;">Jolly</p>
+          <p style="font-size:12px;color:#888;margin:0;">DigitalChiselCo · Handcrafted in Pakistan, shipped to the world</p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background:#f7f4ee;padding:18px 32px;text-align:center;border-top:1px solid #eee;">
+          <p style="font-size:11px;color:#999;margin:0;">
+            You received this because you signed up at <a href="${SITE}/free" style="color:${BRAND_BRONZE};">${SITE.replace(/^https?:\/\//, '')}/free</a>. Reply any time — a real person reads every message.
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const text = `${greeting}
+
+Your free files have arrived.
+
+Download all five STL files + the CNC Scaling Guide PDF from this Google Drive folder:
+
+  ${url}
+
+(No login required. Personal-use license.)
+
+WHAT'S IN THE PACK
+==================
+${FREE_PACK_FILES.map((f) => `${f.n}. ${f.title}\n   ${f.desc}`).join('\n\n')}
+
+BONUS — Our CNC Scaling Guide (7-page PDF)
+Recommended depths, software settings for Aspire, VCarve Pro & Carveco, and a quick reference for wood species.
+
+— A NOTE FROM US —
+
+You have five of the files our buyers have loved most this year. They're yours for personal use — carve them, print them, engrave them, give them as gifts.
+
+Over the next two weeks we'll send you a few short emails — our story, a quick Aspire walkthrough, and first-look access to new pieces. If that's not your thing, there's an unsubscribe link at the bottom; no hard feelings.
+
+Half of every sale we make is donated to feed families in need and care for animals in our community. Your trust in downloading these files is, quietly, part of that too. Thank you.
+
+Jolly
+DigitalChiselCo
+${SITE}/free`;
+
+  return { subject, html, text };
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Free-pack double opt-in confirmation. We send this ourselves via Resend
 // because MailerLite's API-created subscribers don't trigger a confirmation
 // email automatically. After the click, /free/confirm flips MailerLite
