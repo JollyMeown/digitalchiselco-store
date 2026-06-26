@@ -1,0 +1,197 @@
+---
+import Base from '../../layouts/Base.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { supabaseAdmin } from '../../lib/supabase';
+import { verifyAccountToken } from '../../lib/account-token';
+
+export const prerender = false;
+
+const COOKIE = 'dcc_account';
+const MAX_AGE = 60 * 60 * 24 * 30;
+
+// 1. Sign-in via magic link — set cookie, drop the token from the URL.
+const urlToken = Astro.url.searchParams.get('token');
+if (urlToken) {
+  const ok = verifyAccountToken(urlToken);
+  if (ok) {
+    Astro.cookies.set(COOKIE, urlToken, {
+      httpOnly: true,
+      secure: Astro.url.protocol === 'https:',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: MAX_AGE,
+    });
+    return Astro.redirect('/account');
+  }
+}
+
+// 2. Sign-out.
+if (Astro.url.searchParams.get('signout') === '1') {
+  Astro.cookies.delete(COOKIE, { path: '/' });
+  return Astro.redirect('/account');
+}
+
+// 3. Validate the session cookie.
+const cookieToken = Astro.cookies.get(COOKIE)?.value;
+const session = verifyAccountToken(cookieToken);
+
+type DownloadRow = { file_name: string | null; download_link: string };
+type OrderItem = { id: string; title: string; qty: number; price_usd: number; product_id: string | null; downloads?: DownloadRow[] };
+type OrderRow = { id: string; total: number; currency: string; status: string; created_at: string; paddle_transaction_id: string | null; order_items: OrderItem[] };
+
+let orders: OrderRow[] = [];
+if (session?.email) {
+  const db = supabaseAdmin();
+  const { data } = await db
+    .from('orders')
+    .select('id, total, currency, status, created_at, paddle_transaction_id, order_items(id, title, qty, price_usd, product_id)')
+    .ilike('email', session.email)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  orders = (data as OrderRow[]) || [];
+
+  const productIds = Array.from(
+    new Set(orders.flatMap((o) => (o.order_items || []).map((i) => i.product_id)).filter(Boolean)),
+  ) as string[];
+
+  const downloadsByProduct: Record<string, DownloadRow[]> = {};
+  if (productIds.length) {
+    const { data: dls } = await db
+      .from('product_downloads')
+      .select('product_id, file_name, download_link')
+      .in('product_id', productIds);
+    for (const d of (dls || []) as any[]) {
+      (downloadsByProduct[d.product_id] ||= []).push({ file_name: d.file_name, download_link: d.download_link });
+    }
+  }
+  for (const o of orders) {
+    for (const it of o.order_items || []) {
+      it.downloads = (it.product_id && downloadsByProduct[it.product_id]) || [];
+    }
+  }
+}
+---
+<Base title="My Account · DigitalChiselCo" noindex>
+  <Header />
+  <main class="max-w-4xl mx-auto px-4 sm:px-6 py-12 min-h-[60vh]">
+    {!session ? (
+      <section class="max-w-md mx-auto">
+        <h1 class="font-serif text-3xl text-bronze-800 mb-3">Your account</h1>
+        <p class="text-ink-700 mb-6">
+          Enter the email you used at checkout — we'll send you a secure link to view all your past orders and re-download your STL files.
+        </p>
+        <form id="signin" class="space-y-3">
+          <input id="email" type="email" required placeholder="you@email.com" autocomplete="email"
+            class="w-full px-4 py-3 rounded-md border border-bronze-600/30 focus:outline-none focus:border-bronze-600 bg-white" />
+          <button type="submit"
+            class="w-full bg-bronze-600 text-cream px-6 py-3 rounded-md hover:bg-bronze-700 transition">
+            Email me a sign-in link
+          </button>
+        </form>
+        <p id="msg" class="mt-4 text-sm hidden"></p>
+        <p class="mt-8 text-xs text-ink-700/60">
+          New here? Browse the <a href="/catalog" class="text-bronze-600 underline">catalog</a> or get a
+          <a href="/free" class="text-bronze-600 underline">free STL pack</a>.
+        </p>
+      </section>
+    ) : (
+      <section>
+        <div class="flex justify-between flex-wrap gap-3 items-start mb-8">
+          <div>
+            <h1 class="font-serif text-3xl text-bronze-800">My orders</h1>
+            <p class="text-ink-700/70 text-sm mt-1">Signed in as <strong>{session.email}</strong></p>
+          </div>
+          <a href="/account?signout=1" class="text-sm text-bronze-600 underline">Sign out</a>
+        </div>
+        {orders.length === 0 ? (
+          <div class="bg-cream/40 border border-bronze-600/20 rounded-lg p-6">
+            <p class="text-ink-700">No orders found under <strong>{session.email}</strong>.</p>
+            <p class="text-sm text-ink-700/70 mt-2">
+              If you bought files using a different email, <a href="/account?signout=1" class="text-bronze-600 underline">sign out</a> and try again.
+            </p>
+          </div>
+        ) : (
+          <div class="space-y-6">
+            {orders.map((o) => (
+              <div class="bg-white border border-black/10 rounded-xl p-5">
+                <div class="flex justify-between flex-wrap gap-2 items-baseline mb-4">
+                  <div>
+                    <div class="font-medium text-ink-800">Order #{String(o.id).slice(0, 8)}</div>
+                    <div class="text-xs text-ink-700/60">
+                      {new Date(o.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </div>
+                  </div>
+                  <div class="text-sm text-ink-700/80">${Number(o.total).toFixed(2)} {o.currency || 'USD'}</div>
+                </div>
+                <ul class="divide-y divide-black/10">
+                  {(o.order_items || []).map((it) => (
+                    <li class="py-3">
+                      <div class="flex justify-between items-baseline mb-2 gap-3">
+                        <span class="text-sm text-ink-800">{it.title}</span>
+                        <span class="text-xs text-ink-700/60 whitespace-nowrap">{it.qty}× ${Number(it.price_usd).toFixed(2)}</span>
+                      </div>
+                      {it.downloads && it.downloads.length > 0 ? (
+                        <div class="flex flex-wrap gap-2">
+                          {it.downloads.map((d) => (
+                            <a href={d.download_link} target="_blank" rel="noopener"
+                              class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-4 py-2 rounded-md text-sm">
+                              ⬇ Download{d.file_name ? ` · ${d.file_name}` : ''}
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <div class="text-xs text-ink-700/60">
+                          Download link will be emailed within a few minutes if not already attached.
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    )}
+  </main>
+  <Footer />
+
+  {!session && (
+    <script is:inline>
+      const form = document.getElementById('signin');
+      const msg = document.getElementById('msg');
+      const emailInput = document.getElementById('email');
+      const button = form?.querySelector('button[type="submit"]');
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = emailInput.value.trim();
+        msg.className = 'mt-4 text-sm text-ink-700';
+        msg.textContent = 'Sending sign-in link…';
+        msg.classList.remove('hidden');
+        button.disabled = true;
+        try {
+          const res = await fetch('/api/account/request-link', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json();
+          if (res.ok && data.ok) {
+            msg.className = 'mt-4 text-sm text-green-700';
+            msg.textContent = '✓ Check ' + email + ' for your sign-in link. (Valid for 30 days.)';
+            form.reset();
+          } else {
+            msg.className = 'mt-4 text-sm text-red-700';
+            msg.textContent = data?.error || 'Something went wrong. Please try again.';
+          }
+        } catch {
+          msg.className = 'mt-4 text-sm text-red-700';
+          msg.textContent = 'Network error. Please try again.';
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  )}
+</Base>
