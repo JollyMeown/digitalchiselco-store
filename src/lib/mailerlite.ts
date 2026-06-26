@@ -5,7 +5,9 @@
 // Required env vars:
 //   MAILERLITE_API_KEY                 — Account API key (Integrations → API)
 //   MAILERLITE_FREE_GROUP_ID           — Group for /free signups (free pack delivery)
-//   MAILERLITE_MEMBERSHIP_GROUP_ID     — Group for /membership leads (optional; falls back to FREE group)
+//   MAILERLITE_MEMBERSHIP_GROUP_ID     — OPTIONAL. Membership leads are skipped when unset
+//                                        (no fallback to free group; membership is handled
+//                                         by a separate system).
 //
 // If MAILERLITE_API_KEY is missing, all calls are no-ops — the storefront keeps
 // working and we still persist to Supabase.
