@@ -25,6 +25,14 @@ type SubscribePayload = {
   groupId?: string;       // explicit override
   groupKey?: 'free' | 'membership'; // pick the right env var
   source?: string;        // free-tracking only; not sent to MailerLite
+  /**
+   * Forward to MailerLite's `status` field. Pass `'active'` ONLY when the
+   * caller has already verified consent — e.g. the user just clicked our
+   * own HMAC-signed confirmation link. Setting active suppresses
+   * MailerLite's own confirmation email so the user doesn't see duplicates.
+   * Omit to let MailerLite use the group's default.
+   */
+  status?: 'active' | 'unconfirmed' | 'unsubscribed' | 'bounced' | 'junk';
 };
 
 export function isMailerLiteConfigured(): boolean {
@@ -56,7 +64,8 @@ export async function subscribe(p: SubscribePayload): Promise<{ ok: boolean; ski
     fields: { ...(p.name ? { name: p.name } : {}), ...(p.fields || {}) },
   };
   if (groupId) body.groups = [groupId];
-  // status omitted → MailerLite uses the group's default (which honors confirmation settings)
+  if (p.status) body.status = p.status;
+  // when status omitted, MailerLite uses the group's default (typically `unconfirmed`)
 
   try {
     const res = await fetch(`${API}/subscribers`, {
