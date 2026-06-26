@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
+import { subscribe as mailerliteSubscribe } from '../../lib/mailerlite';
 
 export const prerender = false;
 
@@ -10,16 +11,27 @@ export const POST: APIRoute = async ({ request }) => {
     const name = String(body.name || '').trim().slice(0, 120);
     const email = String(body.email || '').toLowerCase().trim();
     const plan_slug = String(body.plan_slug || '').trim().slice(0, 40);
+    if (name.length < 2) {
+      return json({ error: 'Please enter your name.' }, 400);
+    }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return json({ error: 'Please enter a valid email address.' }, 400);
     }
     const db = supabaseAdmin();
     const { error } = await db
       .from('membership_leads')
-      .insert({ name: name || null, email, plan_slug: plan_slug || null, source: 'membership-page' });
+      .insert({ name, email, plan_slug: plan_slug || null, source: 'membership-page' });
     if (error) throw error;
-    // also add to subscribers so they get the regular newsletter flow
     await db.from('subscribers').upsert({ email, source: 'membership' }, { onConflict: 'email' });
+
+    // MailerLite double opt-in to the membership-leads group (or free group as fallback).
+    await mailerliteSubscribe({
+      email,
+      name,
+      groupKey: 'membership',
+      fields: { plan: plan_slug || '' },
+    });
+
     return json({ ok: true });
   } catch (e) {
     console.error('membership-lead failed:', e);

@@ -1,0 +1,67 @@
+---
+import Shell from '../layouts/Shell.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { getSettings } from '../lib/queries';
+const s = await getSettings();
+---
+<Shell
+  title="Our Story · DigitalChiselCo — Premium STL Files for CNC, Laser & 3D Printing"
+  description="The story behind DigitalChiselCo — a one-person digital design studio building museum-grade bas-relief STL files for CNC routers, laser engravers, and 3D printers."
+>
+  <Breadcrumbs crumbs={[{ label: 'Our Story' }]} />
+
+  <article class="max-w-3xl mx-auto">
+    <header class="text-center mb-12">
+      <p class="text-xs tracking-widest text-bronze-600 mb-3">★ OUR STORY</p>
+      <h1 class="font-serif text-4xl md:text-5xl text-bronze-800 leading-tight">From workshop to your machine.</h1>
+      <p class="mt-5 text-lg text-ink-700/85 max-w-2xl mx-auto">
+        DigitalChiselCo is a small, independent digital design studio building bas-relief STL files for the global community of CNC, laser, and 3D-print makers.
+      </p>
+    </header>
+
+    <section class="prose prose-lg max-w-none text-ink-700 leading-relaxed space-y-6">
+      <h2 class="font-serif text-2xl text-bronze-800">Why we started</h2>
+      <p>
+        Carving and 3D printing should feel like making art, not hunting for files. After years of buying patchy STL packs from random marketplaces, we built the studio we wished existed — one with hand-finished designs, honest pricing, and instant downloads that just work in Aspire, VCarve, Fusion 360, and Carveco.
+      </p>
+
+      <h2 class="font-serif text-2xl text-bronze-800">What goes into a DigitalChiselCo file</h2>
+      <p>
+        Every STL on this site starts as a sculpt and ends with a real CNC pass on a real machine. Files are mesh-checked, watertight, scaled to standard router beds, and tested through the depth-mapping process so your tool paths render predictably. If a file would carve ugly, we don't ship it.
+      </p>
+      <ul class="not-prose grid sm:grid-cols-2 gap-3 text-sm mt-4 mb-6">
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Hand-finished bas-relief sculpts</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Tested in Aspire / VCarve / Carveco / Fusion 360</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Watertight, mesh-checked geometry</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Standard router-bed scale, easily resized</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Instant downloads — no shipping delay</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Commercial-use license included</li>
+      </ul>
+
+      <h2 class="font-serif text-2xl text-bronze-800">Who's behind it</h2>
+      <p>
+        DigitalChiselCo is a one-person studio — designer, support, and the person who personally tests every release. When you email <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a>, you're emailing me. I read every message and reply within a day.
+      </p>
+
+      <h2 class="font-serif text-2xl text-bronze-800">{Number(s.products_count).toLocaleString()}+ designs and counting</h2>
+      <p>
+        We release new bas-relief themes every month — wildlife, patriotic, religious, vintage, seasonal, and custom commission work. Customers in over 40 countries carve our files for personal projects, craft fairs, and small woodworking businesses. To see what's coming next, drop your email on the <a href="/free" class="text-bronze-600">free pack page</a> — you'll get the first look at new collections.
+      </p>
+
+      <h2 class="font-serif text-2xl text-bronze-800">The license, in plain English</h2>
+      <p>
+        Buy once, download forever, sell the physical pieces you carve. The only thing you may not do is resell or share the digital files themselves. Full terms on the <a href="/terms" class="text-bronze-600">Terms of Service</a> page.
+      </p>
+    </section>
+
+    <!-- CTA strip -->
+    <section class="mt-16 border border-bronze-600/30 rounded-xl p-8 text-center bg-gradient-to-br from-cream to-white">
+      <h3 class="font-serif text-2xl text-bronze-800">Ready to carve?</h3>
+      <p class="mt-2 text-ink-700">Browse {Number(s.products_count).toLocaleString()}+ premium designs, or start with five free files on the house.</p>
+      <div class="mt-5 flex flex-wrap justify-center gap-3">
+        <a href="/catalog" class="bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition shadow">Browse the catalog →</a>
+        <a href="/free" class="border border-bronze-600 text-bronze-700 px-6 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">Get 5 free STL files</a>
+      </div>
+    </section>
+  </article>
+</Shell>

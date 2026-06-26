@@ -46,7 +46,8 @@ const faviconType = settings.favicon_image_url
     <meta name="twitter:image" content={ogImage} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://i.etsystatic.com" />
+    {/* Preconnect to our image CDN (Supabase Storage) for faster product/category image loads */}
+    <link rel="preconnect" href="https://tutalnieozbngrsfywes.supabase.co" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Instrument+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
@@ -54,5 +55,34 @@ const faviconType = settings.favicon_image_url
   </head>
   <body>
     <slot />
+    <!-- Organization + WebSite structured data — helps Google build Knowledge Graph
+         entries for the brand and enables the sitelinks search box. -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'Organization',
+          '@id': site + '#org',
+          name: 'DigitalChiselCo',
+          url: site,
+          logo: settings.logo_image_url || (site + '/og-default.jpg'),
+          email: settings.admin_email || 'jolly@digitalchiselco.com',
+          sameAs: [],
+          description: 'Premium bas-relief STL files for CNC routers, laser engravers and 3D printers.',
+        },
+        {
+          '@type': 'WebSite',
+          '@id': site + '#website',
+          name: 'DigitalChiselCo',
+          url: site,
+          publisher: { '@id': site + '#org' },
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: { '@type': 'EntryPoint', urlTemplate: site + '/search?q={search_term_string}' },
+            'query-input': 'required name=search_term_string',
+          },
+        },
+      ],
+    })} />
   </body>
 </html>

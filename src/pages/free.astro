@@ -8,10 +8,12 @@ import Shell from '../layouts/Shell.astro';
       <h1 class="text-3xl md:text-4xl text-bronze-800 leading-tight">Get <em class="italic">5 premium STL files</em> — free</h1>
       <p class="mt-4 text-bronze-700">Plus our CNC woodcarving guide. Drop your email and we'll send your free bas-relief pack, ready for CNC routers, 3D printers and laser engravers.</p>
 
-      <form id="sub" class="mt-8 flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+      <form id="sub" class="mt-8 grid gap-3 max-w-md mx-auto">
+        <input id="name" type="text" required placeholder="Your name"
+          class="px-4 py-3 rounded-md border border-bronze-600/30 focus:outline-none focus:border-bronze-600 bg-white" />
         <input id="email" type="email" required placeholder="you@email.com"
-          class="flex-1 px-4 py-3 rounded-md border border-bronze-600/30 focus:outline-none focus:border-bronze-600 bg-white" />
-        <button type="submit" class="bg-bronze-600 text-cream px-6 py-3 rounded-md hover:bg-bronze-700 transition whitespace-nowrap">Send my files</button>
+          class="px-4 py-3 rounded-md border border-bronze-600/30 focus:outline-none focus:border-bronze-600 bg-white" />
+        <button type="submit" class="bg-bronze-600 text-cream px-6 py-3 rounded-md hover:bg-bronze-700 transition">Send my files</button>
       </form>
       <p id="msg" class="mt-4 text-sm hidden"></p>
 
@@ -28,15 +30,16 @@ import Shell from '../layouts/Shell.astro';
     const msg = document.getElementById('msg');
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email = document.getElementById('email').value;
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
       msg.className = 'mt-4 text-sm text-bronze-700';
       msg.textContent = 'Sending…';
       try {
-        const res = await fetch('/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
+        const res = await fetch('/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, email }) });
         const data = await res.json();
         if (res.ok) {
           msg.className = 'mt-4 text-sm text-green-700';
-          msg.textContent = '✓ You’re in! Your free STL pack is on its way to your inbox.';
+          msg.textContent = '✓ Check your inbox! We sent a confirmation email — click the link inside to receive your free STL pack.';
           form.reset();
         } else {
           msg.className = 'mt-4 text-sm text-red-600';

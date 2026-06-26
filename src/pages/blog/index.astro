@@ -1,0 +1,83 @@
+---
+import Shell from '../../layouts/Shell.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { supabaseAdmin } from '../../lib/supabase';
+
+// Fetch published posts if the posts table exists; gracefully fall back to "coming soon".
+let posts: any[] = [];
+let tableExists = false;
+try {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from('posts')
+    .select('slug, title, excerpt, cover_image_url, published_at, author')
+    .eq('status', 'published')
+    .order('published_at', { ascending: false })
+    .limit(50);
+  if (!error) { tableExists = true; posts = data || []; }
+} catch {}
+---
+<Shell
+  title="Blog · DigitalChiselCo — CNC, Laser & 3D Printing Tips"
+  description="Tutorials, scaling tips, and CNC project ideas from the DigitalChiselCo workshop. Get the most out of your bas-relief STL files."
+>
+  <Breadcrumbs crumbs={[{ label: 'Blog' }]} />
+
+  <article class="max-w-4xl mx-auto">
+    <header class="text-center mb-10">
+      <p class="text-xs tracking-widest text-bronze-600 mb-3">★ FROM THE WORKSHOP</p>
+      <h1 class="font-serif text-4xl md:text-5xl text-bronze-800 leading-tight">The DigitalChiselCo Blog</h1>
+      <p class="mt-4 text-lg text-ink-700/85 max-w-2xl mx-auto">
+        Practical CNC carving guides, scaling tutorials, tool-path tips, and project ideas — all aimed at helping you get the cleanest result from your bas-relief STL files.
+      </p>
+    </header>
+
+    {posts.length > 0 ? (
+      <div class="grid sm:grid-cols-2 gap-6">
+        {posts.map((p) => (
+          <a href={`/blog/${p.slug}`} class="block border border-black/10 rounded-lg overflow-hidden hover:shadow-md transition bg-white">
+            <div class="aspect-[16/9] bg-cream overflow-hidden">
+              {p.cover_image_url
+                ? <img src={p.cover_image_url} alt={p.title} loading="lazy" class="w-full h-full object-cover hover:scale-[1.03] transition duration-500" />
+                : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 font-serif">{p.title}</div>}
+            </div>
+            <div class="p-5">
+              <h2 class="font-serif text-lg text-ink-800 leading-snug">{p.title}</h2>
+              {p.excerpt && <p class="mt-2 text-sm text-ink-700/70 line-clamp-2">{p.excerpt}</p>}
+              <div class="mt-3 text-xs text-ink-700/50">
+                {p.author && <span>{p.author} · </span>}
+                {p.published_at && <span>{new Date(p.published_at).toLocaleDateString()}</span>}
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <section class="border border-bronze-600/20 rounded-xl bg-cream/40 p-10 text-center">
+        <div class="inline-block bg-bronze-600/10 text-bronze-700 px-3 py-1 rounded text-xs font-medium tracking-wide mb-4">COMING SOON</div>
+        <h2 class="font-serif text-2xl text-bronze-800">We're writing our first posts.</h2>
+        <p class="mt-3 text-ink-700/85 max-w-xl mx-auto">
+          We're putting together in-depth carving guides and scaling tutorials based on the questions we hear most from customers. Want to be the first to read them?
+        </p>
+        <a href="/free" class="mt-5 inline-block bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition shadow-sm">
+          Join the list & get 5 free STLs
+        </a>
+
+        <div class="mt-10 grid sm:grid-cols-3 gap-4 text-left max-w-2xl mx-auto">
+          <div class="bg-white rounded-lg p-4 border border-black/5">
+            <p class="text-xs text-bronze-600 mb-1">Coming up</p>
+            <p class="text-sm font-medium text-ink-800">Scaling STL files for any router bed</p>
+          </div>
+          <div class="bg-white rounded-lg p-4 border border-black/5">
+            <p class="text-xs text-bronze-600 mb-1">Coming up</p>
+            <p class="text-sm font-medium text-ink-800">CNC vs laser vs 3D printer for bas-relief</p>
+          </div>
+          <div class="bg-white rounded-lg p-4 border border-black/5">
+            <p class="text-xs text-bronze-600 mb-1">Coming up</p>
+            <p class="text-sm font-medium text-ink-800">Best beginner files & step-by-step setup</p>
+          </div>
+        </div>
+      </section>
+    )}
+  </article>
+</Shell>

@@ -1,0 +1,48 @@
+---
+import Shell from '../../layouts/Shell.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { supabaseAdmin } from '../../lib/supabase';
+
+const { slug } = Astro.params;
+let post: any = null;
+try {
+  const db = supabaseAdmin();
+  const { data } = await db
+    .from('posts')
+    .select('slug, title, excerpt, body, cover_image_url, published_at, author, seo_description')
+    .eq('slug', slug!).eq('status', 'published').maybeSingle();
+  post = data;
+} catch {}
+
+if (!post) return Astro.redirect('/blog');
+---
+<Shell
+  title={`${post.title} · DigitalChiselCo Blog`}
+  description={(post.seo_description || post.excerpt || '').slice(0, 155)}
+  image={post.cover_image_url || undefined}
+>
+  <Breadcrumbs crumbs={[{ label: 'Blog', href: '/blog' }, { label: post.title }]} />
+
+  <article class="max-w-3xl mx-auto">
+    {post.cover_image_url && (
+      <img src={post.cover_image_url} alt={post.title} class="w-full aspect-[16/9] object-cover rounded-lg mb-8" />
+    )}
+    <header class="mb-8">
+      <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">{post.title}</h1>
+      <div class="mt-3 text-sm text-ink-700/60">
+        {post.author && <span>{post.author}</span>}
+        {post.published_at && <span> · {new Date(post.published_at).toLocaleDateString()}</span>}
+      </div>
+    </header>
+    <div class="prose prose-lg max-w-none text-ink-700 leading-relaxed" set:html={post.body} />
+  </article>
+
+  <script type="application/ld+json" set:html={JSON.stringify({
+    '@context': 'https://schema.org', '@type': 'BlogPosting',
+    headline: post.title, description: (post.excerpt || '').slice(0, 300),
+    image: post.cover_image_url || undefined,
+    datePublished: post.published_at,
+    author: { '@type': 'Person', name: post.author || 'DigitalChiselCo' },
+    publisher: { '@type': 'Organization', name: 'DigitalChiselCo', logo: { '@type': 'ImageObject', url: 'https://digitalchiselco.com/og-default.jpg' } },
+  })} />
+</Shell>

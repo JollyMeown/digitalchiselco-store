@@ -18,6 +18,9 @@ const related = await getRelatedProducts(p.id, 5);
 
 const desc = p.description || `${cleanTitle} is a high-detail 3D relief STL designed for clean carving on CNC routers, laser engravers and 3D printers. After checkout you'll receive an instant download link by email and in your account.`;
 
+const pageTitle = `${cleanTitle.slice(0, 60)} · DigitalChiselCo`;
+const pageDesc = (p.seo_description || desc).slice(0, 160);
+
 const jsonld = {
   '@context': 'https://schema.org', '@type': 'Product',
   name: cleanTitle, description: (p.seo_description || desc).slice(0, 300),
@@ -26,7 +29,7 @@ const jsonld = {
   offers: { '@type': 'Offer', price, priceCurrency: 'USD', availability: 'https://schema.org/InStock', url: Astro.url.href },
 };
 ---
-<Shell title={`${cleanTitle} | DigitalChiselCo`} description={desc.slice(0, 155)} image={gallery[0]}>
+<Shell title={pageTitle} description={pageDesc} image={gallery[0]} hideBanner={true}>
   <Breadcrumbs crumbs={[cat ? { label: cat.name, href: `/collections/${cat.slug}` } : { label: 'Catalog', href: '/catalog' }, { label: cleanTitle }]} />
 
   <div class="grid md:grid-cols-2 gap-8 lg:gap-12">
