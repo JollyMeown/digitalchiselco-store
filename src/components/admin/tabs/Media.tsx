@@ -61,6 +61,41 @@ export default function Media() {
 
   return (
     <div className="space-y-5">
+      <Card title="Image rules of thumb" action={
+        <button className={btnGhost} onClick={() => {
+          const el = document.getElementById('rot-body');
+          if (el) el.classList.toggle('hidden');
+        }}>Show / Hide</button>
+      }>
+        <div id="rot-body">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="text-left text-ink-700/60 border-b border-black/10">
+                <th className="py-1.5 pr-3">Use</th>
+                <th className="py-1.5 pr-3">Display size</th>
+                <th className="py-1.5 pr-3">Upload at</th>
+                <th className="py-1.5 pr-3">Format</th>
+                <th className="py-1.5">Target KB</th>
+              </tr>
+            </thead>
+            <tbody className="text-ink-700">
+              <tr className="border-b border-black/5"><td className="py-1.5 pr-3 font-medium">Product card thumbnail</td><td className="pr-3">400×400</td><td className="pr-3">800×800</td><td className="pr-3">WebP q80</td><td>60–120</td></tr>
+              <tr className="border-b border-black/5"><td className="py-1.5 pr-3 font-medium">Product page main</td><td className="pr-3">800×800</td><td className="pr-3">1200×1200</td><td className="pr-3">WebP q82</td><td>150–250</td></tr>
+              <tr className="border-b border-black/5"><td className="py-1.5 pr-3 font-medium">Hero / site banner</td><td className="pr-3">1700×720</td><td className="pr-3">1700×720</td><td className="pr-3">WebP q80</td><td>200–400</td></tr>
+              <tr className="border-b border-black/5"><td className="py-1.5 pr-3 font-medium">Category card</td><td className="pr-3">600×340</td><td className="pr-3">1200×680</td><td className="pr-3">WebP q80</td><td>100–180</td></tr>
+              <tr className="border-b border-black/5"><td className="py-1.5 pr-3 font-medium">Membership poster</td><td className="pr-3">800×1000</td><td className="pr-3">1200×1500</td><td className="pr-3">WebP q82</td><td>200–350</td></tr>
+              <tr><td className="py-1.5 pr-3 font-medium">Logo / Favicon</td><td className="pr-3">48–64 px</td><td className="pr-3">256×256</td><td className="pr-3">PNG (transparent)</td><td>&lt; 50</td></tr>
+            </tbody>
+          </table>
+          <div className="mt-3 text-xs text-ink-700/70 space-y-1">
+            <p><strong>WebP, not JPG</strong> — same quality at 30% smaller file size.</p>
+            <p><strong>Upload at 2× display size</strong> — covers retina screens, allows shrinking.</p>
+            <p><strong>Don't upload camera originals</strong> (5 MB+). Resize first → <a href="https://squoosh.app" target="_blank" rel="noopener" className="text-bronze-600 underline">squoosh.app</a> (free, runs in browser).</p>
+            <p><strong>Videos</strong> — keep under 50 MB for Supabase Storage. Compress with HandBrake (H.264, 720p) before uploading. For larger files use YouTube/Vimeo embed links instead.</p>
+          </div>
+        </div>
+      </Card>
+
       <Card title="Brand · Logo and favicon">
         <p className="text-xs text-ink-700/60 mb-3">
           Logo shows in the header (and falls back to the SVG emblem if blank). Favicon is the browser-tab icon (PNG recommended at 256×256).

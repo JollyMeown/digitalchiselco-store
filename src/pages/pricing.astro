@@ -1,0 +1,133 @@
+---
+import Shell from '../layouts/Shell.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { getSettings, getMembershipPlans } from '../lib/queries';
+const s = await getSettings();
+const plans = await getMembershipPlans();
+const discount = s.discount_percent || 20;
+---
+<Shell title="Pricing · DigitalChiselCo" description="CNC STL file pricing — individual files from $3.99, membership plans from $20. Instant download, commercial use included.">
+  <Breadcrumbs crumbs={[{ label: 'Pricing' }]} />
+
+  <article class="max-w-3xl">
+    <h1 class="font-serif text-3xl text-bronze-800 mb-2">Pricing</h1>
+    <p class="text-ink-700 mb-10">Simple, transparent pricing. No subscriptions, no hidden fees. Pay once, download instantly, keep forever.</p>
+
+    <!-- INDIVIDUAL FILES -->
+    <section class="mb-12">
+      <h2 class="font-serif text-2xl text-bronze-800 mb-4">Individual STL Files</h2>
+      <div class="border border-black/10 rounded-xl p-6 bg-white">
+        <div class="grid sm:grid-cols-3 gap-6">
+          <div>
+            <div class="text-xs text-ink-700/60 uppercase tracking-wide mb-1">Price range</div>
+            <div class="font-serif text-2xl text-bronze-700">$3.99 – $19.99</div>
+            <div class="text-xs text-ink-700/60 mt-1">per design</div>
+          </div>
+          <div>
+            <div class="text-xs text-ink-700/60 uppercase tracking-wide mb-1">Current sale</div>
+            <div class="font-serif text-2xl text-bronze-700">{discount}% off</div>
+            <div class="text-xs text-ink-700/60 mt-1">all individual files</div>
+          </div>
+          <div>
+            <div class="text-xs text-ink-700/60 uppercase tracking-wide mb-1">Catalog size</div>
+            <div class="font-serif text-2xl text-bronze-700">{s.products_count.toLocaleString()}+</div>
+            <div class="text-xs text-ink-700/60 mt-1">designs available</div>
+          </div>
+        </div>
+        <ul class="mt-5 text-sm text-ink-700 space-y-1.5 border-t border-black/10 pt-4">
+          <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span> Instant download after purchase</li>
+          <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span> Commercial use included — sell your carved pieces</li>
+          <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span> CNC-ready .STL format</li>
+          <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span> Unlimited re-downloads</li>
+          <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span> No subscription — pay once, keep forever</li>
+        </ul>
+        <a href="/catalog" class="mt-5 inline-block bg-bronze-600 text-cream px-6 py-2.5 rounded-md text-sm hover:bg-bronze-700 transition">Browse catalog</a>
+      </div>
+    </section>
+
+    <!-- BUNDLES -->
+    <section class="mb-12">
+      <h2 class="font-serif text-2xl text-bronze-800 mb-4">Bundles</h2>
+      <div class="border border-black/10 rounded-xl p-6 bg-white">
+        <div class="grid sm:grid-cols-2 gap-6">
+          <div>
+            <div class="text-xs text-ink-700/60 uppercase tracking-wide mb-1">Price range</div>
+            <div class="font-serif text-2xl text-bronze-700">$14.99 – $49.99</div>
+            <div class="text-xs text-ink-700/60 mt-1">per bundle</div>
+          </div>
+          <div>
+            <div class="text-xs text-ink-700/60 uppercase tracking-wide mb-1">Savings</div>
+            <div class="font-serif text-2xl text-bronze-700">Up to 70% off</div>
+            <div class="text-xs text-ink-700/60 mt-1">vs buying individually</div>
+          </div>
+        </div>
+        <p class="mt-4 text-sm text-ink-700">Curated collections of 5–20 themed designs in a single download. Great for building a project library fast.</p>
+        <a href="/collections" class="mt-4 inline-block border border-bronze-600 text-bronze-700 px-6 py-2.5 rounded-md text-sm hover:bg-bronze-600/10 transition">View collections</a>
+      </div>
+    </section>
+
+    <!-- MEMBERSHIP -->
+    {plans.length > 0 && (
+      <section class="mb-12">
+        <h2 class="font-serif text-2xl text-bronze-800 mb-4">Membership Plans</h2>
+        <div class="grid md:grid-cols-2 gap-5">
+          {plans.map((p) => (
+            <div class={`border-2 rounded-xl p-6 ${p.highlight ? 'border-bronze-600 bg-cream/40' : 'border-black/10 bg-white'}`}>
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <span class="font-medium text-lg text-ink-800">{p.name}</span>
+                  {p.highlight && <span class="ml-2 text-xs bg-bronze-600 text-cream px-2 py-0.5 rounded">BEST VALUE</span>}
+                </div>
+                <div class="text-right">
+                  <div class="font-serif text-3xl text-bronze-700">${Number(p.price_usd).toFixed(2)}</div>
+                  {p.original_price_usd && <div class="text-xs text-ink-700/40 line-through">${Number(p.original_price_usd).toFixed(2)} value</div>}
+                </div>
+              </div>
+              <ul class="text-sm text-ink-700 space-y-1.5 mt-3">
+                {p.features.map((f) => <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span>{f}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div class="mt-5">
+          <a href="/membership" class="inline-block bg-bronze-600 text-cream px-6 py-2.5 rounded-md text-sm hover:bg-bronze-700 transition">Learn more about membership</a>
+        </div>
+      </section>
+    )}
+
+    <!-- WHAT'S INCLUDED -->
+    <section class="mb-12 border-l-4 border-bronze-600 bg-cream/40 p-5 rounded-r-lg">
+      <h3 class="font-medium text-bronze-700 mb-3">Every purchase includes</h3>
+      <ul class="text-sm text-ink-700 space-y-1.5">
+        <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span> Instant digital download — no waiting</li>
+        <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span> Commercial use license — sell your physical creations</li>
+        <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span> Unlimited re-downloads — come back anytime</li>
+        <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span> 100% secure payment</li>
+        <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span> Email support from a real person</li>
+      </ul>
+    </section>
+
+    <!-- FAQ -->
+    <section class="mb-8">
+      <h2 class="font-serif text-2xl text-bronze-800 mb-4">Common questions</h2>
+      <div class="space-y-4 text-sm text-ink-700">
+        <details class="border border-black/10 rounded-lg p-4">
+          <summary class="font-medium cursor-pointer">What file format do I get?</summary>
+          <p class="mt-2">All files are in .STL format — the industry standard for CNC bas-relief carving. Compatible with VCarve, Aspire, Fusion 360, and any CAM software that accepts STL.</p>
+        </details>
+        <details class="border border-black/10 rounded-lg p-4">
+          <summary class="font-medium cursor-pointer">Can I sell pieces I carve from these files?</summary>
+          <p class="mt-2">Yes. Your license includes commercial use — you can sell physical items you create. You may not resell or share the digital files themselves.</p>
+        </details>
+        <details class="border border-black/10 rounded-lg p-4">
+          <summary class="font-medium cursor-pointer">Do you offer refunds?</summary>
+          <p class="mt-2">Yes, in specific cases (duplicate purchase, corrupted files, non-delivery). See our <a href="/refunds" class="text-bronze-600">refund policy</a> for details.</p>
+        </details>
+        <details class="border border-black/10 rounded-lg p-4">
+          <summary class="font-medium cursor-pointer">Is the membership a recurring subscription?</summary>
+          <p class="mt-2">No. Membership is a one-time payment covering the full plan period (3 or 6 months). No automatic renewals, no surprise charges.</p>
+        </details>
+      </div>
+    </section>
+  </article>
+</Shell>

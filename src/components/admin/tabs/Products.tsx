@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls, linkColor } from '../ui';
+import ImageUpload from '../ImageUpload';
 
 type Cat = { id: string; name: string; slug: string };
 type Row = {
@@ -240,12 +241,42 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
           </select>
         </div>
         <div className="md:col-span-2">
-          <label className={labelCls}>Main image URL</label>
-          <input value={f.image_url} onChange={(e) => set('image_url', e.target.value)} placeholder="https://…" className={inputCls} />
+          <label className={labelCls}>Main image</label>
+          <ImageUpload value={f.image_url} onChange={(url) => set('image_url', url)} folder="products" />
         </div>
         <div className="md:col-span-2">
-          <label className={labelCls}>Gallery URLs <span className="text-ink-700/40">(one per line)</span></label>
-          <textarea value={f.gallery} onChange={(e) => set('gallery', e.target.value)} rows={4} className={inputCls} />
+          <label className={labelCls}>Gallery images</label>
+          <p className="text-xs text-ink-700/50 mb-2">Add images one at a time using the uploader, or paste URLs (one per line) in the text box below.</p>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {f.gallery.split('\n').filter((u: string) => u.trim()).map((url: string, i: number) => (
+              <div key={i} className="relative group w-20 h-20 rounded border border-black/10 overflow-hidden flex-shrink-0">
+                <img src={url.trim()} className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const urls = f.gallery.split('\n').filter((u: string) => u.trim());
+                    urls.splice(i, 1);
+                    set('gallery', urls.join('\n'));
+                  }}
+                  className="absolute top-0 right-0 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                >×</button>
+              </div>
+            ))}
+          </div>
+          <ImageUpload
+            value=""
+            onChange={(url) => {
+              if (!url) return;
+              const current = f.gallery.split('\n').filter((u: string) => u.trim());
+              current.push(url);
+              set('gallery', current.join('\n'));
+            }}
+            folder="products"
+          />
+          <details className="mt-2">
+            <summary className="text-xs text-ink-700/50 cursor-pointer">Paste URLs manually</summary>
+            <textarea value={f.gallery} onChange={(e) => set('gallery', e.target.value)} rows={3} className={inputCls + ' mt-1'} placeholder="One URL per line" />
+          </details>
         </div>
         <div className="md:col-span-2">
           <label className={labelCls}>Description</label>

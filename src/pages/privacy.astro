@@ -1,0 +1,71 @@
+---
+import Shell from '../layouts/Shell.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+---
+<Shell title="Privacy Policy · DigitalChiselCo" description="How DigitalChiselCo collects, uses, and protects your personal data.">
+  <Breadcrumbs crumbs={[{ label: 'Privacy Policy' }]} />
+
+  <article class="prose prose-sm max-w-3xl text-ink-700">
+    <h1 class="font-serif text-3xl text-bronze-800 mb-6">Privacy Policy</h1>
+    <p class="text-xs text-ink-700/50 mb-8">Last updated: June 26, 2026</p>
+
+    <p>DigitalChiselCo ("we," "us," or "our") respects your privacy. This Privacy Policy explains how we collect, use, and protect your information when you visit <strong>digitalchiselco.com</strong> (the "Site") or make a purchase.</p>
+
+    <h2>1. Information We Collect</h2>
+    <h3>Information you provide</h3>
+    <ul>
+      <li><strong>Account and checkout:</strong> name, email address, billing address, and payment details (processed securely by our payment provider — we never store card numbers).</li>
+      <li><strong>Newsletter and membership:</strong> email address and name when you subscribe or sign up for a membership plan.</li>
+      <li><strong>Support:</strong> any information you send when contacting us by email.</li>
+    </ul>
+
+    <h3>Information collected automatically</h3>
+    <ul>
+      <li><strong>Usage data:</strong> pages visited, time spent, referring URL, browser type, device type, and IP address.</li>
+      <li><strong>Cookies:</strong> we use essential cookies for cart functionality and session management. We do not use advertising or tracking cookies.</li>
+    </ul>
+
+    <h2>2. How We Use Your Information</h2>
+    <ul>
+      <li>Process and fulfill your orders and deliver download links.</li>
+      <li>Send order confirmations, download access, and membership updates.</li>
+      <li>Send promotional emails (only if you opted in — you can unsubscribe anytime).</li>
+      <li>Improve the Site, fix bugs, and analyze usage patterns.</li>
+      <li>Comply with legal obligations and prevent fraud.</li>
+    </ul>
+
+    <h2>3. Sharing Your Information</h2>
+    <p>We do <strong>not</strong> sell, rent, or trade your personal information. We share data only with:</p>
+    <ul>
+      <li><strong>Payment processor:</strong> to process transactions securely (as Merchant of Record, they handle billing, tax, and compliance).</li>
+      <li><strong>Email provider:</strong> to send transactional and marketing emails.</li>
+      <li><strong>Hosting provider:</strong> our Site is hosted on Netlify; data is stored on Supabase (both industry-standard, SOC 2 compliant).</li>
+      <li><strong>Legal requirements:</strong> if required by law, regulation, or valid legal process.</li>
+    </ul>
+
+    <h2>4. Data Retention</h2>
+    <p>We retain your data for as long as necessary to provide our services and fulfill legal obligations. Order records are kept for accounting purposes. You can request deletion of your account and personal data at any time by emailing us.</p>
+
+    <h2>5. Data Security</h2>
+    <p>We use industry-standard security measures including HTTPS encryption, secure authentication, and row-level database security to protect your information. However, no method of transmission over the internet is 100% secure.</p>
+
+    <h2>6. Your Rights</h2>
+    <p>Depending on your location, you may have the right to:</p>
+    <ul>
+      <li>Access the personal data we hold about you.</li>
+      <li>Request correction of inaccurate data.</li>
+      <li>Request deletion of your data.</li>
+      <li>Opt out of marketing emails at any time (click "unsubscribe" in any email).</li>
+      <li>Lodge a complaint with your local data protection authority.</li>
+    </ul>
+
+    <h2>7. Children's Privacy</h2>
+    <p>Our Site is not intended for children under 16. We do not knowingly collect personal information from children.</p>
+
+    <h2>8. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. Changes are effective upon posting. We encourage you to review this page periodically.</p>
+
+    <h2>9. Contact</h2>
+    <p>Questions about your privacy? Contact us at <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a>.</p>
+  </article>
+</Shell>
