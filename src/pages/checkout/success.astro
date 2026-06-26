@@ -1,0 +1,71 @@
+---
+import Base from '../../layouts/Base.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { supabaseAdmin } from '../../lib/supabase';
+
+const txnId = Astro.url.searchParams.get('txn') || '';
+
+// Try to look up the order (may not exist yet if the webhook hasn't fired —
+// the page falls back to a "We're processing your order" state in that case).
+let order: any = null;
+if (txnId) {
+  const db = supabaseAdmin();
+  const { data } = await db
+    .from('orders')
+    .select('id, email, total, currency, created_at, order_items(title, qty, price_usd)')
+    .eq('paddle_transaction_id', txnId)
+    .maybeSingle();
+  order = data;
+}
+---
+<Base title="Order confirmed · DigitalChiselCo" noindex>
+  <Header />
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 py-12 min-h-[50vh]">
+    {order ? (
+      <>
+        <div class="text-center mb-8">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-700 text-3xl mb-4">✓</div>
+          <h1 class="font-serif text-3xl text-bronze-800">Thank you for your order!</h1>
+          <p class="text-ink-700/70 mt-2">Order #{String(order.id).slice(0, 8)} · {new Date(order.created_at).toLocaleDateString()}</p>
+        </div>
+        <div class="bg-white border border-black/10 rounded-xl p-6">
+          <h2 class="font-medium text-ink-800 mb-3">Your downloads</h2>
+          <ul class="divide-y divide-black/10">
+            {(order.order_items || []).map((it: any) => (
+              <li class="py-3 flex justify-between items-center text-sm">
+                <span class="text-ink-800">{it.title}</span>
+                <span class="text-ink-700/60">{it.qty}×  ${Number(it.price_usd).toFixed(2)}</span>
+              </li>
+            ))}
+          </ul>
+          <div class="border-t border-black/10 mt-3 pt-3 flex justify-between text-base font-medium">
+            <span>Total paid</span>
+            <span>${Number(order.total).toFixed(2)} {order.currency}</span>
+          </div>
+        </div>
+        <div class="mt-6 bg-cream/40 border border-bronze-600/20 rounded-lg p-5 text-sm text-ink-700">
+          <p>📧 A copy of your receipt and download links has been sent to <strong>{order.email}</strong>.</p>
+          <p class="mt-2">Need help? Reach us at <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a> — a real person reads every message.</p>
+        </div>
+        <div class="mt-6 text-center">
+          <a href="/account" class="inline-block bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Go to my account</a>
+          <a href="/catalog" class="ml-3 inline-block text-bronze-700 px-6 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">Continue shopping</a>
+        </div>
+      </>
+    ) : (
+      <>
+        <div class="text-center">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-cream text-bronze-700 text-3xl mb-4">⌛</div>
+          <h1 class="font-serif text-3xl text-bronze-800">We're processing your order…</h1>
+          <p class="text-ink-700/70 mt-3 max-w-lg mx-auto">
+            Payment confirmed. We're preparing your downloads now — this usually takes a few seconds.
+            Refresh this page in a moment, or check your email for the download links.
+          </p>
+          <button onclick="location.reload()" class="mt-6 bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Refresh</button>
+        </div>
+      </>
+    )}
+  </main>
+  <Footer />
+</Base>

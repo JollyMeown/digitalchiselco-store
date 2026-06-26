@@ -1,0 +1,123 @@
+// Creates a Paddle "transaction" from the cart and returns its transactionId,
+// which the frontend feeds to Paddle.Checkout.open({ transactionId }) to launch
+// the overlay.
+//
+// We use this server-side path (instead of inline non-catalog items in the
+// browser) because:
+//   1) It lets us look up each cart item's paddle_price_id in the DB rather
+//      than trusting the browser-supplied price.
+//   2) Membership items (id starts with 'membership:<slug>') resolve to their
+//      Paddle price via membership_plans table.
+//   3) For products that don't have a paddle_price_id yet, we fall back to
+//      passing non-catalog items so checkout still works during the catalog
+//      sync rollout.
+
+import type { APIRoute } from 'astro';
+import { supabaseAdmin } from '../../lib/supabase';
+import { paddleApi } from '../../lib/paddle';
+
+export const prerender = false;
+
+type CartItem = { id: string; slug?: string; title?: string; price?: number; qty?: number };
+
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
+
+export const POST: APIRoute = async ({ request }) => {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const cart: CartItem[] = Array.isArray(body.items) ? body.items : [];
+    const email: string | undefined = body.email ? String(body.email).toLowerCase().trim() : undefined;
+    const discountPercent: number = Number(body.discount_percent) || 0;
+
+    if (!cart.length) return json({ error: 'Cart is empty.' }, 400);
+
+    const db = supabaseAdmin();
+
+    // Split cart into product ids vs membership slugs
+    const productIds = cart.filter((c) => !String(c.id).startsWith('membership:')).map((c) => c.id);
+    const membershipSlugs = cart
+      .filter((c) => String(c.id).startsWith('membership:'))
+      .map((c) => String(c.id).slice('membership:'.length));
+
+    // Look up Paddle IDs from DB
+    const [{ data: products }, { data: plans }] = await Promise.all([
+      productIds.length
+        ? db.from('products').select('id, title, slug, price_usd, paddle_price_id').in('id', productIds)
+        : { data: [] as any[] },
+      membershipSlugs.length
+        ? db.from('membership_plans').select('slug, name, price_usd, paddle_price_id').in('slug', membershipSlugs)
+        : { data: [] as any[] },
+    ] as any);
+
+    // Build the items array Paddle expects.
+    const items: any[] = [];
+    for (const c of cart) {
+      const qty = Math.max(1, Number(c.qty) || 1);
+      if (String(c.id).startsWith('membership:')) {
+        const slug = String(c.id).slice('membership:'.length);
+        const plan = (plans || []).find((p: any) => p.slug === slug);
+        if (!plan) continue;
+        if (plan.paddle_price_id) {
+          items.push({ price_id: plan.paddle_price_id, quantity: qty });
+        } else {
+          items.push(adhocItem(plan.name, Number(plan.price_usd), qty));
+        }
+      } else {
+        const p = (products || []).find((x: any) => x.id === c.id);
+        if (!p) continue;
+        const price = applyDiscount(Number(p.price_usd), discountPercent);
+        if (p.paddle_price_id) {
+          items.push({ price_id: p.paddle_price_id, quantity: qty });
+        } else {
+          items.push(adhocItem(p.title, price, qty));
+        }
+      }
+    }
+    if (!items.length) return json({ error: 'No valid items in cart.' }, 400);
+
+    // Create the transaction in Paddle
+    const txn = await paddleApi<any>('/transactions', {
+      method: 'POST',
+      body: {
+        items,
+        ...(email ? { customer: { email } } : {}),
+        // Embed our own identifiers so the webhook handler can correlate easily
+        custom_data: {
+          source: 'digitalchiselco-cart',
+          cart_ids: cart.map((c) => c.id),
+        },
+      },
+    });
+
+    return json({ transaction_id: txn.data?.id, status: txn.data?.status });
+  } catch (e: any) {
+    console.error('checkout-init failed:', e);
+    return json({ error: e.message || 'Checkout could not start.' }, 500);
+  }
+};
+
+function applyDiscount(price: number, percent: number): number {
+  if (!percent || percent <= 0 || percent >= 100) return price;
+  return Math.max(0, +(price * (100 - percent) / 100).toFixed(2));
+}
+
+// Non-catalog item — Paddle accepts this in /transactions when the price is
+// declared inline. We use USD across the board.
+function adhocItem(name: string, priceUsd: number, qty: number) {
+  return {
+    quantity: qty,
+    price: {
+      description: name.slice(0, 200),
+      name: name.slice(0, 200),
+      product: {
+        name: name.slice(0, 200),
+        tax_category: 'standard',
+      },
+      unit_price: {
+        amount: String(Math.round(priceUsd * 100)),
+        currency_code: 'USD',
+      },
+    },
+  };
+}

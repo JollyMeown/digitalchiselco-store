@@ -8,7 +8,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "import:products": "node scripts/import_products.mjs",
-    "migrate:images": "node scripts/migrate_images.mjs"
+    "migrate:images": "node scripts/migrate_images.mjs",
+    "sync:paddle": "node scripts/sync_paddle_products.mjs"
   },
   "dependencies": {
     "@astrojs/netlify": "^6.0.0",

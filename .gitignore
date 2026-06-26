@@ -21,3 +21,9 @@ drive_folders.json
 PROJECT_HANDOFF.md
 *HANDOFF*
 *SECRETS*
+
+# Local-only assets and logs (not for deploy)
+BRANDING/
+migration.log
+migration_errors.json
+migration_skipped_videos.json

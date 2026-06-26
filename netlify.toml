@@ -6,7 +6,7 @@
   # The anon key is public by design (RLS-protected); service_role runs only in the
   # server function. Tell Netlify's secrets scanner these are intentional so the build
   # doesn't fail. (Without this, Netlify aborts the deploy when it sees the keys.)
-  SECRETS_SCAN_OMIT_KEYS = "PUBLIC_SUPABASE_URL,PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY"
+  SECRETS_SCAN_OMIT_KEYS = "PUBLIC_SUPABASE_URL,PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,PADDLE_API_KEY,PUBLIC_PADDLE_CLIENT_TOKEN,PADDLE_WEBHOOK_SECRET"
 
 # ── Redirects ────────────────────────────────────────────────────────
 # Canonical: www → apex (or vice versa — pick one)

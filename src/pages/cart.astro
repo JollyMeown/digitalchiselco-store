@@ -4,8 +4,10 @@ import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
-import { pricing, money } from '../lib/pricing';
+import { pricing } from '../lib/pricing';
 const { percent } = pricing(1);
+const paddleEnv = (import.meta.env.PADDLE_ENV === 'production' ? 'production' : 'sandbox');
+const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
 ---
 <Base title="Cart | DigitalChiselCo">
   <Header />
@@ -31,7 +33,9 @@ const { percent } = pricing(1);
   </section>
 
   <Footer />
-  <script is:inline define:vars={{ DISCOUNT: percent }}>
+  <!-- Paddle.js — overlay checkout -->
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+  <script is:inline define:vars={{ DISCOUNT: percent, PADDLE_TOKEN: paddleToken, PADDLE_ENV: paddleEnv }}>
     const fmt = (n) => '$' + Number(n).toFixed(2);
     const itemsEl = document.getElementById('items');
     const escAttr = (s) => String(s ?? '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -101,8 +105,64 @@ const { percent } = pricing(1);
     loadUpsell();
     window.addEventListener('cart-changed', () => { renderCart(); loadUpsell(); });
 
-    document.getElementById('checkout')?.addEventListener('click', () => {
-      alert('Checkout (Paddle) is being set up — coming next. Your cart is saved.');
+    // ── Paddle.js setup ────────────────────────────────────────────────
+    function setupPaddle() {
+      if (typeof Paddle === 'undefined' || !PADDLE_TOKEN) return false;
+      try {
+        if (PADDLE_ENV === 'sandbox') Paddle.Environment.set('sandbox');
+        Paddle.Initialize({
+          token: PADDLE_TOKEN,
+          eventCallback: (e) => {
+            if (e.name === 'checkout.completed') {
+              const txnId = e.data?.transaction_id || e.data?.id;
+              localStorage.setItem('cart', '[]');
+              window.dispatchEvent(new Event('cart-changed'));
+              window.location.href = '/checkout/success' + (txnId ? '?txn=' + encodeURIComponent(txnId) : '');
+            } else if (e.name === 'checkout.error') {
+              console.error('Paddle checkout error:', e);
+            }
+          },
+        });
+      } catch (err) {
+        console.error('Paddle setup failed:', err);
+        return false;
+      }
+      return true;
+    }
+
+    // Wait for Paddle.js to attach
+    function whenPaddleReady(cb) {
+      if (typeof Paddle !== 'undefined') return cb();
+      let tries = 0;
+      const t = setInterval(() => {
+        if (typeof Paddle !== 'undefined') { clearInterval(t); cb(); }
+        else if (++tries > 50) { clearInterval(t); console.error('Paddle.js failed to load.'); }
+      }, 100);
+    }
+
+    whenPaddleReady(setupPaddle);
+
+    document.getElementById('checkout')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      if (!cart.length) return;
+      if (!PADDLE_TOKEN) { alert('Checkout is not yet configured. Please contact support.'); return; }
+      btn.disabled = true; btn.textContent = 'Starting checkout…';
+      try {
+        const res = await fetch('/api/checkout-init', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ items: cart, discount_percent: DISCOUNT }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.transaction_id) throw new Error(data.error || 'Could not start checkout.');
+        Paddle.Checkout.open({ transactionId: data.transaction_id });
+        btn.disabled = false; btn.textContent = 'Checkout';
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Checkout failed. Please try again.');
+        btn.disabled = false; btn.textContent = 'Checkout';
+      }
     });
   </script>
 </Base>
