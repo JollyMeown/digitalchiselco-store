@@ -2,9 +2,22 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls } from '../ui';
 
+type PurchaseRow = {
+  order_id: string;
+  email: string;
+  customer_name: string | null;
+  total: number;
+  currency: string;
+  status: string;
+  created_at: string;
+  paddle_transaction_id: string | null;
+  plan_titles: string[];
+};
+
 export default function Membership() {
   const [plans, setPlans] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
+  const [purchases, setPurchases] = useState<PurchaseRow[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -14,7 +27,45 @@ export default function Membership() {
       supabase.from('membership_plans').select('*').order('sort_order'),
       supabase.from('membership_leads').select('*').order('created_at', { ascending: false }).limit(200),
     ]);
-    setPlans(p ?? []); setLeads(l ?? []);
+    const planRows = p ?? [];
+    setPlans(planRows); setLeads(l ?? []);
+
+    // Membership purchases = orders that have an order_items row whose title
+    // matches one of our membership plan names. The webhook normalises the
+    // title to the plan's canonical name for membership items.
+    const planNames = planRows.map((x: any) => x.name).filter(Boolean);
+    if (planNames.length) {
+      const { data: items } = await supabase
+        .from('order_items')
+        .select('title, order_id, orders(id, email, customer_name, total, currency, status, created_at, paddle_transaction_id)')
+        .in('title', planNames)
+        .limit(500);
+      const byOrder = new Map<string, PurchaseRow>();
+      for (const it of items || []) {
+        const o = (it as any).orders;
+        if (!o) continue;
+        const existing = byOrder.get(o.id);
+        if (existing) {
+          if (!existing.plan_titles.includes(it.title)) existing.plan_titles.push(it.title);
+        } else {
+          byOrder.set(o.id, {
+            order_id: o.id,
+            email: o.email,
+            customer_name: o.customer_name,
+            total: Number(o.total),
+            currency: o.currency,
+            status: o.status,
+            created_at: o.created_at,
+            paddle_transaction_id: o.paddle_transaction_id,
+            plan_titles: [it.title],
+          });
+        }
+      }
+      const sorted = [...byOrder.values()].sort((a, b) => b.created_at.localeCompare(a.created_at));
+      setPurchases(sorted);
+    } else {
+      setPurchases([]);
+    }
   }
   async function remove(id: string) {
     if (!confirm('Delete this plan?')) return;
@@ -27,6 +78,19 @@ export default function Membership() {
     const blob = new Blob([head + body], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = `membership-leads-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+  }
+  function exportPurchases() {
+    const csvEsc = (v: any) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const head = 'date,name,email,plan,total,currency,status,order_id\n';
+    const body = purchases.map((r) =>
+      [r.created_at, r.customer_name || '', r.email, r.plan_titles.join(' + '), r.total, r.currency, r.status, r.order_id].map(csvEsc).join(','),
+    ).join('\n');
+    const blob = new Blob([head + body], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `membership-purchases-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
   }
 
   return (
@@ -60,6 +124,47 @@ export default function Membership() {
           </div>
         ))}
       </div>
+
+      <Card
+        title={`Membership purchases (${purchases.length})`}
+        action={purchases.length ? <button className={btnGhost} onClick={exportPurchases}>Export CSV</button> : null}
+      >
+        {purchases.length === 0 ? (
+          <p className="text-sm text-ink-700/60">No paid memberships yet. They'll appear here as soon as a Paddle transaction.completed webhook lands for a membership plan.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs text-ink-700/60 text-left">
+                <tr>
+                  <th className="p-2">Date</th>
+                  <th className="p-2">Name</th>
+                  <th className="p-2">Email</th>
+                  <th className="p-2">Plan</th>
+                  <th className="p-2 text-right">Total</th>
+                  <th className="p-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {purchases.map((p) => (
+                  <tr key={p.order_id} className="border-t border-black/5">
+                    <td className="p-2 text-xs whitespace-nowrap">{new Date(p.created_at).toLocaleString()}</td>
+                    <td className="p-2">{p.customer_name || '—'}</td>
+                    <td className="p-2"><a href={`mailto:${p.email}`} className="text-bronze-700 hover:underline">{p.email}</a></td>
+                    <td className="p-2 text-xs">{p.plan_titles.join(' + ')}</td>
+                    <td className="p-2 text-right">${p.total.toFixed(2)} {p.currency || 'USD'}</td>
+                    <td className="p-2 text-xs">
+                      <span className={
+                        p.status === 'paid' ? 'text-green-700' :
+                        p.status === 'refunded' ? 'text-red-700' : 'text-ink-700/60'
+                      }>{p.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <Card title={`Membership leads (${leads.length})`} action={<button className={btnGhost} onClick={exportLeads}>Export CSV</button>}>
         {leads.length === 0 ? (

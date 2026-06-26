@@ -130,10 +130,16 @@ async function handleTransactionCompleted(db: any, txn: any) {
     return;
   }
 
+  // Capture customer's name early — used both on the order row and for the
+  // ops notification we may send further down.
+  const earlyOpsCustomerName =
+    customerName || (txn.custom_data && txn.custom_data.customer_name) || null;
+
   const { data: order, error: orderErr } = await db
     .from('orders')
     .insert({
       email: email || 'unknown@digitalchiselco.com',
+      customer_name: earlyOpsCustomerName,
       status: 'paid',
       subtotal,
       total,
@@ -246,11 +252,9 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // never rolls back the order.
   if (purchasedMemberships.length && email && email !== 'unknown@digitalchiselco.com') {
     try {
-      const opsCustomerName =
-        customerName || (txn.custom_data && txn.custom_data.customer_name) || null;
       const { subject, html, text } = membershipPurchaseNotification({
         customerEmail: email,
-        customerName: opsCustomerName,
+        customerName: earlyOpsCustomerName,
         orderId: order.id,
         orderShortId: String(order.id).slice(0, 8),
         createdAt: new Date().toISOString(),
