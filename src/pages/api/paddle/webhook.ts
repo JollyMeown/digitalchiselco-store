@@ -14,7 +14,15 @@ import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { verifyWebhookSignature, paddleApi } from '../../../lib/paddle';
 import { send as sendEmail } from '../../../lib/resend';
-import { orderConfirmation } from '../../../lib/email-templates';
+import { orderConfirmation, membershipPurchaseNotification } from '../../../lib/email-templates';
+
+const OPS_INBOX = 'jolly@digitalchiselco.com';
+
+// process.env at runtime in Netlify Functions; import.meta.env at build-time
+// in Astro dev. Read both so dev and prod behave identically.
+function env(name: string): string | undefined {
+  return process.env[name] ?? (import.meta as any).env?.[name];
+}
 
 export const prerender = false;
 
@@ -24,7 +32,7 @@ const json = (data: unknown, status = 200) =>
 export const POST: APIRoute = async ({ request }) => {
   const rawBody = await request.text();
   const sig = request.headers.get('paddle-signature');
-  const secret = process.env.PADDLE_WEBHOOK_SECRET || '';
+  const secret = env('PADDLE_WEBHOOK_SECRET') || '';
 
   if (!secret) {
     console.error('Webhook hit but PADDLE_WEBHOOK_SECRET is not set');
@@ -147,6 +155,8 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // item came through as ad-hoc (no paddle_price_id) and so title-matching is
   // the only handle we have.
   const cartIds: string[] = Array.isArray(txn.custom_data?.cart_ids) ? txn.custom_data.cart_ids : [];
+  // Track membership plans in this order so we can ping ops afterwards.
+  const purchasedMemberships: { name: string; slug: string; price_usd: number; qty: number }[] = [];
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const priceId = it.price?.id;
@@ -156,6 +166,31 @@ async function handleTransactionCompleted(db: any, txn: any) {
 
     let productId: string | null = null;
     let title: string = String(it.price?.description || it.price?.name || '').slice(0, 240);
+
+    // Detect membership-plan items: match by paddle_price_id OR by membership:<slug> cart marker.
+    let membershipPlan: { name: string; slug: string; price_usd: number } | null = null;
+    if (priceId) {
+      const { data: mp } = await db
+        .from('membership_plans')
+        .select('name, slug, price_usd')
+        .eq('paddle_price_id', priceId)
+        .maybeSingle();
+      if (mp) membershipPlan = mp;
+    }
+    if (!membershipPlan && cartIds[i]?.startsWith('membership:')) {
+      const slug = cartIds[i].slice('membership:'.length);
+      const { data: mp } = await db
+        .from('membership_plans')
+        .select('name, slug, price_usd')
+        .eq('slug', slug)
+        .maybeSingle();
+      if (mp) membershipPlan = mp;
+    }
+    if (membershipPlan) {
+      purchasedMemberships.push({ ...membershipPlan, qty });
+      // Use the canonical plan name for the order_items row so admin/email reads cleanly.
+      title = membershipPlan.name;
+    }
 
     // (1) Catalog match: synced products carry a paddle_price_id in our DB.
     if (priceId) {
@@ -204,6 +239,45 @@ async function handleTransactionCompleted(db: any, txn: any) {
   }
 
   console.log(`Order ${order.id} created for txn ${txn.id} (${email}, $${total}).`);
+
+  // ── Ops notification: new membership purchase ─────────────────────
+  // Sends to OPS_INBOX so Jolly can spin up the manual fulfilment side
+  // (first 8-file pack + monthly schedule). Best-effort — failure here
+  // never rolls back the order.
+  if (purchasedMemberships.length && email && email !== 'unknown@digitalchiselco.com') {
+    try {
+      const opsCustomerName =
+        customerName || (txn.custom_data && txn.custom_data.customer_name) || null;
+      const { subject, html, text } = membershipPurchaseNotification({
+        customerEmail: email,
+        customerName: opsCustomerName,
+        orderId: order.id,
+        orderShortId: String(order.id).slice(0, 8),
+        createdAt: new Date().toISOString(),
+        currency,
+        plans: purchasedMemberships,
+        totalPaid: total,
+        invoiceNumber: txn.invoice_number || null,
+      });
+      const r = await sendEmail({
+        to: OPS_INBOX,
+        subject,
+        html,
+        text,
+        replyTo: email,            // hitting reply goes straight to the customer
+        idempotencyKey: `membership-ops:${order.id}`,
+      });
+      if (r.ok && !r.skipped) {
+        console.log(`[email] Membership ops notification sent for order ${order.id.slice(0, 8)} (id=${r.id})`);
+      } else if (r.skipped) {
+        console.log(`[email] Membership ops notification skipped (Resend not configured) — order ${order.id.slice(0, 8)}`);
+      } else {
+        console.error(`[email] Membership ops notification failed for order ${order.id.slice(0, 8)}: ${r.error}`);
+      }
+    } catch (e) {
+      console.error(`[email] Membership ops notification threw for order ${order.id}:`, e);
+    }
+  }
 
   // ── Send branded confirmation email with download links ──────────────
   // Pulls download links from product_downloads for each ordered product, then
@@ -255,7 +329,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
       // Permanent redirect endpoint on OUR domain. The endpoint fetches a
       // fresh pre-signed invoice URL from Paddle on each click — Paddle's
       // direct URLs expire after 1 hour, so emailing them directly breaks.
-      const siteUrl = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
+      const siteUrl = (env('PUBLIC_SITE_URL') || 'https://digitalchiselco.com').replace(/\/$/, '');
       const paddleInvoiceUrl = invoiceNumber ? `${siteUrl}/api/invoice/${txn.id}` : null;
 
       const { subject, html, text } = orderConfirmation({

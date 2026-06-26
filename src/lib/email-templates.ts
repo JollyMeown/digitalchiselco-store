@@ -253,3 +253,78 @@ ${SITE}
 function esc(s: string): string {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// Internal ops notification: new membership purchase.
+// Goes to jolly@digitalchiselco.com so the manual side of the membership
+// fulfilment (first pack delivery + monthly schedule) can kick off.
+// ──────────────────────────────────────────────────────────────────────
+
+export type MembershipPurchaseData = {
+  customerEmail: string;
+  customerName?: string | null;
+  orderId: string;
+  orderShortId: string;
+  createdAt: string;
+  currency: string;
+  plans: { name: string; slug: string; price_usd: number; qty: number }[];
+  totalPaid: number;
+  invoiceNumber?: string | null;
+};
+
+export function membershipPurchaseNotification(d: MembershipPurchaseData): { subject: string; html: string; text: string } {
+  const planSummary = d.plans.map((p) => `${p.qty}× ${p.name}`).join(', ');
+  const subject = `🟢 New membership: ${d.customerName || d.customerEmail} — ${planSummary}`;
+  const dateStr = new Date(d.createdAt).toLocaleString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  });
+
+  const plansHtml = d.plans.map((p) => `
+    <tr>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;">${esc(p.name)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">${p.qty}× $${p.price_usd.toFixed(2)}</td>
+    </tr>`).join('');
+
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f7f4ee;font-family:Helvetica,Arial,sans-serif;color:${BRAND_INK};">
+  <div style="max-width:560px;margin:0 auto;padding:24px;background:#fff;border:1px solid #eee;border-radius:10px;">
+    <div style="background:${BRAND_BRONZE};color:${BRAND_CREAM};padding:14px 18px;border-radius:6px;margin-bottom:18px;">
+      <strong style="font-size:16px;">New membership purchase</strong><br>
+      <span style="font-size:13px;opacity:.85;">Time to send the first pack.</span>
+    </div>
+
+    <p style="margin:0 0 14px;font-size:15px;">A customer just paid for a membership. Their details are below — kick off the manual fulfilment when you have a moment.</p>
+
+    <table style="width:100%;border-collapse:collapse;margin:0 0 18px;font-size:14px;">
+      <tr><td style="padding:6px 8px;width:120px;color:#666;">Name</td><td style="padding:6px 8px;"><strong>${esc(d.customerName || '(not provided)')}</strong></td></tr>
+      <tr><td style="padding:6px 8px;color:#666;">Email</td><td style="padding:6px 8px;"><a href="mailto:${esc(d.customerEmail)}" style="color:${BRAND_BRONZE};">${esc(d.customerEmail)}</a></td></tr>
+      <tr><td style="padding:6px 8px;color:#666;">Order</td><td style="padding:6px 8px;">#${esc(d.orderShortId)}${d.invoiceNumber ? ` · invoice ${esc(d.invoiceNumber)}` : ''}</td></tr>
+      <tr><td style="padding:6px 8px;color:#666;">Date</td><td style="padding:6px 8px;">${esc(dateStr)}</td></tr>
+    </table>
+
+    <h3 style="font-size:14px;margin:0 0 8px;color:#444;">Plan(s) purchased</h3>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 12px;font-size:14px;">${plansHtml}
+      <tr><td style="padding:8px;border-top:2px solid #333;"><strong>Total paid</strong></td><td style="padding:8px;border-top:2px solid #333;text-align:right;"><strong>$${d.totalPaid.toFixed(2)} ${esc(d.currency)}</strong></td></tr>
+    </table>
+
+    <p style="font-size:13px;color:#666;margin:18px 0 0;">— DigitalChiselCo notifier</p>
+  </div>
+</body></html>`;
+
+  const text = `New membership purchase
+
+Name : ${d.customerName || '(not provided)'}
+Email: ${d.customerEmail}
+Order: #${d.orderShortId}${d.invoiceNumber ? ` · invoice ${d.invoiceNumber}` : ''}
+Date : ${dateStr}
+
+Plan(s):
+${d.plans.map((p) => `  - ${p.qty}× ${p.name} ($${p.price_usd.toFixed(2)})`).join('\n')}
+
+Total paid: $${d.totalPaid.toFixed(2)} ${d.currency}
+
+— DigitalChiselCo notifier`;
+
+  return { subject, html, text };
+}
