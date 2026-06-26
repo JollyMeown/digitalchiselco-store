@@ -255,6 +255,72 @@ function esc(s: string): string {
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// Free-pack double opt-in confirmation. We send this ourselves via Resend
+// because MailerLite's API-created subscribers don't trigger a confirmation
+// email automatically. After the click, /free/confirm flips MailerLite
+// status → active, which fires the existing welcome automation that
+// actually delivers the 5-file pack.
+// ──────────────────────────────────────────────────────────────────────
+
+export function freePackConfirmation(d: { email: string; name?: string | null; confirmUrl: string }): { subject: string; html: string; text: string } {
+  const subject = 'Confirm your DigitalChiselCo free STL pack';
+  const greeting = d.name ? `Hi ${esc(d.name)},` : 'Hi there,';
+
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f7f4ee;font-family:Helvetica,Arial,sans-serif;color:${BRAND_INK};">
+  <div style="max-width:560px;margin:0 auto;padding:24px;background:#fff;border:1px solid #eee;border-radius:10px;">
+    <div style="background:${BRAND_BRONZE};color:${BRAND_CREAM};text-align:center;padding:22px 18px;border-radius:8px;margin-bottom:22px;">
+      <div style="font-size:11px;letter-spacing:2px;opacity:.85;">DIGITALCHISELCO</div>
+      <div style="font-family:Georgia,serif;font-size:24px;margin-top:6px;">Confirm your free STL pack</div>
+    </div>
+
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">${greeting}</p>
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">
+      You're one click away from your <strong>5 premium bas-relief STL files</strong> and our CNC woodcarving guide. Tap the button below to confirm your email and we'll send your pack within a minute.
+    </p>
+
+    <p style="margin:24px 0;text-align:center;">
+      <a href="${d.confirmUrl}" style="display:inline-block;background:${BRAND_BRONZE};color:#fff;text-decoration:none;padding:14px 30px;border-radius:6px;font-size:15px;font-weight:500;">Confirm and send my files</a>
+    </p>
+
+    <p style="font-size:13px;color:#666;line-height:1.5;margin:20px 0 4px;">
+      Or paste this link into your browser:
+    </p>
+    <p style="font-size:12px;color:#666;line-height:1.45;word-break:break-all;margin:0 0 22px;">
+      <a href="${d.confirmUrl}" style="color:${BRAND_BRONZE};">${d.confirmUrl}</a>
+    </p>
+
+    <ul style="margin:0 0 18px;padding-left:18px;font-size:13px;color:#555;line-height:1.7;">
+      <li>5 hand-picked premium bas-relief STL files</li>
+      <li>CNC woodcarving guide (PDF)</li>
+      <li>Tested in Aspire, VCarve, Carveco, ArtCAM, Fusion 360</li>
+    </ul>
+
+    <p style="font-size:12px;color:#888;border-top:1px solid #eee;padding-top:14px;margin:22px 0 0;">
+      This link is valid for 14 days. If you didn't request this, you can safely ignore the email.
+    </p>
+  </div>
+</body></html>`;
+
+  const text = `${d.name ? `Hi ${d.name},` : 'Hi there,'}
+
+You're one click away from your 5 premium bas-relief STL files and our CNC woodcarving guide. Confirm your email here:
+
+${d.confirmUrl}
+
+What you'll get:
+  - 5 hand-picked premium bas-relief STL files
+  - CNC woodcarving guide (PDF)
+  - Tested in Aspire, VCarve, Carveco, ArtCAM, Fusion 360
+
+This link is valid for 14 days. If you didn't request this, ignore this email.
+
+— DigitalChiselCo`;
+
+  return { subject, html, text };
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Internal ops notification: new membership purchase.
 // Goes to jolly@digitalchiselco.com so the manual side of the membership
 // fulfilment (first pack delivery + monthly schedule) can kick off.

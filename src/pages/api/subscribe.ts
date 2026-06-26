@@ -1,26 +1,48 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
-import { subscribe as mailerliteSubscribe } from '../../lib/mailerlite';
+import { send as sendEmail } from '../../lib/resend';
+import { signSubscribeToken } from '../../lib/subscribe-token';
+import { freePackConfirmation } from '../../lib/email-templates';
 
 export const prerender = false;
+
+function env(name: string): string | undefined {
+  return process.env[name] ?? (import.meta as any).env?.[name];
+}
+
+const SITE = (env('PUBLIC_SITE_URL') || 'https://digitalchiselco.com').replace(/\/$/, '');
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const POST: APIRoute = async ({ request }) => {
   try {
     const body = await request.json().catch(() => ({}));
     const email = String(body.email || '').toLowerCase().trim();
     const name = String(body.name || '').trim().slice(0, 120) || null;
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    if (!EMAIL_RE.test(email)) {
       return json({ error: 'Please enter a valid email address.' }, 400);
     }
+
+    // Always upsert into our subscribers table. confirmed_at stays null until
+    // the user clicks the link in the email.
     const db = supabaseAdmin();
     const { error } = await db
       .from('subscribers')
-      .upsert({ email, source: 'free-pack' }, { onConflict: 'email' });
+      .upsert({ email, name, source: 'free-pack' }, { onConflict: 'email' });
     if (error) throw error;
 
-    // Hand off to MailerLite so they get the double-opt-in email and the
-    // free-pack automation fires. No-op if MAILERLITE_API_KEY is unset.
-    await mailerliteSubscribe({ email, name, groupKey: 'free' });
+    // Send our own confirmation email via Resend. We deliberately DO NOT
+    // call MailerLite here — that happens after the click, in
+    // /free/confirm, so the welcome automation only fires for real humans.
+    const token = signSubscribeToken(email);
+    const confirmUrl = `${SITE}/free/confirm?token=${encodeURIComponent(token)}`;
+    const { subject, html, text } = freePackConfirmation({ email, name, confirmUrl });
+    await sendEmail({
+      to: email,
+      subject,
+      html,
+      text,
+      idempotencyKey: `subscribe-confirm:${email}`,
+    });
 
     return json({ ok: true });
   } catch (e) {

@@ -1,0 +1,116 @@
+---
+import Base from '../../layouts/Base.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { supabaseAdmin } from '../../lib/supabase';
+import { verifySubscribeToken } from '../../lib/subscribe-token';
+import { subscribe as mailerliteSubscribe } from '../../lib/mailerlite';
+
+export const prerender = false;
+
+type Outcome = 'ok' | 'already' | 'invalid' | 'error';
+
+const token = Astro.url.searchParams.get('token');
+const verified = verifySubscribeToken(token);
+
+let outcome: Outcome = 'invalid';
+let displayEmail = '';
+
+if (verified) {
+  displayEmail = verified.email;
+  try {
+    const db = supabaseAdmin();
+
+    // Look up the row; if it doesn't exist (unlikely — they'd have to forge a
+    // valid token without ever submitting the form), insert a fresh confirmed
+    // row so the welcome automation still goes out.
+    const { data: existing } = await db
+      .from('subscribers')
+      .select('id, name, confirmed_at')
+      .eq('email', verified.email)
+      .maybeSingle();
+
+    let name: string | null = existing?.name || null;
+    let alreadyConfirmed = !!existing?.confirmed_at;
+
+    if (!alreadyConfirmed) {
+      const nowIso = new Date().toISOString();
+      const upsert = await db
+        .from('subscribers')
+        .upsert(
+          { email: verified.email, name, source: 'free-pack', confirmed_at: nowIso },
+          { onConflict: 'email' },
+        );
+      if (upsert.error) throw upsert.error;
+
+      // Flip MailerLite status to active so the existing Free STL Pack
+      // welcome automation actually fires and delivers the 5-file pack.
+      // No-op if MAILERLITE_API_KEY isn't set in this environment.
+      await mailerliteSubscribe({ email: verified.email, name, groupKey: 'free' }).catch((e) => {
+        console.error('[subscribe-confirm] MailerLite call failed (continuing):', e);
+      });
+      outcome = 'ok';
+    } else {
+      outcome = 'already';
+    }
+  } catch (e) {
+    console.error('[subscribe-confirm] failed:', e);
+    outcome = 'error';
+  }
+}
+---
+<Base title="Confirm your free STL pack · DigitalChiselCo" noindex>
+  <Header />
+  <main class="max-w-2xl mx-auto px-4 sm:px-6 py-16 text-center min-h-[60vh]">
+    {outcome === 'ok' && (
+      <section>
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-700 text-3xl mb-5">✓</div>
+        <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">You're in!</h1>
+        <p class="mt-4 text-ink-700 leading-relaxed max-w-xl mx-auto">
+          Thanks for confirming <strong>{displayEmail}</strong>. Your <strong>5 premium bas-relief STL files</strong> and the CNC woodcarving guide are on the way — keep an eye on your inbox over the next minute or two.
+        </p>
+        <div class="mt-8 flex justify-center gap-3 flex-wrap">
+          <a href="/catalog" class="bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Browse the full catalog</a>
+          <a href="/membership" class="border border-bronze-600 text-bronze-700 px-6 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">See the membership</a>
+        </div>
+      </section>
+    )}
+
+    {outcome === 'already' && (
+      <section>
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-cream text-bronze-700 text-3xl mb-5">★</div>
+        <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">You're already confirmed.</h1>
+        <p class="mt-4 text-ink-700 leading-relaxed max-w-xl mx-auto">
+          We've got <strong>{displayEmail}</strong> on the list already. Check your inbox (or spam folder) for the original welcome email with your STL files. If you can't find it, email <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a> and we'll resend.
+        </p>
+        <div class="mt-8">
+          <a href="/catalog" class="bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Browse the catalog</a>
+        </div>
+      </section>
+    )}
+
+    {outcome === 'invalid' && (
+      <section>
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-50 text-red-600 text-3xl mb-5">!</div>
+        <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">This confirmation link doesn't work.</h1>
+        <p class="mt-4 text-ink-700 leading-relaxed max-w-xl mx-auto">
+          It may have expired (links are valid for 14 days), or it might have been clipped by your email client. Sign up again at <a href="/free" class="text-bronze-600 underline">/free</a> and we'll send you a fresh link.
+        </p>
+        <div class="mt-8">
+          <a href="/free" class="bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Get a new link</a>
+        </div>
+      </section>
+    )}
+
+    {outcome === 'error' && (
+      <section>
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-50 text-red-600 text-3xl mb-5">!</div>
+        <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">Something went wrong.</h1>
+        <p class="mt-4 text-ink-700 leading-relaxed max-w-xl mx-auto">
+          We logged the error and will sort it out. In the meantime, email <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a> and we'll send you the pack manually.
+        </p>
+      </section>
+    )}
+  </main>
+  <Footer />
+</Base>
