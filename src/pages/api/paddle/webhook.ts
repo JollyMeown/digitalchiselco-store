@@ -91,7 +91,22 @@ export const POST: APIRoute = async ({ request }) => {
 async function handleTransactionCompleted(db: any, txn: any) {
   if (!txn?.id) throw new Error('transaction.data.id missing');
 
-  const email: string = (txn.customer?.email || '').toLowerCase().trim();
+  // Paddle's webhook payload only embeds customer_id (not the full customer
+  // record). Fetch the customer separately so we have the email + name for
+  // the order row and the transactional receipt.
+  let customerEmail = '';
+  let customerName: string | null = null;
+  if (txn.customer_id) {
+    try {
+      const cust = await paddleApi<any>(`/customers/${txn.customer_id}`);
+      customerEmail = (cust?.data?.email || '').toLowerCase().trim();
+      customerName = cust?.data?.name || null;
+    } catch (e: any) {
+      console.error(`Paddle customer lookup failed for ${txn.customer_id}:`, e.message);
+    }
+  }
+  // Fallback chain in case the customer lookup fails or customer_id is missing.
+  const email: string = customerEmail || (txn.customer?.email || '').toLowerCase().trim();
   const total = Number(txn.details?.totals?.total ?? txn.details?.totals?.subtotal ?? 0) / 100; // cents → dollars
   const subtotal = Number(txn.details?.totals?.subtotal ?? 0) / 100;
   const currency = String(txn.currency_code || 'USD');
@@ -196,12 +211,13 @@ async function handleTransactionCompleted(db: any, txn: any) {
         download_links: it.product_id ? downloadsByProduct[it.product_id] : undefined,
       }));
 
-      const customerName: string | null =
-        txn.customer?.name || (txn.custom_data && txn.custom_data.customer_name) || null;
+      // customerName already looked up at top of function via /customers/{id}
+      const finalCustomerName: string | null =
+        customerName || (txn.custom_data && txn.custom_data.customer_name) || null;
 
       const { subject, html, text } = orderConfirmation({
         email,
-        customerName,
+        customerName: finalCustomerName,
         orderId: order.id,
         orderShortId: String(order.id).slice(0, 8),
         createdAt: new Date().toISOString(),
