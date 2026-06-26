@@ -10,26 +10,33 @@ export const prerender = false;
 const COOKIE = 'dcc_account';
 const MAX_AGE = 60 * 60 * 24 * 30;
 
+// NOTE on redirects: we DON'T use Astro.redirect('/account') here. In Astro 5
+// with @astrojs/netlify, that call ends up serving a Location header that
+// preserves the original query string — so `/account?token=…` → `/account`
+// turns into `/account?token=…` → `/account?token=…`, and the browser loops
+// until it gives up with ERR_TOO_MANY_REDIRECTS. Constructing the Response
+// directly with an explicit Location header bypasses that.
+function redirectTo(path: string, setCookie?: string): Response {
+  const headers: Record<string, string> = { location: path, 'cache-control': 'no-store' };
+  if (setCookie) headers['set-cookie'] = setCookie;
+  return new Response(null, { status: 302, headers });
+}
+function cookieHeader(value: string, maxAgeSec: number): string {
+  const parts = [`${COOKIE}=${value}`, `Max-Age=${maxAgeSec}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
+  if (Astro.url.protocol === 'https:') parts.push('Secure');
+  return parts.join('; ');
+}
+
 // 1. Sign-in via magic link — set cookie, drop the token from the URL.
 const urlToken = Astro.url.searchParams.get('token');
 if (urlToken) {
   const ok = verifyAccountToken(urlToken);
-  if (ok) {
-    Astro.cookies.set(COOKIE, urlToken, {
-      httpOnly: true,
-      secure: Astro.url.protocol === 'https:',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: MAX_AGE,
-    });
-    return Astro.redirect('/account');
-  }
+  if (ok) return redirectTo('/account', cookieHeader(urlToken, MAX_AGE));
 }
 
 // 2. Sign-out.
 if (Astro.url.searchParams.get('signout') === '1') {
-  Astro.cookies.delete(COOKIE, { path: '/' });
-  return Astro.redirect('/account');
+  return redirectTo('/account', `${COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${Astro.url.protocol === 'https:' ? '; Secure' : ''}`);
 }
 
 // 3. Validate the session cookie.
