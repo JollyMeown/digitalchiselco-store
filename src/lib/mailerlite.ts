@@ -34,11 +34,20 @@ export async function subscribe(p: SubscribePayload): Promise<{ ok: boolean; ski
   if (!key) {
     return { ok: true, skipped: true, error: 'MAILERLITE_API_KEY not set' };
   }
-  const groupId =
-    p.groupId ||
-    (p.groupKey === 'membership'
-      ? env('MAILERLITE_MEMBERSHIP_GROUP_ID') || env('MAILERLITE_FREE_GROUP_ID')
-      : env('MAILERLITE_FREE_GROUP_ID'));
+  // Per-group resolution. Membership only fires if a membership group id is
+  // explicitly set — we never fall back to the free-pack group for membership
+  // leads (those are handled by a separate system).
+  let groupId = p.groupId;
+  if (!groupId) {
+    if (p.groupKey === 'membership') {
+      groupId = env('MAILERLITE_MEMBERSHIP_GROUP_ID');
+      if (!groupId) {
+        return { ok: true, skipped: true, error: 'no membership group configured — skipping MailerLite' };
+      }
+    } else {
+      groupId = env('MAILERLITE_FREE_GROUP_ID');
+    }
+  }
 
   const body: any = {
     email: p.email,
