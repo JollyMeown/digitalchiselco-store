@@ -12,7 +12,7 @@ const page = Math.max(1, Number(Astro.url.searchParams.get('page') || '1'));
 const { products, total, perPage } = await getProductsByCategory(category.id, page);
 const pages = Math.ceil(total / perPage);
 ---
-<Shell title={`${category.name} STL Files | DigitalChiselCo`} description={`Browse ${total} ${category.name} bas-relief STL files for CNC, 3D printing and laser engraving.`}>
+<Shell title={`${category.name} STL Files | DigitalChiselCo`} description={`Browse ${total} ${category.name} bas-relief STL files for CNC, 3D printing and laser engraving.`} scrollPastBanner={true}>
   <Breadcrumbs crumbs={[{ label: 'Collections', href: '/collections' }, { label: category.name }]} />
   {category.image_url ? (
     <>

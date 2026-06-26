@@ -3,7 +3,7 @@ import Shell from '../../layouts/Shell.astro';
 import { getCategories } from '../../lib/queries';
 const categories = await getCategories();
 ---
-<Shell title="Collections | DigitalChiselCo">
+<Shell title="Collections | DigitalChiselCo" scrollPastBanner={true}>
   <h1 class="text-3xl mb-6">Shop by collection</h1>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
     {categories.map((c) => (

@@ -7,12 +7,32 @@ import Footer from '../components/Footer.astro';
 import SideMenu from '../components/SideMenu.astro';
 import SiteBanner from '../components/SiteBanner.astro';
 
-interface Props { title?: string; description?: string; image?: string; noindex?: boolean; fullWidth?: boolean; hideBanner?: boolean; }
-const { title, description, image, noindex, fullWidth = false, hideBanner = false } = Astro.props;
+interface Props { title?: string; description?: string; image?: string; noindex?: boolean; fullWidth?: boolean; hideBanner?: boolean; scrollPastBanner?: boolean; }
+const { title, description, image, noindex, fullWidth = false, hideBanner = false, scrollPastBanner = false } = Astro.props;
 ---
 <Base title={title} description={description} image={image} noindex={noindex}>
   <Header />
   {!hideBanner && <SiteBanner />}
+  {scrollPastBanner && !hideBanner && (
+    <script is:inline>
+      (function () {
+        function scrollPast() {
+          var banner = document.getElementById('site-banner');
+          if (!banner) return;
+          var header = document.querySelector('header.sticky');
+          var headerH = header ? header.offsetHeight : 0;
+          var rect = banner.getBoundingClientRect();
+          var bottom = rect.top + window.pageYOffset + rect.height;
+          window.scrollTo(0, Math.max(0, bottom - headerH));
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', scrollPast);
+        } else {
+          scrollPast();
+        }
+      })();
+    </script>
+  )}
   {fullWidth ? (
     <slot />
   ) : (

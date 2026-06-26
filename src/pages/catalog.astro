@@ -10,7 +10,7 @@ const pages = Math.ceil(total / perPage);
 const around = Array.from({ length: pages }, (_, i) => i + 1)
   .filter((p) => p === 1 || p === pages || Math.abs(p - page) <= 2);
 ---
-<Shell title="Catalog — All STL Files | DigitalChiselCo">
+<Shell title="Catalog — All STL Files | DigitalChiselCo" scrollPastBanner={true}>
   <Breadcrumbs crumbs={[{ label: 'Catalog' }]} />
   <h1 class="text-3xl mb-1">Every design, in one place</h1>
   <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} premium bas-relief STL files · ready for CNC, 3D print &amp; laser.</p>
