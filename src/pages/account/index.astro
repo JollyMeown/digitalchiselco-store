@@ -10,40 +10,50 @@ export const prerender = false;
 const COOKIE = 'dcc_account';
 const MAX_AGE = 60 * 60 * 24 * 30;
 
-// NOTE on redirects: relative Location headers (e.g. `/account`) get their
-// query string appended by the Netlify Edge layer in front of the SSR
-// function — so `/account?token=…` → relative `/account` becomes
-// `/account?token=…` → `/account?token=…`, and the browser loops until it
-// gives up with ERR_TOO_MANY_REDIRECTS. Sending an absolute URL skips that
-// rewrite. (Absolute URLs to other hosts — e.g. our /api/invoice → S3 — are
-// unaffected, which is how we noticed the pattern.)
-function redirectTo(path: string, setCookie?: string): Response {
-  const absolute = `${Astro.url.protocol}//${Astro.url.host}${path}`;
-  const headers: Record<string, string> = { location: absolute, 'cache-control': 'no-store' };
-  if (setCookie) headers['set-cookie'] = setCookie;
-  return new Response(null, { status: 302, headers });
-}
+// NOTE: we used to redirect after sign-in to drop ?token=… from the URL.
+// That broke with ERR_TOO_MANY_REDIRECTS because the Netlify Edge in front
+// of the SSR function silently appends the inbound query string to any
+// same-host Location header — so `/account?token=…` would redirect to
+// `/account?token=…` forever. We now render the dashboard on the same
+// request, set the cookie via response header, and use a tiny inline
+// script to strip the token from the URL client-side via history.replaceState.
 function cookieHeader(value: string, maxAgeSec: number): string {
   const parts = [`${COOKIE}=${value}`, `Max-Age=${maxAgeSec}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
   if (Astro.url.protocol === 'https:') parts.push('Secure');
   return parts.join('; ');
 }
 
-// 1. Sign-in via magic link — set cookie, drop the token from the URL.
+// Determine the session.
 const urlToken = Astro.url.searchParams.get('token');
-if (urlToken) {
-  const ok = verifyAccountToken(urlToken);
-  if (ok) return redirectTo('/account', cookieHeader(urlToken, MAX_AGE));
-}
-
-// 2. Sign-out.
-if (Astro.url.searchParams.get('signout') === '1') {
-  return redirectTo('/account', `${COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${Astro.url.protocol === 'https:' ? '; Secure' : ''}`);
-}
-
-// 3. Validate the session cookie.
 const cookieToken = Astro.cookies.get(COOKIE)?.value;
-const session = verifyAccountToken(cookieToken);
+const isSignOut = Astro.url.searchParams.get('signout') === '1';
+let session: { email: string } | null = null;
+let cleanUrlAfterRender = false;
+
+if (isSignOut) {
+  // Clear cookie, render the sign-in form below.
+  Astro.response.headers.append('Set-Cookie',
+    `${COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${Astro.url.protocol === 'https:' ? '; Secure' : ''}`);
+  cleanUrlAfterRender = true;
+  // intentionally leave `session` null — even though the cookie is still in
+  // the inbound request, this render must show the signed-out state.
+} else if (urlToken) {
+  // Magic-link sign-in: validate, set cookie via header, render dashboard now.
+  const ok = verifyAccountToken(urlToken);
+  if (ok) {
+    session = ok;
+    Astro.response.headers.append('Set-Cookie', cookieHeader(urlToken, MAX_AGE));
+    cleanUrlAfterRender = true;
+  } else {
+    // Invalid token — fall back to whatever the cookie says.
+    const sess = verifyAccountToken(cookieToken);
+    if (sess) session = sess;
+  }
+} else {
+  // Plain visit — try the cookie.
+  const sess = verifyAccountToken(cookieToken);
+  if (sess) session = sess;
+}
 
 type DownloadRow = { file_name: string | null; download_link: string };
 type OrderItem = { id: string; title: string; qty: number; price_usd: number; product_id: string | null; downloads?: DownloadRow[] };
@@ -83,6 +93,11 @@ if (session?.email) {
 ---
 <Base title="My Account · DigitalChiselCo" noindex>
   <Header />
+  {cleanUrlAfterRender && (
+    <script is:inline>
+      try { history.replaceState(null, '', '/account'); } catch (_) { /* noop */ }
+    </script>
+  )}
   <main class="max-w-4xl mx-auto px-4 sm:px-6 py-12 min-h-[60vh]">
     {!session ? (
       <section class="max-w-md mx-auto">
@@ -111,13 +126,13 @@ if (session?.email) {
             <h1 class="font-serif text-3xl text-bronze-800">My orders</h1>
             <p class="text-ink-700/70 text-sm mt-1">Signed in as <strong>{session.email}</strong></p>
           </div>
-          <a href="/account?signout=1" class="text-sm text-bronze-600 underline">Sign out</a>
+          <a href="/account?signout=1" class="text-sm text-bronze-600 underline" data-signout>Sign out</a>
         </div>
         {orders.length === 0 ? (
           <div class="bg-cream/40 border border-bronze-600/20 rounded-lg p-6">
             <p class="text-ink-700">No orders found under <strong>{session.email}</strong>.</p>
             <p class="text-sm text-ink-700/70 mt-2">
-              If you bought files using a different email, <a href="/account?signout=1" class="text-bronze-600 underline">sign out</a> and try again.
+              If you bought files using a different email, <a href="/account?signout=1" class="text-bronze-600 underline" data-signout>sign out</a> and try again.
             </p>
           </div>
         ) : (
