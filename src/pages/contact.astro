@@ -1,0 +1,124 @@
+---
+import Shell from '../layouts/Shell.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+---
+<Shell
+  title="Contact · DigitalChiselCo"
+  description="Get in touch with DigitalChiselCo — a one-person studio building bas-relief STL files for CNC, laser and 3D printing. Email replies within 24 hours."
+  scrollPastBanner={true}
+>
+  <Breadcrumbs crumbs={[{ label: 'Contact' }]} />
+
+  <article class="max-w-3xl mx-auto">
+    <header class="mb-10">
+      <p class="text-xs tracking-widest text-bronze-600 mb-3">★ CONTACT</p>
+      <h1 class="font-serif text-4xl text-bronze-800 leading-tight">Talk to a real person.</h1>
+      <p class="mt-4 text-ink-700 leading-relaxed">
+        DigitalChiselCo is a one-person studio. Every email comes to me directly — no support queues, no autoresponders. Replies usually within 24 hours, often the same day.
+      </p>
+    </header>
+
+    <section class="grid md:grid-cols-2 gap-8 mb-12">
+      <div>
+        <h2 class="font-serif text-xl text-bronze-800 mb-3">Email us</h2>
+        <p class="text-ink-700 mb-2">
+          <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600 underline">jolly@digitalchiselco.com</a>
+        </p>
+        <p class="text-sm text-ink-700/70">Reply target: under 24 hours.</p>
+
+        <h2 class="font-serif text-xl text-bronze-800 mt-8 mb-3">Business identity</h2>
+        <p class="text-sm text-ink-700 leading-relaxed">
+          <strong>DigitalChiselCo</strong> is a trade name operated by <strong>Khalid Khattak</strong>, sole proprietor, based in Pakistan. Payments and tax compliance are handled by our Merchant of Record (Paddle.com).
+        </p>
+
+        <h2 class="font-serif text-xl text-bronze-800 mt-8 mb-3">What to expect</h2>
+        <ul class="text-sm text-ink-700 space-y-1.5">
+          <li class="flex gap-2"><span class="text-bronze-600">✓</span> Real human replies — no scripts</li>
+          <li class="flex gap-2"><span class="text-bronze-600">✓</span> Most questions answered within 24 hours</li>
+          <li class="flex gap-2"><span class="text-bronze-600">✓</span> Order issues fixed same-day when possible</li>
+          <li class="flex gap-2"><span class="text-bronze-600">✓</span> Custom file requests welcome</li>
+        </ul>
+      </div>
+
+      <div>
+        <h2 class="font-serif text-xl text-bronze-800 mb-3">Or use the form</h2>
+        <form id="contact-form" class="space-y-3">
+          <div>
+            <label for="c-name" class="text-xs font-medium block mb-1">Your name</label>
+            <input id="c-name" required type="text" placeholder="Khalid" autocomplete="name"
+              class="w-full px-4 py-2.5 rounded-md border border-bronze-600/30 focus:outline-none focus:border-bronze-600 bg-white text-sm" />
+          </div>
+          <div>
+            <label for="c-email" class="text-xs font-medium block mb-1">Email</label>
+            <input id="c-email" required type="email" placeholder="you@email.com" autocomplete="email"
+              class="w-full px-4 py-2.5 rounded-md border border-bronze-600/30 focus:outline-none focus:border-bronze-600 bg-white text-sm" />
+          </div>
+          <div>
+            <label for="c-subject" class="text-xs font-medium block mb-1">Subject (optional)</label>
+            <input id="c-subject" type="text" placeholder="Order #, file question, …"
+              class="w-full px-4 py-2.5 rounded-md border border-bronze-600/30 focus:outline-none focus:border-bronze-600 bg-white text-sm" />
+          </div>
+          <div>
+            <label for="c-message" class="text-xs font-medium block mb-1">Message</label>
+            <textarea id="c-message" required rows="6" placeholder="What can I help with?"
+              class="w-full px-4 py-2.5 rounded-md border border-bronze-600/30 focus:outline-none focus:border-bronze-600 bg-white text-sm"></textarea>
+          </div>
+          <!-- honeypot: hidden from humans, bots will fill it -->
+          <input type="text" name="website" tabindex="-1" autocomplete="off"
+            class="hidden" aria-hidden="true" />
+          <button type="submit"
+            class="w-full bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition shadow-sm">
+            Send message
+          </button>
+          <p id="c-msg" class="text-sm hidden"></p>
+        </form>
+      </div>
+    </section>
+  </article>
+
+  <script is:inline>
+    const form = document.getElementById('contact-form');
+    const msg = document.getElementById('c-msg');
+    const honeypot = form.querySelector('input[name="website"]');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name    = document.getElementById('c-name').value.trim();
+      const email   = document.getElementById('c-email').value.trim();
+      const subject = document.getElementById('c-subject').value.trim();
+      const message = document.getElementById('c-message').value.trim();
+      const website = honeypot?.value || '';
+      if (!name || !email || !message) {
+        msg.className = 'text-sm text-red-600';
+        msg.textContent = 'Please fill name, email and message.';
+        msg.classList.remove('hidden');
+        return;
+      }
+      msg.className = 'text-sm text-ink-700';
+      msg.textContent = 'Sending…';
+      msg.classList.remove('hidden');
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name, email, subject, message, website }),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          msg.className = 'text-sm text-green-700';
+          msg.textContent = '✓ Thanks! Your message landed — we usually reply within 24 hours.';
+          form.reset();
+        } else {
+          msg.className = 'text-sm text-red-600';
+          msg.textContent = data?.error || 'Something went wrong. Email us directly at jolly@digitalchiselco.com.';
+        }
+      } catch {
+        msg.className = 'text-sm text-red-600';
+        msg.textContent = 'Network error. Email us directly at jolly@digitalchiselco.com.';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</Shell>

@@ -2,70 +2,106 @@
 import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 ---
-<Shell title="Privacy Policy · DigitalChiselCo" description="How DigitalChiselCo collects, uses, and protects your personal data.">
+<Shell title="Privacy Policy · DigitalChiselCo" description="How DigitalChiselCo collects, uses, and protects your personal data — including the sub-processors involved.">
   <Breadcrumbs crumbs={[{ label: 'Privacy Policy' }]} />
 
   <article class="prose prose-sm max-w-3xl text-ink-700">
     <h1 class="font-serif text-3xl text-bronze-800 mb-6">Privacy Policy</h1>
-    <p class="text-xs text-ink-700/50 mb-8">Last updated: June 26, 2026</p>
+    <p class="text-xs text-ink-700/50 mb-8">Last updated: June 27, 2026</p>
 
     <p>DigitalChiselCo ("we," "us," or "our") respects your privacy. This Privacy Policy explains how we collect, use, and protect your information when you visit <strong>digitalchiselco.com</strong> (the "Site") or make a purchase.</p>
 
-    <h2>1. Information We Collect</h2>
+    <h2>1. Data Controller</h2>
+    <p>The data controller responsible for your personal data under this policy is <strong>Khalid Khattak</strong>, sole proprietor trading as <strong>DigitalChiselCo</strong>, based in Pakistan. For any data-related question or request, contact <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a>.</p>
+    <p>When you make a purchase, our payment provider <strong>Paddle.com Market Ltd</strong> acts as a separate independent controller for the billing and tax data it collects, as our Merchant of Record. See Paddle's privacy policy at <a href="https://www.paddle.com/privacy" class="text-bronze-600" rel="noopener" target="_blank">paddle.com/privacy</a>.</p>
+
+    <h2>2. Information We Collect</h2>
     <h3>Information you provide</h3>
     <ul>
-      <li><strong>Account and checkout:</strong> name, email address, billing address, and payment details (processed securely by our payment provider — we never store card numbers).</li>
-      <li><strong>Newsletter and membership:</strong> email address and name when you subscribe or sign up for a membership plan.</li>
-      <li><strong>Support:</strong> any information you send when contacting us by email.</li>
+      <li><strong>Account and checkout:</strong> name, email address, and billing country. Payment card details are entered directly into Paddle's secure checkout — we never see or store card numbers.</li>
+      <li><strong>Newsletter and free-pack signup:</strong> email address and (optionally) first name when you subscribe.</li>
+      <li><strong>Membership lead form:</strong> name, email, and selected plan.</li>
+      <li><strong>Contact form / support:</strong> any information you send when contacting us by email or via our <a href="/contact" class="text-bronze-600">contact page</a>.</li>
     </ul>
 
     <h3>Information collected automatically</h3>
     <ul>
-      <li><strong>Usage data:</strong> pages visited, time spent, referring URL, browser type, device type, and IP address.</li>
-      <li><strong>Cookies:</strong> we use essential cookies for cart functionality and session management. We do not use advertising or tracking cookies.</li>
+      <li><strong>Usage analytics:</strong> pages visited, time on page, referring URL, device type, and approximate location — collected by Google Analytics 4 (see section 3 below).</li>
+      <li><strong>Essential cookies:</strong> we set a small number of first-party cookies for cart functionality, your account session, and CSRF protection. No advertising cookies. No remarketing pixels.</li>
+      <li><strong>Server logs:</strong> standard request logs (IP address, user-agent, timestamp) kept for up to 30 days by our hosting provider for security and abuse-prevention purposes.</li>
     </ul>
 
-    <h2>2. How We Use Your Information</h2>
+    <h2>3. Sub-processors and Third-Party Services</h2>
+    <p>We share the minimum data necessary with the following sub-processors. Each is bound by a Data Processing Agreement or industry-standard contract.</p>
+    <table class="text-sm border-collapse">
+      <thead><tr><th class="text-left p-2 border-b">Provider</th><th class="text-left p-2 border-b">Purpose</th><th class="text-left p-2 border-b">Data</th></tr></thead>
+      <tbody>
+        <tr><td class="p-2 border-b align-top"><strong>Paddle.com Market Ltd</strong> (UK)</td><td class="p-2 border-b align-top">Payment processing, Merchant of Record, tax/VAT/GST handling, fraud prevention, invoicing.</td><td class="p-2 border-b align-top">Name, email, billing address, card data (handled exclusively by Paddle).</td></tr>
+        <tr><td class="p-2 border-b align-top"><strong>Resend</strong> (US)</td><td class="p-2 border-b align-top">Transactional email delivery: order receipts, account sign-in, contact-form forwarding.</td><td class="p-2 border-b align-top">Name, email, email content.</td></tr>
+        <tr><td class="p-2 border-b align-top"><strong>MailerLite</strong> (Lithuania / EU)</td><td class="p-2 border-b align-top">Newsletter and free-pack delivery automations, opt-in management.</td><td class="p-2 border-b align-top">Name, email, signup source.</td></tr>
+        <tr><td class="p-2 border-b align-top"><strong>Supabase</strong> (US)</td><td class="p-2 border-b align-top">Database hosting (orders, accounts, content). SOC 2 Type II.</td><td class="p-2 border-b align-top">All Site data.</td></tr>
+        <tr><td class="p-2 border-b align-top"><strong>Netlify</strong> (US)</td><td class="p-2 border-b align-top">Web hosting, CDN, serverless functions. SOC 2 Type II.</td><td class="p-2 border-b align-top">Request logs.</td></tr>
+        <tr><td class="p-2 border-b align-top"><strong>Google Analytics 4</strong> (US, by Google LLC)</td><td class="p-2 border-b align-top">Aggregated usage analytics — pages visited, traffic sources. IP addresses are anonymised by Google before storage.</td><td class="p-2 border-b align-top">Cookie identifier, page URL, approximate geolocation, device type.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>4. How We Use Your Information</h2>
     <ul>
       <li>Process and fulfill your orders and deliver download links.</li>
-      <li>Send order confirmations, download access, and membership updates.</li>
-      <li>Send promotional emails (only if you opted in — you can unsubscribe anytime).</li>
-      <li>Improve the Site, fix bugs, and analyze usage patterns.</li>
-      <li>Comply with legal obligations and prevent fraud.</li>
+      <li>Send order confirmations, download access, and account sign-in links.</li>
+      <li>Send promotional emails — only if you opted in. You can unsubscribe from any newsletter email at any time.</li>
+      <li>Improve the Site, fix bugs, and understand usage patterns (Google Analytics).</li>
+      <li>Detect and prevent fraud and abuse.</li>
+      <li>Comply with legal obligations (tax, accounting, dispute response).</li>
     </ul>
 
-    <h2>3. Sharing Your Information</h2>
-    <p>We do <strong>not</strong> sell, rent, or trade your personal information. We share data only with:</p>
+    <h2>5. Sharing</h2>
+    <p>We do <strong>not</strong> sell, rent, or trade your personal information. We share data only with the sub-processors listed in section 3, or when required by law, regulation, or valid legal process.</p>
+
+    <h2>6. International Data Transfers</h2>
+    <p>Because some of our sub-processors are located in the United States or the European Union, your personal data may be transferred to and processed in countries outside your country of residence. Where required, those transfers are protected by Standard Contractual Clauses or equivalent safeguards adopted by the respective processor.</p>
+
+    <h2>7. Data Retention</h2>
     <ul>
-      <li><strong>Payment processor:</strong> to process transactions securely (as Merchant of Record, they handle billing, tax, and compliance).</li>
-      <li><strong>Email provider:</strong> to send transactional and marketing emails.</li>
-      <li><strong>Hosting provider:</strong> our Site is hosted on Netlify; data is stored on Supabase (both industry-standard, SOC 2 compliant).</li>
-      <li><strong>Legal requirements:</strong> if required by law, regulation, or valid legal process.</li>
+      <li><strong>Account and order records:</strong> retained for as long as your account exists, and for a further 7 years after closure for accounting and tax reasons.</li>
+      <li><strong>Newsletter subscribers:</strong> retained until you unsubscribe.</li>
+      <li><strong>Contact-form messages:</strong> retained for up to 2 years for support history, then deleted.</li>
+      <li><strong>Server logs:</strong> up to 30 days.</li>
+      <li><strong>Google Analytics events:</strong> retained for 14 months, the default GA4 retention window.</li>
     </ul>
 
-    <h2>4. Data Retention</h2>
-    <p>We retain your data for as long as necessary to provide our services and fulfill legal obligations. Order records are kept for accounting purposes. You can request deletion of your account and personal data at any time by emailing us.</p>
+    <h2>8. Data Security</h2>
+    <p>We use industry-standard security measures including HTTPS encryption, secure HttpOnly cookies, hashed passwordless authentication, and row-level database security. No method of transmission over the internet is 100% secure, but we work to protect your data with the same care we expect for our own.</p>
 
-    <h2>5. Data Security</h2>
-    <p>We use industry-standard security measures including HTTPS encryption, secure authentication, and row-level database security to protect your information. However, no method of transmission over the internet is 100% secure.</p>
-
-    <h2>6. Your Rights</h2>
-    <p>Depending on your location, you may have the right to:</p>
+    <h2>9. Your Rights</h2>
+    <p>Depending on your country of residence, you may have the right to:</p>
     <ul>
       <li>Access the personal data we hold about you.</li>
       <li>Request correction of inaccurate data.</li>
-      <li>Request deletion of your data.</li>
-      <li>Opt out of marketing emails at any time (click "unsubscribe" in any email).</li>
+      <li>Request deletion of your data (subject to legal retention obligations).</li>
+      <li>Object to or restrict certain processing.</li>
+      <li>Receive your data in a portable format.</li>
+      <li>Withdraw consent for marketing emails by clicking "unsubscribe" in any email, or by emailing us.</li>
       <li>Lodge a complaint with your local data protection authority.</li>
     </ul>
+    <p>To exercise any of these rights, email <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a>. We respond within 30 days.</p>
 
-    <h2>7. Children's Privacy</h2>
-    <p>Our Site is not intended for children under 16. We do not knowingly collect personal information from children.</p>
+    <h2>10. Cookies</h2>
+    <p>We use a small number of first-party cookies and one third-party analytics cookie set by Google Analytics 4. Specifically:</p>
+    <ul>
+      <li><code>cart</code> (localStorage) — your shopping cart between page loads.</li>
+      <li><code>dcc_account</code> — your signed-in session on the account dashboard. HttpOnly, Secure, SameSite=Lax.</li>
+      <li><code>_ga</code> and <code>_ga_*</code> — Google Analytics measurement. Set by Google's gtag.js library loaded from googletagmanager.com.</li>
+    </ul>
+    <p>You can disable analytics by enabling your browser's Do Not Track or by using a tracking-blocking extension. Essential cookies cannot be disabled without breaking core Site functionality.</p>
 
-    <h2>8. Changes to This Policy</h2>
-    <p>We may update this Privacy Policy from time to time. Changes are effective upon posting. We encourage you to review this page periodically.</p>
+    <h2>11. Children's Privacy</h2>
+    <p>Our Site is not intended for children under 16. We do not knowingly collect personal information from children. If you believe a child has provided us with personal data, contact us and we will delete the record.</p>
 
-    <h2>9. Contact</h2>
-    <p>Questions about your privacy? Contact us at <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a>.</p>
+    <h2>12. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. The "Last updated" date at the top of this page reflects the most recent change. Material changes will be highlighted at the top of the page for 30 days after they take effect.</p>
+
+    <h2>13. Contact</h2>
+    <p>Questions about your privacy or this policy? Email <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a> or use the <a href="/contact" class="text-bronze-600">contact page</a>.</p>
   </article>
 </Shell>
