@@ -28,6 +28,18 @@ export type OrderEmailData = {
   currency: string;
   items: OrderEmailItem[];
   logoUrl?: string | null;    // optional brand logo
+  // Receipt fields — populated from Paddle webhook so we can suppress Paddle's
+  // own email and have ours be the full record customers keep.
+  invoiceNumber?: string | null;     // human-friendly invoice number (Paddle's)
+  paddleInvoiceUrl?: string | null;  // hosted PDF invoice link (Paddle's)
+  subtotal?: number | null;
+  tax?: number | null;
+  discountTotal?: number | null;
+  paymentMethod?: {
+    type?: string;                   // 'card' | 'paypal' | ...
+    cardBrand?: string | null;       // 'visa' | 'mastercard' | ...
+    last4?: string | null;
+  } | null;
 };
 
 /**
@@ -102,8 +114,9 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
             <td style="padding:18px 28px 4px;">
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:${BRAND_CREAM};border-radius:8px;padding:14px 16px;">
                 <tr>
-                  <td style="font-size:13px;color:#666;font-family:Helvetica,Arial,sans-serif;">
-                    Order <strong style="color:${BRAND_INK};">#${esc(d.orderShortId)}</strong> &middot; ${esc(dateStr)} &middot; Total <strong style="color:${BRAND_INK};">${money(d.total)} ${esc(d.currency)}</strong>
+                  <td style="font-size:13px;color:#666;font-family:Helvetica,Arial,sans-serif;line-height:1.6;">
+                    <strong style="color:${BRAND_INK};">Order #${esc(d.orderShortId)}</strong>${d.invoiceNumber ? ` &middot; Invoice <strong style="color:${BRAND_INK};">${esc(d.invoiceNumber)}</strong>` : ''}<br>
+                    ${esc(dateStr)}${d.paymentMethod && d.paymentMethod.last4 ? ` &middot; Paid via ${esc((d.paymentMethod.cardBrand || 'card').toUpperCase())} ending in ${esc(d.paymentMethod.last4)}` : ''}
                   </td>
                 </tr>
               </table>
@@ -118,6 +131,41 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
               </table>
             </td>
           </tr>
+
+          <!-- Totals breakdown -->
+          <tr>
+            <td style="padding:0 28px 4px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="font-family:Helvetica,Arial,sans-serif;font-size:14px;color:${BRAND_INK};">
+                ${(d.subtotal != null) ? `
+                <tr>
+                  <td style="padding:4px 0;color:#666;">Subtotal</td>
+                  <td style="padding:4px 0;text-align:right;color:#666;">${money(d.subtotal)} ${esc(d.currency)}</td>
+                </tr>` : ''}
+                ${(d.discountTotal && d.discountTotal > 0) ? `
+                <tr>
+                  <td style="padding:4px 0;color:#188038;">Discount</td>
+                  <td style="padding:4px 0;text-align:right;color:#188038;">&minus;${money(d.discountTotal)} ${esc(d.currency)}</td>
+                </tr>` : ''}
+                ${(d.tax != null && d.tax > 0) ? `
+                <tr>
+                  <td style="padding:4px 0;color:#666;">Tax</td>
+                  <td style="padding:4px 0;text-align:right;color:#666;">${money(d.tax)} ${esc(d.currency)}</td>
+                </tr>` : ''}
+                <tr>
+                  <td style="padding:8px 0;border-top:1px solid #E5DDD0;font-weight:600;font-size:15px;">Total paid</td>
+                  <td style="padding:8px 0;text-align:right;border-top:1px solid #E5DDD0;font-weight:600;font-size:15px;">${money(d.total)} ${esc(d.currency)}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          ${d.paddleInvoiceUrl ? `
+          <!-- Invoice download link -->
+          <tr>
+            <td style="padding:12px 28px 4px;text-align:center;">
+              <a href="${esc(d.paddleInvoiceUrl)}" style="font-size:13px;color:${BRAND_BRONZE};text-decoration:underline;">📄 Download PDF invoice</a>
+            </td>
+          </tr>` : ''}
 
           <!-- Helpful tips -->
           <tr>
@@ -168,15 +216,29 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
     const linksTxt = (it.download_links || []).map((l) => `  - ${l.name ? l.name + ': ' : ''}${l.url}`).join('\n');
     return `* ${it.title} (${it.qty}× ${money(it.price_usd)})\n${linksTxt || '  (link will be sent separately)'}`;
   }).join('\n\n');
+  const payLine = d.paymentMethod?.last4
+    ? ` - Paid via ${(d.paymentMethod.cardBrand || 'card').toUpperCase()} ending in ${d.paymentMethod.last4}`
+    : '';
+  const invoiceLine = d.invoiceNumber ? ` - Invoice ${d.invoiceNumber}` : '';
+  const totalsTxt = [
+    d.subtotal != null ? `Subtotal: ${money(d.subtotal)} ${d.currency}` : null,
+    d.discountTotal && d.discountTotal > 0 ? `Discount: -${money(d.discountTotal)} ${d.currency}` : null,
+    d.tax != null && d.tax > 0 ? `Tax: ${money(d.tax)} ${d.currency}` : null,
+    `Total paid: ${money(d.total)} ${d.currency}`,
+  ].filter(Boolean).join('\n');
+  const invoiceLink = d.paddleInvoiceUrl ? `\nPDF invoice: ${d.paddleInvoiceUrl}\n` : '';
   const text = `${d.customerName ? `Hi ${d.customerName},` : 'Hi there,'}
 
 Thank you for your order from ${BRAND_NAME}!
 
-Order #${d.orderShortId} - ${dateStr} - Total ${money(d.total)} ${d.currency}
+Order #${d.orderShortId}${invoiceLine}
+${dateStr}${payLine}
 
 Your downloads:
 ${itemsTxt}
 
+${totalsTxt}
+${invoiceLink}
 These links don't expire — keep this email for future re-downloads, or sign into your account at ${SITE}/account anytime.
 
 Need help? Reply to this email and a real person will help within 24 hours.

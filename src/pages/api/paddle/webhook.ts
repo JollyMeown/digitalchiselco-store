@@ -215,6 +215,22 @@ async function handleTransactionCompleted(db: any, txn: any) {
       const finalCustomerName: string | null =
         customerName || (txn.custom_data && txn.custom_data.customer_name) || null;
 
+      // Pull receipt-grade fields straight from Paddle's payload so our email
+      // can fully replace Paddle's generic receipt.
+      const tax = Number(txn.details?.totals?.tax ?? 0) / 100 || 0;
+      const discountTotal = Number(txn.details?.totals?.discount ?? 0) / 100 || 0;
+      const card = txn.payments?.[0]?.method_details?.card;
+      const paymentMethod = card ? {
+        type: txn.payments?.[0]?.method_details?.type || 'card',
+        cardBrand: card.type || null,
+        last4: card.last4 || null,
+      } : null;
+      const invoiceNumber = txn.invoice_number || null;
+      // Build the hosted invoice URL Paddle exposes per transaction.
+      const paddleEnvName = process.env.PADDLE_ENV === 'production' ? 'production' : 'sandbox';
+      const paddleHost = paddleEnvName === 'production' ? 'https://my.paddle.com' : 'https://sandbox-my.paddle.com';
+      const paddleInvoiceUrl = invoiceNumber ? `${paddleHost}/invoice/${txn.id}` : null;
+
       const { subject, html, text } = orderConfirmation({
         email,
         customerName: finalCustomerName,
@@ -225,6 +241,12 @@ async function handleTransactionCompleted(db: any, txn: any) {
         currency,
         items: emailItems,
         logoUrl: settings?.logo_image_url || null,
+        invoiceNumber,
+        paddleInvoiceUrl,
+        subtotal,
+        tax,
+        discountTotal,
+        paymentMethod,
       });
 
       const sendResult = await sendEmail({
