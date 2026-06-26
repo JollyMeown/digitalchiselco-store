@@ -5,8 +5,6 @@ import Footer from '../../components/Footer.astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { verifySubscribeToken } from '../../lib/subscribe-token';
 import { subscribe as mailerliteSubscribe } from '../../lib/mailerlite';
-import { send as sendEmail } from '../../lib/resend';
-import { freePackDelivery } from '../../lib/email-templates';
 
 export const prerender = false;
 
@@ -45,23 +43,10 @@ if (verified) {
         );
       if (upsert.error) throw upsert.error;
 
-      // Send our branded delivery email (Resend) with the real Google Drive
-      // folder link. This is the primary "your files are here" email — we
-      // control the design, the link target, and the timing.
-      const delivery = freePackDelivery({ email: verified.email, name });
-      await sendEmail({
-        to: verified.email,
-        subject: delivery.subject,
-        html: delivery.html,
-        text: delivery.text,
-        idempotencyKey: `free-pack-delivery:${verified.email}`,
-      }).catch((e) => {
-        console.error('[subscribe-confirm] Resend delivery failed (continuing):', e);
-      });
-
-      // Still add to MailerLite for future newsletters. status='active'
-      // skips MailerLite's own confirmation email; whether their welcome
-      // automation also fires is a setting in Jolly's MailerLite dashboard.
+      // Hand off to MailerLite as the file deliverer. status='active'
+      // skips MailerLite's own confirmation email (we already ran our
+      // own HMAC-verified opt-in) and triggers the Free STL Pack
+      // welcome automation that ships the actual files.
       await mailerliteSubscribe({ email: verified.email, name, groupKey: 'free', status: 'active' }).catch((e) => {
         console.error('[subscribe-confirm] MailerLite call failed (continuing):', e);
       });
