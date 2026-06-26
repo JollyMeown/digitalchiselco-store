@@ -23,7 +23,12 @@ const { title, description, image, noindex, fullWidth = false, hideBanner = fals
           var headerH = header ? header.offsetHeight : 0;
           var rect = banner.getBoundingClientRect();
           var bottom = rect.top + window.pageYOffset + rect.height;
-          window.scrollTo(0, Math.max(0, bottom - headerH));
+          var target = Math.max(0, bottom - headerH);
+          var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          // Brief pause so the banner is visible before the gentle scroll begins.
+          setTimeout(function () {
+            window.scrollTo({ top: target, behavior: reduceMotion ? 'auto' : 'smooth' });
+          }, 250);
         }
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', scrollPast);

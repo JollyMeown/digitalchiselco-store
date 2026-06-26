@@ -5,7 +5,7 @@ import { getMembershipPlans } from '../lib/queries';
 const plans = await getMembershipPlans();
 const featured = plans.find((p) => p.highlight) || plans[0];
 ---
-<Shell title="Become a Member · DigitalChiselCo" description="CNC STL membership — 8 fresh bas-relief STL designs every month, 24 carving files for $20. Instant first pack, commercial use, no recurring charge.">
+<Shell title="Become a Member · DigitalChiselCo" description="CNC STL membership — 8 fresh bas-relief STL designs every month, 24 carving files for $20. Instant first pack, commercial use, no recurring charge." scrollPastBanner={true}>
   <Breadcrumbs crumbs={[{ label: 'Membership' }]} />
 
   <!-- HERO -->
