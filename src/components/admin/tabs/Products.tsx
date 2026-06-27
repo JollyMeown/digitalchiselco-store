@@ -239,7 +239,7 @@ function VerifyBadge({ row, onToggled }: { row: Row; onToggled: (downloadId: str
 function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
   const blank = useMemo(() => ({
     title: '', slug: '', description: '', price_usd: 9.99, image_url: '',
-    gallery: '', is_bundle: false, is_bestseller: false, active: true, link_status: 'review',
+    gallery: '', is_bundle: false, is_bestseller: false, is_customizable: false, active: true, link_status: 'review',
     seo_title: '', seo_description: '', download_link: '', category_ids: [] as string[],
   }), []);
   const [f, setF] = useState<any>(blank);
@@ -266,7 +266,7 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
       title: p.title || '', slug: p.slug || '', description: p.description || '',
       price_usd: p.price_usd || 0, image_url: p.image_url || '',
       gallery: Array.isArray(p.gallery) ? p.gallery.join('\n') : '',
-      is_bundle: !!p.is_bundle, is_bestseller: !!p.is_bestseller, active: p.active !== false,
+      is_bundle: !!p.is_bundle, is_bestseller: !!p.is_bestseller, is_customizable: !!p.is_customizable, active: p.active !== false,
       link_status: p.link_status || 'review',
       seo_title: p.seo_title || '', seo_description: p.seo_description || '',
       download_link: p.product_downloads?.[0]?.download_link || '',
@@ -290,7 +290,7 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
     const payload: any = {
       title: f.title.trim(), slug: f.slug.trim(), description: f.description || null,
       price_usd: Number(f.price_usd) || 0, image_url: f.image_url || null,
-      gallery, is_bundle: !!f.is_bundle, is_bestseller: !!f.is_bestseller, active: !!f.active,
+      gallery, is_bundle: !!f.is_bundle, is_bestseller: !!f.is_bestseller, is_customizable: !!f.is_customizable, active: !!f.active,
       link_status: f.link_status, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
     };
     let id = existing?.id;
@@ -414,6 +414,12 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
         <div className="flex items-center gap-4 flex-wrap">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.active} onChange={(e) => set('active', e.target.checked)} /> Active (visible in catalog)</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_bestseller} onChange={(e) => set('is_bestseller', e.target.checked)} /> ★ Best seller (shows in homepage marquee)</label>
+          <label className="flex items-center gap-2 text-sm" title="Customer must fill in extra fields at checkout — manage them in the Customized tab.">
+            <input type="checkbox" checked={f.is_customizable} onChange={(e) => set('is_customizable', e.target.checked)} /> ✎ Customizable
+          </label>
+          {f.is_customizable && existing && (
+            <a href="#customized" className="text-xs text-bronze-600 hover:underline">→ Configure fields in Customized tab</a>
+          )}
         </div>
         {!existing && (
           <p className="md:col-span-2 text-xs text-ink-700/60 bg-cream/40 border border-bronze-600/20 rounded-md px-3 py-2">
