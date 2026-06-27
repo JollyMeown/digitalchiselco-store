@@ -165,9 +165,15 @@ function badge(reason) {
   };
   return `<span style="background:${colors[reason] || '#eee'};padding:2px 8px;border-radius:10px;font-size:11px;margin-right:4px">${reason}</span>`;
 }
-function rowHtml(r) {
+function rowHtml(r, editable) {
+  const inputHtml = editable
+    ? `<div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+         <input type="url" data-fix data-id="${escapeHtml(r.download_id)}" data-slug="${escapeHtml(r.slug)}" placeholder="Paste corrected Drive URL here…" style="flex:1;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-family:monospace;font-size:12px" />
+         <span data-status style="font-size:11px;color:#999;min-width:60px"></span>
+       </div>`
+    : '';
   return `
-    <tr>
+    <tr data-row data-id="${escapeHtml(r.download_id)}">
       <td style="width:140px"><img src="${escapeHtml(r.image_url)}" style="width:130px;height:130px;object-fit:cover;border-radius:8px;display:block" loading="lazy" referrerpolicy="no-referrer"/></td>
       <td>
         <div style="font-weight:600;margin-bottom:6px;line-height:1.3">${escapeHtml(r.title)}</div>
@@ -178,22 +184,138 @@ function rowHtml(r) {
         <div style="font-size:13px;margin-bottom:6px"><b>Drive file:</b> <span style="font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px">${escapeHtml(r.drive_filename || '(not found)')}</span> &middot; tokens=${r.filename_tokens} &middot; overlap=${r.overlap_pct}% &middot; used by ${r.times_file_used || 0} products</div>
         <div style="margin-bottom:8px">${r.flag_reasons.split('|').filter(Boolean).map(badge).join('')}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a href="${escapeHtml(r.drive_url)}" target="_blank" style="background:#1f5fea;color:white;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:12px">⬇ Open Drive link</a>
+          <a href="${escapeHtml(r.drive_url)}" target="_blank" style="background:#1f5fea;color:white;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:12px">⬇ Open current Drive link</a>
           <a href="${escapeHtml(r.storefront_url)}" target="_blank" style="background:#7a3f10;color:white;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:12px">View on site</a>
         </div>
+        ${inputHtml}
       </td>
     </tr>`;
 }
+
+const WORKBENCH_SCRIPT = `
+<script>
+const LS_KEY = 'dcc_audit_fixes_v1';
+function load() { try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { return {}; } }
+function save(o) { localStorage.setItem(LS_KEY, JSON.stringify(o)); }
+function isDriveUrl(u) { return /drive\\.google\\.com\\/(uc\\?|file\\/d\\/|folders\\/)/.test(u || ''); }
+function csvEsc(v) { const s = String(v ?? ''); return /[",\\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; }
+
+const store = load();
+
+// Hydrate inputs from localStorage
+document.querySelectorAll('input[data-fix]').forEach((input) => {
+  const id = input.dataset.id;
+  if (store[id]) { input.value = store[id]; input.dataset.persisted = '1'; markRow(input); }
+  input.addEventListener('input', () => {
+    const v = input.value.trim();
+    const s = load();
+    if (v) s[id] = v; else delete s[id];
+    save(s);
+    markRow(input);
+    updateProgress();
+  });
+});
+
+function markRow(input) {
+  const status = input.parentElement.querySelector('[data-status]');
+  const v = input.value.trim();
+  if (!v) { status.textContent = ''; input.style.borderColor = '#ccc'; return; }
+  if (!isDriveUrl(v)) { status.textContent = '✗ not Drive'; status.style.color = '#c00'; input.style.borderColor = '#c00'; return; }
+  status.textContent = '✓ saved'; status.style.color = '#15803d'; input.style.borderColor = '#15803d';
+}
+
+function updateProgress() {
+  const s = load();
+  const total = document.querySelectorAll('input[data-fix]').length;
+  const filled = Object.values(s).filter((v) => v && isDriveUrl(v)).length;
+  document.getElementById('progress-count').textContent = filled + ' / ' + total + ' fixed';
+  document.getElementById('dl-btn').disabled = filled === 0;
+}
+
+document.getElementById('dl-btn').addEventListener('click', () => {
+  const s = load();
+  const header = ['download_id','slug','new_drive_url'];
+  let out = header.join(',') + '\\n';
+  let count = 0;
+  document.querySelectorAll('input[data-fix]').forEach((input) => {
+    const id = input.dataset.id;
+    const v = (s[id] || '').trim();
+    if (v && isDriveUrl(v)) {
+      out += [csvEsc(id), csvEsc(input.dataset.slug), csvEsc(v)].join(',') + '\\n';
+      count++;
+    }
+  });
+  const blob = new Blob([out], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'download-link-fixes.csv';
+  a.click();
+});
+
+document.getElementById('clear-btn').addEventListener('click', () => {
+  if (!confirm('Clear all entered fixes? This cannot be undone.')) return;
+  localStorage.removeItem(LS_KEY);
+  document.querySelectorAll('input[data-fix]').forEach((input) => {
+    input.value = '';
+    input.style.borderColor = '#ccc';
+    const st = input.parentElement.querySelector('[data-status]');
+    if (st) st.textContent = '';
+  });
+  updateProgress();
+});
+
+document.getElementById('filter-pending').addEventListener('change', (e) => {
+  const onlyPending = e.target.checked;
+  const s = load();
+  document.querySelectorAll('tr[data-row]').forEach((tr) => {
+    const id = tr.dataset.id;
+    const filled = !!(s[id] && isDriveUrl(s[id]));
+    tr.style.display = onlyPending && filled ? 'none' : '';
+  });
+});
+
+updateProgress();
+</script>`;
+
+function buildWorkbench(title, rows) {
+  const body = rows.map((r) => rowHtml(r, true)).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
+    <style>
+      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:1100px;margin:0 auto;padding:0 16px 40px;color:#222}
+      table{border-collapse:collapse;width:100%}
+      td{border-top:1px solid #eee;padding:14px 10px;vertical-align:top}
+      h1{margin:8px 0 4px}
+      .stats{color:#666;margin-bottom:16px}
+      .toolbar{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:12px 0;margin-bottom:8px;z-index:10;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+      .toolbar button{padding:8px 14px;border-radius:6px;border:0;font-weight:600;cursor:pointer}
+      .toolbar button[disabled]{opacity:.4;cursor:not-allowed}
+      #dl-btn{background:#15803d;color:#fff}
+      #clear-btn{background:#e5e7eb;color:#333}
+      #progress-count{font-weight:600;color:#15803d}
+      input[type="url"]:focus{outline:none;border-color:#1f5fea}
+    </style>
+    </head><body>
+    <div class="toolbar">
+      <h1 style="margin:0;font-size:18px">${title}</h1>
+      <span id="progress-count" style="margin-left:auto">0 / 0</span>
+      <label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="filter-pending"/> Hide done</label>
+      <button id="dl-btn" disabled>⬇ Download fixes CSV</button>
+      <button id="clear-btn">Clear progress</button>
+    </div>
+    <p class="stats">${rows.length} rows. Click <b>⬇ Open current Drive link</b> to verify, paste the corrected URL into the input, and the page auto-saves to your browser. When done with a batch, click <b>Download fixes CSV</b> and send it back to apply via <code>npm run apply:download-fixes</code>.</p>
+    <table>${body}</table>${WORKBENCH_SCRIPT}</body></html>`;
+}
+
 function buildHtml(title, rows) {
-  const body = rows.map(rowHtml).join('');
+  const body = rows.map((r) => rowHtml(r, false)).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
     <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:1100px;margin:24px auto;padding:0 16px;color:#222} table{border-collapse:collapse;width:100%} td{border-top:1px solid #eee;padding:14px 10px;vertical-align:top} h1{margin:8px 0 4px} .stats{color:#666;margin-bottom:16px}</style>
     </head><body>
     <h1>${title}</h1>
-    <p class="stats">${rows.length} rows. Click ⬇ Open Drive link to verify, then update the link in admin.</p>
+    <p class="stats">${rows.length} rows. Click ⬇ Open Drive link to verify.</p>
     <table>${body}</table></body></html>`;
 }
-fs.writeFileSync('audit-flagged.html', buildHtml('Flagged downloads (need review)', flagged));
+fs.writeFileSync('audit-flagged.html', buildWorkbench('Flagged downloads — fix workbench', flagged));
 fs.writeFileSync('audit-ok.html', buildHtml('OK downloads (spot-check only)', ok));
 
 // ---------- summary ----------
