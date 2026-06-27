@@ -21,10 +21,10 @@ const q = Astro.url.searchParams.get('q') ?? '';
         class="flex-1 px-4 py-2 text-sm rounded-l-md border border-r-0 border-black/15 focus:outline-none focus:border-bronze-600" />
       <button class="bg-bronze-600 text-cream px-4 rounded-r-md text-sm" aria-label="Search">Search</button>
     </form>
-    <div class="hidden lg:flex gap-5 text-sm text-ink-700 ml-auto">
+    <div class="hidden lg:flex gap-5 text-sm text-ink-700 ml-auto whitespace-nowrap">
       {links.map((l) => <a href={l.href} class={l.href === '/free' ? 'text-bronze-600' : ''}>{l.label}</a>)}
     </div>
-    <div class="flex gap-4 text-sm text-ink-700 ml-auto lg:ml-4 items-center">
+    <div class="flex gap-4 text-sm text-ink-700 ml-auto lg:ml-4 items-center whitespace-nowrap">
       <a href="/membership" class="hidden md:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
       <a href="/account" class="hidden lg:inline-block" aria-label="Account">Account</a>
       <a href="/cart" aria-label="Cart">Cart <span id="cart-count" class="text-bronze-600 font-medium"></span></a>
