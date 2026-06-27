@@ -95,7 +95,10 @@ export default function Products() {
       const anyFlagged = dls.some((d) => d.audit_status === 'flagged');
       if (badgeFilter === 'verified') return allVerified;
       if (badgeFilter === 'auto_ok') return !anyVerified && allAutoOk;
-      if (badgeFilter === 'flagged') return anyFlagged;
+      // "Flagged" means "still needs my attention" — exclude rows the human
+      // has already verified, even if the audit script's stale audit_status
+      // hasn't caught up yet.
+      if (badgeFilter === 'flagged') return anyFlagged && !allVerified;
       if (badgeFilter === 'unaudited') return dls.length === 0 || dls.every((d) => !d.audit_status && !d.verified_at);
       return true;
     });
