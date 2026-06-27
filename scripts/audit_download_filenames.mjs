@@ -117,6 +117,7 @@ for (const r of downloads) {
   }
 
   const row = {
+    download_id: r.id,
     slug,
     title,
     image_url: r.products?.image_url || '',
@@ -135,8 +136,9 @@ for (const r of downloads) {
 
 // ---------- write CSVs ----------
 const HEADER = [
-  'slug', 'title', 'image_url', 'storefront_url', 'drive_filename', 'filename_tokens',
-  'overlap_pct', 'times_file_used', 'flag_reasons', 'drive_url', 'is_bundle', 'active',
+  'download_id', 'slug', 'title', 'image_url', 'storefront_url', 'drive_filename',
+  'filename_tokens', 'overlap_pct', 'times_file_used', 'flag_reasons', 'drive_url',
+  'is_bundle', 'active', 'new_drive_url',
 ];
 function writeCsv(file, rows) {
   let out = csvRow(HEADER);
