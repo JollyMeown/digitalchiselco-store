@@ -22,6 +22,10 @@ PROJECT_HANDOFF.md
 *HANDOFF*
 *SECRETS*
 
+# scraped data artifacts
+enrich.json
+gap_products.json
+
 # Local-only assets and logs (not for deploy)
 BRANDING/
 migration.log

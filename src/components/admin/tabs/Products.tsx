@@ -301,9 +301,13 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.active} onChange={(e) => set('active', e.target.checked)} /> Active (visible in catalog)</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_bundle} onChange={(e) => set('is_bundle', e.target.checked)} /> Bundle</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_bestseller} onChange={(e) => set('is_bestseller', e.target.checked)} /> ★ Best seller (shows in homepage marquee)</label>
         </div>
+        {!existing && (
+          <p className="md:col-span-2 text-xs text-ink-700/60 bg-cream/40 border border-bronze-600/20 rounded-md px-3 py-2">
+            <strong className="text-ink-800">Creating a bundle?</strong> Use the <a href="#bundles" className="text-bronze-600 underline">Bundle Composer</a> tab instead — it lets you pick multiple source products at once and auto-aggregates their images and Drive links.
+          </p>
+        )}
       </div>
       <div className="mt-5 flex items-center gap-3 border-t border-black/10 pt-4">
         <button className={btnPrimary} disabled={busy} onClick={save}>{busy ? 'Saving…' : (existing ? 'Save changes' : 'Create product')}</button>

@@ -213,3 +213,23 @@ export async function getRelatedToProducts(productIds: string[], limit = 8): Pro
     return (data ?? []) as ProductCard[];
   } catch (e) { console.error('getRelatedToProducts failed:', e); return []; }
 }
+
+export type CustomerCreation = {
+  id: string; name: string; description: string | null; gallery: string[];
+  product_id: string | null; product_url: string | null; is_featured: boolean;
+  products?: { title: string; slug: string } | null;
+};
+export async function getCustomerCreations(limit = 9): Promise<CustomerCreation[]> {
+  try {
+    const { data, error } = await supabase
+      .from('customer_creations')
+      .select('id,name,description,gallery,product_id,product_url,is_featured,products(title,slug)')
+      .eq('active', true)
+      .order('is_featured', { ascending: false })
+      .order('sort_order')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []) as any;
+  } catch (e) { console.error('getCustomerCreations failed:', e); return []; }
+}

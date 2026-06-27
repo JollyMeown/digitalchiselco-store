@@ -1,0 +1,314 @@
+// Bundle Composer — assemble a "bundle" product from existing products.
+// Auto-pulls the first image from each source product into the bundle gallery,
+// auto-aggregates their Drive download links, and lets the admin override the
+// hero image, title, and description. Export button generates a CSV with the
+// bundle info + every member product + its download link.
+import { useEffect, useState } from 'react';
+import { supabase } from '../../../lib/supabase';
+import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls, labelCls, Toast } from '../ui';
+import ImageUpload from '../ImageUpload';
+
+type SourceProduct = { id: string; title: string; slug: string; image_url: string | null; price_usd: number };
+type BundleRow = {
+  id: string; title: string; slug: string; price_usd: number; image_url: string | null;
+  description: string | null; active: boolean;
+  bundle_items: { source_product_id: string; sort_order: number; products: SourceProduct | null }[];
+};
+
+const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+
+export default function Bundles() {
+  const [bundles, setBundles] = useState<BundleRow[]>([]);
+  const [products, setProducts] = useState<SourceProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState<BundleRow | 'new' | null>(null);
+
+  useEffect(() => { load(); }, []);
+  async function load() {
+    setLoading(true);
+    const [{ data: bs }, { data: ps }] = await Promise.all([
+      supabase.from('products')
+        .select('id,title,slug,price_usd,image_url,description,active,bundle_items(source_product_id,sort_order,products(id,title,slug,image_url,price_usd))')
+        .eq('is_bundle', true).order('created_at', { ascending: false }),
+      supabase.from('products').select('id,title,slug,image_url,price_usd').eq('active', true).eq('is_bundle', false).order('title').limit(2000),
+    ]);
+    setBundles((bs ?? []) as any);
+    setProducts((ps ?? []) as any);
+    setLoading(false);
+  }
+
+  async function del(b: BundleRow) {
+    if (!confirm(`Delete bundle "${b.title}"? This removes the bundle product and its composition.`)) return;
+    await supabase.from('products').delete().eq('id', b.id);
+    load();
+  }
+
+  function exportCsv(b: BundleRow) {
+    const items = (b.bundle_items || []).sort((a, c) => a.sort_order - c.sort_order);
+    const head = 'bundle_title,bundle_slug,bundle_price_usd,item_position,item_title,item_slug,item_price_usd\n';
+    const lines = items.map((it, i) => {
+      const p = it.products;
+      return [b.title, b.slug, b.price_usd, i + 1, p?.title || '', p?.slug || '', p?.price_usd ?? ''].map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
+    });
+    download(`${b.slug}.csv`, head + lines.join('\n'));
+  }
+
+  // Export bundle info + every member's full Drive download link. Drive links
+  // live in product_downloads (server-only RLS), so we fetch them via the
+  // service role through the existing admin path: select via supabase using the
+  // logged-in admin session (is_admin policy allows it).
+  async function exportFullManifest(b: BundleRow) {
+    const items = (b.bundle_items || []).sort((a, c) => a.sort_order - c.sort_order);
+    const ids = items.map((it) => it.source_product_id);
+    if (!ids.length) { alert('This bundle has no items.'); return; }
+    const { data: dls } = await supabase.from('product_downloads').select('product_id,download_link,file_name').in('product_id', ids);
+    const byProduct: Record<string, string[]> = {};
+    (dls ?? []).forEach((d: any) => { (byProduct[d.product_id] ||= []).push(d.download_link); });
+    const head = 'bundle_title,bundle_slug,item_position,product_title,product_slug,drive_download_link\n';
+    const lines: string[] = [];
+    items.forEach((it, i) => {
+      const p = it.products;
+      const links = byProduct[it.source_product_id] || [''];
+      links.forEach((link) => {
+        lines.push([b.title, b.slug, i + 1, p?.title || '', p?.slug || '', link].map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
+      });
+    });
+    download(`${b.slug}-manifest.csv`, head + lines.join('\n'));
+  }
+
+  function download(name: string, body: string) {
+    const blob = new Blob([body], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm">Compose multi-product bundles. Pick source products from any category, and the bundle automatically inherits their first image (as gallery) and Drive download links. You can override the hero image, title, and description.</p>
+          </div>
+          <button onClick={() => setOpen('new')} className={btnPrimary}>+ New bundle</button>
+        </div>
+      </Card>
+
+      {loading ? <div className="text-sm text-ink-700/60">Loading…</div> : (
+        <div className="bg-white border border-black/10 rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-ink-700/60 text-left bg-cream/40">
+              <tr><th className="p-2">Bundle</th><th className="p-2">Items</th><th className="p-2">Price</th><th className="p-2">Slug</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th></tr>
+            </thead>
+            <tbody>
+              {bundles.length === 0 ? (
+                <tr><td colSpan={6} className="p-6 text-center text-ink-700/60 text-sm">No bundles yet. Click "+ New bundle" to compose one.</td></tr>
+              ) : bundles.map((b) => (
+                <tr key={b.id} className="border-t border-black/5">
+                  <td className="p-2">
+                    <div className="flex items-center gap-2">
+                      {b.image_url && <img src={b.image_url} alt="" className="w-10 h-10 rounded object-cover" />}
+                      <span>{b.title}</span>
+                    </div>
+                  </td>
+                  <td className="p-2">{(b.bundle_items || []).length}</td>
+                  <td className="p-2">${Number(b.price_usd).toFixed(2)}</td>
+                  <td className="p-2 text-xs text-ink-700/60">{b.slug}</td>
+                  <td className="p-2"><span className={`text-xs px-2 py-0.5 rounded ${b.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>{b.active ? 'active' : 'inactive'}</span></td>
+                  <td className="p-2 text-right whitespace-nowrap">
+                    <button className={btnGhost} onClick={() => setOpen(b)}>Edit</button>
+                    <button className={btnGhost + ' ml-1'} onClick={() => exportCsv(b)}>CSV</button>
+                    <button className={btnGhost + ' ml-1'} onClick={() => exportFullManifest(b)} title="Includes Drive download links">Manifest</button>
+                    <a className={btnGhost + ' ml-1'} href={`/product/${b.slug}`} target="_blank">View ↗</a>
+                    <button className={btnDanger + ' ml-1'} onClick={() => del(b)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Modal open={!!open} onClose={() => setOpen(null)} title={open === 'new' ? 'New bundle' : open ? `Edit: ${(open as BundleRow).title}` : ''} wide>
+        {open && <BundleForm bundle={open === 'new' ? null : (open as BundleRow)} products={products} onDone={() => { setOpen(null); load(); }} />}
+      </Modal>
+    </div>
+  );
+}
+
+function BundleForm({ bundle, products, onDone }: { bundle: BundleRow | null; products: SourceProduct[]; onDone: () => void }) {
+  const [title, setTitle] = useState(bundle?.title || '');
+  const [slug, setSlug] = useState(bundle?.slug || '');
+  const [price, setPrice] = useState<number | string>(bundle?.price_usd ?? '');
+  const [description, setDescription] = useState(bundle?.description || '');
+  const [heroImage, setHeroImage] = useState(bundle?.image_url || '');
+  const [pickedIds, setPickedIds] = useState<string[]>(() =>
+    (bundle?.bundle_items || []).sort((a, b) => a.sort_order - b.sort_order).map((it) => it.source_product_id)
+  );
+  const [active, setActive] = useState(bundle?.active ?? true);
+  const [search, setSearch] = useState('');
+  const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
+  const [saving, setSaving] = useState(false);
+
+  const pickedSet = new Set(pickedIds);
+  const filtered = products.filter((p) => !search || p.title.toLowerCase().includes(search.toLowerCase()) || p.slug.includes(search.toLowerCase()));
+  const pickedList = pickedIds.map((id) => products.find((p) => p.id === id)).filter(Boolean) as SourceProduct[];
+  const gallery = pickedList.map((p) => p.image_url).filter(Boolean) as string[];
+  const sumPrice = pickedList.reduce((s, p) => s + Number(p.price_usd || 0), 0);
+
+  async function save() {
+    if (!title.trim()) { setMsg({ kind: 'error', text: 'Title is required.' }); return; }
+    if (!pickedIds.length) { setMsg({ kind: 'error', text: 'Pick at least one source product.' }); return; }
+    const finalSlug = slug || slugify(title);
+    const finalPrice = Number(price) || Math.round(sumPrice * 0.7 * 100) / 100;
+    const finalGallery = heroImage ? [heroImage, ...gallery] : gallery;
+    const mainImage = heroImage || gallery[0] || null;
+
+    setSaving(true);
+    try {
+      let bundleId = bundle?.id;
+      if (!bundleId) {
+        const { data, error } = await supabase.from('products').insert({
+          title, slug: finalSlug, price_usd: finalPrice, image_url: mainImage,
+          description, gallery: finalGallery, is_bundle: true, active, link_status: 'verified',
+        }).select('id').single();
+        if (error) throw error;
+        bundleId = data.id;
+      } else {
+        const { error } = await supabase.from('products').update({
+          title, slug: finalSlug, price_usd: finalPrice, image_url: mainImage,
+          description, gallery: finalGallery, active,
+        }).eq('id', bundleId);
+        if (error) throw error;
+        // wipe existing bundle_items + product_downloads (we'll re-create from picked sources)
+        await supabase.from('bundle_items').delete().eq('bundle_product_id', bundleId);
+        await supabase.from('product_downloads').delete().eq('product_id', bundleId);
+      }
+
+      // Insert bundle_items in pick order
+      const items = pickedIds.map((sid, i) => ({ bundle_product_id: bundleId!, source_product_id: sid, sort_order: i }));
+      if (items.length) {
+        const { error } = await supabase.from('bundle_items').insert(items);
+        if (error) throw error;
+      }
+
+      // Aggregate Drive download links from each source -> attach to bundle product
+      const { data: srcDls } = await supabase.from('product_downloads').select('product_id,download_link,file_name').in('product_id', pickedIds);
+      const downloads = (srcDls ?? []).map((d: any, i: number) => ({
+        product_id: bundleId!, download_link: d.download_link, file_name: d.file_name || null, sort_order: i,
+      }));
+      if (downloads.length) {
+        const { error } = await supabase.from('product_downloads').insert(downloads);
+        if (error) throw error;
+      }
+
+      setMsg({ kind: 'success', text: `✓ Bundle saved (${pickedIds.length} items, ${downloads.length} download link${downloads.length === 1 ? '' : 's'})` });
+      setTimeout(onDone, 700);
+    } catch (e: any) {
+      setMsg({ kind: 'error', text: e.message || String(e) });
+    }
+    setSaving(false);
+  }
+
+  function move(idx: number, dir: -1 | 1) {
+    const target = idx + dir;
+    if (target < 0 || target >= pickedIds.length) return;
+    const next = pickedIds.slice();
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setPickedIds(next);
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <div>
+            <label className={labelCls}>Title</label>
+            <input value={title} onChange={(e) => { setTitle(e.target.value); if (!bundle && !slug) setSlug(slugify(e.target.value)); }} className={inputCls} placeholder="e.g. Cowboy & Western 10-Pack Bundle" />
+          </div>
+          <div>
+            <label className={labelCls}>Slug <span className="text-ink-700/40">(URL)</span></label>
+            <input value={slug} onChange={(e) => setSlug(e.target.value)} className={inputCls} placeholder="cowboy-western-10-pack-bundle" />
+          </div>
+          <div>
+            <label className={labelCls}>Price (USD)</label>
+            <input value={price} onChange={(e) => setPrice(e.target.value)} className={inputCls} placeholder={`Default: $${(sumPrice * 0.7).toFixed(2)} (30% bundle discount)`} />
+            {sumPrice > 0 && <p className="text-xs text-ink-700/60 mt-1">Sum of source prices: ${sumPrice.toFixed(2)}. Customers expect a discount on bundles.</p>}
+          </div>
+          <div>
+            <label className={labelCls}>Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} className={inputCls} placeholder="Describe the bundle (themes, what's included, who it's for...)" />
+          </div>
+          <label className="flex items-center gap-2 text-sm pt-1">
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active (visible in catalog)
+          </label>
+        </div>
+        <div>
+          <label className={labelCls}>Hero bundle image <span className="text-ink-700/40">(shown as main product image; overrides auto)</span></label>
+          <ImageUpload value={heroImage} onChange={setHeroImage} folder="bundles" />
+          <p className="text-xs text-ink-700/60 mt-2">If left empty, the bundle uses the first image of the first source product. Either way, all picked source products' first images make up the bundle's gallery.</p>
+
+          {gallery.length > 0 && (
+            <div className="mt-4">
+              <div className="text-xs text-ink-700/60 mb-2">Auto gallery preview ({gallery.length})</div>
+              <div className="grid grid-cols-5 gap-1">
+                {gallery.slice(0, 10).map((g, i) => <img key={i} src={g} alt="" className="w-full aspect-square object-cover rounded" />)}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="border-t border-black/10 pt-4">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <div className="text-sm font-medium">Picked products <span className="text-ink-700/60">({pickedIds.length})</span></div>
+            <div className="text-xs text-ink-700/60">Each source's first image goes into the bundle gallery; all source Drive links are auto-attached to this bundle.</div>
+          </div>
+          {pickedIds.length > 0 && <button className={btnGhost} onClick={() => setPickedIds([])}>Clear all</button>}
+        </div>
+        {pickedList.length > 0 && (
+          <div className="border border-black/10 rounded mb-3 max-h-44 overflow-y-auto">
+            <table className="w-full text-xs">
+              <tbody>
+                {pickedList.map((p, i) => (
+                  <tr key={p.id} className="border-t border-black/5 first:border-t-0">
+                    <td className="p-2 w-8 text-ink-700/60">#{i + 1}</td>
+                    <td className="p-2 w-10">{p.image_url && <img src={p.image_url} alt="" className="w-8 h-8 rounded object-cover" />}</td>
+                    <td className="p-2">{p.title.slice(0, 70)}</td>
+                    <td className="p-2 text-right w-16">${Number(p.price_usd).toFixed(2)}</td>
+                    <td className="p-2 w-24 text-right whitespace-nowrap">
+                      <button className="px-1.5 text-bronze-700" onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
+                      <button className="px-1.5 text-bronze-700" onClick={() => move(i, 1)} disabled={i === pickedList.length - 1}>↓</button>
+                      <button className="px-1.5 text-red-600" onClick={() => setPickedIds(pickedIds.filter((id) => id !== p.id))}>✕</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products to add…" className={inputCls + ' mb-2'} />
+        <div className="border border-black/10 rounded max-h-64 overflow-y-auto">
+          {filtered.slice(0, 100).map((p) => {
+            const picked = pickedSet.has(p.id);
+            return (
+              <button key={p.id} type="button" onClick={() => setPickedIds(picked ? pickedIds.filter((id) => id !== p.id) : [...pickedIds, p.id])}
+                className={`w-full text-left px-2 py-1.5 flex items-center gap-2 text-xs hover:bg-cream/50 border-b border-black/5 last:border-b-0 ${picked ? 'bg-bronze-600/10' : ''}`}>
+                <input type="checkbox" readOnly checked={picked} />
+                {p.image_url ? <img src={p.image_url} alt="" className="w-8 h-8 rounded object-cover" /> : <div className="w-8 h-8 rounded bg-cream" />}
+                <span className="flex-1">{p.title.slice(0, 80)}</span>
+                <span className="text-ink-700/60">${Number(p.price_usd).toFixed(2)}</span>
+              </button>
+            );
+          })}
+          {filtered.length > 100 && <div className="p-2 text-center text-xs text-ink-700/60">Showing first 100. Refine search to see more.</div>}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 border-t border-black/10 pt-4">
+        <button disabled={saving} onClick={save} className={btnPrimary}>{saving ? 'Saving…' : (bundle ? 'Save changes' : 'Create bundle')}</button>
+        <Toast message={msg.text} kind={msg.kind} />
+      </div>
+    </div>
+  );
+}

@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import CarvedByYou from '../components/CarvedByYou.astro';
 import SideMenu from '../components/SideMenu.astro';
 import SiteBanner from '../components/SiteBanner.astro';
 import ProductCard from '../components/ProductCard.astro';
@@ -228,6 +229,8 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
       <a href="/catalog" class="mt-6 inline-block bg-[#FAC775] text-bronze-900 px-6 py-3 rounded-md text-sm font-medium hover:opacity-90 transition">Browse the catalog →</a>
     </div>
   </section>
+
+  <CarvedByYou />
 
   <Footer />
   <script type="application/ld+json" set:html={JSON.stringify({

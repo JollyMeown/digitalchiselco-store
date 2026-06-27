@@ -1,0 +1,59 @@
+---
+// "Carved by you" — customer-creations showcase on the homepage.
+// Admin manages entries in /admin#creations.
+import { getCustomerCreations } from '../lib/queries';
+const creations = await getCustomerCreations(9);
+---
+{creations.length > 0 && (
+  <section class="bg-gradient-to-b from-cream/40 via-cream/20 to-white py-16 relative overflow-hidden">
+    <div class="absolute inset-0 pointer-events-none opacity-[0.04]" aria-hidden="true">
+      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="wood" patternUnits="userSpaceOnUse" width="40" height="40"><path d="M0 20 Q 10 18 20 20 T 40 20" stroke="#412402" stroke-width="0.4" fill="none"/></pattern></defs><rect width="100%" height="100%" fill="url(#wood)"/></svg>
+    </div>
+    <div class="relative max-w-6xl mx-auto px-4 sm:px-6">
+      <div class="text-center mb-10">
+        <div class="inline-flex items-center gap-2 text-xs tracking-widest text-bronze-600 uppercase mb-3">
+          <span class="h-px w-8 bg-bronze-600/40"></span>
+          The Maker Wall
+          <span class="h-px w-8 bg-bronze-600/40"></span>
+        </div>
+        <h2 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">Carved by <em class="italic">you</em></h2>
+        <p class="mt-3 text-bronze-700/80 text-sm max-w-xl mx-auto">
+          Real makers, real finished pieces. Wood grain that holds light, lines carved by hand off the same files in our shop.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-5">
+        {creations.map((c, idx) => {
+          const linkHref = c.products?.slug ? `/product/${c.products.slug}` : (c.product_url || null);
+          const titleSlice = c.description ? c.description.split('\n')[0].slice(0, 100) : '';
+          // make first item span 2 cols on sm+ if featured
+          const feat = idx === 0 && c.is_featured;
+          return (
+            <article class={`group relative overflow-hidden rounded-lg bg-white border border-black/10 hover:shadow-md transition ${feat ? 'sm:col-span-2 sm:row-span-2' : ''}`}>
+              <div class="aspect-square overflow-hidden bg-cream">
+                <img src={c.gallery[0]} alt={`Bas-relief carving by ${c.name}`} loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+              </div>
+              <div class="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-bronze-800/85 via-bronze-800/45 to-transparent text-cream">
+                <div class="flex items-end justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="font-serif text-base md:text-lg leading-tight truncate">{c.name}</div>
+                    {titleSlice && <p class="text-[11px] md:text-xs text-cream/80 line-clamp-2 mt-0.5">{titleSlice}</p>}
+                  </div>
+                  {linkHref && (
+                    <a href={linkHref} class="flex-shrink-0 text-[10px] md:text-xs px-2.5 py-1 rounded bg-cream text-bronze-800 hover:bg-white whitespace-nowrap" aria-label={`Shop the design ${c.name} carved`}>
+                      Shop this →
+                    </a>
+                  )}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div class="text-center mt-10">
+        <p class="text-sm text-bronze-700/70 italic">Carved one of our designs? Send a photo to <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600 underline">jolly@digitalchiselco.com</a> and we'll feature you here.</p>
+      </div>
+    </div>
+  </section>
+)}

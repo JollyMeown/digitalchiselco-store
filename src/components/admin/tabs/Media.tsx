@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { Card, btnPrimary, inputCls, labelCls } from '../ui';
+import { Card, btnGhost, btnPrimary, inputCls, labelCls } from '../ui';
 import ImageUpload from '../ImageUpload';
 
 export default function Media() {

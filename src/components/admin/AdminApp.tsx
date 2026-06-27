@@ -11,6 +11,8 @@ import Links from './tabs/Links';
 import Reviews from './tabs/Reviews';
 import Faqs from './tabs/Faqs';
 import Membership from './tabs/Membership';
+import Bundles from './tabs/Bundles';
+import Creations from './tabs/Creations';
 import { inputCls, btnPrimary } from './ui';
 
 type Tab = { key: string; label: string; icon: string; Component: any };
@@ -18,8 +20,10 @@ type Tab = { key: string; label: string; icon: string; Component: any };
 const TABS: Tab[] = [
   { key: 'overview',    label: 'Overview',     icon: '◎', Component: Overview },
   { key: 'products',    label: 'Products',     icon: '▦', Component: Products },
+  { key: 'bundles',     label: 'Bundle Composer', icon: '◫', Component: Bundles },
   { key: 'categories',  label: 'Categories',   icon: '☷', Component: Categories },
   { key: 'orders',      label: 'Orders',       icon: '⊞', Component: Orders },
+  { key: 'creations',   label: 'Carved by you', icon: '✦', Component: Creations },
   { key: 'membership',  label: 'Membership',   icon: '◆', Component: Membership },
   { key: 'reviews',     label: 'Reviews',      icon: '★', Component: Reviews },
   { key: 'faqs',        label: 'FAQs',         icon: '?', Component: Faqs },
