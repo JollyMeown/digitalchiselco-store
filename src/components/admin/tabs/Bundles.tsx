@@ -14,6 +14,7 @@ type BundleRow = {
   id: string; title: string; slug: string; price_usd: number; image_url: string | null;
   description: string | null; active: boolean;
   bundle_items: { source_product_id: string; sort_order: number; products: SourceProduct | null }[];
+  product_downloads?: { download_link: string }[];
 };
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
@@ -37,7 +38,8 @@ export default function Bundles() {
     const { data: bs, error: bErr } = await supabase.from('products')
       .select(
         'id,title,slug,price_usd,image_url,description,active,' +
-        'bundle_items!bundle_items_bundle_product_id_fkey(source_product_id,sort_order,products:source_product_id(id,title,slug,image_url,price_usd))'
+        'bundle_items!bundle_items_bundle_product_id_fkey(source_product_id,sort_order,products:source_product_id(id,title,slug,image_url,price_usd)),' +
+        'product_downloads(download_link)'
       )
       .eq('is_bundle', true).order('created_at', { ascending: false });
     if (bErr) console.error('Bundles load failed:', bErr);
@@ -288,6 +290,15 @@ function BundleForm({ bundle, onDone }: { bundle: BundleRow | null; onDone: () =
   const [pickedIds, setPickedIds] = useState<string[]>(() =>
     (bundle?.bundle_items || []).sort((a, b) => a.sort_order - b.sort_order).map((it) => it.source_product_id)
   );
+  // External Drive URL — saved when the bundle has no source products (e.g. a
+  // single pre-packaged ZIP in Drive). On load, pre-fill from the existing
+  // download row if and only if the bundle has no items (so we don't tempt
+  // anyone into overwriting an aggregated source list).
+  const [externalDownloadUrl, setExternalDownloadUrl] = useState(() => {
+    const items = bundle?.bundle_items || [];
+    const dls = bundle?.product_downloads || [];
+    return items.length === 0 && dls.length > 0 ? dls[0].download_link : '';
+  });
   const [active, setActive] = useState(bundle?.active ?? true);
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
   const [saving, setSaving] = useState(false);
@@ -319,7 +330,16 @@ function BundleForm({ bundle, onDone }: { bundle: BundleRow | null; onDone: () =
 
   async function save() {
     if (!title.trim()) { setMsg({ kind: 'error', text: 'Title is required.' }); return; }
-    if (!pickedIds.length) { setMsg({ kind: 'error', text: 'Pick at least one source product.' }); return; }
+    const externalUrl = externalDownloadUrl.trim();
+    const useExternal = externalUrl.length > 0;
+    if (!useExternal && !pickedIds.length) {
+      setMsg({ kind: 'error', text: 'Pick at least one source product OR provide an external Drive link.' });
+      return;
+    }
+    if (useExternal && !/drive\.google\.com\/(uc\?|file\/d\/|folders\/)/.test(externalUrl)) {
+      setMsg({ kind: 'error', text: 'External link must be a Google Drive URL.' });
+      return;
+    }
     const finalSlug = slug || slugify(title);
     const finalPrice = Number(price) || Math.round(sumPrice * 0.7 * 100) / 100;
     const finalGallery = heroImage ? [heroImage, ...gallery] : gallery;
@@ -353,17 +373,36 @@ function BundleForm({ bundle, onDone }: { bundle: BundleRow | null; onDone: () =
         if (error) throw error;
       }
 
-      // Aggregate Drive download links from each source -> attach to bundle product
-      const { data: srcDls } = await supabase.from('product_downloads').select('product_id,download_link,file_name').in('product_id', pickedIds);
-      const downloads = (srcDls ?? []).map((d: any, i: number) => ({
-        product_id: bundleId!, download_link: d.download_link, file_name: d.file_name || null, sort_order: i,
-      }));
-      if (downloads.length) {
-        const { error } = await supabase.from('product_downloads').insert(downloads);
+      // Attach download links. External-link mode wins when provided — the
+      // single Drive URL replaces any source aggregation. Without it, we
+      // aggregate Drive links from each picked source product.
+      let downloadCount = 0;
+      if (useExternal) {
+        const { error } = await supabase.from('product_downloads').insert({
+          product_id: bundleId!,
+          download_link: externalUrl,
+          file_name: title.trim(),
+          sort_order: 0,
+          verified_at: new Date().toISOString(),
+        });
         if (error) throw error;
+        downloadCount = 1;
+      } else if (pickedIds.length) {
+        const { data: srcDls } = await supabase.from('product_downloads').select('product_id,download_link,file_name').in('product_id', pickedIds);
+        const downloads = (srcDls ?? []).map((d: any, i: number) => ({
+          product_id: bundleId!, download_link: d.download_link, file_name: d.file_name || null, sort_order: i,
+        }));
+        if (downloads.length) {
+          const { error } = await supabase.from('product_downloads').insert(downloads);
+          if (error) throw error;
+        }
+        downloadCount = downloads.length;
       }
 
-      setMsg({ kind: 'success', text: `✓ Bundle saved (${pickedIds.length} items, ${downloads.length} download link${downloads.length === 1 ? '' : 's'})` });
+      const summary = useExternal
+        ? `external Drive link${pickedIds.length ? ` · ${pickedIds.length} source product${pickedIds.length === 1 ? '' : 's'} kept for gallery` : ''}`
+        : `${pickedIds.length} items, ${downloadCount} download link${downloadCount === 1 ? '' : 's'}`;
+      setMsg({ kind: 'success', text: `✓ Bundle saved (${summary})` });
       setTimeout(onDone, 700);
     } catch (e: any) {
       setMsg({ kind: 'error', text: e.message || String(e) });
@@ -421,10 +460,30 @@ function BundleForm({ bundle, onDone }: { bundle: BundleRow | null; onDone: () =
       </div>
 
       <div className="border-t border-black/10 pt-4">
+        <div className="mb-4 rounded-md border border-bronze-600/20 bg-bronze-50/40 p-3">
+          <label className={labelCls}>External Drive download link <span className="text-ink-700/40">(optional — for pre-packaged ZIP bundles)</span></label>
+          <input
+            type="url"
+            value={externalDownloadUrl}
+            onChange={(e) => setExternalDownloadUrl(e.target.value)}
+            placeholder="https://drive.google.com/uc?export=download&id=…"
+            className={inputCls}
+          />
+          <p className="text-xs text-ink-700/60 mt-1.5">
+            {externalDownloadUrl.trim()
+              ? '✓ External link will be used as this bundle\'s only download. Source products below are kept only for the gallery.'
+              : 'Leave blank to use the aggregated Drive links from the picked products below.'}
+          </p>
+        </div>
+
         <div className="flex items-center justify-between mb-2">
           <div>
-            <div className="text-sm font-medium">Picked products <span className="text-ink-700/60">({pickedIds.length})</span></div>
-            <div className="text-xs text-ink-700/60">Each source's first image goes into the bundle gallery; all source Drive links are auto-attached to this bundle.</div>
+            <div className="text-sm font-medium">{externalDownloadUrl.trim() ? 'Picked products (gallery only)' : 'Picked products'} <span className="text-ink-700/60">({pickedIds.length})</span></div>
+            <div className="text-xs text-ink-700/60">
+              {externalDownloadUrl.trim()
+                ? 'These contribute their first image to the bundle gallery. Their Drive links are not used because the external link above takes precedence.'
+                : 'Each source\'s first image goes into the bundle gallery; all source Drive links are auto-attached to this bundle.'}
+            </div>
           </div>
           {pickedIds.length > 0 && <button className={btnGhost} onClick={() => setPickedIds([])}>Clear all</button>}
         </div>
