@@ -16,7 +16,8 @@
     "seed:blog": "node scripts/seed_blog_posts.mjs",
     "dedupe:downloads": "node scripts/dedupe_product_downloads.mjs",
     "cleanup:mailerlite-unconfirmed": "node scripts/cleanup_unconfirmed_mailerlite.mjs",
-    "backfill:thin-images": "node scripts/backfill_thin_product_images.mjs"
+    "backfill:thin-images": "node scripts/backfill_thin_product_images.mjs",
+    "audit:downloads": "node scripts/audit_download_filenames.mjs"
   },
   "dependencies": {
     "@astrojs/netlify": "^6.0.0",
