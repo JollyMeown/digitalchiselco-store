@@ -98,6 +98,12 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
         promoRemove?.classList.add('hidden');
       }
 
+      // Re-validate the applied promo against the live cart on every change.
+      // Without this, removing items below a tier's minimum (e.g. 6 items for
+      // 2026OFF15) would leave the discount applied stale. Debounced via a
+      // simple in-flight flag so rapid cart edits collapse into one round-trip.
+      revalidatePromoSoon(c, promo);
+
       // ── Bulk-discount upsell hint ─────────────────────────────────
       // Tiers must mirror seed_bulk_promos.mjs. Find the next tier the
       // cart hasn't reached and tell the customer how to unlock it.
@@ -167,6 +173,62 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
       } catch (e) { console.error('upsell load failed', e); }
     }
 
+    // Tiny debouncing wrapper used by renderCart() to re-check the applied
+    // promo against the live cart whenever items change.
+    let revalTimer = null;
+    let revalInFlight = false;
+    let lastCartHash = '';
+    async function revalidatePromoSoon(c, promo) {
+      if (!promo?.code) { lastCartHash = JSON.stringify(c.map((x) => x.id).sort()); return; }
+      const hash = JSON.stringify(c.map((x) => x.id).sort());
+      if (hash === lastCartHash && !revalInFlight) return; // nothing to do
+      lastCartHash = hash;
+      clearTimeout(revalTimer);
+      revalTimer = setTimeout(() => doRevalidate(promo.code), 200);
+    }
+    async function doRevalidate(code) {
+      if (revalInFlight) return;
+      revalInFlight = true;
+      try {
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]')
+          .filter((c) => !String(c.id).startsWith('membership:'))
+          .map((c) => ({ id: c.id, price: Number(c.price), qty: 1, title: c.title }));
+        if (cart.length === 0) {
+          localStorage.removeItem('promo');
+          renderCart();
+          return;
+        }
+        const res = await fetch('/api/coupons/validate', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ code, items: cart }),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          // Update the stored discount so the next renderCart() uses the fresh number.
+          localStorage.setItem('promo', JSON.stringify({
+            code: data.code, description: data.description,
+            discount_amount: data.discount_amount, percent_off: data.percent_off,
+          }));
+          const promoMsg = document.getElementById('promo-msg');
+          if (promoMsg && promoMsg.textContent.startsWith('✕')) promoMsg.textContent = '';
+          renderCart();
+        } else {
+          // Promo no longer eligible — drop it and tell the user gently.
+          localStorage.removeItem('promo');
+          const promoMsg = document.getElementById('promo-msg');
+          if (promoMsg) {
+            promoMsg.textContent = '⚠ Promo "' + code + '" removed — ' + (data.error || 'no longer eligible for this cart.');
+            promoMsg.className = 'mt-2 text-xs text-amber-700';
+          }
+          renderCart();
+        }
+      } catch (e) {
+        // Network blip — leave the promo in place; we'll re-check on next change.
+      } finally {
+        revalInFlight = false;
+      }
+    }
+
     renderCart();
     loadUpsell();
     window.addEventListener('cart-changed', () => { renderCart(); loadUpsell(); });
@@ -193,6 +255,8 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
         localStorage.setItem('promo', JSON.stringify({ code: data.code, description: data.description, discount_amount: data.discount_amount, percent_off: data.percent_off }));
         promoMsg.textContent = '✓ ' + (data.description || data.code) + ' applied — saved ' + fmt(data.discount_amount);
         promoMsg.className = 'mt-2 text-xs text-green-700';
+        // Pretend the cart "changed" so the revalidator's hash is up to date
+        lastCartHash = JSON.stringify(JSON.parse(localStorage.getItem('cart') || '[]').map((x) => x.id).sort());
         renderCart();
       } catch (e) {
         promoMsg.textContent = 'Network error. Please try again.'; promoMsg.className = 'mt-2 text-xs text-red-600';

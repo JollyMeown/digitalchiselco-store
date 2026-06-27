@@ -5,8 +5,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls, labelCls, Toast } from '../ui';
+import ProductSearchPicker, { type PickerProduct } from '../ProductSearchPicker';
 
 type Sale = { id: string; name: string; percent_off: number; starts_at: string; expires_at: string; active: boolean; scope: string; scope_ids: string[] | null; terms: string | null };
+type Category = { id: string; name: string; slug: string };
 type Coupon = {
   id: string; code: string; description: string | null; active: boolean;
   percent_off: number | null; fixed_amount_off: number | null;
@@ -198,6 +200,97 @@ function Sales() {
   );
 }
 
+// Shared "apply this discount to…" picker used by Sales and Promo Codes.
+// Renders:
+//   - radio: All listings | Specific categories | Specific products
+//   - when "category": multi-checkbox list of categories
+//   - when "product":  ProductSearchPicker + a removable picked-list
+function ScopePicker({
+  scope, setScope, scopeIds, setScopeIds,
+}: {
+  scope: 'all' | 'category' | 'product';
+  setScope: (s: 'all' | 'category' | 'product') => void;
+  scopeIds: string[];
+  setScopeIds: (ids: string[]) => void;
+}) {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [pickedProducts, setPickedProducts] = useState<Record<string, PickerProduct>>({});
+
+  useEffect(() => {
+    supabase.from('categories').select('id,name,slug').order('name').then(({ data }) => setCategories((data ?? []) as any));
+  }, []);
+
+  // When editing an existing scope=product discount, fetch the picked product
+  // details so they can be shown in the removable list.
+  useEffect(() => {
+    if (scope !== 'product' || scopeIds.length === 0) return;
+    const missing = scopeIds.filter((id) => !pickedProducts[id]);
+    if (missing.length === 0) return;
+    supabase.from('products').select('id,title,slug,image_url,price_usd').in('id', missing).then(({ data }) => {
+      const next = { ...pickedProducts };
+      (data ?? []).forEach((p: any) => { next[p.id] = p; });
+      setPickedProducts(next);
+    });
+  }, [scope, scopeIds]);
+
+  function toggleProduct(p: PickerProduct) {
+    if (scopeIds.includes(p.id)) setScopeIds(scopeIds.filter((id) => id !== p.id));
+    else { setScopeIds([...scopeIds, p.id]); setPickedProducts({ ...pickedProducts, [p.id]: p }); }
+  }
+  function toggleCategory(id: string) {
+    if (scopeIds.includes(id)) setScopeIds(scopeIds.filter((x) => x !== id));
+    else setScopeIds([...scopeIds, id]);
+  }
+
+  return (
+    <div>
+      <div className={labelCls}>Apply to</div>
+      <div className="flex gap-3 items-center flex-wrap text-sm">
+        <label className="flex items-center gap-1.5"><input type="radio" checked={scope === 'all'} onChange={() => { setScope('all'); setScopeIds([]); }} /> All listings</label>
+        <label className="flex items-center gap-1.5"><input type="radio" checked={scope === 'category'} onChange={() => { setScope('category'); setScopeIds([]); }} /> Specific categories</label>
+        <label className="flex items-center gap-1.5"><input type="radio" checked={scope === 'product'} onChange={() => { setScope('product'); setScopeIds([]); }} /> Specific products</label>
+      </div>
+
+      {scope === 'category' && (
+        <div className="mt-2 border border-black/10 rounded-md p-2 max-h-44 overflow-y-auto grid grid-cols-2 gap-1 text-xs">
+          {categories.length === 0 ? <div className="text-ink-700/60 p-2">Loading…</div> : categories.map((c) => (
+            <label key={c.id} className="flex items-center gap-1.5 cursor-pointer px-1 py-0.5 hover:bg-cream/40 rounded">
+              <input type="checkbox" checked={scopeIds.includes(c.id)} onChange={() => toggleCategory(c.id)} />
+              {c.name}
+            </label>
+          ))}
+        </div>
+      )}
+
+      {scope === 'product' && (
+        <div className="mt-2 space-y-2">
+          {scopeIds.length > 0 && (
+            <div className="border border-black/10 rounded-md max-h-32 overflow-y-auto">
+              {scopeIds.map((id) => {
+                const p = pickedProducts[id];
+                return (
+                  <div key={id} className="flex items-center gap-2 px-2 py-1.5 text-xs border-b border-black/5 last:border-b-0">
+                    {p?.image_url ? <img src={p.image_url} alt="" className="w-7 h-7 rounded object-cover" /> : <div className="w-7 h-7 rounded bg-cream" />}
+                    <span className="flex-1 truncate">{p?.title || id}</span>
+                    <button type="button" className="text-red-600 hover:underline" onClick={() => setScopeIds(scopeIds.filter((x) => x !== id))}>Remove</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <ProductSearchPicker
+            selectedIds={scopeIds}
+            onPick={toggleProduct}
+            placeholder="Search products to add to scope…"
+            compact
+            showFilters
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SaleForm({ s, onDone }: { s: Sale | null; onDone: () => void }) {
   const [name, setName] = useState(s?.name || '');
   const [percent, setPercent] = useState<number | string>(s?.percent_off ?? 20);
@@ -205,6 +298,8 @@ function SaleForm({ s, onDone }: { s: Sale | null; onDone: () => void }) {
   const [to, setTo] = useState(s ? isoDate(s.expires_at) : new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
   const [terms, setTerms] = useState(s?.terms || '');
   const [active, setActive] = useState(s?.active ?? true);
+  const [scope, setScope] = useState<'all' | 'category' | 'product'>((s?.scope as any) || 'all');
+  const [scopeIds, setScopeIds] = useState<string[]>(s?.scope_ids || []);
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
   const [busy, setBusy] = useState(false);
 
@@ -212,8 +307,14 @@ function SaleForm({ s, onDone }: { s: Sale | null; onDone: () => void }) {
     if (!name.trim()) { setMsg({ kind: 'error', text: 'Name required.' }); return; }
     const pct = Number(percent);
     if (!pct || pct < 1 || pct > 100) { setMsg({ kind: 'error', text: 'Percent off must be 1–100.' }); return; }
+    if (scope !== 'all' && scopeIds.length === 0) { setMsg({ kind: 'error', text: `Pick at least one ${scope}.` }); return; }
     setBusy(true);
-    const payload = { name: name.trim().toUpperCase().replace(/\s+/g, ''), percent_off: pct, starts_at: toIsoStart(from), expires_at: toIsoEnd(to), terms: terms || null, active, scope: 'all' };
+    const payload = {
+      name: name.trim().toUpperCase().replace(/\s+/g, ''),
+      percent_off: pct, starts_at: toIsoStart(from), expires_at: toIsoEnd(to),
+      terms: terms || null, active,
+      scope, scope_ids: scope === 'all' ? null : scopeIds,
+    };
     const { error } = s
       ? await supabase.from('sales').update(payload).eq('id', s.id)
       : await supabase.from('sales').insert(payload);
@@ -247,9 +348,10 @@ function SaleForm({ s, onDone }: { s: Sale | null; onDone: () => void }) {
         <label className={labelCls}>Terms (shown to buyer; optional)</label>
         <textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows={3} className={inputCls} maxLength={500} placeholder="E.g. Discount applies to STL files only. Not combinable with promo codes." />
       </div>
+      <ScopePicker scope={scope} setScope={setScope} scopeIds={scopeIds} setScopeIds={setScopeIds} />
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label>
       <div className="bg-cream/40 border border-bronze-600/20 rounded-md p-3 text-xs text-ink-700/70">
-        Sales apply to <strong>all listings</strong> automatically. To run promo-code style discounts with item-count minimums, switch to the <strong>Promo codes</strong> tab instead.
+        Sales auto-apply at checkout to every eligible product in the chosen scope. For code-entry discounts with item-count or order-total minimums, use the <strong>Promo codes</strong> tab instead.
       </div>
       <div className="flex items-center gap-3 border-t border-black/10 pt-4">
         <button disabled={busy} onClick={save} className={btnPrimary}>{busy ? 'Saving…' : (s ? 'Save changes' : 'Create sale')}</button>
@@ -331,12 +433,15 @@ function CodeForm({ c, onDone }: { c: Coupon | null; onDone: () => void }) {
   const [limitType, setLimitType] = useState<'no' | 'total' | 'single'>(c?.single_use_per_buyer ? 'single' : c?.max_redemptions ? 'total' : 'no');
   const [maxRed, setMaxRed] = useState<number | string>(c?.max_redemptions ?? '');
   const [active, setActive] = useState(c?.active ?? true);
+  const [scope, setScope] = useState<'all' | 'category' | 'product'>((c?.scope as any) || 'all');
+  const [scopeIds, setScopeIds] = useState<string[]>(c?.scope_ids || []);
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
   const [busy, setBusy] = useState(false);
 
   async function save() {
     const cleanCode = code.trim().toUpperCase().replace(/\s+/g, '');
     if (!/^[A-Z0-9]{3,32}$/.test(cleanCode)) { setMsg({ kind: 'error', text: 'Code must be 3–32 letters/digits.' }); return; }
+    if (scope !== 'all' && scopeIds.length === 0) { setMsg({ kind: 'error', text: `Pick at least one ${scope}.` }); return; }
     setBusy(true);
     const payload: any = {
       code: cleanCode,
@@ -350,7 +455,7 @@ function CodeForm({ c, onDone }: { c: Coupon | null; onDone: () => void }) {
       max_redemptions: limitType === 'total' ? Number(maxRed) || null : null,
       single_use_per_buyer: limitType === 'single',
       active,
-      scope: 'all',
+      scope, scope_ids: scope === 'all' ? null : scopeIds,
     };
     const { error } = c
       ? await supabase.from('coupons').update(payload).eq('id', c.id)
@@ -416,6 +521,8 @@ function CodeForm({ c, onDone }: { c: Coupon | null; onDone: () => void }) {
           {limitType === 'total' && <input type="number" min="1" value={maxRed} onChange={(e) => setMaxRed(e.target.value)} className={inputCls + ' w-24 ml-2'} placeholder="e.g. 100" />}
         </div>
       </div>
+
+      <ScopePicker scope={scope} setScope={setScope} scopeIds={scopeIds} setScopeIds={setScopeIds} />
 
       <label className="flex items-center gap-2"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label>
 

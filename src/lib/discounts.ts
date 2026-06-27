@@ -50,8 +50,33 @@ export async function validateCoupon(rawCode: string, cart: CartLine[], email: s
   if (coupon.expires_at && Date.parse(coupon.expires_at) < now) return { ok: false, error: 'This code has expired.' };
   if (coupon.max_redemptions && coupon.redemption_count >= coupon.max_redemptions) return { ok: false, error: 'This code has reached its redemption limit.' };
 
-  const items = cart.reduce((n, l) => n + (Number(l.qty) || 1), 0);
-  const subtotal = cart.reduce((s, l) => s + (Number(l.price) || 0) * (Number(l.qty) || 1), 0);
+  // ── Scope filtering ────────────────────────────────────────────────────
+  // If the coupon is scoped to specific categories/products, restrict the
+  // cart lines to ones inside that scope BEFORE checking min_items / min_total.
+  let eligible: CartLine[] = cart;
+  if (coupon.scope && coupon.scope !== 'all' && Array.isArray(coupon.scope_ids) && coupon.scope_ids.length > 0) {
+    const ids: string[] = coupon.scope_ids;
+    if (coupon.scope === 'product') {
+      const set = new Set(ids);
+      eligible = cart.filter((l) => set.has(l.id));
+    } else if (coupon.scope === 'category') {
+      const productIds = cart.map((l) => l.id);
+      const { data: pc } = await db.from('product_categories')
+        .select('product_id,category_id').in('product_id', productIds);
+      const catSet = new Set(ids);
+      const productCats: Record<string, string[]> = {};
+      (pc ?? []).forEach((row: any) => {
+        (productCats[row.product_id] ||= []).push(row.category_id);
+      });
+      eligible = cart.filter((l) => (productCats[l.id] || []).some((c) => catSet.has(c)));
+    }
+    if (eligible.length === 0) {
+      return { ok: false, error: 'This code doesn\'t apply to the products in your cart.' };
+    }
+  }
+
+  const items = eligible.reduce((n, l) => n + (Number(l.qty) || 1), 0);
+  const subtotal = eligible.reduce((s, l) => s + (Number(l.price) || 0) * (Number(l.qty) || 1), 0);
 
   if (coupon.min_items && items < coupon.min_items) return { ok: false, error: `Add ${coupon.min_items - items} more item${coupon.min_items - items === 1 ? '' : 's'} to use this code (needs ${coupon.min_items}+).` };
   if (coupon.min_subtotal && subtotal < Number(coupon.min_subtotal)) return { ok: false, error: `Spend $${(Number(coupon.min_subtotal) - subtotal).toFixed(2)} more to use this code (minimum $${coupon.min_subtotal}).` };

@@ -54,15 +54,41 @@ export async function getSettings(): Promise<SiteSettings> {
   } catch (e) { console.error('getSettings failed:', e); return SETTINGS_FALLBACK; }
 }
 
+/**
+ * Customer-facing product search. Splits the query into tokens (so
+ * "wolf moon" matches even when the title has them in different orders),
+ * matches each token against title + description, and ranks results so
+ * title hits float above description-only hits.
+ */
 export async function searchProducts(q: string, limit = 60) {
   const term = q.trim();
   if (!term) return [];
+  // Sanitise tokens — PostgREST's or() uses commas + parens as syntax.
+  const tokens = term.split(/\s+/).map((t) => t.replace(/[,()*]/g, '')).filter((t) => t.length >= 2);
+  if (tokens.length === 0) return [];
   try {
-    const { data, error } = await supabase
-      .from('products').select(CARD).eq('active', true)
-      .ilike('title', `%${term}%`).order('title').limit(limit);
+    // Build (title.ilike.*tok* OR description.ilike.*tok*) per token, ANDed.
+    let qb: any = supabase.from('products').select(CARD).eq('active', true);
+    for (const t of tokens) {
+      qb = qb.or(`title.ilike.*${t}*,description.ilike.*${t}*`);
+    }
+    qb = qb.limit(Math.min(200, limit * 3));
+    const { data, error } = await qb;
     if (error) throw error;
-    return (data ?? []) as ProductCard[];
+    const rows = (data ?? []) as ProductCard[] & { title: string }[];
+    // Rank: title hit count first, then position-in-title earliness.
+    const lower = tokens.map((t) => t.toLowerCase());
+    const scored = rows.map((p: any) => {
+      const tl = (p.title || '').toLowerCase();
+      let titleHits = 0; let firstPos = 9999;
+      for (const t of lower) {
+        const pos = tl.indexOf(t);
+        if (pos >= 0) { titleHits++; if (pos < firstPos) firstPos = pos; }
+      }
+      return { p, titleHits, firstPos };
+    });
+    scored.sort((a, b) => (b.titleHits - a.titleHits) || (a.firstPos - b.firstPos));
+    return scored.slice(0, limit).map((s) => s.p) as ProductCard[];
   } catch (e) { console.error('searchProducts failed:', e); return []; }
 }
 

@@ -23,19 +23,27 @@ interface Props {
   excludeBundles?: boolean;
   /** Compact = no right-side preview, for narrow modals */
   compact?: boolean;
+  /** Show additional filter toggles: only-with-drive-link, only-unbundled */
+  showFilters?: boolean;
 }
 
 export default function ProductSearchPicker({
   selectedIds = [], onPick, showPrice = false, initialPreview = null,
   placeholder = 'Type to search products…',
-  excludeBundles = true, compact = false,
+  excludeBundles = true, compact = false, showFilters = false,
 }: Props) {
   const [query, setQuery] = useState('');
   const [searchDescriptions, setSearchDescriptions] = useState(false);
+  const [requireDriveLink, setRequireDriveLink] = useState(false);
+  const [onlyUnbundled, setOnlyUnbundled] = useState(false); // not-yet-in-any-bundle
   const [results, setResults] = useState<PickerProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState<number | null>(null);
+  // Caches of product-ids that match each filter, fetched on demand and reused
+  // across keystrokes. Re-fetched only when the toggle flips.
+  const [linkedIds, setLinkedIds] = useState<Set<string> | null>(null);
+  const [bundledIds, setBundledIds] = useState<Set<string> | null>(null);
   const reqIdRef = useRef(0);
 
   const selectedSet = new Set(selectedIds);
@@ -46,7 +54,39 @@ export default function ProductSearchPicker({
   useEffect(() => {
     const t = setTimeout(() => { run(query, searchDescriptions); }, 220);
     return () => clearTimeout(t);
-  }, [query, searchDescriptions, excludeBundles]);
+  }, [query, searchDescriptions, excludeBundles, requireDriveLink, onlyUnbundled, linkedIds, bundledIds]);
+
+  // Lazy-load the filter caches when the user enables a toggle for the first
+  // time. These are paginated to bypass Supabase's 1000-row default cap.
+  useEffect(() => {
+    if (!requireDriveLink || linkedIds) return;
+    (async () => {
+      const ids = new Set<string>();
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase
+          .from('product_downloads').select('product_id').range(from, from + 999);
+        if (error || !data?.length) break;
+        data.forEach((d: any) => ids.add(d.product_id));
+        if (data.length < 1000) break;
+      }
+      setLinkedIds(ids);
+    })();
+  }, [requireDriveLink, linkedIds]);
+
+  useEffect(() => {
+    if (!onlyUnbundled || bundledIds) return;
+    (async () => {
+      const ids = new Set<string>();
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase
+          .from('bundle_items').select('source_product_id').range(from, from + 999);
+        if (error || !data?.length) break;
+        data.forEach((d: any) => ids.add(d.source_product_id));
+        if (data.length < 1000) break;
+      }
+      setBundledIds(ids);
+    })();
+  }, [onlyUnbundled, bundledIds]);
 
   async function run(q: string, descToo: boolean) {
     const myReq = ++reqIdRef.current;
@@ -69,11 +109,29 @@ export default function ProductSearchPicker({
         qb = qb.ilike('title', `%${safe}%`);
       }
     }
-    qb = qb.limit(100);
+    // If a "requires X" filter is active, scope to that id-set. Fetch more
+    // than 100 so the post-filter still has enough to show.
+    const idRestrict =
+      (requireDriveLink && linkedIds ? linkedIds : null) &&
+      (onlyUnbundled && bundledIds ? null : null); // placeholder, see below
+    let restrictIds: string[] | null = null;
+    if (requireDriveLink && linkedIds) {
+      restrictIds = Array.from(linkedIds);
+    }
+    if (restrictIds) {
+      // Postgres has a practical IN-list size limit, but ~3k uuids fits.
+      qb = qb.in('id', restrictIds.slice(0, 2000));
+    }
+    qb = qb.limit(150);
     const { data, error, count } = await qb;
     if (myReq !== reqIdRef.current) return; // stale
     if (error) console.error('product search failed', error);
-    setResults((data ?? []) as any);
+    let rows = (data ?? []) as any[];
+    if (onlyUnbundled && bundledIds) {
+      rows = rows.filter((r) => !bundledIds.has(r.id));
+    }
+    rows = rows.slice(0, 100);
+    setResults(rows as any);
     setTotalCount(count ?? null);
     setLoading(false);
   }
@@ -119,10 +177,24 @@ export default function ProductSearchPicker({
           className={inputCls}
           autoFocus
         />
-        <label className="flex items-center gap-1.5 text-[11px] text-ink-700/70 cursor-pointer select-none">
-          <input type="checkbox" checked={searchDescriptions} onChange={(e) => setSearchDescriptions(e.target.checked)} />
-          Also search descriptions (slower, fuller)
-        </label>
+        <div className="flex items-center gap-3 flex-wrap text-[11px] text-ink-700/70 select-none">
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" checked={searchDescriptions} onChange={(e) => setSearchDescriptions(e.target.checked)} />
+            Also search descriptions
+          </label>
+          {showFilters && (
+            <>
+              <label className="flex items-center gap-1.5 cursor-pointer" title="Only show products that already have a Drive download link">
+                <input type="checkbox" checked={requireDriveLink} onChange={(e) => setRequireDriveLink(e.target.checked)} />
+                Has Drive link
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer" title="Hide products that are already in another bundle">
+                <input type="checkbox" checked={onlyUnbundled} onChange={(e) => setOnlyUnbundled(e.target.checked)} />
+                Un-bundled only
+              </label>
+            </>
+          )}
+        </div>
         {list}
       </div>
       {!compact && (

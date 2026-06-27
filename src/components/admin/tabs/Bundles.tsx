@@ -456,6 +456,7 @@ function BundleForm({ bundle, onDone }: { bundle: BundleRow | null; onDone: () =
           showPrice
           placeholder="Search the full catalog by title…"
           compact
+          showFilters
         />
       </div>
 
