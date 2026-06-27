@@ -22,8 +22,12 @@ const isPremium = category.slug === 'premium-bundle-offer';
         <img src={category.image_url} alt={category.name} class="w-full h-auto block" loading="eager" />
       </div>
       <h1 class="sr-only">{category.name}</h1>
-      <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} {isPremium ? 'curated bundles · save more, carve more' : 'designs'}</p>
-      {category.description && <p class="text-ink-700/80 text-sm mb-6 max-w-3xl">{category.description}</p>}
+      {!isPremium && (
+        <>
+          <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} designs</p>
+          {category.description && <p class="text-ink-700/80 text-sm mb-6 max-w-3xl">{category.description}</p>}
+        </>
+      )}
     </>
   ) : isPremium ? (
     <section class="mb-6 sm:mb-8 -mx-4 sm:-mx-6 px-5 sm:px-6 py-7 sm:py-10 bg-gradient-to-br from-[#FAEEDA] via-[#fbf4e6] to-[#FAC775]/40 rounded-2xl border border-[#FAC775]/30">
