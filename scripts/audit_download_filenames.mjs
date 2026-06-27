@@ -63,7 +63,7 @@ let downloads = [];
 for (let from = 0; ; from += 1000) {
   const { data, error } = await db
     .from('product_downloads')
-    .select('id, product_id, download_link, products(title, slug, image_url, is_bundle, active)')
+    .select('id, product_id, download_link, verified_at, products(title, slug, image_url, is_bundle, active)')
     .range(from, from + 999);
   if (error) throw error;
   if (!data?.length) break;
@@ -122,6 +122,7 @@ for (const r of downloads) {
     title,
     image_url: r.products?.image_url || '',
     storefront_url: slug ? `https://digitalchiselco.com/product/${slug}` : '',
+    verified_at: r.verified_at,
     drive_filename: driveName,
     filename_tokens: filenameTokens,
     overlap_pct: Math.round(overlap * 100),
@@ -355,7 +356,14 @@ function buildHtml(title, rows) {
     <p class="stats">${rows.length} rows. Click ⬇ Open Drive link to verify.</p>
     <table>${body}</table></body></html>`;
 }
-fs.writeFileSync('audit-flagged.html', buildWorkbench('Flagged downloads — fix workbench', flagged));
+// Only show rows in the HTML workbench that the user hasn't already verified.
+// Already-verified rows still appear in audit-flagged.csv for the full picture,
+// but the workbench is for actionable work only.
+const actionable = flagged.filter((r) => !r.verified_at);
+const titleSuffix = actionable.length === flagged.length
+  ? `${actionable.length} need attention`
+  : `${actionable.length} need attention (${flagged.length - actionable.length} already verified, hidden)`;
+fs.writeFileSync('audit-flagged.html', buildWorkbench(`Flagged downloads — ${titleSuffix}`, actionable));
 fs.writeFileSync('audit-ok.html', buildHtml('OK downloads (spot-check only)', ok));
 
 // ---------- summary ----------
