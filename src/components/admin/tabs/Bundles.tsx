@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls, labelCls, Toast } from '../ui';
 import ImageUpload from '../ImageUpload';
+import ProductSearchPicker, { type PickerProduct } from '../ProductSearchPicker';
 
 type SourceProduct = { id: string; title: string; slug: string; image_url: string | null; price_usd: number };
 type BundleRow = {
@@ -19,7 +20,6 @@ const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'
 
 export default function Bundles() {
   const [bundles, setBundles] = useState<BundleRow[]>([]);
-  const [products, setProducts] = useState<SourceProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<BundleRow | 'new' | null>(null);
 
@@ -29,20 +29,20 @@ export default function Bundles() {
     // bundle_items has two FKs to products (bundle_product_id, source_product_id),
     // so Supabase needs explicit hints to disambiguate the join. We use the
     // bundle side as the outer link and the source side as the nested embed.
-    const [{ data: bs, error: bErr }, { data: ps }] = await Promise.all([
-      supabase.from('products')
-        .select(
-          'id,title,slug,price_usd,image_url,description,active,' +
-          'bundle_items!bundle_items_bundle_product_id_fkey(source_product_id,sort_order,products:source_product_id(id,title,slug,image_url,price_usd))'
-        )
-        .eq('is_bundle', true).order('created_at', { ascending: false }),
-      supabase.from('products').select('id,title,slug,image_url,price_usd').eq('active', true).eq('is_bundle', false).order('title').limit(2000),
-    ]);
+    // bundle_items has two FKs to products (bundle_product_id, source_product_id),
+    // so Supabase needs explicit hints to disambiguate the join. We use the
+    // bundle side as the outer link and the source side as the nested embed.
+    // (We no longer pre-fetch all candidate products here — the picker
+    // searches the catalog server-side as the user types.)
+    const { data: bs, error: bErr } = await supabase.from('products')
+      .select(
+        'id,title,slug,price_usd,image_url,description,active,' +
+        'bundle_items!bundle_items_bundle_product_id_fkey(source_product_id,sort_order,products:source_product_id(id,title,slug,image_url,price_usd))'
+      )
+      .eq('is_bundle', true).order('created_at', { ascending: false });
     if (bErr) console.error('Bundles load failed:', bErr);
-    // Normalise: `bundle_items` should be on the returned object as `bundle_items`
     (bs || []).forEach((b: any) => { b.bundle_items = b.bundle_items || []; });
     setBundles((bs ?? []) as any);
-    setProducts((ps ?? []) as any);
     setLoading(false);
   }
 
@@ -103,23 +103,95 @@ export default function Bundles() {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
   }
 
-  // Server packages images + manifest + Drive URLs into one ZIP and streams it.
+  // Fetch a tiny JSON manifest from the server (admin-auth required for the
+  // Drive URLs), then build the ZIP in the browser. Earlier server-side
+  // packaging tripped Netlify's "usage_exceeded" because images were being
+  // proxied through the function.
   async function downloadZip(b: BundleRow) {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     if (!token) { alert('Sign in expired — refresh the page.'); return; }
+
     const res = await fetch(`/api/admin/bundle-zip?id=${encodeURIComponent(b.id)}`, {
       headers: { authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
-      let msg = 'Could not download bundle ZIP.';
+      let msg = 'Could not load bundle manifest.';
       try { msg = (await res.json()).error || msg; } catch {}
       alert(msg); return;
     }
-    const blob = await res.blob();
+    const m = await res.json();
+    const safe = (s: string) => String(s || '').replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_').slice(0, 120);
+    const folder = safe(m.slug || m.id || 'bundle');
+
+    const { ZipBuilderBrowser } = await import('../../../lib/zip-browser');
+    const zip = new ZipBuilderBrowser();
+
+    // 1) gallery images — fetched directly from public Supabase Storage URLs
+    const allImages: string[] = [];
+    if (m.image_url && !m.gallery.includes(m.image_url)) allImages.push(m.image_url);
+    allImages.push(...m.gallery);
+    let okImgs = 0, failedImgs = 0;
+    for (let i = 0; i < allImages.length; i++) {
+      const url = allImages[i];
+      try {
+        const r = await fetch(url, { credentials: 'omit' });
+        if (!r.ok) { failedImgs++; continue; }
+        const buf = new Uint8Array(await r.arrayBuffer());
+        const extMatch = url.match(/\.([a-z0-9]{2,5})(?:\?|#|$)/i);
+        const ext = (extMatch?.[1] || 'jpg').toLowerCase();
+        zip.add(`${folder}/images/${String(i + 1).padStart(2, '0')}.${ext}`, buf);
+        okImgs++;
+      } catch { failedImgs++; }
+    }
+
+    // 2) README.txt
+    const lines: string[] = [];
+    lines.push(`Bundle: ${m.title}`);
+    lines.push(`Slug:   ${m.slug}`);
+    lines.push(`Price:  $${Number(m.price_usd).toFixed(2)} USD`);
+    lines.push(`Items:  ${m.items.length}`);
+    lines.push(`Images: ${okImgs}${failedImgs ? ` (${failedImgs} failed to fetch)` : ''}`);
+    lines.push('');
+    lines.push('Description');
+    lines.push('-----------');
+    lines.push(m.description || '(no description)');
+    lines.push('');
+    lines.push('Source products');
+    lines.push('---------------');
+    (m.items || []).forEach((it: any, i: number) => {
+      const p = it.product;
+      lines.push(`${i + 1}. ${p?.title || '(unknown)'} — $${Number(p?.price_usd || 0).toFixed(2)}`);
+      lines.push(`   slug: ${p?.slug || ''}`);
+      const ls = (p?.drive_links || []) as { name?: string | null; url: string }[];
+      if (ls.length === 0) lines.push('   drive: (no link attached)');
+      else ls.forEach((l) => lines.push(`   drive: ${l.url}`));
+      lines.push('');
+    });
+    if ((m.bundle_downloads || []).length) {
+      lines.push('Direct bundle download URLs');
+      lines.push('---------------------------');
+      for (const d of m.bundle_downloads) lines.push(`- ${d.url}`);
+      lines.push('');
+    }
+    zip.add(`${folder}/README.txt`, lines.join('\r\n'));
+
+    // 3) manifest.json
+    zip.add(`${folder}/manifest.json`, JSON.stringify(m, null, 2));
+
+    // 4) drive-urls.tsv
+    const driveLines: string[] = [];
+    (m.items || []).forEach((it: any) => {
+      const p = it.product;
+      const ls = (p?.drive_links || []) as { url: string }[];
+      for (const l of ls) driveLines.push(`${p?.title || ''}\t${l.url}`);
+    });
+    zip.add(`${folder}/drive-urls.tsv`, driveLines.join('\r\n') || '(no Drive URLs attached)');
+
+    const blob = zip.build();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${b.slug || 'bundle'}.zip`;
+    a.download = `${folder}.zip`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
@@ -201,13 +273,13 @@ export default function Bundles() {
       )}
 
       <Modal open={!!open} onClose={() => setOpen(null)} title={open === 'new' ? 'New bundle' : open ? `Edit: ${(open as BundleRow).title}` : ''} wide>
-        {open && <BundleForm bundle={open === 'new' ? null : (open as BundleRow)} products={products} onDone={() => { setOpen(null); load(); }} />}
+        {open && <BundleForm bundle={open === 'new' ? null : (open as BundleRow)} onDone={() => { setOpen(null); load(); }} />}
       </Modal>
     </div>
   );
 }
 
-function BundleForm({ bundle, products, onDone }: { bundle: BundleRow | null; products: SourceProduct[]; onDone: () => void }) {
+function BundleForm({ bundle, onDone }: { bundle: BundleRow | null; onDone: () => void }) {
   const [title, setTitle] = useState(bundle?.title || '');
   const [slug, setSlug] = useState(bundle?.slug || '');
   const [price, setPrice] = useState<number | string>(bundle?.price_usd ?? '');
@@ -217,13 +289,31 @@ function BundleForm({ bundle, products, onDone }: { bundle: BundleRow | null; pr
     (bundle?.bundle_items || []).sort((a, b) => a.sort_order - b.sort_order).map((it) => it.source_product_id)
   );
   const [active, setActive] = useState(bundle?.active ?? true);
-  const [search, setSearch] = useState('');
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
   const [saving, setSaving] = useState(false);
 
-  const pickedSet = new Set(pickedIds);
-  const filtered = products.filter((p) => !search || p.title.toLowerCase().includes(search.toLowerCase()) || p.slug.includes(search.toLowerCase()));
-  const pickedList = pickedIds.map((id) => products.find((p) => p.id === id)).filter(Boolean) as SourceProduct[];
+  // Details for picked products (image, title, price). Seeded from the
+  // bundle's source products (when editing) and topped up whenever the user
+  // picks a new one from the search picker.
+  const [picked, setPicked] = useState<Record<string, PickerProduct>>(() => {
+    const seed: Record<string, PickerProduct> = {};
+    (bundle?.bundle_items || []).forEach((it) => {
+      const p = it.products;
+      if (p) seed[p.id] = { id: p.id, title: p.title, slug: p.slug, image_url: p.image_url, price_usd: p.price_usd };
+    });
+    return seed;
+  });
+
+  function addPicked(p: PickerProduct) {
+    if (pickedIds.includes(p.id)) {
+      setPickedIds(pickedIds.filter((id) => id !== p.id));
+    } else {
+      setPickedIds([...pickedIds, p.id]);
+      setPicked((prev) => ({ ...prev, [p.id]: p }));
+    }
+  }
+
+  const pickedList = pickedIds.map((id) => picked[id]).filter(Boolean) as PickerProduct[];
   const gallery = pickedList.map((p) => p.image_url).filter(Boolean) as string[];
   const sumPrice = pickedList.reduce((s, p) => s + Number(p.price_usd || 0), 0);
 
@@ -347,7 +437,7 @@ function BundleForm({ bundle, products, onDone }: { bundle: BundleRow | null; pr
                     <td className="p-2 w-8 text-ink-700/60">#{i + 1}</td>
                     <td className="p-2 w-10">{p.image_url && <img src={p.image_url} alt="" className="w-8 h-8 rounded object-cover" />}</td>
                     <td className="p-2">{p.title.slice(0, 70)}</td>
-                    <td className="p-2 text-right w-16">${Number(p.price_usd).toFixed(2)}</td>
+                    <td className="p-2 text-right w-16">${Number(p.price_usd || 0).toFixed(2)}</td>
                     <td className="p-2 w-24 text-right whitespace-nowrap">
                       <button className="px-1.5 text-bronze-700" onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
                       <button className="px-1.5 text-bronze-700" onClick={() => move(i, 1)} disabled={i === pickedList.length - 1}>↓</button>
@@ -360,22 +450,13 @@ function BundleForm({ bundle, products, onDone }: { bundle: BundleRow | null; pr
           </div>
         )}
 
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products to add…" className={inputCls + ' mb-2'} />
-        <div className="border border-black/10 rounded max-h-64 overflow-y-auto">
-          {filtered.slice(0, 100).map((p) => {
-            const picked = pickedSet.has(p.id);
-            return (
-              <button key={p.id} type="button" onClick={() => setPickedIds(picked ? pickedIds.filter((id) => id !== p.id) : [...pickedIds, p.id])}
-                className={`w-full text-left px-2 py-1.5 flex items-center gap-2 text-xs hover:bg-cream/50 border-b border-black/5 last:border-b-0 ${picked ? 'bg-bronze-600/10' : ''}`}>
-                <input type="checkbox" readOnly checked={picked} />
-                {p.image_url ? <img src={p.image_url} alt="" className="w-8 h-8 rounded object-cover" /> : <div className="w-8 h-8 rounded bg-cream" />}
-                <span className="flex-1">{p.title.slice(0, 80)}</span>
-                <span className="text-ink-700/60">${Number(p.price_usd).toFixed(2)}</span>
-              </button>
-            );
-          })}
-          {filtered.length > 100 && <div className="p-2 text-center text-xs text-ink-700/60">Showing first 100. Refine search to see more.</div>}
-        </div>
+        <ProductSearchPicker
+          selectedIds={pickedIds}
+          onPick={addPicked}
+          showPrice
+          placeholder="Search the full catalog by title…"
+          compact
+        />
       </div>
 
       <div className="flex items-center gap-3 border-t border-black/10 pt-4">
