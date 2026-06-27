@@ -63,14 +63,40 @@ for (const r of candidates) {
   if (!isDriveUrl(newUrl)) { errors.push({ slug, reason: `not a Drive URL: ${newUrl}` }); skipped++; continue; }
 
   // Verify the row exists and fetch current state for the diff preview
-  const { data: cur, error: getErr } = await db
+  let { data: cur, error: getErr } = await db
     .from('product_downloads')
     .select('id, product_id, download_link, products(title, slug)')
     .eq('id', downloadId)
     .maybeSingle();
 
-  if (getErr || !cur) {
-    errors.push({ slug, reason: `download_id ${downloadId} not in DB` });
+  // Slug fallback: when the original download_id has been wiped+reinserted
+  // (e.g. an admin edit on that product), re-resolve by slug. The slug-mismatch
+  // check below still guards against routing to the wrong product.
+  let usedFallback = false;
+  if ((getErr || !cur) && slug) {
+    const { data: byProd } = await db
+      .from('products')
+      .select('id, slug, product_downloads(id, download_link)')
+      .eq('slug', slug)
+      .maybeSingle();
+    const dls = byProd?.product_downloads || [];
+    if (byProd && dls.length === 1) {
+      cur = {
+        id: dls[0].id,
+        product_id: byProd.id,
+        download_link: dls[0].download_link,
+        products: { title: '', slug: byProd.slug },
+      };
+      usedFallback = true;
+    } else if (byProd && dls.length > 1) {
+      errors.push({ slug, reason: `download_id ${downloadId} not in DB; slug "${slug}" has ${dls.length} download rows — won't guess which one` });
+      skipped++;
+      continue;
+    }
+  }
+
+  if (!cur) {
+    errors.push({ slug, reason: `download_id ${downloadId} not in DB` + (slug ? `, and slug "${slug}" has no download rows either` : '') });
     skipped++;
     continue;
   }
@@ -82,7 +108,7 @@ for (const r of candidates) {
   }
 
   const isNoop = cur.download_link === newUrl;
-  planned.push({ slug: cur.products?.slug, downloadId, before: cur.download_link, after: newUrl, noop: isNoop });
+  planned.push({ slug: cur.products?.slug, downloadId: cur.id, before: cur.download_link, after: newUrl, noop: isNoop, usedFallback });
 
   if (APPLY) {
     // Always stamp verified_at — re-feeding a URL through the workbench counts
@@ -91,7 +117,7 @@ for (const r of candidates) {
     const { error: upErr } = await db
       .from('product_downloads')
       .update({ download_link: newUrl, verified_at: new Date().toISOString() })
-      .eq('id', downloadId);
+      .eq('id', cur.id);
     if (upErr) {
       errors.push({ slug, reason: `update failed: ${upErr.message}` });
       skipped++;
