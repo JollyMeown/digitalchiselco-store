@@ -21,6 +21,7 @@ export default function Products() {
   const [catFilter, setCatFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [bestsellerOnly, setBestsellerOnly] = useState(false);
+  const [badgeFilter, setBadgeFilter] = useState<'all' | 'verified' | 'auto_ok' | 'flagged' | 'unaudited'>('all');
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Row | null>(null);
   const [creating, setCreating] = useState(false);
@@ -46,23 +47,34 @@ export default function Products() {
     const myReq = ++reqIdRef.current;
     setLoading(true);
     const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,product_downloads(id,verified_at,audit_status)';
-    let qb = catFilter
-      ? supabase.from('products')
-          .select(`${baseSelect},product_categories!inner(categories(id,name,slug))`)
-          .eq('product_categories.category_id', catFilter)
-      : supabase.from('products')
-          .select(`${baseSelect},product_categories(categories(id,name,slug))`);
-    qb = qb.order('title').limit(200);
-    const search = q.trim();
-    if (search) qb = qb.ilike('title', `%${search}%`);
-    if (statusFilter === 'active') qb = qb.eq('active', true);
-    if (statusFilter === 'inactive') qb = qb.eq('active', false);
-    if (bestsellerOnly) qb = qb.eq('is_bestseller', true);
-    const { data, error } = await qb;
-    // Drop stale responses — only the most recent request gets to update state.
+    function buildQb() {
+      let qb = catFilter
+        ? supabase.from('products')
+            .select(`${baseSelect},product_categories!inner(categories(id,name,slug))`)
+            .eq('product_categories.category_id', catFilter)
+        : supabase.from('products')
+            .select(`${baseSelect},product_categories(categories(id,name,slug))`);
+      qb = qb.order('title');
+      const search = q.trim();
+      if (search) qb = qb.ilike('title', `%${search}%`);
+      if (statusFilter === 'active') qb = qb.eq('active', true);
+      if (statusFilter === 'inactive') qb = qb.eq('active', false);
+      if (bestsellerOnly) qb = qb.eq('is_bestseller', true);
+      return qb;
+    }
+    // Supabase REST hard-caps a single response at 1000 rows. Page through
+    // until we've collected everything the filters match.
+    const all: any[] = [];
+    for (let from = 0; from < 10000; from += 1000) {
+      const { data, error } = await buildQb().range(from, from + 999);
+      if (myReq !== reqIdRef.current) return;
+      if (error) { console.error(error); break; }
+      if (!data?.length) break;
+      all.push(...data);
+      if (data.length < 1000) break;
+    }
     if (myReq !== reqIdRef.current) return;
-    if (error) console.error(error);
-    setRows((data ?? []) as any);
+    setRows(all as any);
     setLoading(false);
   }
 
@@ -73,7 +85,22 @@ export default function Products() {
     setRows((r) => r.filter((x) => x.id !== id));
   }
 
-  const totalFiltered = rows.length;
+  const visibleRows = useMemo(() => {
+    if (badgeFilter === 'all') return rows;
+    return rows.filter((r) => {
+      const dls = r.product_downloads ?? [];
+      const anyVerified = dls.some((d) => !!d.verified_at);
+      const allVerified = dls.length > 0 && dls.every((d) => !!d.verified_at);
+      const allAutoOk = dls.length > 0 && dls.every((d) => d.audit_status === 'auto_ok');
+      const anyFlagged = dls.some((d) => d.audit_status === 'flagged');
+      if (badgeFilter === 'verified') return allVerified;
+      if (badgeFilter === 'auto_ok') return !anyVerified && allAutoOk;
+      if (badgeFilter === 'flagged') return anyFlagged;
+      if (badgeFilter === 'unaudited') return dls.length === 0 || dls.every((d) => !d.audit_status && !d.verified_at);
+      return true;
+    });
+  }, [rows, badgeFilter]);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -88,10 +115,17 @@ export default function Products() {
             <option value="active">Active only</option>
             <option value="inactive">Inactive only</option>
           </select>
+          <select value={badgeFilter} onChange={(e) => setBadgeFilter(e.target.value as any)} className={inputCls + ' max-w-xs'} title="Filter by download-link verification badge">
+            <option value="all">All badges</option>
+            <option value="verified">✓ Verified</option>
+            <option value="auto_ok">? Auto-ok (needs check)</option>
+            <option value="flagged">🚩 Flagged</option>
+            <option value="unaudited">Un-audited</option>
+          </select>
           <label className="flex items-center gap-1.5 text-xs text-ink-700 cursor-pointer">
             <input type="checkbox" checked={bestsellerOnly} onChange={(e) => setBestsellerOnly(e.target.checked)} /> ★ Bestsellers only
           </label>
-          <span className="text-xs text-ink-700/60 ml-auto">{totalFiltered} shown</span>
+          <span className="text-xs text-ink-700/60 ml-auto">{visibleRows.length} of {rows.length} shown</span>
           <button className={btnGhost} onClick={() => setImportOpen(true)} title="Bulk import products from a CSV">⇪ Import CSV</button>
           <button className={btnPrimary} onClick={() => setCreating(true)}>+ New product</button>
         </div>
@@ -111,7 +145,7 @@ export default function Products() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {visibleRows.map((r) => (
                 <tr key={r.id} className="border-t border-black/5 hover:bg-cream/30">
                   <td className="p-2"><span className={`inline-block w-2.5 h-2.5 rounded-full ${linkColor[r.link_status] || 'bg-gray-400'}`} /></td>
                   <td className="p-2">{r.image_url ? <img src={r.image_url} className="w-10 h-10 object-cover rounded" /> : <div className="w-10 h-10 bg-cream rounded" />}</td>
