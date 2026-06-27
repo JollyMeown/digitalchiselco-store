@@ -18,6 +18,7 @@
     "cleanup:mailerlite-unconfirmed": "node scripts/cleanup_unconfirmed_mailerlite.mjs",
     "backfill:thin-images": "node scripts/backfill_thin_product_images.mjs",
     "audit:downloads": "node scripts/audit_download_filenames.mjs",
+    "audit:duplicates": "node scripts/audit_duplicate_downloads.mjs",
     "apply:download-fixes": "node scripts/apply_download_link_fixes.mjs"
   },
   "dependencies": {
