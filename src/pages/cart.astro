@@ -43,6 +43,17 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
       </div>
 
       <div class="flex justify-between text-lg font-medium mt-3 border-t border-black/10 pt-3"><span>Total</span><span id="total">$0.00</span></div>
+
+      <!-- Email at cart — lets us pre-lock Paddle's email field so the receipt
+           goes to exactly the address the buyer enters here. -->
+      <div class="mt-4">
+        <label for="buyer-email" class="block text-xs text-ink-700/70 mb-1">Email for download links and receipt</label>
+        <input id="buyer-email" type="email" inputmode="email" autocomplete="email" required placeholder="you@email.com"
+          class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white" />
+        <p id="buyer-email-msg" class="mt-1 text-xs text-red-600 hidden"></p>
+        <p class="mt-1 text-[11px] text-ink-700/50">We send your STL files and receipt here. This is the same email you'll see in the payment popup.</p>
+      </div>
+
       <button id="checkout" class="mt-4 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">Checkout</button>
       <p class="text-xs text-ink-700/60 mt-2 text-center">Secure checkout · instant download links emailed after purchase</p>
     </div>
@@ -233,6 +244,19 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
     loadUpsell();
     window.addEventListener('cart-changed', () => { renderCart(); loadUpsell(); });
 
+    // ── Buyer email persistence ───────────────────────────────────────
+    // Remember the last email between visits so the field is pre-filled.
+    const emailInput = document.getElementById('buyer-email');
+    const emailMsg = document.getElementById('buyer-email-msg');
+    try {
+      const saved = localStorage.getItem('buyer_email');
+      if (saved && emailInput) emailInput.value = saved;
+    } catch {}
+    emailInput?.addEventListener('input', () => {
+      emailMsg.classList.add('hidden');
+      try { localStorage.setItem('buyer_email', emailInput.value.trim()); } catch {}
+    });
+
     // ── Promo code ────────────────────────────────────────────────────
     const promoMsg = document.getElementById('promo-msg');
     const promoCodeInput = document.getElementById('promo-code');
@@ -308,17 +332,35 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
       const cart = JSON.parse(localStorage.getItem('cart') || '[]');
       if (!cart.length) return;
       if (!PADDLE_TOKEN) { alert('Checkout is not yet configured. Please contact support.'); return; }
+
+      // Require + validate email before opening Paddle, so the receipt and
+      // download links land exactly where the buyer expects.
+      const buyerEmail = (emailInput?.value || '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(buyerEmail)) {
+        emailMsg.textContent = 'Please enter a valid email — we send your downloads here.';
+        emailMsg.classList.remove('hidden');
+        emailInput?.focus();
+        return;
+      }
+      try { localStorage.setItem('buyer_email', buyerEmail); } catch {}
+
       btn.disabled = true; btn.textContent = 'Starting checkout…';
       try {
         const promo = JSON.parse(localStorage.getItem('promo') || 'null');
         const res = await fetch('/api/checkout-init', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ items: cart, discount_percent: DISCOUNT, coupon_code: promo?.code || null }),
+          body: JSON.stringify({ items: cart, email: buyerEmail, discount_percent: DISCOUNT, coupon_code: promo?.code || null }),
         });
         const data = await res.json();
         if (!res.ok || !data.transaction_id) throw new Error(data.error || 'Could not start checkout.');
-        Paddle.Checkout.open({ transactionId: data.transaction_id });
+        // Passing customer.email here pre-fills + locks the email field in
+        // Paddle's overlay, so the receipt can only go to the same address
+        // we already captured.
+        Paddle.Checkout.open({
+          transactionId: data.transaction_id,
+          customer: { email: buyerEmail },
+        });
         btn.disabled = false; btn.textContent = 'Checkout';
       } catch (err) {
         console.error(err);
