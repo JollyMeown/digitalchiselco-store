@@ -81,22 +81,21 @@ for (const r of candidates) {
     continue;
   }
 
-  if (cur.download_link === newUrl) {
-    planned.push({ slug: cur.products?.slug, before: cur.download_link, after: newUrl, noop: true });
-    continue;
-  }
-
-  planned.push({ slug: cur.products?.slug, downloadId, before: cur.download_link, after: newUrl });
+  const isNoop = cur.download_link === newUrl;
+  planned.push({ slug: cur.products?.slug, downloadId, before: cur.download_link, after: newUrl, noop: isNoop });
 
   if (APPLY) {
+    // Always stamp verified_at — re-feeding a URL through the workbench counts
+    // as a fresh confirmation. The download_link write is harmless on no-ops
+    // (same value) so we do it unconditionally to keep the path simple.
     const { error: upErr } = await db
       .from('product_downloads')
-      .update({ download_link: newUrl })
+      .update({ download_link: newUrl, verified_at: new Date().toISOString() })
       .eq('id', downloadId);
     if (upErr) {
       errors.push({ slug, reason: `update failed: ${upErr.message}` });
       skipped++;
-    } else {
+    } else if (!isNoop) {
       updated++;
     }
   }

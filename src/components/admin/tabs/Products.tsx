@@ -8,6 +8,7 @@ type Row = {
   id: string; title: string; slug: string; price_usd: number; image_url: string | null;
   link_status: string; active: boolean; is_bundle: boolean; description?: string;
   gallery?: string[]; product_categories?: { categories: Cat | null }[];
+  product_downloads?: { verified_at: string | null }[];
 };
 
 const slugify = (s: string) =>
@@ -44,7 +45,7 @@ export default function Products() {
   async function load() {
     const myReq = ++reqIdRef.current;
     setLoading(true);
-    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller';
+    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,product_downloads(verified_at)';
     let qb = catFilter
       ? supabase.from('products')
           .select(`${baseSelect},product_categories!inner(categories(id,name,slug))`)
@@ -117,6 +118,13 @@ export default function Products() {
                   <td className="p-2">
                     {(r as any).is_bestseller && <span className="text-yellow-500 mr-1" title="Best seller">★</span>}
                     <a href={`/product/${r.slug}`} target="_blank" className="text-ink-800 hover:text-bronze-600">{r.title.slice(0, 60)}</a>
+                    {(() => {
+                      const dls = r.product_downloads ?? [];
+                      const verified = dls.length > 0 && dls.every((d) => !!d.verified_at);
+                      return verified
+                        ? <span className="ml-2 inline-block bg-green-100 text-green-700 text-[10px] font-medium px-1.5 py-0.5 rounded" title="Download link manually verified via audit workbench">✓ verified</span>
+                        : null;
+                    })()}
                   </td>
                   <td className="p-2 text-xs text-ink-700/70">{(r.product_categories ?? []).map((pc) => pc.categories?.name).filter(Boolean).join(', ') || '—'}</td>
                   <td className="p-2">${Number(r.price_usd).toFixed(2)}</td>
