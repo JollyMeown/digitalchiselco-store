@@ -6,13 +6,18 @@ const { product, discount = DEFAULT_DISCOUNT } = Astro.props;
 const { price, original, percent } = pricing(product.price_usd, discount);
 const title = product.title.split('|')[0].trim();
 ---
-<div class="group border border-black/10 rounded-md overflow-hidden hover:shadow-md transition flex flex-col">
-  <a href={`/product/${product.slug}`} class="block aspect-square bg-cream overflow-hidden">
+<div class="group border border-black/10 rounded-md overflow-hidden hover:shadow-md transition flex flex-col bg-white">
+  <a href={`/product/${product.slug}`} class="relative block aspect-square bg-cream overflow-hidden">
     {product.image_url ? (
       <img src={product.image_url} alt={`${title} bas-relief STL design`} loading="lazy" width="400" height="400"
            class="w-full h-full object-cover group-hover:scale-[1.03] transition" />
     ) : (
       <div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">{title}</div>
+    )}
+    {product.is_bundle && (
+      <span class="absolute top-2 left-2 inline-flex items-center gap-1 bg-[#FAC775] text-bronze-900 text-[10px] font-medium tracking-wider uppercase px-2 py-0.5 rounded shadow-sm">
+        <span aria-hidden="true">🔥</span> Bundle
+      </span>
     )}
   </a>
   <div class="p-3 flex flex-col flex-1">

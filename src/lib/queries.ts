@@ -221,6 +221,31 @@ export type CustomerCreation = {
   product_id: string | null; product_url: string | null; is_featured: boolean;
   products?: { title: string; slug: string } | null;
 };
+// Fetch active bundle products grouped under the "PREMIUM BUNDLE OFFER" category
+// (created in scripts/seed_premium_bundles.mjs). Skips inactive/memberships.
+export async function getPremiumBundles(limit = 12): Promise<ProductCard[]> {
+  try {
+    // First find the category id by slug (one query, cached by Supabase pooler).
+    const { data: cat } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('slug', 'premium-bundle-offer')
+      .maybeSingle();
+    if (!cat?.id) return [];
+    const { data, error } = await supabase
+      .from('products')
+      .select(`${CARD}, product_categories!inner(category_id)`)
+      .eq('active', true)
+      .eq('product_categories.category_id', cat.id)
+      .eq('is_bundle', true)
+      .neq('is_subscription', true)
+      .order('price_usd', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []) as ProductCard[];
+  } catch (e) { console.error('getPremiumBundles failed:', e); return []; }
+}
+
 export async function getCustomerCreations(limit = 9): Promise<CustomerCreation[]> {
   try {
     const { data, error } = await supabase

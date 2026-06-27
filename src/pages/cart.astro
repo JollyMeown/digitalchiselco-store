@@ -17,6 +17,11 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
     <div id="empty" class="text-ink-700/70 hidden">Your cart is empty. <a href="/catalog" class="text-bronze-600">Browse the catalog →</a></div>
     <div id="items" class="divide-y divide-black/10"></div>
     <div id="summary" class="mt-6 hidden">
+      <!-- Bulk discount upsell hint — appears only when adding more items unlocks a deeper discount -->
+      <div id="tier-hint" class="hidden mb-4 bg-[#FAEEDA] border border-bronze-600/30 rounded-md px-3 py-2.5 text-sm text-bronze-800 flex items-center justify-between gap-3">
+        <span id="tier-hint-text">Add more items to unlock a bigger discount.</span>
+        <a href="/catalog" class="flex-shrink-0 text-xs font-medium text-bronze-700 underline whitespace-nowrap">Add items →</a>
+      </div>
       <div class="flex justify-between text-sm text-ink-700/60"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
       <div class="flex justify-between text-sm text-green-700"><span>Discount ({percent}% off)</span><span id="savings">$0.00</span></div>
 
@@ -91,6 +96,34 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
       } else {
         promoRow.classList.add('hidden');
         promoRemove?.classList.add('hidden');
+      }
+
+      // ── Bulk-discount upsell hint ─────────────────────────────────
+      // Tiers must mirror seed_bulk_promos.mjs. Find the next tier the
+      // cart hasn't reached and tell the customer how to unlock it.
+      const tiers = [
+        { items: 6,  percent: 15, code: '2026OFF15' },
+        { items: 10, percent: 20, code: '2026OFF20' },
+        { items: 25, percent: 35, code: '2026OFF35' },
+      ];
+      const itemCount = c.length;
+      const hintBox = document.getElementById('tier-hint');
+      const hintText = document.getElementById('tier-hint-text');
+      const next = tiers.find((t) => t.items > itemCount);
+      if (next && itemCount > 0) {
+        const diff = next.items - itemCount;
+        hintText.innerHTML = '🔥 Add ' + diff + ' more item' + (diff === 1 ? '' : 's') + ' to unlock <strong>' + next.percent + '% OFF</strong> with code <code class="font-mono">' + next.code + '</code>';
+        hintBox.classList.remove('hidden');
+      } else if (itemCount > 0 && tiers.length) {
+        const reached = tiers.filter((t) => t.items <= itemCount).pop();
+        if (reached && (!promo || promo.code !== reached.code)) {
+          hintText.innerHTML = '✓ You qualify for <strong>' + reached.percent + '% OFF</strong> — apply code <code class="font-mono">' + reached.code + '</code> below.';
+          hintBox.classList.remove('hidden');
+        } else {
+          hintBox.classList.add('hidden');
+        }
+      } else {
+        hintBox.classList.add('hidden');
       }
       document.querySelectorAll('.rm').forEach((b) => b.addEventListener('click', () => {
         const next = JSON.parse(localStorage.getItem('cart') || '[]').filter((y) => y.id !== b.dataset.id);
