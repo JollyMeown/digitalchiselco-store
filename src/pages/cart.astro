@@ -18,9 +18,9 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
     <div id="items" class="divide-y divide-black/10"></div>
     <div id="summary" class="mt-6 hidden">
       <!-- Bulk discount upsell hint — appears only when adding more items unlocks a deeper discount -->
-      <div id="tier-hint" class="hidden mb-4 bg-[#FAEEDA] border border-bronze-600/30 rounded-md px-3 py-2.5 text-sm text-bronze-800 flex items-center justify-between gap-3">
-        <span id="tier-hint-text">Add more items to unlock a bigger discount.</span>
-        <a href="/catalog" class="flex-shrink-0 text-xs font-medium text-bronze-700 underline whitespace-nowrap">Add items →</a>
+      <div id="tier-hint" class="hidden mb-4 bg-[#FAEEDA] border border-bronze-600/30 rounded-md px-3 py-2.5 text-sm text-bronze-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
+        <span id="tier-hint-text" class="leading-snug">Add more items to unlock a bigger discount.</span>
+        <a href="/catalog" class="flex-shrink-0 text-xs font-medium text-bronze-700 underline whitespace-nowrap self-start sm:self-auto">Add items →</a>
       </div>
       <div class="flex justify-between text-sm text-ink-700/60"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
       <div class="flex justify-between text-sm text-green-700"><span>Discount ({percent}% off)</span><span id="savings">$0.00</span></div>

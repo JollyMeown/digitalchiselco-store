@@ -12,7 +12,7 @@ type Creation = {
   is_featured: boolean; sort_order: number; created_at: string;
   products?: { title: string; slug: string } | null;
 };
-type ProductPick = { id: string; title: string; slug: string };
+type ProductPick = { id: string; title: string; slug: string; image_url: string | null };
 
 export default function Creations() {
   const [rows, setRows] = useState<Creation[]>([]);
@@ -25,7 +25,7 @@ export default function Creations() {
     setLoading(true);
     const [{ data: cs }, { data: ps }] = await Promise.all([
       supabase.from('customer_creations').select('*,products(title,slug)').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
-      supabase.from('products').select('id,title,slug').eq('active', true).order('title').limit(2000),
+      supabase.from('products').select('id,title,slug,image_url').eq('active', true).order('title').limit(2000),
     ]);
     setRows((cs ?? []) as any);
     setProducts((ps ?? []) as any);
@@ -110,6 +110,19 @@ function CreationForm({ c, products, onDone }: { c: Creation | null; products: P
   const [sortOrder, setSortOrder] = useState<number | string>(c?.sort_order ?? 0);
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
   const [busy, setBusy] = useState(false);
+  // Searchable product picker state
+  const [productQuery, setProductQuery] = useState('');
+  const [productListOpen, setProductListOpen] = useState(false);
+  const [hoverProductId, setHoverProductId] = useState<string | null>(null);
+  const selectedProduct = productId ? products.find((p) => p.id === productId) : null;
+  const previewProduct = hoverProductId ? products.find((p) => p.id === hoverProductId) : selectedProduct;
+  const filteredProducts = (() => {
+    const q = productQuery.toLowerCase().trim();
+    const base = q
+      ? products.filter((p) => p.title.toLowerCase().includes(q) || p.slug.includes(q))
+      : products;
+    return base.slice(0, 40);
+  })();
 
   function addImage(url: string) { if (url) setGallery([...gallery, url]); }
   function removeImage(i: number) { setGallery(gallery.filter((_, x) => x !== i)); }
@@ -150,10 +163,54 @@ function CreationForm({ c, products, onDone }: { c: Creation | null; products: P
           </div>
           <div>
             <label className={labelCls}>Source product <span className="text-ink-700/40">(optional — links the creation to the catalog)</span></label>
-            <select value={productId} onChange={(e) => setProductId(e.target.value)} className={inputCls}>
-              <option value="">— None —</option>
-              {products.map((p) => <option key={p.id} value={p.id}>{p.title.slice(0, 60)}</option>)}
-            </select>
+            <div className="flex gap-3 items-stretch">
+              {/* Searchable combobox */}
+              <div className="relative flex-1 min-w-0">
+                <div className="flex gap-2">
+                  <input
+                    value={productListOpen ? productQuery : (selectedProduct?.title || '')}
+                    onChange={(e) => { setProductQuery(e.target.value); setProductListOpen(true); }}
+                    onFocus={() => { setProductListOpen(true); setProductQuery(''); }}
+                    placeholder={selectedProduct ? selectedProduct.title.slice(0, 40) : 'Type to search products…'}
+                    className={inputCls}
+                  />
+                  {productId && (
+                    <button type="button" onClick={() => { setProductId(''); setProductQuery(''); setProductListOpen(false); }}
+                      className="px-2 text-ink-700/60 hover:text-red-600 border border-black/15 rounded-md text-xs">Clear</button>
+                  )}
+                </div>
+                {productListOpen && (
+                  <div className="absolute z-30 mt-1 w-full bg-white border border-black/15 rounded-md shadow-lg max-h-64 overflow-y-auto"
+                       onMouseLeave={() => setHoverProductId(null)}>
+                    {filteredProducts.length === 0 ? (
+                      <div className="p-3 text-xs text-ink-700/60">No products match "{productQuery}".</div>
+                    ) : filteredProducts.map((p) => (
+                      <button key={p.id} type="button"
+                        onMouseEnter={() => setHoverProductId(p.id)}
+                        onClick={() => { setProductId(p.id); setHoverProductId(null); setProductListOpen(false); setProductQuery(''); }}
+                        className={`w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-cream/60 ${productId === p.id ? 'bg-bronze-600/10' : ''}`}>
+                        {p.image_url
+                          ? <img src={p.image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                          : <div className="w-8 h-8 rounded bg-cream flex-shrink-0" />}
+                        <span className="flex-1 truncate">{p.title}</span>
+                      </button>
+                    ))}
+                    {filteredProducts.length === 40 && <div className="p-2 text-center text-[10px] text-ink-700/50 border-t border-black/5">Showing first 40. Refine search to see more.</div>}
+                  </div>
+                )}
+              </div>
+              {/* Right-side preview pane */}
+              <div className="w-28 flex-shrink-0 border border-black/15 rounded-md overflow-hidden bg-cream/40 flex items-center justify-center">
+                {previewProduct?.image_url ? (
+                  <img src={previewProduct.image_url} alt={previewProduct.title} className="w-full h-28 object-cover" />
+                ) : (
+                  <div className="text-[10px] text-ink-700/40 p-2 text-center">Hover an item to preview</div>
+                )}
+              </div>
+            </div>
+            {previewProduct && (
+              <p className="text-[11px] text-ink-700/60 mt-1 truncate">↳ {previewProduct.title}</p>
+            )}
           </div>
           <div>
             <label className={labelCls}>External URL <span className="text-ink-700/40">(if not in catalog)</span></label>

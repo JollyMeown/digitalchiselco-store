@@ -14,6 +14,7 @@ import Membership from './tabs/Membership';
 import Bundles from './tabs/Bundles';
 import Creations from './tabs/Creations';
 import Discounts from './tabs/Discounts';
+import OrderSoundListener from './OrderSoundListener';
 import { inputCls, btnPrimary } from './ui';
 
 type Tab = { key: string; label: string; icon: string; Component: any };
@@ -103,6 +104,7 @@ export default function AdminApp() {
           <Active />
         </div>
       </main>
+      <OrderSoundListener />
     </div>
   );
 }

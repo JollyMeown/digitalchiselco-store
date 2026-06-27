@@ -19,6 +19,8 @@ export type SiteSettings = {
   trust_badges: { icon: string; label: string }[];
   announcement_active: boolean; announcement_text: string | null;
   announcement_link: string | null; announcement_cta_label: string | null;
+  announcement_font_size: number | null; announcement_speed_seconds: number | null;
+  order_sound_enabled: boolean; order_sound_volume: number | null;
 };
 
 const SETTINGS_FALLBACK: SiteSettings = {

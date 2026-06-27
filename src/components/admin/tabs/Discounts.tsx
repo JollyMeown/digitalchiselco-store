@@ -46,8 +46,10 @@ export default function Discounts() {
 function Announcement() {
   const [s, setS] = useState<any>(null);
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
-  useEffect(() => { supabase.from('site_settings').select('announcement_active,announcement_text,announcement_link,announcement_cta_label').eq('id', 1).maybeSingle().then(({ data }) => setS(data)); }, []);
+  useEffect(() => { supabase.from('site_settings').select('announcement_active,announcement_text,announcement_link,announcement_cta_label,announcement_font_size,announcement_speed_seconds').eq('id', 1).maybeSingle().then(({ data }) => setS(data)); }, []);
   if (!s) return <div className="text-sm text-ink-700/60">Loading…</div>;
+  const fontPx = Math.min(20, Math.max(10, Number(s.announcement_font_size) || 13));
+  const speed = Math.min(120, Math.max(10, Number(s.announcement_speed_seconds) || 35));
   async function save() {
     setMsg({ kind: 'info', text: 'Saving…' });
     const { error } = await supabase.from('site_settings').update({
@@ -55,41 +57,76 @@ function Announcement() {
       announcement_text: s.announcement_text || null,
       announcement_link: s.announcement_link || null,
       announcement_cta_label: s.announcement_cta_label || null,
+      announcement_font_size: fontPx,
+      announcement_speed_seconds: speed,
     }).eq('id', 1);
     setMsg(error ? { kind: 'error', text: 'Error: ' + error.message } : { kind: 'success', text: '✓ Saved. Live on the homepage now.' });
   }
+  // Live preview line (mimics the storefront's flatten)
+  const previewLine = (s.announcement_text || '').replace(/\s*\n+\s*/g, ' · ').trim();
   return (
     <Card title="Homepage announcement strip">
-      <p className="text-xs text-ink-700/60 mb-3">A wide, attention-grabbing strip shown above the hero. Supports line breaks. Use it to announce sales, bulk discounts, or seasonal promos.</p>
+      <p className="text-xs text-ink-700/60 mb-3">A thin one-liner shown at the very top of every page. Line breaks in the text are flattened into "·" separators. The strip slowly scrolls — hover to pause.</p>
       <label className="flex items-center gap-2 text-sm mb-3">
         <input type="checkbox" checked={!!s.announcement_active} onChange={(e) => setS({ ...s, announcement_active: e.target.checked })} />
         Active (show on homepage)
       </label>
       <div className="grid md:grid-cols-2 gap-4">
-        <div>
-          <label className={labelCls}>Body (line breaks preserved)</label>
-          <textarea
-            value={s.announcement_text || ''}
-            onChange={(e) => setS({ ...s, announcement_text: e.target.value })}
-            rows={10}
-            placeholder={`✨ Wild Bulk Discount is LIVE! 🔥\n\nSave more when you buy more.\n\n☑ 6 items → 15% OFF (Code: 2026OFF15)\n☑ 10 items → 20% OFF (Code: 2026OFF20)\n☑ 25 items → 35% OFF (Code: 2026OFF35)`}
-            className={inputCls + ' font-mono text-xs'}
-          />
-        </div>
         <div className="space-y-3">
           <div>
-            <label className={labelCls}>CTA label (button text)</label>
-            <input value={s.announcement_cta_label || ''} onChange={(e) => setS({ ...s, announcement_cta_label: e.target.value })} placeholder="Shop the catalog" className={inputCls} />
+            <label className={labelCls}>Message <span className="text-ink-700/40">(line breaks become "·" separators)</span></label>
+            <textarea
+              value={s.announcement_text || ''}
+              onChange={(e) => setS({ ...s, announcement_text: e.target.value })}
+              rows={5}
+              placeholder={`✨ Wild Bulk Discount is LIVE!\n☑ 6 items → 15% OFF · 2026OFF15\n☑ 10 items → 20% OFF · 2026OFF20\n☑ 25 items → 35% OFF · 2026OFF35`}
+              className={inputCls + ' font-mono text-xs'}
+            />
           </div>
-          <div>
-            <label className={labelCls}>CTA link</label>
-            <input value={s.announcement_link || ''} onChange={(e) => setS({ ...s, announcement_link: e.target.value })} placeholder="/catalog" className={inputCls} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Font size: <span className="font-mono text-bronze-700">{fontPx}px</span></label>
+              <input type="range" min="10" max="20" value={fontPx}
+                onChange={(e) => setS({ ...s, announcement_font_size: Number(e.target.value) })}
+                className="w-full accent-bronze-600" />
+              <div className="text-[10px] text-ink-700/50 flex justify-between"><span>10</span><span>20</span></div>
+            </div>
+            <div>
+              <label className={labelCls}>Scroll speed: <span className="font-mono text-bronze-700">{speed}s / loop</span></label>
+              <input type="range" min="10" max="120" value={speed}
+                onChange={(e) => setS({ ...s, announcement_speed_seconds: Number(e.target.value) })}
+                className="w-full accent-bronze-600" />
+              <div className="text-[10px] text-ink-700/50 flex justify-between"><span>fast</span><span>slow</span></div>
+            </div>
           </div>
-          <div className="bg-cream/40 border border-bronze-600/20 rounded-md p-3 text-xs text-ink-700/70">
-            <p className="font-medium text-bronze-700 mb-1">Preview</p>
-            <div className="bg-bronze-800 text-cream rounded p-3 whitespace-pre-line text-xs text-center">{s.announcement_text || '— empty —'}</div>
-            {s.announcement_cta_label && <div className="text-center mt-1"><span className="inline-block bg-bronze-600 text-cream px-3 py-1 rounded text-[10px]">{s.announcement_cta_label}</span></div>}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>CTA label <span className="text-ink-700/40">(optional link)</span></label>
+              <input value={s.announcement_cta_label || ''} onChange={(e) => setS({ ...s, announcement_cta_label: e.target.value })} placeholder="Shop the catalog" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>CTA link</label>
+              <input value={s.announcement_link || ''} onChange={(e) => setS({ ...s, announcement_link: e.target.value })} placeholder="/catalog" className={inputCls} />
+            </div>
           </div>
+        </div>
+        <div>
+          <div className={labelCls}>Live preview</div>
+          <div className="border border-black/10 rounded-lg overflow-hidden bg-white">
+            <div className="bg-[#2b1d10] text-[#FAEEDA] overflow-hidden py-1.5" style={{ fontSize: fontPx + 'px' }}>
+              <div className="whitespace-nowrap" style={{ animation: `dcc-ann-preview ${speed}s linear infinite` }}>
+                <span className="font-medium tracking-wide">{previewLine || '— empty —'}</span>
+                {s.announcement_cta_label && <a className="ml-6 text-[#FAC775] underline">{s.announcement_cta_label} →</a>}
+                <span className="ml-6 text-[#FAC775] opacity-60">★</span>
+                <span className="ml-6 font-medium tracking-wide">{previewLine || '— empty —'}</span>
+                {s.announcement_cta_label && <a className="ml-6 text-[#FAC775] underline">{s.announcement_cta_label} →</a>}
+              </div>
+            </div>
+            <div className="px-3 py-3 bg-cream/30 text-xs text-ink-700/70">
+              Hover the live strip on the storefront to pause it. Customers on devices with "reduced motion" enabled see a stationary version automatically.
+            </div>
+          </div>
+          <style>{`@keyframes dcc-ann-preview { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
         </div>
       </div>
       <div className="mt-4 flex items-center gap-3 border-t border-black/10 pt-4">

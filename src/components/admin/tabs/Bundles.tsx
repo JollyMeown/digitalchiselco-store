@@ -26,12 +26,21 @@ export default function Bundles() {
   useEffect(() => { load(); }, []);
   async function load() {
     setLoading(true);
-    const [{ data: bs }, { data: ps }] = await Promise.all([
+    // bundle_items has two FKs to products (bundle_product_id, source_product_id),
+    // so Supabase needs explicit hints to disambiguate the join. We use the
+    // bundle side as the outer link and the source side as the nested embed.
+    const [{ data: bs, error: bErr }, { data: ps }] = await Promise.all([
       supabase.from('products')
-        .select('id,title,slug,price_usd,image_url,description,active,bundle_items(source_product_id,sort_order,products(id,title,slug,image_url,price_usd))')
+        .select(
+          'id,title,slug,price_usd,image_url,description,active,' +
+          'bundle_items!bundle_items_bundle_product_id_fkey(source_product_id,sort_order,products:source_product_id(id,title,slug,image_url,price_usd))'
+        )
         .eq('is_bundle', true).order('created_at', { ascending: false }),
       supabase.from('products').select('id,title,slug,image_url,price_usd').eq('active', true).eq('is_bundle', false).order('title').limit(2000),
     ]);
+    if (bErr) console.error('Bundles load failed:', bErr);
+    // Normalise: `bundle_items` should be on the returned object as `bundle_items`
+    (bs || []).forEach((b: any) => { b.bundle_items = b.bundle_items || []; });
     setBundles((bs ?? []) as any);
     setProducts((ps ?? []) as any);
     setLoading(false);
@@ -92,6 +101,19 @@ export default function Bundles() {
         </div>
       </Card>
 
+      {/* Heads-up if any bundle has no source mapping (e.g. legacy Etsy-imported bundles) */}
+      {bundles.some((b) => !(b.bundle_items || []).length) && (
+        <Card>
+          <div className="flex items-start gap-3">
+            <div className="text-2xl flex-shrink-0" aria-hidden="true">🔗</div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-ink-800">{bundles.filter((b) => !(b.bundle_items || []).length).length} bundle{bundles.filter((b) => !(b.bundle_items || []).length).length === 1 ? '' : 's'} need source products attached</p>
+              <p className="text-xs text-ink-700/70 mt-1">Legacy bundles (imported from Etsy before the Bundle Composer existed) have no source products yet — so customers won't receive any Drive download links. Click <strong>Edit</strong> on each row marked <code>0 items</code> and tick the products that belong in that bundle.</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {loading ? <div className="text-sm text-ink-700/60">Loading…</div> : (
         <div className="bg-white border border-black/10 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
@@ -109,7 +131,9 @@ export default function Bundles() {
                       <span>{b.title}</span>
                     </div>
                   </td>
-                  <td className="p-2">{(b.bundle_items || []).length}</td>
+                  <td className="p-2">{(b.bundle_items || []).length === 0
+                    ? <span className="text-red-600 font-medium">0 ⚠</span>
+                    : (b.bundle_items || []).length}</td>
                   <td className="p-2">${Number(b.price_usd).toFixed(2)}</td>
                   <td className="p-2 text-xs text-ink-700/60">{b.slug}</td>
                   <td className="p-2"><span className={`text-xs px-2 py-0.5 rounded ${b.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>{b.active ? 'active' : 'inactive'}</span></td>

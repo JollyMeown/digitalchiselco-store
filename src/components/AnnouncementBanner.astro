@@ -1,25 +1,72 @@
 ---
-// Wide attention-grabbing banner shown above the hero when admin toggles it on
-// in Discounts → Announcement strip. Text supports line breaks (whitespace-pre-line).
+// Slim one-liner announcement strip pinned to the very top of the site.
+// Scrolls left automatically; admin controls text, font-size (px), and speed.
 import { getSettings } from '../lib/queries';
 const s = await getSettings();
 const show = s.announcement_active && (s.announcement_text || '').trim().length > 0;
+
+// Flatten line breaks into a single bullet-separated line — the slim strip
+// is one row only, multi-line content gets condensed.
+const line = (s.announcement_text || '').replace(/\s*\n+\s*/g, ' · ').trim();
+const fontPx = Math.min(20, Math.max(10, Number((s as any).announcement_font_size) || 13));
+const speed = Math.min(120, Math.max(10, Number((s as any).announcement_speed_seconds) || 35));
+const ctaLabel = s.announcement_cta_label?.trim();
+const ctaHref = s.announcement_link?.trim() || '/catalog';
 ---
 {show && (
-  <section class="relative bg-gradient-to-r from-bronze-800 via-bronze-700 to-bronze-800 text-cream overflow-hidden" aria-label="Site announcement">
-    <div class="absolute inset-0 opacity-10 pointer-events-none" aria-hidden="true">
-      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="ann-grain" patternUnits="userSpaceOnUse" width="30" height="30"><circle cx="3" cy="3" r="0.6" fill="#FAEEDA"/><circle cx="18" cy="14" r="0.4" fill="#FAEEDA"/><circle cx="25" cy="25" r="0.5" fill="#FAEEDA"/></pattern></defs><rect width="100%" height="100%" fill="url(#ann-grain)"/></svg>
-    </div>
-    <div class="relative max-w-5xl mx-auto px-4 sm:px-6 py-5 flex flex-col md:flex-row items-center gap-4 md:gap-6">
-      <div class="flex-1 whitespace-pre-line text-center md:text-left text-sm md:text-[15px] leading-relaxed">
-        {s.announcement_text}
+  <div class="ann-strip" role="status" aria-label="Site announcement" style={`--ann-font:${fontPx}px; --ann-speed:${speed}s;`}>
+    <div class="ann-track">
+      <div class="ann-group">
+        <span class="ann-msg">{line}</span>
+        {ctaLabel && <a href={ctaHref} class="ann-cta">{ctaLabel} →</a>}
+        <span class="ann-dot" aria-hidden="true">★</span>
+        <span class="ann-msg">{line}</span>
+        {ctaLabel && <a href={ctaHref} class="ann-cta">{ctaLabel} →</a>}
+        <span class="ann-dot" aria-hidden="true">★</span>
       </div>
-      {s.announcement_cta_label && (
-        <a href={s.announcement_link || '/catalog'} class="flex-shrink-0 inline-flex items-center gap-2 bg-[#FAC775] hover:bg-[#fcd28e] text-bronze-900 text-sm font-medium px-5 py-2.5 rounded-md transition whitespace-nowrap">
-          {s.announcement_cta_label}
-          <span aria-hidden="true">→</span>
-        </a>
-      )}
+      <div class="ann-group" aria-hidden="true">
+        <span class="ann-msg">{line}</span>
+        {ctaLabel && <a href={ctaHref} class="ann-cta">{ctaLabel} →</a>}
+        <span class="ann-dot" aria-hidden="true">★</span>
+        <span class="ann-msg">{line}</span>
+        {ctaLabel && <a href={ctaHref} class="ann-cta">{ctaLabel} →</a>}
+        <span class="ann-dot" aria-hidden="true">★</span>
+      </div>
     </div>
-  </section>
+  </div>
 )}
+
+<style>
+  .ann-strip {
+    position: relative;
+    background: #2b1d10;
+    color: #FAEEDA;
+    overflow: hidden;
+    padding: 6px 0;
+    font-size: var(--ann-font, 13px);
+    line-height: 1.4;
+  }
+  .ann-track {
+    display: flex;
+    width: max-content;
+    animation: ann-scroll var(--ann-speed, 35s) linear infinite;
+  }
+  .ann-strip:hover .ann-track { animation-play-state: paused; }
+  .ann-group { display: flex; align-items: center; gap: 1.25rem; padding-right: 1.25rem; white-space: nowrap; }
+  .ann-msg { font-weight: 500; letter-spacing: 0.01em; }
+  .ann-cta {
+    color: #FAC775;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-weight: 500;
+  }
+  .ann-cta:hover { color: #fcd28e; }
+  .ann-dot { color: #FAC775; opacity: 0.6; }
+  @keyframes ann-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ann-track { animation: none; }
+  }
+</style>

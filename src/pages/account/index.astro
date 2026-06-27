@@ -60,6 +60,9 @@ type OrderItem = { id: string; title: string; qty: number; price_usd: number; pr
 type OrderRow = { id: string; total: number; currency: string; status: string; created_at: string; paddle_transaction_id: string | null; order_items: OrderItem[] };
 
 let orders: OrderRow[] = [];
+let paidCount = 0;
+let totalSpent = 0;
+let totalFiles = 0;
 if (session?.email) {
   const db = supabaseAdmin();
   const { data } = await db
@@ -89,6 +92,10 @@ if (session?.email) {
       it.downloads = (it.product_id && downloadsByProduct[it.product_id]) || [];
     }
   }
+  const paidOrders = orders.filter((o) => o.status === 'paid');
+  paidCount = paidOrders.length;
+  totalSpent = paidOrders.reduce((s, o) => s + Number(o.total || 0), 0);
+  totalFiles = paidOrders.reduce((n, o) => n + (o.order_items || []).reduce((m, it) => m + (it.downloads || []).length, 0), 0);
 }
 ---
 <Base title="My Account · DigitalChiselCo" noindex>
@@ -121,7 +128,7 @@ if (session?.email) {
       </section>
     ) : (
       <section>
-        <div class="flex justify-between flex-wrap gap-3 items-start mb-8">
+        <div class="flex justify-between flex-wrap gap-3 items-start mb-6">
           <div>
             <h1 class="font-serif text-3xl text-bronze-800">My orders</h1>
             <p class="text-ink-700/70 text-sm mt-1">Signed in as <strong>{session.email}</strong></p>
@@ -129,52 +136,89 @@ if (session?.email) {
           <a href="/account?signout=1" class="text-sm text-bronze-600 underline" data-signout>Sign out</a>
         </div>
         {orders.length === 0 ? (
-          <div class="bg-cream/40 border border-bronze-600/20 rounded-lg p-6">
+          <div class="bg-cream/40 border border-bronze-600/20 rounded-lg p-8 text-center">
+            <div class="text-5xl mb-3" aria-hidden="true">📭</div>
             <p class="text-ink-700">No orders found under <strong>{session.email}</strong>.</p>
             <p class="text-sm text-ink-700/70 mt-2">
               If you bought files using a different email, <a href="/account?signout=1" class="text-bronze-600 underline" data-signout>sign out</a> and try again.
             </p>
+            <a href="/catalog" class="inline-block mt-5 bg-bronze-600 hover:bg-bronze-700 text-cream px-5 py-2.5 rounded-md text-sm">Browse the catalog →</a>
           </div>
         ) : (
-          <div class="space-y-6">
-            {orders.map((o) => (
-              <div class="bg-white border border-black/10 rounded-xl p-5">
-                <div class="flex justify-between flex-wrap gap-2 items-baseline mb-4">
-                  <div>
-                    <div class="font-medium text-ink-800">Order #{String(o.id).slice(0, 8)}</div>
-                    <div class="text-xs text-ink-700/60">
-                      {new Date(o.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </div>
-                  </div>
-                  <div class="text-sm text-ink-700/80">${Number(o.total).toFixed(2)} {o.currency || 'USD'}</div>
-                </div>
-                <ul class="divide-y divide-black/10">
-                  {(o.order_items || []).map((it) => (
-                    <li class="py-3">
-                      <div class="flex justify-between items-baseline mb-2 gap-3">
-                        <span class="text-sm text-ink-800">{it.title}</span>
-                        <span class="text-xs text-ink-700/60 whitespace-nowrap">{it.qty}× ${Number(it.price_usd).toFixed(2)}</span>
-                      </div>
-                      {it.downloads && it.downloads.length > 0 ? (
-                        <div class="flex flex-wrap gap-2">
-                          {it.downloads.map((d) => (
-                            <a href={d.download_link} target="_blank" rel="noopener"
-                              class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-4 py-2 rounded-md text-sm">
-                              ⬇ Download{d.file_name ? ` · ${d.file_name}` : ''}
-                            </a>
-                          ))}
-                        </div>
-                      ) : (
-                        <div class="text-xs text-ink-700/60">
-                          Download link will be emailed within a few minutes if not already attached.
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+          <>
+            {/* Stats strip */}
+            <div class="grid grid-cols-3 gap-3 mb-6">
+              <div class="bg-cream/40 border border-bronze-600/20 rounded-lg p-4 text-center">
+                <div class="text-2xl font-medium text-bronze-800">{paidCount}</div>
+                <div class="text-[11px] uppercase tracking-wide text-bronze-700/70 mt-0.5">Paid orders</div>
               </div>
-            ))}
-          </div>
+              <div class="bg-cream/40 border border-bronze-600/20 rounded-lg p-4 text-center">
+                <div class="text-2xl font-medium text-bronze-800">{'$' + totalSpent.toFixed(0)}</div>
+                <div class="text-[11px] uppercase tracking-wide text-bronze-700/70 mt-0.5">Total spent</div>
+              </div>
+              <div class="bg-cream/40 border border-bronze-600/20 rounded-lg p-4 text-center">
+                <div class="text-2xl font-medium text-bronze-800">{totalFiles}</div>
+                <div class="text-[11px] uppercase tracking-wide text-bronze-700/70 mt-0.5">Files available</div>
+              </div>
+            </div>
+
+            <div class="space-y-6">
+              {orders.map((o) => {
+                const itemCount = (o.order_items || []).reduce((s, it) => s + (Number(it.qty) || 1), 0);
+                const downloadCount = (o.order_items || []).reduce((s, it) => s + (it.downloads?.length || 0), 0);
+                const statusClasses: any = {
+                  paid: 'bg-green-100 text-green-800',
+                  pending: 'bg-yellow-100 text-yellow-800',
+                  refunded: 'bg-purple-100 text-purple-800',
+                  failed: 'bg-red-100 text-red-800',
+                  canceled: 'bg-gray-100 text-gray-700',
+                };
+                const statusClass = statusClasses[o.status] || 'bg-gray-100 text-gray-700';
+                return (
+                  <div class="bg-white border border-black/10 rounded-xl p-5">
+                    <div class="flex justify-between flex-wrap gap-2 items-baseline mb-4">
+                      <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <span class="font-medium text-ink-800">Order #{String(o.id).slice(0, 8)}</span>
+                          <span class={`text-xs px-2 py-0.5 rounded ${statusClass}`}>{o.status}</span>
+                        </div>
+                        <div class="text-xs text-ink-700/60 mt-1">
+                          {new Date(o.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          {' · '}{itemCount} item{itemCount === 1 ? '' : 's'}
+                          {downloadCount > 0 && ` · ${downloadCount} file${downloadCount === 1 ? '' : 's'} available`}
+                        </div>
+                      </div>
+                      <div class="text-sm text-ink-700/80 whitespace-nowrap">${Number(o.total).toFixed(2)} {o.currency || 'USD'}</div>
+                    </div>
+                    <ul class="divide-y divide-black/10">
+                      {(o.order_items || []).map((it) => (
+                        <li class="py-3">
+                          <div class="flex justify-between items-baseline mb-2 gap-3">
+                            <span class="text-sm text-ink-800">{it.title}</span>
+                            <span class="text-xs text-ink-700/60 whitespace-nowrap">{it.qty}× ${Number(it.price_usd).toFixed(2)}</span>
+                          </div>
+                          {it.downloads && it.downloads.length > 0 ? (
+                            <div class="flex flex-wrap gap-2">
+                              {it.downloads.map((d, i) => (
+                                <a href={d.download_link} target="_blank" rel="noopener"
+                                  class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-4 py-2 rounded-md text-sm transition">
+                                  ⬇ Download{it.downloads!.length > 1 ? ` file ${i + 1}` : ''}{d.file_name && it.downloads!.length === 1 ? ` · ${d.file_name}` : ''}
+                                </a>
+                              ))}
+                            </div>
+                          ) : (
+                            <div class="text-xs text-ink-700/60 italic">
+                              Download link will be emailed within a few minutes if not already attached.
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </section>
     )}

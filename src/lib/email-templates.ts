@@ -106,6 +106,12 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
               <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#555;">
                 Your CNC-ready bas-relief STL${d.items.length > 1 ? ' files are' : ' file is'} prepared and ready to download. Tap any button below to grab the file. Links don't expire — bookmark this email if you want to come back later.
               </p>
+              <!-- Primary CTA: full account dashboard -->
+              <p style="margin:18px 0 0;text-align:center;">
+                <a href="${SITE}/account" style="display:inline-block;background:${BRAND_BRONZE_DARK};color:${BRAND_CREAM};text-decoration:none;padding:13px 26px;border-radius:8px;font-size:15px;font-weight:500;">
+                  📥 View all my downloads
+                </a>
+              </p>
             </td>
           </tr>
 
@@ -169,7 +175,7 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
 
           <!-- Helpful tips -->
           <tr>
-            <td style="padding:8px 28px 24px;">
+            <td style="padding:8px 28px 16px;">
               <div style="background:#FFFBF4;border-left:3px solid ${BRAND_BRONZE};padding:14px 16px;border-radius:0 6px 6px 0;">
                 <div style="font-size:13px;font-weight:500;color:${BRAND_BRONZE_DARK};margin-bottom:6px;">📌 A few quick tips</div>
                 <ul style="margin:0;padding-left:18px;font-size:13px;color:#555;line-height:1.6;">
@@ -177,6 +183,32 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
                   <li>Scale freely to your router bed or 3D printer; the geometry stays clean.</li>
                   <li>Commercial use is included — sell the pieces you carve.</li>
                 </ul>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Charity callout -->
+          <tr>
+            <td style="padding:0 28px 16px;">
+              <div style="background:${BRAND_BRONZE_DARK};color:${BRAND_CREAM};padding:18px 22px;border-radius:8px;text-align:center;">
+                <div style="font-size:13px;letter-spacing:2px;color:#FAC775;text-transform:uppercase;margin-bottom:4px;">Thank you</div>
+                <div style="font-size:15px;font-weight:500;line-height:1.5;">50% of your purchase goes to people in need and animal welfare.</div>
+                <div style="font-size:12px;color:#E5DDD0;margin-top:6px;">You just helped fund a real cause. 🖤</div>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Carved by you invitation -->
+          <tr>
+            <td style="padding:0 28px 24px;">
+              <div style="border:1px dashed #d4c9b3;padding:18px 22px;border-radius:8px;text-align:center;">
+                <div style="font-family:Georgia,'Times New Roman',serif;font-size:18px;color:${BRAND_INK};margin-bottom:6px;">Carved one of our designs?</div>
+                <p style="margin:0 0 12px;font-size:13px;color:#666;line-height:1.6;">
+                  Send a photo and we'll feature your work on our <em>Carved by you</em> wall (with credit + a link back to your shop if you have one).
+                </p>
+                <a href="mailto:jolly@digitalchiselco.com?subject=My%20DigitalChiselCo%20carving" style="display:inline-block;background:#FAC775;color:${BRAND_BRONZE_DARK};text-decoration:none;padding:9px 20px;border-radius:6px;font-size:13px;font-weight:500;">
+                  📷 Share my carving
+                </a>
               </div>
             </td>
           </tr>

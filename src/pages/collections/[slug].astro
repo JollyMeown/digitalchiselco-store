@@ -17,12 +17,12 @@ const isPremium = category.slug === 'premium-bundle-offer';
 <Shell title={`${category.name} STL Files | DigitalChiselCo`} description={meta} scrollPastBanner={true}>
   <Breadcrumbs crumbs={[{ label: 'Collections', href: '/collections' }, { label: category.name }]} />
   {isPremium ? (
-    <section class="mb-8 -mx-4 sm:-mx-6 px-6 py-10 bg-gradient-to-br from-[#FAEEDA] via-[#fbf4e6] to-[#FAC775]/40 rounded-2xl border border-[#FAC775]/30">
+    <section class="mb-6 sm:mb-8 -mx-4 sm:-mx-6 px-5 sm:px-6 py-7 sm:py-10 bg-gradient-to-br from-[#FAEEDA] via-[#fbf4e6] to-[#FAC775]/40 rounded-2xl border border-[#FAC775]/30">
       <div class="text-[11px] tracking-[0.18em] uppercase text-bronze-700/80 font-medium mb-2">🔥 Limited-time savings</div>
-      <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">{category.name}</h1>
-      <p class="text-sm text-bronze-700/90 mt-1">{total.toLocaleString()} curated bundles · save more, carve more</p>
+      <h1 class="font-serif text-2xl sm:text-3xl md:text-4xl text-bronze-800 leading-tight">{category.name}</h1>
+      <p class="text-xs sm:text-sm text-bronze-700/90 mt-1">{total.toLocaleString()} curated bundles · save more, carve more</p>
       {category.description && (
-        <p class="mt-4 max-w-3xl text-sm md:text-[15px] text-ink-800 leading-relaxed">{category.description}</p>
+        <p class="mt-3 sm:mt-4 max-w-3xl text-sm md:text-[15px] text-ink-800 leading-relaxed">{category.description}</p>
       )}
     </section>
   ) : category.image_url ? (
