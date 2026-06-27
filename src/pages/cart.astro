@@ -19,7 +19,25 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
     <div id="summary" class="mt-6 hidden">
       <div class="flex justify-between text-sm text-ink-700/60"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
       <div class="flex justify-between text-sm text-green-700"><span>Discount ({percent}% off)</span><span id="savings">$0.00</span></div>
-      <div class="flex justify-between text-lg font-medium mt-1"><span>Total</span><span id="total">$0.00</span></div>
+
+      <!-- Promo code -->
+      <div class="mt-4 border-t border-black/10 pt-4">
+        <details class="group">
+          <summary class="cursor-pointer text-sm text-bronze-700 hover:underline list-none select-none flex items-center gap-1">
+            <span class="group-open:rotate-90 inline-block transition">▸</span> Have a promo code?
+          </summary>
+          <div class="mt-3 flex gap-2">
+            <input id="promo-code" type="text" autocapitalize="characters" placeholder="e.g. 2026OFF15"
+              class="flex-1 px-3 py-2 text-sm border border-black/15 rounded-md font-mono uppercase tracking-wider focus:outline-none focus:border-bronze-600" />
+            <button id="promo-apply" type="button" class="px-4 py-2 text-sm bg-bronze-600 text-cream rounded-md hover:bg-bronze-700 transition">Apply</button>
+            <button id="promo-remove" type="button" class="hidden px-3 py-2 text-sm border border-black/15 rounded-md hover:bg-cream">Remove</button>
+          </div>
+          <p id="promo-msg" class="mt-2 text-xs"></p>
+        </details>
+        <div id="promo-row" class="hidden flex justify-between text-sm text-green-700 mt-2"><span id="promo-label">Promo</span><span id="promo-amount">$0.00</span></div>
+      </div>
+
+      <div class="flex justify-between text-lg font-medium mt-3 border-t border-black/10 pt-3"><span>Total</span><span id="total">$0.00</span></div>
       <button id="checkout" class="mt-4 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">Checkout</button>
       <p class="text-xs text-ink-700/60 mt-2 text-center">Secure checkout · instant download links emailed after purchase</p>
     </div>
@@ -58,7 +76,22 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
       const savings = original - subtotalRaw;
       document.getElementById('subtotal').textContent = fmt(original);
       document.getElementById('savings').textContent = '−' + fmt(savings);
-      document.getElementById('total').textContent = fmt(subtotalRaw);
+      const promo = JSON.parse(localStorage.getItem('promo') || 'null');
+      const promoOff = promo?.discount_amount ? Math.min(subtotalRaw, Number(promo.discount_amount)) : 0;
+      document.getElementById('total').textContent = fmt(Math.max(0, subtotalRaw - promoOff));
+      const promoRow = document.getElementById('promo-row');
+      const promoLabel = document.getElementById('promo-label');
+      const promoAmount = document.getElementById('promo-amount');
+      const promoRemove = document.getElementById('promo-remove');
+      if (promo?.code && promoOff > 0) {
+        promoRow.classList.remove('hidden');
+        promoLabel.textContent = 'Promo (' + promo.code + ')';
+        promoAmount.textContent = '−' + fmt(promoOff);
+        promoRemove?.classList.remove('hidden');
+      } else {
+        promoRow.classList.add('hidden');
+        promoRemove?.classList.add('hidden');
+      }
       document.querySelectorAll('.rm').forEach((b) => b.addEventListener('click', () => {
         const next = JSON.parse(localStorage.getItem('cart') || '[]').filter((y) => y.id !== b.dataset.id);
         localStorage.setItem('cart', JSON.stringify(next)); window.dispatchEvent(new Event('cart-changed'));
@@ -105,6 +138,37 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
     loadUpsell();
     window.addEventListener('cart-changed', () => { renderCart(); loadUpsell(); });
 
+    // ── Promo code ────────────────────────────────────────────────────
+    const promoMsg = document.getElementById('promo-msg');
+    const promoCodeInput = document.getElementById('promo-code');
+    // Pre-fill if already applied
+    {
+      const existing = JSON.parse(localStorage.getItem('promo') || 'null');
+      if (existing?.code) { promoCodeInput.value = existing.code; promoMsg.textContent = '✓ ' + (existing.description || existing.code) + ' applied.'; promoMsg.className = 'mt-2 text-xs text-green-700'; }
+    }
+    document.getElementById('promo-apply')?.addEventListener('click', async () => {
+      const code = (promoCodeInput.value || '').trim().toUpperCase();
+      if (!code) { promoMsg.textContent = 'Enter a code.'; promoMsg.className = 'mt-2 text-xs text-red-600'; return; }
+      const cart = JSON.parse(localStorage.getItem('cart') || '[]')
+        .filter((c) => !String(c.id).startsWith('membership:'))
+        .map((c) => ({ id: c.id, price: Number(c.price), qty: 1, title: c.title }));
+      promoMsg.textContent = 'Checking…'; promoMsg.className = 'mt-2 text-xs text-ink-700/60';
+      try {
+        const res = await fetch('/api/coupons/validate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, items: cart }) });
+        const data = await res.json();
+        if (!res.ok || !data.ok) { promoMsg.textContent = '✕ ' + (data.error || 'Code not valid.'); promoMsg.className = 'mt-2 text-xs text-red-600'; return; }
+        localStorage.setItem('promo', JSON.stringify({ code: data.code, description: data.description, discount_amount: data.discount_amount, percent_off: data.percent_off }));
+        promoMsg.textContent = '✓ ' + (data.description || data.code) + ' applied — saved ' + fmt(data.discount_amount);
+        promoMsg.className = 'mt-2 text-xs text-green-700';
+        renderCart();
+      } catch (e) {
+        promoMsg.textContent = 'Network error. Please try again.'; promoMsg.className = 'mt-2 text-xs text-red-600';
+      }
+    });
+    document.getElementById('promo-remove')?.addEventListener('click', () => {
+      localStorage.removeItem('promo'); promoCodeInput.value = ''; promoMsg.textContent = ''; renderCart();
+    });
+
     // ── Paddle.js setup ────────────────────────────────────────────────
     function setupPaddle() {
       if (typeof Paddle === 'undefined' || !PADDLE_TOKEN) return false;
@@ -149,10 +213,11 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
       if (!PADDLE_TOKEN) { alert('Checkout is not yet configured. Please contact support.'); return; }
       btn.disabled = true; btn.textContent = 'Starting checkout…';
       try {
+        const promo = JSON.parse(localStorage.getItem('promo') || 'null');
         const res = await fetch('/api/checkout-init', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ items: cart, discount_percent: DISCOUNT }),
+          body: JSON.stringify({ items: cart, discount_percent: DISCOUNT, coupon_code: promo?.code || null }),
         });
         const data = await res.json();
         if (!res.ok || !data.transaction_id) throw new Error(data.error || 'Could not start checkout.');

@@ -15,6 +15,7 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { paddleApi } from '../../lib/paddle';
+import { validateCoupon, getActiveShopSale } from '../../lib/discounts';
 
 export const prerender = false;
 
@@ -28,11 +29,35 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json().catch(() => ({}));
     const cart: CartItem[] = Array.isArray(body.items) ? body.items : [];
     const email: string | undefined = body.email ? String(body.email).toLowerCase().trim() : undefined;
-    const discountPercent: number = Number(body.discount_percent) || 0;
+    let discountPercent: number = Number(body.discount_percent) || 0;
+    const couponCode: string | undefined = body.coupon_code ? String(body.coupon_code).trim().toUpperCase() : undefined;
 
     if (!cart.length) return json({ error: 'Cart is empty.' }, 400);
 
     const db = supabaseAdmin();
+
+    // Server-side discount resolution. Priority:
+    //   1) Promo code (customer-entered)   — server-validated, may set fixed-$ or percent
+    //   2) Auto shop sale (Etsy-style)     — applies when no code is used
+    let couponMeta: { id: string; code: string; amount: number; percent: number | null } | null = null;
+    let fixedDiscount = 0;
+    if (couponCode) {
+      const validation = await validateCoupon(
+        couponCode,
+        cart.filter((c) => !String(c.id).startsWith('membership:')).map((c) => ({ id: c.id, price: Number(c.price) || 0, qty: Number(c.qty) || 1 })),
+        email ?? null,
+      );
+      if (!validation.ok) return json({ error: validation.error }, 400);
+      const { data: row } = await db.from('coupons').select('id').eq('code', validation.code).maybeSingle();
+      if (row) {
+        couponMeta = { id: row.id, code: validation.code, amount: validation.discount_amount, percent: validation.percent_off };
+        if (validation.percent_off) discountPercent = Math.max(discountPercent, validation.percent_off);
+        else if (validation.fixed_amount_off) fixedDiscount = validation.fixed_amount_off;
+      }
+    } else {
+      const sale = await getActiveShopSale();
+      if (sale) discountPercent = Math.max(discountPercent, sale.percent_off);
+    }
 
     // Split cart into product ids vs membership slugs
     const productIds = cart.filter((c) => !String(c.id).startsWith('membership:')).map((c) => c.id);
@@ -51,6 +76,19 @@ export const POST: APIRoute = async ({ request }) => {
     ] as any);
 
     // Build the items array Paddle expects.
+    // When a discount applies (percent or fixed), we force ad-hoc lines so the
+    // discounted prices reach Paddle directly (Paddle's catalog price would
+    // otherwise override). Membership prices are NEVER discounted by promo codes.
+    const hasDiscount = discountPercent > 0 || fixedDiscount > 0;
+
+    // Pre-compute the product subtotal so we can pro-rate fixed-$ discounts
+    const productSubtotal = cart.reduce((s, c) => {
+      if (String(c.id).startsWith('membership:')) return s;
+      const p = (products || []).find((x: any) => x.id === c.id);
+      if (!p) return s;
+      return s + Number(p.price_usd) * Math.max(1, Number(c.qty) || 1);
+    }, 0);
+
     const items: any[] = [];
     for (const c of cart) {
       const qty = Math.max(1, Number(c.qty) || 1);
@@ -66,11 +104,17 @@ export const POST: APIRoute = async ({ request }) => {
       } else {
         const p = (products || []).find((x: any) => x.id === c.id);
         if (!p) continue;
-        const price = applyDiscount(Number(p.price_usd), discountPercent);
-        if (p.paddle_price_id) {
-          items.push({ price_id: p.paddle_price_id, quantity: qty });
+        let unit = Number(p.price_usd);
+        if (discountPercent) unit = applyDiscount(unit, discountPercent);
+        if (fixedDiscount && productSubtotal > 0) {
+          // Pro-rate the fixed discount across product lines
+          const share = (unit * qty / productSubtotal) * fixedDiscount;
+          unit = Math.max(0, +(unit - share / qty).toFixed(2));
+        }
+        if (hasDiscount || !p.paddle_price_id) {
+          items.push(adhocItem(p.title, unit, qty));
         } else {
-          items.push(adhocItem(p.title, price, qty));
+          items.push({ price_id: p.paddle_price_id, quantity: qty });
         }
       }
     }
@@ -86,11 +130,24 @@ export const POST: APIRoute = async ({ request }) => {
         custom_data: {
           source: 'digitalchiselco-cart',
           cart_ids: cart.map((c) => c.id),
+          ...(couponMeta ? { coupon_id: couponMeta.id, coupon_code: couponMeta.code, coupon_discount: couponMeta.amount } : {}),
         },
       },
     });
 
-    return json({ transaction_id: txn.data?.id, status: txn.data?.status });
+    // Stamp the coupon redemption immediately so single_use_per_buyer + global
+    // max_redemptions are enforced even if the buyer abandons checkout. (We can
+    // sweep stale "pending" redemptions later if needed.)
+    if (couponMeta && txn.data?.id) {
+      await db.from('coupon_redemptions').insert({ coupon_id: couponMeta.id, email: email || null, amount_off: couponMeta.amount });
+      await db.rpc('increment_coupon_redemption', { p_coupon_id: couponMeta.id }).then(() => {}, async () => {
+        // Fallback if the RPC doesn't exist yet: do it the manual way.
+        const { data: cur } = await db.from('coupons').select('redemption_count').eq('id', couponMeta!.id).maybeSingle();
+        await db.from('coupons').update({ redemption_count: (cur?.redemption_count || 0) + 1 }).eq('id', couponMeta!.id);
+      });
+    }
+
+    return json({ transaction_id: txn.data?.id, status: txn.data?.status, discount_amount: couponMeta?.amount || 0 });
   } catch (e: any) {
     console.error('checkout-init failed:', e);
     return json({ error: e.message || 'Checkout could not start.' }, 500);

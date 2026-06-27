@@ -17,6 +17,8 @@ export type SiteSettings = {
   membership_image_url: string | null; membership_title: string; membership_subtitle: string;
   free_image_url: string | null; welfare_image_url: string | null; welfare_text: string;
   trust_badges: { icon: string; label: string }[];
+  announcement_active: boolean; announcement_text: string | null;
+  announcement_link: string | null; announcement_cta_label: string | null;
 };
 
 const SETTINGS_FALLBACK: SiteSettings = {

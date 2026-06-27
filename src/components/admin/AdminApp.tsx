@@ -13,6 +13,7 @@ import Faqs from './tabs/Faqs';
 import Membership from './tabs/Membership';
 import Bundles from './tabs/Bundles';
 import Creations from './tabs/Creations';
+import Discounts from './tabs/Discounts';
 import { inputCls, btnPrimary } from './ui';
 
 type Tab = { key: string; label: string; icon: string; Component: any };
@@ -23,6 +24,7 @@ const TABS: Tab[] = [
   { key: 'bundles',     label: 'Bundle Composer', icon: '◫', Component: Bundles },
   { key: 'categories',  label: 'Categories',   icon: '☷', Component: Categories },
   { key: 'orders',      label: 'Orders',       icon: '⊞', Component: Orders },
+  { key: 'discounts',   label: 'Discounts',    icon: '%', Component: Discounts },
   { key: 'creations',   label: 'Carved by you', icon: '✦', Component: Creations },
   { key: 'membership',  label: 'Membership',   icon: '◆', Component: Membership },
   { key: 'reviews',     label: 'Reviews',      icon: '★', Component: Reviews },

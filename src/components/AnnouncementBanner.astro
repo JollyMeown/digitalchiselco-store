@@ -1,0 +1,25 @@
+---
+// Wide attention-grabbing banner shown above the hero when admin toggles it on
+// in Discounts → Announcement strip. Text supports line breaks (whitespace-pre-line).
+import { getSettings } from '../lib/queries';
+const s = await getSettings();
+const show = s.announcement_active && (s.announcement_text || '').trim().length > 0;
+---
+{show && (
+  <section class="relative bg-gradient-to-r from-bronze-800 via-bronze-700 to-bronze-800 text-cream overflow-hidden" aria-label="Site announcement">
+    <div class="absolute inset-0 opacity-10 pointer-events-none" aria-hidden="true">
+      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="ann-grain" patternUnits="userSpaceOnUse" width="30" height="30"><circle cx="3" cy="3" r="0.6" fill="#FAEEDA"/><circle cx="18" cy="14" r="0.4" fill="#FAEEDA"/><circle cx="25" cy="25" r="0.5" fill="#FAEEDA"/></pattern></defs><rect width="100%" height="100%" fill="url(#ann-grain)"/></svg>
+    </div>
+    <div class="relative max-w-5xl mx-auto px-4 sm:px-6 py-5 flex flex-col md:flex-row items-center gap-4 md:gap-6">
+      <div class="flex-1 whitespace-pre-line text-center md:text-left text-sm md:text-[15px] leading-relaxed">
+        {s.announcement_text}
+      </div>
+      {s.announcement_cta_label && (
+        <a href={s.announcement_link || '/catalog'} class="flex-shrink-0 inline-flex items-center gap-2 bg-[#FAC775] hover:bg-[#fcd28e] text-bronze-900 text-sm font-medium px-5 py-2.5 rounded-md transition whitespace-nowrap">
+          {s.announcement_cta_label}
+          <span aria-hidden="true">→</span>
+        </a>
+      )}
+    </div>
+  </section>
+)}
