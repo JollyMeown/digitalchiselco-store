@@ -8,7 +8,7 @@ type Row = {
   id: string; title: string; slug: string; price_usd: number; image_url: string | null;
   link_status: string; active: boolean; is_bundle: boolean; description?: string;
   gallery?: string[]; product_categories?: { categories: Cat | null }[];
-  product_downloads?: { verified_at: string | null }[];
+  product_downloads?: { id: string; verified_at: string | null; audit_status: string | null }[];
 };
 
 const slugify = (s: string) =>
@@ -45,7 +45,7 @@ export default function Products() {
   async function load() {
     const myReq = ++reqIdRef.current;
     setLoading(true);
-    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,product_downloads(verified_at)';
+    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,product_downloads(id,verified_at,audit_status)';
     let qb = catFilter
       ? supabase.from('products')
           .select(`${baseSelect},product_categories!inner(categories(id,name,slug))`)
@@ -118,13 +118,14 @@ export default function Products() {
                   <td className="p-2">
                     {(r as any).is_bestseller && <span className="text-yellow-500 mr-1" title="Best seller">★</span>}
                     <a href={`/product/${r.slug}`} target="_blank" className="text-ink-800 hover:text-bronze-600">{r.title.slice(0, 60)}</a>
-                    {(() => {
-                      const dls = r.product_downloads ?? [];
-                      const verified = dls.length > 0 && dls.every((d) => !!d.verified_at);
-                      return verified
-                        ? <span className="ml-2 inline-block bg-green-100 text-green-700 text-[10px] font-medium px-1.5 py-0.5 rounded" title="Download link manually verified via audit workbench">✓ verified</span>
-                        : null;
-                    })()}
+                    <VerifyBadge row={r} onToggled={(downloadId, newTs) => {
+                      setRows((cur) => cur.map((x) => x.id !== r.id ? x : {
+                        ...x,
+                        product_downloads: (x.product_downloads ?? []).map((d) =>
+                          d.id === downloadId ? { ...d, verified_at: newTs } : d
+                        ),
+                      }));
+                    }} />
                   </td>
                   <td className="p-2 text-xs text-ink-700/70">{(r.product_categories ?? []).map((pc) => pc.categories?.name).filter(Boolean).join(', ') || '—'}</td>
                   <td className="p-2">${Number(r.price_usd).toFixed(2)}</td>
@@ -149,6 +150,53 @@ export default function Products() {
       />
     </div>
   );
+}
+
+function VerifyBadge({ row, onToggled }: { row: Row; onToggled: (downloadId: string, newTs: string | null) => void }) {
+  const [busy, setBusy] = useState(false);
+  const dls = row.product_downloads ?? [];
+  if (!dls.length) return null;
+
+  const allVerified = dls.every((d) => !!d.verified_at);
+  const anyVerified = dls.some((d) => !!d.verified_at);
+  const allAutoOk = !anyVerified && dls.every((d) => d.audit_status === 'auto_ok');
+
+  // Mixed state is unusual but possible for bundles — show muted indicator
+  if (anyVerified && !allVerified) {
+    return <span className="ml-2 inline-block bg-amber-100 text-amber-700 text-[10px] font-medium px-1.5 py-0.5 rounded" title="Some download rows are verified, others aren't (bundle with mixed state)">⚠ partial</span>;
+  }
+
+  async function toggle() {
+    if (busy) return;
+    setBusy(true);
+    const newTs = allVerified ? null : new Date().toISOString();
+    try {
+      for (const d of dls) {
+        const { error } = await supabase
+          .from('product_downloads')
+          .update({ verified_at: newTs })
+          .eq('id', d.id);
+        if (error) throw error;
+        onToggled(d.id, newTs);
+      }
+    } catch (e: any) {
+      alert('Failed to toggle: ' + (e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (allVerified) {
+    return (
+      <button onClick={toggle} disabled={busy} className="ml-2 inline-block bg-green-100 hover:bg-green-200 text-green-700 text-[10px] font-medium px-1.5 py-0.5 rounded" title="Manually verified. Click to undo.">✓ verified</button>
+    );
+  }
+  if (allAutoOk) {
+    return (
+      <button onClick={toggle} disabled={busy} className="ml-2 inline-block bg-blue-100 hover:bg-blue-200 text-blue-700 text-[10px] font-medium px-1.5 py-0.5 rounded" title="Audit script says this looks fine — click to mark as manually verified.">? auto-ok</button>
+    );
+  }
+  return null;
 }
 
 function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
@@ -223,12 +271,23 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
       await supabase.from('product_categories').insert(f.category_ids.map((c: string) => ({ product_id: id, category_id: c })));
     }
     // download link (single, simple). If we already have downloads, update first; else insert.
+    // Stamp verified_at whenever the URL is freshly entered/changed — the admin
+    // explicitly typed/pasted this value, so it counts as a manual verification.
     if (f.download_link.trim()) {
-      const { data: existingDl } = await supabase.from('product_downloads').select('id').eq('product_id', id).limit(1);
+      const trimmed = f.download_link.trim();
+      const { data: existingDl } = await supabase.from('product_downloads').select('id,download_link').eq('product_id', id).limit(1);
       if (existingDl && existingDl.length) {
-        await supabase.from('product_downloads').update({ download_link: f.download_link.trim() }).eq('id', existingDl[0].id);
+        const changed = existingDl[0].download_link !== trimmed;
+        const patch: any = { download_link: trimmed };
+        if (changed) patch.verified_at = new Date().toISOString();
+        await supabase.from('product_downloads').update(patch).eq('id', existingDl[0].id);
       } else {
-        await supabase.from('product_downloads').insert({ product_id: id, download_link: f.download_link.trim(), file_name: f.title.trim() });
+        await supabase.from('product_downloads').insert({
+          product_id: id,
+          download_link: trimmed,
+          file_name: f.title.trim(),
+          verified_at: new Date().toISOString(),
+        });
       }
     }
     setBusy(false); setMsg('✓ Saved');

@@ -148,6 +148,22 @@ function writeCsv(file, rows) {
 writeCsv('audit-ok.csv', ok);
 writeCsv('audit-flagged.csv', flagged);
 
+// ---------- write audit_status back to DB (powers admin badges) ----------
+async function stampStatus(label, rows) {
+  if (!rows.length) return;
+  const ids = rows.map((r) => r.download_id).filter(Boolean);
+  // Chunk to keep PostgREST `?id=in.(…)` URL well below the 8KB practical limit
+  for (let i = 0; i < ids.length; i += 300) {
+    const slice = ids.slice(i, i + 300);
+    const { error } = await db.from('product_downloads').update({ audit_status: label }).in('id', slice);
+    if (error) throw error;
+  }
+}
+console.log('\nStamping audit_status on product_downloads…');
+await stampStatus('auto_ok', ok);
+await stampStatus('flagged', flagged);
+console.log(`  ${ok.length} marked auto_ok · ${flagged.length} marked flagged`);
+
 // ---------- HTML report (thumbnails inline) ----------
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) =>
