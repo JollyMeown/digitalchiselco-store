@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls, linkColor } from '../ui';
 import ImageUpload from '../ImageUpload';
@@ -23,39 +23,43 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Row | null>(null);
   const [creating, setCreating] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  // Monotonic request id — guards against an older in-flight load() overwriting
+  // a newer result. Without this, typing fast in the search box could "snap
+  // back" to the unfiltered 200 rows.
+  const reqIdRef = useRef(0);
 
-  useEffect(() => { loadCats(); load(); }, []);
-  useEffect(() => { load(); }, [q, catFilter, statusFilter, bestsellerOnly]);
+  useEffect(() => { loadCats(); }, []);
+  // Debounce the search box so each keystroke doesn't spam Supabase. 220ms feels
+  // instant but collapses a 6-char "bundle" type into a single round-trip.
+  useEffect(() => {
+    const t = setTimeout(() => { load(); }, 220);
+    return () => clearTimeout(t);
+  }, [q, catFilter, statusFilter, bestsellerOnly]);
 
   async function loadCats() {
     const { data } = await supabase.from('categories').select('id,name,slug').order('name');
     setCats(data ?? []);
   }
   async function load() {
+    const myReq = ++reqIdRef.current;
     setLoading(true);
-    let qb = supabase
-      .from('products')
-      .select('id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,product_categories(categories(id,name,slug))')
-      .order('title')
-      .limit(200);
-    if (q.trim()) qb = qb.ilike('title', `%${q.trim()}%`);
+    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller';
+    let qb = catFilter
+      ? supabase.from('products')
+          .select(`${baseSelect},product_categories!inner(categories(id,name,slug))`)
+          .eq('product_categories.category_id', catFilter)
+      : supabase.from('products')
+          .select(`${baseSelect},product_categories(categories(id,name,slug))`);
+    qb = qb.order('title').limit(200);
+    const search = q.trim();
+    if (search) qb = qb.ilike('title', `%${search}%`);
     if (statusFilter === 'active') qb = qb.eq('active', true);
     if (statusFilter === 'inactive') qb = qb.eq('active', false);
     if (bestsellerOnly) qb = qb.eq('is_bestseller', true);
-    if (catFilter) {
-      // filter by category via the join — need inner
-      qb = supabase
-        .from('products')
-        .select('id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,product_categories!inner(categories(id,name,slug))')
-        .eq('product_categories.category_id', catFilter)
-        .order('title')
-        .limit(200);
-      if (q.trim()) qb = qb.ilike('title', `%${q.trim()}%`);
-      if (statusFilter === 'active') qb = qb.eq('active', true);
-      if (statusFilter === 'inactive') qb = qb.eq('active', false);
-      if (bestsellerOnly) qb = qb.eq('is_bestseller', true);
-    }
     const { data, error } = await qb;
+    // Drop stale responses — only the most recent request gets to update state.
+    if (myReq !== reqIdRef.current) return;
     if (error) console.error(error);
     setRows((data ?? []) as any);
     setLoading(false);
@@ -87,9 +91,13 @@ export default function Products() {
             <input type="checkbox" checked={bestsellerOnly} onChange={(e) => setBestsellerOnly(e.target.checked)} /> ★ Bestsellers only
           </label>
           <span className="text-xs text-ink-700/60 ml-auto">{totalFiltered} shown</span>
+          <button className={btnGhost} onClick={() => setImportOpen(true)} title="Bulk import products from a CSV">⇪ Import CSV</button>
           <button className={btnPrimary} onClick={() => setCreating(true)}>+ New product</button>
         </div>
       </Card>
+
+      <CsvImportModal open={importOpen} onClose={() => setImportOpen(false)} onDone={() => { setImportOpen(false); load(); }} />
+
 
       {loading ? <div className="text-sm text-ink-700/60">Loading…</div> : (
         <div className="bg-white border border-black/10 rounded-lg overflow-hidden">
@@ -313,6 +321,87 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
         <button className={btnPrimary} disabled={busy} onClick={save}>{busy ? 'Saving…' : (existing ? 'Save changes' : 'Create product')}</button>
         <button className={btnGhost} onClick={onClose}>Cancel</button>
         <span className={'text-xs ' + (msg.startsWith('✓') ? 'text-green-700' : msg.startsWith('Error') ? 'text-red-600' : 'text-ink-700/60')}>{msg}</span>
+      </div>
+    </Modal>
+  );
+}
+
+function CsvImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<any | null>(null);
+  const [err, setErr] = useState('');
+
+  async function run() {
+    if (!file) return;
+    setBusy(true); setErr(''); setResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setErr('Sign in expired — refresh the page.'); setBusy(false); return; }
+      const text = await file.text();
+      const res = await fetch('/api/admin/products-import', {
+        method: 'POST',
+        headers: { 'content-type': 'text/csv', authorization: `Bearer ${token}` },
+        body: text,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) { setErr(data.error || `HTTP ${res.status}`); setBusy(false); return; }
+      setResult(data.summary);
+    } catch (e: any) { setErr(e.message || 'Import failed.'); }
+    setBusy(false);
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Bulk import products from CSV" wide>
+      <div className="space-y-4 text-sm">
+        <div className="bg-cream/40 border border-bronze-600/20 rounded-md p-3 text-xs leading-relaxed">
+          <strong>Required column:</strong> <code className="font-mono">title</code><br />
+          <strong>Optional:</strong> <code className="font-mono">slug</code>, <code className="font-mono">price_usd</code>, <code className="font-mono">description</code>,
+          <code className="font-mono"> image_url</code>, <code className="font-mono">gallery</code> (use <code>;</code> between URLs),
+          <code className="font-mono"> categories</code> (use <code>;</code> between names or slugs),
+          <code className="font-mono"> download_link</code> (Google Drive),
+          <code className="font-mono"> is_bundle</code>, <code className="font-mono">is_bestseller</code>, <code className="font-mono">active</code> (true/false),
+          <code className="font-mono"> seo_title</code>, <code className="font-mono">seo_description</code>.
+          <div className="mt-2 text-ink-700/60">Existing products with the same <code>slug</code> are updated; new ones are created. Categories are matched by name or slug — unknown ones are silently skipped.</div>
+        </div>
+
+        <div>
+          <label className={labelCls}>Pick a CSV file</label>
+          <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="block w-full text-sm" />
+        </div>
+
+        {err && <p className="text-xs text-red-600">{err}</p>}
+        {result && (
+          <div className="bg-green-50 border border-green-200 rounded-md p-3 text-xs">
+            <p className="font-medium text-green-800 mb-1">✓ Import complete</p>
+            <ul className="text-green-900/80">
+              <li>Created: <strong>{result.created}</strong></li>
+              <li>Updated: <strong>{result.updated}</strong></li>
+              {result.skipped > 0 && <li>Skipped (no title): <strong>{result.skipped}</strong></li>}
+              {result.errors?.length > 0 && (
+                <li className="mt-1">
+                  Errors: <strong>{result.errors.length}</strong>
+                  <ul className="mt-1 ml-3 list-disc text-red-700">
+                    {result.errors.slice(0, 8).map((e: any, i: number) => (
+                      <li key={i}>Row {e.row}: {e.error}</li>
+                    ))}
+                    {result.errors.length > 8 && <li>… and {result.errors.length - 8} more</li>}
+                  </ul>
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 border-t border-black/10 pt-4">
+          <button className={btnPrimary} disabled={!file || busy} onClick={run}>{busy ? 'Importing…' : 'Import'}</button>
+          <button className={btnGhost} onClick={onClose}>Close</button>
+          {result && (
+            <button className={btnGhost + ' ml-auto'} onClick={onDone}>Refresh list</button>
+          )}
+        </div>
       </div>
     </Modal>
   );

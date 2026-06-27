@@ -52,6 +52,19 @@ export default function Bundles() {
     load();
   }
 
+  // Toggle the is_bundle flag off — "un-bundles" a product back to a regular
+  // catalog item. Useful when a product was wrongly classified as a bundle.
+  // We don't delete it; the product just disappears from Bundle Composer's
+  // list and re-appears in the regular Products tab.
+  async function unbundle(b: BundleRow) {
+    if (!confirm(`Mark "${b.title}" as a regular product?\n\nIt will be removed from the Bundle Composer (and from the PREMIUM BUNDLES section) but kept in the catalog. Its bundle composition will be deleted; the product itself stays.`)) return;
+    // Wipe bundle_items first so the product can later be re-bundled cleanly.
+    await supabase.from('bundle_items').delete().eq('bundle_product_id', b.id);
+    const { error } = await supabase.from('products').update({ is_bundle: false }).eq('id', b.id);
+    if (error) { alert('Failed: ' + error.message); return; }
+    load();
+  }
+
   function exportCsv(b: BundleRow) {
     const items = (b.bundle_items || []).sort((a, c) => a.sort_order - c.sort_order);
     const head = 'bundle_title,bundle_slug,bundle_price_usd,item_position,item_title,item_slug,item_price_usd\n';
@@ -90,6 +103,27 @@ export default function Bundles() {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
   }
 
+  // Server packages images + manifest + Drive URLs into one ZIP and streams it.
+  async function downloadZip(b: BundleRow) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) { alert('Sign in expired — refresh the page.'); return; }
+    const res = await fetch(`/api/admin/bundle-zip?id=${encodeURIComponent(b.id)}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      let msg = 'Could not download bundle ZIP.';
+      try { msg = (await res.json()).error || msg; } catch {}
+      alert(msg); return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${b.slug || 'bundle'}.zip`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -118,13 +152,27 @@ export default function Bundles() {
         <div className="bg-white border border-black/10 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead className="text-xs text-ink-700/60 text-left bg-cream/40">
-              <tr><th className="p-2">Bundle</th><th className="p-2">Items</th><th className="p-2">Price</th><th className="p-2">Slug</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th></tr>
+              <tr>
+                <th className="p-2 w-14 text-center" title="Include as bundle">Bundle?</th>
+                <th className="p-2">Bundle</th>
+                <th className="p-2">Items</th>
+                <th className="p-2">Price</th>
+                <th className="p-2">Slug</th>
+                <th className="p-2">Status</th>
+                <th className="p-2 text-right">Actions</th>
+              </tr>
             </thead>
             <tbody>
               {bundles.length === 0 ? (
-                <tr><td colSpan={6} className="p-6 text-center text-ink-700/60 text-sm">No bundles yet. Click "+ New bundle" to compose one.</td></tr>
+                <tr><td colSpan={7} className="p-6 text-center text-ink-700/60 text-sm">No bundles yet. Click "+ New bundle" to compose one.</td></tr>
               ) : bundles.map((b) => (
                 <tr key={b.id} className="border-t border-black/5">
+                  <td className="p-2 text-center">
+                    <input type="checkbox" checked={true}
+                      title="Uncheck to mark this as a regular product (no longer a bundle)."
+                      onChange={() => unbundle(b)}
+                      className="accent-bronze-600" />
+                  </td>
                   <td className="p-2">
                     <div className="flex items-center gap-2">
                       {b.image_url && <img src={b.image_url} alt="" className="w-10 h-10 rounded object-cover" />}
@@ -139,6 +187,7 @@ export default function Bundles() {
                   <td className="p-2"><span className={`text-xs px-2 py-0.5 rounded ${b.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>{b.active ? 'active' : 'inactive'}</span></td>
                   <td className="p-2 text-right whitespace-nowrap">
                     <button className={btnGhost} onClick={() => setOpen(b)}>Edit</button>
+                    <button className={btnGhost + ' ml-1'} onClick={() => downloadZip(b)} title="Download ZIP with images, manifest and Drive URLs">ZIP</button>
                     <button className={btnGhost + ' ml-1'} onClick={() => exportCsv(b)}>CSV</button>
                     <button className={btnGhost + ' ml-1'} onClick={() => exportFullManifest(b)} title="Includes Drive download links">Manifest</button>
                     <a className={btnGhost + ' ml-1'} href={`/product/${b.slug}`} target="_blank">View ↗</a>
