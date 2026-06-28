@@ -32,7 +32,7 @@ if (!apiKey) {
   console.error('  Add it to your .env (local only — never commit) and re-run.\n');
   process.exit(1);
 }
-const anthropic = new Anthropic({ apiKey });
+const anthropic = new Anthropic({ apiKey, maxRetries: 5 });
 const db = createClient(process.env.PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
@@ -81,9 +81,9 @@ FORBIDDEN
 - Never mention donations, charity, welfare, or giving a percentage away.
 - Do not mention price.
 
-STRUCTURE OF THE BODY (200 to 300 words, three short paragraphs)
+STRUCTURE OF THE BODY (220 to 330 words, three short paragraphs)
 1. A HOOK. Open with one or two vivid sentences about what the piece depicts and the feeling of the finished carve. Make them want it.
-2. The substance. What it is (a high-detail bas-relief STL), how it carves (clean toolpaths, depth), which software and machines it is ready for, what they can make with it (wall art, signs, gifts, decor).
+2. The substance. What it is (a high-detail bas-relief STL), how it carves (clean toolpaths, depth), which software and machines it is ready for, what they can make with it (wall art, signs, gifts, decor). You MUST include the recommended machining setup, written naturally and in your own words (vary the phrasing for every product, never copy a fixed sentence): rough it with a 6mm end mill at 40 percent stepover, then finish with a 3mm ball nose at 10 percent stepover. Write "40 percent" and "10 percent" as words or with the percent sign, never with an en-dash range.
 3. A close with a clear CALL TO ACTION. Instant download, commercial use included, carve it, sell it, gift it.
 
 TITLES
@@ -178,19 +178,27 @@ async function loadSeenTitles() {
 }
 
 // ---------- select products to process ----------
+// Paginates through the catalog and (unless --force) filters server-side to
+// products still needing copy (seo_status='pending'). This is resume-safe at
+// any scale: re-running picks up wherever the last run stopped, regardless of
+// where the product sits in the title order.
+const SEL = 'id,title,slug,price_usd,image_url,description,seo_status,product_categories(categories(name,slug))';
 async function selectProducts() {
-  let q = db.from('products')
-    .select('id,title,slug,price_usd,image_url,description,seo_status,product_categories(categories(name,slug))')
-    .eq('active', true)
-    .not('image_url', 'is', null);
-  if (SLUG) q = q.eq('slug', SLUG);
-  if (CATEGORY) q = q.eq('product_categories.categories.slug', CATEGORY);
-  q = q.order('title').limit(LIMIT * 3); // over-fetch; we filter client-side
-  const { data, error } = await q;
-  if (error) throw error;
-  let rows = data || [];
-  if (!FORCE) rows = rows.filter((r) => r.seo_status !== 'generated' && r.seo_status !== 'approved');
-  if (ONLY_MISSING) rows = rows.filter((r) => !r.description || r.description.trim().length < 200);
+  const rows = [];
+  for (let from = 0; rows.length < LIMIT; from += 1000) {
+    let q = db.from('products').select(SEL).eq('active', true).not('image_url', 'is', null);
+    if (SLUG) q = q.eq('slug', SLUG);
+    if (!FORCE) q = q.eq('seo_status', 'pending');
+    q = q.order('title').range(from, from + 999);
+    const { data, error } = await q;
+    if (error) throw error;
+    if (!data?.length) break;
+    let batch = data;
+    if (CATEGORY) batch = batch.filter((r) => (r.product_categories || []).some((pc) => pc.categories?.slug === CATEGORY));
+    if (ONLY_MISSING) batch = batch.filter((r) => !r.description || r.description.trim().length < 200);
+    rows.push(...batch);
+    if (data.length < 1000) break;
+  }
   return rows.slice(0, LIMIT);
 }
 
