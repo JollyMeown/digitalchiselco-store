@@ -8,6 +8,10 @@ import { getCustomerCreations } from '../lib/queries';
 interface Props { enabled?: boolean; speed?: number; direction?: 'left' | 'right'; }
 const { enabled = true, speed = 55, direction = 'left' } = Astro.props;
 const creations = await getCustomerCreations(12);
+// The marquee duplicates its children for a seamless loop, so it only makes
+// sense with enough makers to actually scroll. With 1–2, show them centered
+// and static (no duplicate).
+const useMarquee = enabled && creations.length >= 3;
 ---
 {creations.length > 0 && (
   <section class="bg-gradient-to-b from-cream/40 via-cream/20 to-white py-16 relative overflow-hidden">
@@ -27,7 +31,7 @@ const creations = await getCustomerCreations(12);
         </p>
       </div>
 
-      {enabled ? (
+      {useMarquee ? (
         <Marquee duration={speed} direction={direction} gapClass="gap-5">
           {creations.map((c) => <CreationCard creation={c} />)}
         </Marquee>
