@@ -202,24 +202,20 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
     </section>
   )}
 
-  <!-- Made for You — customizable / personalized designs marquee -->
+  <!-- Made for You — customizable / personalized designs (centered, static) -->
   {madeForYou.length > 0 && (
     <section class="relative">
       <div class="absolute inset-0 -mx-4 sm:-mx-6 rounded-2xl bg-gradient-to-br from-[#F5EBE0] via-[#fff5e6] to-[#E8C49D]/40 -z-10" aria-hidden="true"></div>
-      <div class="py-7">
-        <div class="flex justify-between items-end flex-wrap gap-2 mb-4 px-1">
-          <div class="min-w-0">
-            <div class="text-[11px] tracking-[0.18em] uppercase text-bronze-700/80 font-medium">✨ Personalized for you</div>
-            <h2 class="font-serif text-xl sm:text-2xl md:text-3xl text-bronze-800 mt-0.5">MADE FOR YOU</h2>
-            <p class="text-xs sm:text-sm text-bronze-700/70 mt-1">Share a name, a date, or a photo — we'll carve a one-of-a-kind STL just for you.</p>
-          </div>
-          <a href="/collections/made-for-you" class="text-sm text-bronze-700 hover:underline whitespace-nowrap">See all →</a>
-        </div>
-        <Marquee duration={70}>
+      <div class="py-8 text-center">
+        <div class="text-[11px] tracking-[0.18em] uppercase text-bronze-700/80 font-medium">✨ Personalized for you</div>
+        <h2 class="font-serif text-xl sm:text-2xl md:text-3xl text-bronze-800 mt-0.5">MADE FOR YOU</h2>
+        <p class="text-xs sm:text-sm text-bronze-700/70 mt-1 max-w-xl mx-auto">Share a name, a date, or a photo — we'll carve a one-of-a-kind STL just for you.</p>
+        <div class="mt-5 flex flex-wrap justify-center gap-4 px-1">
           {madeForYou.map((p) => (
             <div class="w-[220px] sm:w-[240px]"><ProductCard product={p} discount={s.discount_percent} /></div>
           ))}
-        </Marquee>
+        </div>
+        <a href="/collections/made-for-you" class="inline-block mt-5 text-sm text-bronze-700 hover:underline">See all personalized designs →</a>
       </div>
     </section>
   )}

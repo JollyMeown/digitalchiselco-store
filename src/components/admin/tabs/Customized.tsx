@@ -73,6 +73,15 @@ export default function Customized() {
   async function mark(p: PickerProduct) {
     const { error } = await supabase.from('products').update({ is_customizable: true }).eq('id', p.id);
     if (error) { setMsg({ kind: 'error', text: error.message }); return; }
+    // Also attach to the "Made for You" category so it appears on /collections/made-for-you.
+    // Idempotent — onConflict no-ops if the link already exists.
+    const { data: cat } = await supabase.from('categories').select('id').eq('slug', 'made-for-you').maybeSingle();
+    if (cat) {
+      await supabase.from('product_categories').upsert(
+        { product_id: p.id, category_id: cat.id },
+        { ignoreDuplicates: true, onConflict: 'product_id,category_id' },
+      );
+    }
     setAddOpen(false);
     setMsg({ kind: 'success', text: `"${p.title.slice(0, 50)}" is now customizable. Configure its fields next.` });
     await load();
@@ -89,10 +98,14 @@ export default function Customized() {
   }
 
   async function unmark(p: CustomizableProduct) {
-    if (!confirm(`Remove customization from "${p.title}"?\n\nAll ${p.product_custom_fields.length} field definition${p.product_custom_fields.length === 1 ? '' : 's'} will be deleted. The product itself stays in the catalog.`)) return;
+    if (!confirm(`Remove customization from "${p.title}"?\n\nAll ${p.product_custom_fields.length} field definition${p.product_custom_fields.length === 1 ? '' : 's'} will be deleted, and the product will be removed from the "Made for You" category. The product itself stays in the catalog.`)) return;
     // FK cascade wipes fields when is_customizable goes false? No — flag is separate.
-    // Explicitly wipe fields, then flip the flag.
+    // Explicitly wipe fields, detach from "Made for You", then flip the flag.
     await supabase.from('product_custom_fields').delete().eq('product_id', p.id);
+    const { data: cat } = await supabase.from('categories').select('id').eq('slug', 'made-for-you').maybeSingle();
+    if (cat) {
+      await supabase.from('product_categories').delete().eq('product_id', p.id).eq('category_id', cat.id);
+    }
     const { error } = await supabase.from('products').update({ is_customizable: false }).eq('id', p.id);
     if (error) { setMsg({ kind: 'error', text: error.message }); return; }
     setMsg({ kind: 'success', text: `Customization removed from "${p.title.slice(0, 50)}"` });
