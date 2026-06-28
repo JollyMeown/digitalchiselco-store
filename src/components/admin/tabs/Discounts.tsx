@@ -164,7 +164,7 @@ function Sales() {
       {loading ? <div className="text-sm text-ink-700/60">Loading…</div> : rows.length === 0 ? (
         <Card><p className="text-sm text-ink-700/60">No sales yet. Click "+ New sale" to schedule one.</p></Card>
       ) : (
-        <div className="bg-white border border-black/10 rounded-lg overflow-hidden">
+        <div className="bg-white border border-black/10 rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs text-ink-700/60 text-left bg-cream/40">
               <tr><th className="p-2">Name</th><th className="p-2">% off</th><th className="p-2">From</th><th className="p-2">To</th><th className="p-2">Scope</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th></tr>
@@ -386,7 +386,7 @@ function Codes() {
       {loading ? <div className="text-sm text-ink-700/60">Loading…</div> : rows.length === 0 ? (
         <Card><p className="text-sm text-ink-700/60">No promo codes yet.</p></Card>
       ) : (
-        <div className="bg-white border border-black/10 rounded-lg overflow-hidden">
+        <div className="bg-white border border-black/10 rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs text-ink-700/60 text-left bg-cream/40">
               <tr><th className="p-2">Code</th><th className="p-2">Discount</th><th className="p-2">Minimum</th><th className="p-2">Expires</th><th className="p-2">Uses</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th></tr>

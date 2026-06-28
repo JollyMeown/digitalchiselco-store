@@ -121,7 +121,7 @@ export default function Orders() {
       {loading ? <div className="text-sm text-ink-700/60">Loading…</div> : filtered.length === 0 ? (
         <Card><p className="text-sm text-ink-700/60">No orders match the current filters.</p></Card>
       ) : (
-        <div className="bg-white border border-black/10 rounded-lg overflow-hidden">
+        <div className="bg-white border border-black/10 rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs text-ink-700/60 text-left bg-cream/40">
               <tr><th className="p-2">When</th><th className="p-2">Order</th><th className="p-2">Email</th><th className="p-2">Items</th><th className="p-2">Status</th><th className="p-2 text-right">Total</th><th className="p-2"></th></tr>

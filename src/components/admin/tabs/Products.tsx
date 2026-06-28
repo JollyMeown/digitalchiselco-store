@@ -150,7 +150,7 @@ export default function Products() {
 
 
       {loading ? <div className="text-sm text-ink-700/60">Loading…</div> : (
-        <div className="bg-white border border-black/10 rounded-lg overflow-hidden">
+        <div className="bg-white border border-black/10 rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs text-ink-700/60 text-left bg-cream/40">
               <tr>
