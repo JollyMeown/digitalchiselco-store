@@ -273,20 +273,32 @@ async function main() {
     console.log(`Jitter: waiting ${Math.round(ms / 60000)} min before posting...`);
     await sleep(ms);
   }
+  // Pre-flight: verify we can WRITE to the DB before creating anything on Cults.
+  // (Cults has no delete — an untracked listing would be re-created = duplicate.
+  //  This catches a wrong/anon SUPABASE_SERVICE_ROLE_KEY, which can still read.)
+  if (ready[0]) {
+    const { error } = await db.from('products')
+      .update({ cults3d_uploaded_at: null }).eq('id', ready[0].productId).is('cults3d_uploaded_at', null);
+    if (error) { console.error('ABORT: cannot write to DB (check SUPABASE_SERVICE_ROLE_KEY has service-role/write access):', error.message); process.exit(1); }
+  }
+
   let ok = 0, fail = 0;
   for (const pl of ready) {
     const res = await createListing(pl);
     if (res.ok) {
+      // Mark in DB FIRST and HALT if it fails — never leave a Cults listing untracked.
+      const { error: upErr } = await db.from('products')
+        .update({ cults3d_url: res.creation.url, cults3d_uploaded_at: new Date().toISOString() }).eq('id', pl.productId);
+      if (upErr) { console.error(`ABORT: created ${res.creation.url} but DB update failed — fix tracking before re-running:`, upErr.message); process.exit(1); }
       ok++;
-      // DB is the source of truth so the cloud job never re-uploads (no delete on Cults3D).
-      await db.from('products').update({ cults3d_url: res.creation.url, cults3d_uploaded_at: new Date().toISOString() }).eq('id', pl.productId);
       ledger[pl.productId] = { id: res.creation.id, url: res.creation.url, images: res.images, at: new Date().toISOString() };
-      writeFileSync(LEDGER_PATH, JSON.stringify(ledger, null, 2));
+      try { writeFileSync(LEDGER_PATH, JSON.stringify(ledger, null, 2)); } catch {}
       console.log(`✓ ${pl.slug} (${res.images} img) -> ${res.creation.url}`);
     } else { fail++; console.log(`✗ ${pl.slug}: ${redact(JSON.stringify(res.errors))}`); }
     await sleep(800); // stay well under 60 req / 30s
   }
-  console.log(`\nDone. Created ${ok}, failed ${fail}. Ledger: ${LEDGER_PATH}`);
+  console.log(`\nDone. Created ${ok}, failed ${fail}.`);
+  if (fail > 0 && ok === 0) process.exit(1); // surface a red CI run when nothing succeeded
 }
 
 main().catch((e) => { console.error(redact((e && e.stack) || e)); process.exit(1); });
