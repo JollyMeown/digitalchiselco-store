@@ -18,8 +18,9 @@ const related = await getRelatedProducts(p.id, 5);
 
 const desc = p.description || `${cleanTitle} is a high-detail 3D relief STL designed for clean carving on CNC routers, laser engravers and 3D printers. After checkout you'll receive an instant download link by email and in your account.`;
 
-const pageTitle = `${cleanTitle.slice(0, 60)} · DigitalChiselCo`;
+const pageTitle = p.seo_title || `${cleanTitle.slice(0, 60)} · DigitalChiselCo`;
 const pageDesc = (p.seo_description || desc).slice(0, 160);
+const mainAlt = p.image_alt || `${cleanTitle} bas-relief STL`;
 
 const jsonld = {
   '@context': 'https://schema.org', '@type': 'Product',
@@ -37,7 +38,7 @@ const jsonld = {
     <div>
       <div class="aspect-square bg-cream rounded-lg overflow-hidden">
         {gallery[0]
-          ? <img id="main-img" src={gallery[0]} alt={`${cleanTitle} bas-relief STL`} width="800" height="800" class="w-full h-full object-cover" />
+          ? <img id="main-img" src={gallery[0]} alt={mainAlt} width="800" height="800" class="w-full h-full object-cover" />
           : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 p-6 text-center font-serif">{cleanTitle}</div>}
       </div>
       {gallery.length > 1 && (

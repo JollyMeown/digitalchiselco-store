@@ -14,6 +14,7 @@ import Membership from './tabs/Membership';
 import Bundles from './tabs/Bundles';
 import Creations from './tabs/Creations';
 import Customized from './tabs/Customized';
+import Seo from './tabs/Seo';
 import Discounts from './tabs/Discounts';
 import OrderSoundListener from './OrderSoundListener';
 import { inputCls, btnPrimary } from './ui';
@@ -23,6 +24,7 @@ type Tab = { key: string; label: string; icon: string; Component: any };
 const TABS: Tab[] = [
   { key: 'overview',    label: 'Overview',     icon: '◎', Component: Overview },
   { key: 'products',    label: 'Products',     icon: '▦', Component: Products },
+  { key: 'seo',         label: 'SEO Review',   icon: '✦', Component: Seo },
   { key: 'bundles',     label: 'Bundle Composer', icon: '◫', Component: Bundles },
   { key: 'customized',  label: 'Customized',   icon: '✎', Component: Customized },
   { key: 'categories',  label: 'Categories',   icon: '☷', Component: Categories },

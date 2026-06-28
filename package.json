@@ -19,9 +19,11 @@
     "backfill:thin-images": "node scripts/backfill_thin_product_images.mjs",
     "audit:downloads": "node scripts/audit_download_filenames.mjs",
     "audit:duplicates": "node scripts/audit_duplicate_downloads.mjs",
-    "apply:download-fixes": "node scripts/apply_download_link_fixes.mjs"
+    "apply:download-fixes": "node scripts/apply_download_link_fixes.mjs",
+    "seo:generate": "node scripts/generate_seo_copy.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.106.0",
     "@astrojs/netlify": "^6.0.0",
     "@astrojs/react": "^4.1.0",
     "@astrojs/tailwind": "^6.0.0",
