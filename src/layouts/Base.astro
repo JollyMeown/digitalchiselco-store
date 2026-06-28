@@ -1,13 +1,19 @@
 ---
 import '../styles/global.css';
 import { getSettings } from '../lib/queries';
-interface Props { title?: string; description?: string; image?: string; noindex?: boolean; }
+interface Props { title?: string; description?: string; image?: string; noindex?: boolean; ogType?: string; price?: number; currency?: string; availability?: string; }
 const {
   title = 'DigitalChiselCo — Premium STL Files for CNC, Laser & 3D Printing',
   description = 'Hundreds of museum-grade bas-relief STL files for CNC routers, 3D printers and laser engravers. Instant download, commercial use included.',
   image = '/og-default.jpg',
   noindex = false,
+  ogType = 'website',
+  price,
+  currency = 'USD',
+  availability = 'in stock',
 } = Astro.props;
+// Product Rich Pin metadata — emitted only on product pages (ogType === 'product').
+const priceAmount = typeof price === 'number' ? price.toFixed(2) : null;
 const site = import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com';
 // GA4 — defaults to the project's measurement ID. Override per-environment via
 // the Netlify env var PUBLIC_GA_MEASUREMENT_ID (e.g. a staging stream).
@@ -36,12 +42,22 @@ const faviconType = settings.favicon_image_url
     {settings.favicon_image_url && <link rel="apple-touch-icon" href={settings.favicon_image_url} />}
     <meta name="theme-color" content="#854F0B" />
     <!-- Open Graph -->
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={ogImage} />
     <meta property="og:site_name" content="DigitalChiselCo" />
+    {ogType === 'product' && priceAmount && (
+      <>
+        {/* Product Rich Pin tags — let Pinterest show live price + availability on organic pins */}
+        <meta property="product:price:amount" content={priceAmount} />
+        <meta property="product:price:currency" content={currency} />
+        <meta property="product:availability" content={availability} />
+        <meta property="og:price:amount" content={priceAmount} />
+        <meta property="og:price:currency" content={currency} />
+      </>
+    )}
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />

@@ -7,10 +7,10 @@ import Footer from '../components/Footer.astro';
 import SideMenu from '../components/SideMenu.astro';
 import SiteBanner from '../components/SiteBanner.astro';
 
-interface Props { title?: string; description?: string; image?: string; noindex?: boolean; fullWidth?: boolean; hideBanner?: boolean; scrollPastBanner?: boolean; }
-const { title, description, image, noindex, fullWidth = false, hideBanner = false, scrollPastBanner = false } = Astro.props;
+interface Props { title?: string; description?: string; image?: string; noindex?: boolean; fullWidth?: boolean; hideBanner?: boolean; scrollPastBanner?: boolean; ogType?: string; price?: number; currency?: string; availability?: string; }
+const { title, description, image, noindex, fullWidth = false, hideBanner = false, scrollPastBanner = false, ogType, price, currency, availability } = Astro.props;
 ---
-<Base title={title} description={description} image={image} noindex={noindex}>
+<Base title={title} description={description} image={image} noindex={noindex} ogType={ogType} price={price} currency={currency} availability={availability}>
   <Header />
   {!hideBanner && <SiteBanner />}
   {scrollPastBanner && !hideBanner && (

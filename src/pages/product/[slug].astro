@@ -30,7 +30,7 @@ const jsonld = {
   offers: { '@type': 'Offer', price, priceCurrency: 'USD', availability: 'https://schema.org/InStock', url: Astro.url.href },
 };
 ---
-<Shell title={pageTitle} description={pageDesc} image={gallery[0]} hideBanner={true}>
+<Shell title={pageTitle} description={pageDesc} image={gallery[0]} hideBanner={true} ogType="product" price={price} currency="USD" availability="in stock">
   <Breadcrumbs crumbs={[cat ? { label: cat.name, href: `/collections/${cat.slug}` } : { label: 'Catalog', href: '/catalog' }, { label: cleanTitle }]} />
 
   <div class="grid md:grid-cols-2 gap-8 lg:gap-12">
