@@ -21,6 +21,15 @@ export type SiteSettings = {
   announcement_link: string | null; announcement_cta_label: string | null;
   announcement_font_size: number | null; announcement_speed_seconds: number | null;
   order_sound_enabled: boolean; order_sound_volume: number | null;
+  marquee_settings: Record<string, { enabled: boolean; speed: number; direction: 'left' | 'right' }>;
+};
+
+export const MARQUEE_DEFAULTS: SiteSettings['marquee_settings'] = {
+  collections: { enabled: true, speed: 45, direction: 'left' },
+  bestsellers: { enabled: true, speed: 50, direction: 'left' },
+  premium: { enabled: true, speed: 90, direction: 'left' },
+  madeforyou: { enabled: false, speed: 60, direction: 'left' },
+  reviews: { enabled: true, speed: 60, direction: 'left' },
 };
 
 const SETTINGS_FALLBACK: SiteSettings = {
@@ -44,6 +53,7 @@ const SETTINGS_FALLBACK: SiteSettings = {
     { icon: '🔒', label: '100% Payment Security' },
     { icon: '💬', label: 'Contact Us for Help' },
   ],
+  marquee_settings: MARQUEE_DEFAULTS,
 };
 
 export async function getSettings(): Promise<SiteSettings> {

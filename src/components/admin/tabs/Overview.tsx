@@ -7,7 +7,11 @@ type Item = { title: string; price_usd: number; qty: number; order_id: string };
 
 const fmt = (n: number) => '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt0 = (n: number) => '$' + Math.round(n).toLocaleString();
-const dayKey = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
+// Local-time day key (not UTC) so buckets line up with the admin's calendar.
+const dayKey = (d: Date | string) => {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+};
 
 export default function Overview() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -199,11 +203,9 @@ export default function Overview() {
           <>
             <div className="flex items-end gap-0.5 h-40 mb-2">
               {stats.buckets.map((b) => (
-                <div key={b.day} className="flex-1 flex flex-col items-stretch group relative" title={`${b.day}: ${fmt(b.total)} (${b.orders} orders)`}>
-                  <div className="flex-1 flex items-end">
-                    <div className="w-full bg-bronze-600/80 rounded-t hover:bg-bronze-700 transition" style={{ height: `${(b.total / maxBucket) * 100}%`, minHeight: b.total > 0 ? 2 : 0 }} />
-                  </div>
-                </div>
+                <div key={b.day} className="flex-1 bg-bronze-600/80 rounded-t hover:bg-bronze-700 transition"
+                  title={`${b.day}: ${fmt(b.total)} (${b.orders} orders)`}
+                  style={{ height: b.total > 0 ? `${Math.max(4, (b.total / maxBucket) * 100)}%` : '0%' }} />
               ))}
             </div>
             <div className="flex justify-between text-[10px] text-ink-700/50">
@@ -223,9 +225,9 @@ export default function Overview() {
             <>
               <div className="flex items-end gap-0.5 h-36 mb-2">
                 {stats.buckets.map((b) => (
-                  <div key={b.day} className="flex-1 flex items-end" title={`${b.day}: ${b.orders} order${b.orders === 1 ? '' : 's'}`}>
-                    <div className="w-full bg-bronze-400 rounded-t hover:bg-bronze-600 transition" style={{ height: `${(b.orders / maxOrders) * 100}%`, minHeight: b.orders > 0 ? 2 : 0 }} />
-                  </div>
+                  <div key={b.day} className="flex-1 bg-bronze-400 rounded-t hover:bg-bronze-600 transition"
+                    title={`${b.day}: ${b.orders} order${b.orders === 1 ? '' : 's'}`}
+                    style={{ height: b.orders > 0 ? `${Math.max(4, (b.orders / maxOrders) * 100)}%` : '0%' }} />
                 ))}
               </div>
               <div className="flex justify-between text-[10px] text-ink-700/50"><span>{stats.buckets[0]?.day}</span><span>peak {maxOrders}/day</span><span>{stats.buckets[n - 1]?.day}</span></div>

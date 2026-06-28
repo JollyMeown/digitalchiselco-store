@@ -11,14 +11,14 @@ import Marquee from '../components/Marquee.astro';
 import {
   getCategories, getProducts, getSettings,
   getBestSellers, getLatestProducts, getReviews, getFaqs, getMembershipPlans,
-  getPremiumBundles, getCustomizableProducts,
+  getPremiumBundles, getCustomizableProducts, MARQUEE_DEFAULTS,
 } from '../lib/queries';
 
 const s = await getSettings();
 const categories = await getCategories();
 const [bestsellers, latest, reviews, faqs, plans, { products }, premiumBundles, madeForYou] = await Promise.all([
   getBestSellers(12),
-  getLatestProducts(8),
+  getLatestProducts(12),
   getReviews(12),
   getFaqs(20),
   getMembershipPlans(),
@@ -30,6 +30,18 @@ const [bestsellers, latest, reviews, faqs, plans, { products }, premiumBundles, 
 // fallback bestsellers if admin hasn't flagged any yet — use first 8 with images
 const showBest = bestsellers.length > 0 ? bestsellers : products.filter((p) => p.image_url).slice(0, 8);
 const featuredPlan = plans.find((p) => p.highlight) || plans[0];
+
+// Per-section homepage motion config (admin → Settings → Homepage motion),
+// each falling back to the built-in defaults if a key is missing.
+const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
+  const d = MARQUEE_DEFAULTS[k];
+  const v = ((s.marquee_settings || {}) as any)[k] || {};
+  return {
+    enabled: v.enabled ?? d.enabled,
+    speed: Number(v.speed ?? d.speed) || d.speed,
+    direction: (v.direction ?? d.direction) as 'left' | 'right',
+  };
+};
 ---
 <Base>
   <Header />
@@ -95,18 +107,30 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
           <h2 class="font-serif text-2xl text-ink-800">Shop by collection</h2>
           <a href="/collections" class="text-sm text-bronze-600 hover:underline">View all →</a>
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {categories.slice(0, 6).map((c) => (
-            <a href={`/collections/${c.slug}`} class="block border border-black/10 rounded-lg overflow-hidden hover:shadow-md transition group">
-              <div class="aspect-[16/9] bg-cream overflow-hidden">
-                {c.image_url
-                  ? <img src={c.image_url} alt={c.name} loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.04] transition duration-500" />
-                  : <div class="w-full h-full flex items-center justify-center font-serif text-bronze-600/50 text-center px-3">{c.name}</div>}
-              </div>
-              {!c.image_url && <div class="p-3 text-sm">{c.name}</div>}
-            </a>
-          ))}
-        </div>
+        {mq('collections').enabled ? (
+          <Marquee duration={mq('collections').speed} direction={mq('collections').direction}>
+            {categories.filter((c) => c.image_url).map((c) => (
+              <a href={`/collections/${c.slug}`} class="block w-[260px] sm:w-[300px] border border-black/10 rounded-lg overflow-hidden hover:shadow-md transition group">
+                <div class="aspect-[16/9] bg-cream overflow-hidden">
+                  <img src={c.image_url} alt={c.name} loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.04] transition duration-500" />
+                </div>
+              </a>
+            ))}
+          </Marquee>
+        ) : (
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {categories.slice(0, 6).map((c) => (
+              <a href={`/collections/${c.slug}`} class="block border border-black/10 rounded-lg overflow-hidden hover:shadow-md transition group">
+                <div class="aspect-[16/9] bg-cream overflow-hidden">
+                  {c.image_url
+                    ? <img src={c.image_url} alt={c.name} loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.04] transition duration-500" />
+                    : <div class="w-full h-full flex items-center justify-center font-serif text-bronze-600/50 text-center px-3">{c.name}</div>}
+                </div>
+                {!c.image_url && <div class="p-3 text-sm">{c.name}</div>}
+              </a>
+            ))}
+          </div>
+        )}
       </section>
 
       <!-- Premium Bundles — slow marquee. Curated savings, top of the homepage stack. -->
@@ -121,7 +145,7 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
               </div>
               <a href="/collections/premium-bundle-offer" class="text-sm text-bronze-700 hover:underline whitespace-nowrap">See all bundles →</a>
             </div>
-            <Marquee duration={90}>
+            <Marquee duration={mq('premium').speed} direction={mq('premium').direction}>
               {premiumBundles.map((p) => (
                 <div class="w-[220px] sm:w-[240px]"><ProductCard product={p} discount={s.discount_percent} /></div>
               ))}
@@ -138,7 +162,7 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
             <h2 class="font-serif text-2xl text-ink-800">★ Best Sellers</h2>
             <a href="/catalog" class="text-sm text-bronze-600 hover:underline">Shop all →</a>
           </div>
-          <Marquee duration={50}>
+          <Marquee duration={mq('bestsellers').speed} direction={mq('bestsellers').direction}>
             {showBest.map((p) => (
               <div class="w-[200px] sm:w-[220px]"><ProductCard product={p} discount={s.discount_percent} /></div>
             ))}
@@ -155,7 +179,7 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
             <a href="/catalog" class="text-sm text-bronze-600 hover:underline">Browse catalog →</a>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {latest.slice(0, 8).map((p) => <ProductCard product={p} discount={s.discount_percent} />)}
+            {latest.slice(0, 12).map((p) => <ProductCard product={p} discount={s.discount_percent} />)}
           </div>
         </section>
       )}
@@ -170,7 +194,7 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
           <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">Loved by makers</h2>
           <p class="text-sm text-bronze-700 mt-2">★★★★★ {Number(s.rating)} average · {s.reviews_count}+ verified reviews</p>
         </div>
-        <Marquee duration={60} direction="right">
+        <Marquee duration={mq('reviews').speed} direction={mq('reviews').direction}>
           {reviews.map((r) => (
             <figure class="w-[300px] md:w-[340px] bg-white border border-black/10 rounded-lg p-5">
               <div class="text-bronze-600 mb-2 text-sm">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</div>
@@ -191,11 +215,21 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
         <div class="text-[11px] tracking-[0.18em] uppercase text-bronze-700/80 font-medium">✨ Personalized for you</div>
         <h2 class="font-serif text-xl sm:text-2xl md:text-3xl text-bronze-800 mt-0.5">MADE FOR YOU</h2>
         <p class="text-xs sm:text-sm text-bronze-700/70 mt-1 max-w-xl mx-auto">Share a name, a date, or a photo — we'll carve a one-of-a-kind STL just for you.</p>
-        <div class="mt-5 flex flex-wrap justify-center gap-4 px-1">
-          {madeForYou.map((p) => (
-            <div class="w-[220px] sm:w-[240px]"><ProductCard product={p} discount={s.discount_percent} /></div>
-          ))}
-        </div>
+        {mq('madeforyou').enabled ? (
+          <div class="mt-5">
+            <Marquee duration={mq('madeforyou').speed} direction={mq('madeforyou').direction}>
+              {madeForYou.map((p) => (
+                <div class="w-[220px] sm:w-[240px]"><ProductCard product={p} discount={s.discount_percent} /></div>
+              ))}
+            </Marquee>
+          </div>
+        ) : (
+          <div class="mt-5 flex flex-wrap justify-center gap-4 px-1">
+            {madeForYou.map((p) => (
+              <div class="w-[220px] sm:w-[240px]"><ProductCard product={p} discount={s.discount_percent} /></div>
+            ))}
+          </div>
+        )}
         <a href="/collections/made-for-you" class="inline-block mt-5 text-sm text-bronze-700 hover:underline">See all personalized designs →</a>
       </div>
     </section>
