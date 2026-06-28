@@ -261,32 +261,48 @@ function FieldsEditor({ product, onSaved, onClose }: { product: CustomizableProd
       ) : (
         <div className="space-y-3">
           {fields.map((f, i) => (
-            <div key={i} className="border border-black/10 rounded-md p-3 bg-cream/30">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs text-ink-700/60 font-mono">#{i + 1}</span>
-                <input value={f.label} onChange={(e) => update(i, { label: e.target.value, field_key: f.field_key || slugifyKey(e.target.value) })}
-                  placeholder="Field label (what the customer sees)" className={inputCls + ' flex-1'} />
+            <div key={i} className="border border-black/10 rounded-md p-3 bg-cream/30 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-ink-700/60 font-mono w-6">#{i + 1}</span>
                 <select value={f.field_type} onChange={(e) => update(i, { field_type: e.target.value as any })} className={inputCls + ' max-w-[180px]'}>
                   {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
                 <label className="text-xs flex items-center gap-1 whitespace-nowrap">
                   <input type="checkbox" checked={f.required} onChange={(e) => update(i, { required: e.target.checked })} /> required
                 </label>
+                <div className="flex-1" />
                 <button className="text-bronze-700 px-2" onClick={() => move(i, -1)} disabled={i === 0} title="Move up">↑</button>
                 <button className="text-bronze-700 px-2" onClick={() => move(i, 1)} disabled={i === fields.length - 1} title="Move down">↓</button>
                 <button className="text-red-600 px-2" onClick={() => remove(i)} title="Delete">✕</button>
               </div>
-              <div className="grid sm:grid-cols-2 gap-2 mt-1">
-                <input value={f.placeholder || ''} onChange={(e) => update(i, { placeholder: e.target.value })}
-                  placeholder="Placeholder text (optional)" className={inputCls + ' text-xs'} />
-                <input value={f.help_text || ''} onChange={(e) => update(i, { help_text: e.target.value })}
-                  placeholder="Help text shown under the field (optional)" className={inputCls + ' text-xs'} />
+              <div>
+                <label className="text-[11px] text-ink-700/70 block mb-0.5">Label <span className="text-ink-700/50">— shown to the customer above the input (e.g. "Full name")</span></label>
+                <input value={f.label} onChange={(e) => update(i, { label: e.target.value, field_key: f.field_key || slugifyKey(e.target.value) })}
+                  placeholder='e.g. "Full name" · "Engraving text" · "Wedding date"' className={inputCls} />
+              </div>
+              <div className="grid sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-ink-700/70 block mb-0.5">Placeholder <span className="text-ink-700/50">— faint hint inside the empty input</span></label>
+                  <input value={f.placeholder || ''} onChange={(e) => update(i, { placeholder: e.target.value })}
+                    placeholder='e.g. "Olivia & Adam 1998"' className={inputCls + ' text-xs'} />
+                </div>
+                <div>
+                  <label className="text-[11px] text-ink-700/70 block mb-0.5">Help text <span className="text-ink-700/50">— small note shown under the input</span></label>
+                  <input value={f.help_text || ''} onChange={(e) => update(i, { help_text: e.target.value })}
+                    placeholder='e.g. "Max 20 characters fit the design"' className={inputCls + ' text-xs'} />
+                </div>
                 {(f.field_type === 'text' || f.field_type === 'textarea' || f.field_type === 'file_url') && (
-                  <input type="number" min="1" value={f.max_length ?? ''} onChange={(e) => update(i, { max_length: e.target.value ? Number(e.target.value) : null })}
-                    placeholder="Max length (optional)" className={inputCls + ' text-xs'} />
+                  <div>
+                    <label className="text-[11px] text-ink-700/70 block mb-0.5">Max length <span className="text-ink-700/50">— characters (optional)</span></label>
+                    <input type="number" min="1" value={f.max_length ?? ''} onChange={(e) => update(i, { max_length: e.target.value ? Number(e.target.value) : null })}
+                      placeholder="e.g. 80" className={inputCls + ' text-xs'} />
+                  </div>
                 )}
-                <input value={f.field_key} onChange={(e) => update(i, { field_key: slugifyKey(e.target.value) })}
-                  placeholder="Internal key (auto-filled from label)" className={inputCls + ' text-xs font-mono'} />
+                <div>
+                  <label className="text-[11px] text-ink-700/70 block mb-0.5">Internal key <span className="text-ink-700/50">— auto-filled from label, rarely edited</span></label>
+                  <input value={f.field_key} onChange={(e) => update(i, { field_key: slugifyKey(e.target.value) })}
+                    placeholder="auto-filled" className={inputCls + ' text-xs font-mono'} />
+                </div>
               </div>
             </div>
           ))}

@@ -247,22 +247,28 @@ async function handleTransactionCompleted(db: any, txn: any) {
       });
     }
 
-    // Persist captured customization values for this line, if any.
-    const lineCustom = cartCustomizations[i];
-    if (insertedItem && Array.isArray(lineCustom) && lineCustom.some((f) => f && String(f.value || '').trim())) {
-      const cleaned = lineCustom
-        .filter((f) => f && typeof f === 'object')
-        .map((f) => ({
-          key: String(f.key || '').slice(0, 60),
-          label: String(f.label || '').slice(0, 200),
-          type: String(f.type || 'text').slice(0, 20),
-          value: String(f.value || '').slice(0, 2000),
-        }));
-      await db.from('order_item_customizations').insert({
-        order_item_id: insertedItem.id,
-        product_id: productId,
-        fields: cleaned,
-      });
+    // Persist captured customization values for this line, if any. Wrapped in
+    // try/catch so a DB hiccup here can never block the order confirmation
+    // email that runs after this loop.
+    try {
+      const lineCustom = cartCustomizations[i];
+      if (insertedItem?.id && Array.isArray(lineCustom) && lineCustom.some((f) => f && String(f.value || '').trim())) {
+        const cleaned = lineCustom
+          .filter((f) => f && typeof f === 'object')
+          .map((f) => ({
+            key: String(f.key || '').slice(0, 60),
+            label: String(f.label || '').slice(0, 200),
+            type: String(f.type || 'text').slice(0, 20),
+            value: String(f.value || '').slice(0, 2000),
+          }));
+        await db.from('order_item_customizations').insert({
+          order_item_id: insertedItem.id,
+          product_id: productId,
+          fields: cleaned,
+        });
+      }
+    } catch (e) {
+      console.error('order_item_customizations insert failed (continuing):', e);
     }
   }
 
