@@ -3,7 +3,6 @@ import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import CarvedByYou from '../components/CarvedByYou.astro';
-import AnnouncementBanner from '../components/AnnouncementBanner.astro';
 import SideMenu from '../components/SideMenu.astro';
 import SiteBanner from '../components/SiteBanner.astro';
 import ProductCard from '../components/ProductCard.astro';
@@ -45,7 +44,6 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
 ---
 <Base>
   <Header />
-  <AnnouncementBanner />
   <SiteBanner />
 
   <!-- Trust strip — horizontal scroll on mobile (one line, no wrap), grid on tablet+ -->

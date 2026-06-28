@@ -48,7 +48,7 @@ export default function Discounts() {
 function Announcement() {
   const [s, setS] = useState<any>(null);
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
-  useEffect(() => { supabase.from('site_settings').select('announcement_active,announcement_text,announcement_link,announcement_cta_label,announcement_font_size,announcement_speed_seconds').eq('id', 1).maybeSingle().then(({ data }) => setS(data)); }, []);
+  useEffect(() => { supabase.from('site_settings').select('announcement_active,announcement_text,announcement_link,announcement_cta_label,announcement_font_size,announcement_speed_seconds,cart_promos_active').eq('id', 1).maybeSingle().then(({ data }) => setS(data)); }, []);
   if (!s) return <div className="text-sm text-ink-700/60">Loading…</div>;
   const fontPx = Math.min(20, Math.max(10, Number(s.announcement_font_size) || 13));
   const speed = Math.min(120, Math.max(10, Number(s.announcement_speed_seconds) || 35));
@@ -61,17 +61,22 @@ function Announcement() {
       announcement_cta_label: s.announcement_cta_label || null,
       announcement_font_size: fontPx,
       announcement_speed_seconds: speed,
+      cart_promos_active: !!s.cart_promos_active,
     }).eq('id', 1);
-    setMsg(error ? { kind: 'error', text: 'Error: ' + error.message } : { kind: 'success', text: '✓ Saved. Live on the homepage now.' });
+    setMsg(error ? { kind: 'error', text: 'Error: ' + error.message } : { kind: 'success', text: '✓ Saved. Live on all pages now.' });
   }
   // Live preview line (mimics the storefront's flatten)
   const previewLine = (s.announcement_text || '').replace(/\s*\n+\s*/g, ' · ').trim();
   return (
     <Card title="Homepage announcement strip">
       <p className="text-xs text-ink-700/60 mb-3">A thin one-liner shown at the very top of every page. Line breaks in the text are flattened into "·" separators. The strip slowly scrolls — hover to pause.</p>
-      <label className="flex items-center gap-2 text-sm mb-3">
+      <label className="flex items-center gap-2 text-sm mb-2">
         <input type="checkbox" checked={!!s.announcement_active} onChange={(e) => setS({ ...s, announcement_active: e.target.checked })} />
-        Active (show on homepage)
+        Active (show the scrolling strip on all pages)
+      </label>
+      <label className="flex items-center gap-2 text-sm mb-3">
+        <input type="checkbox" checked={s.cart_promos_active !== false} onChange={(e) => setS({ ...s, cart_promos_active: e.target.checked })} />
+        🛒 Show the bulk-discount promo codes on the cart page
       </label>
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-3">

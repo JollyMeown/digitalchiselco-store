@@ -5,7 +5,15 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { pricing } from '../lib/pricing';
+import { getSettings } from '../lib/queries';
 const { percent } = pricing(1);
+const settings = await getSettings();
+const showCartPromos = (settings as any).cart_promos_active !== false;
+const promoTiers = [
+  { items: 6, percent: 15, code: '2026OFF15' },
+  { items: 10, percent: 20, code: '2026OFF20' },
+  { items: 25, percent: 35, code: '2026OFF35' },
+];
 const paddleEnv = (import.meta.env.PADDLE_ENV === 'production' ? 'production' : 'sandbox');
 const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || '';
@@ -16,6 +24,20 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
   <Breadcrumbs crumbs={[{ label: 'Cart' }]} />
   <main class="px-6 pb-6 max-w-3xl mx-auto min-h-[40vh]">
     <h1 class="text-3xl mb-6">Your cart</h1>
+    {showCartPromos && (
+      <div class="mb-6 rounded-lg border border-bronze-600/30 bg-[#FAEEDA] px-4 py-3">
+        <p class="text-sm font-medium text-bronze-800">Save more when you buy more on my 3D models 🎉</p>
+        <ul class="mt-2 space-y-1.5 text-sm text-ink-800">
+          {promoTiers.map((t) => (
+            <li class="flex items-center gap-2 flex-wrap">
+              <span class="text-green-700" aria-hidden="true">☑</span>
+              <span>{t.items} items → <strong>{t.percent}% OFF</strong></span>
+              <code class="sm:ml-auto font-mono text-xs bg-white/70 border border-bronze-600/20 rounded px-2 py-0.5 text-bronze-800">{t.code}</code>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
     <div id="empty" class="text-ink-700/70 hidden">Your cart is empty. <a href="/catalog" class="text-bronze-600">Browse the catalog →</a></div>
     <div id="items" class="divide-y divide-black/10"></div>
     <div id="summary" class="mt-6 hidden">
@@ -194,6 +216,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         title.textContent = ids.length ? 'Complete your collection' : 'You may also like';
         grid.innerHTML = data.products.map(cardHtml).join('');
         wrap.classList.remove('hidden');
+        window.dccSyncCartButtons?.(); // reflect in-cart state on upsell cards
       } catch (e) { console.error('upsell load failed', e); }
     }
 

@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { getSettings } from '../lib/queries';
+import AnnouncementBanner from '../components/AnnouncementBanner.astro';
 interface Props { title?: string; description?: string; image?: string; noindex?: boolean; ogType?: string; price?: number; currency?: string; availability?: string; }
 const {
   title = 'DigitalChiselCo — Premium STL Files for CNC, Laser & 3D Printing',
@@ -83,7 +84,8 @@ const faviconType = settings.favicon_image_url
       </>
     )}
   </head>
-  <body>
+  <body class="overflow-x-clip">
+    <AnnouncementBanner />
     <slot />
     <!-- Organization + WebSite structured data — helps Google build Knowledge Graph
          entries for the brand and enables the sitelinks search box. -->

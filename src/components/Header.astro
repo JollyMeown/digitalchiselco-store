@@ -21,17 +21,17 @@ const categories = await getCategories();
     <!-- Hamburger: visible on mobile/tablet only -->
     <button id="dcc-menu-open" class="lg:hidden text-bronze-700 text-2xl leading-none w-9 h-9 -ml-1 rounded hover:bg-cream" aria-label="Open menu" aria-controls="dcc-drawer" aria-expanded="false">☰</button>
     <Logo />
-    <form action="/search" method="get" role="search" class="hidden md:flex flex-1 max-w-md mx-2">
+    <form action="/search" method="get" role="search" class="hidden md:flex flex-1 min-w-0 max-w-xs xl:max-w-md mx-2">
       <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files"
         class="flex-1 px-4 py-2 text-sm rounded-l-md border border-r-0 border-black/15 focus:outline-none focus:border-bronze-600" />
       <button class="bg-bronze-600 text-cream px-4 rounded-r-md text-sm" aria-label="Search">Search</button>
     </form>
-    <div class="hidden lg:flex gap-5 text-sm text-ink-700 ml-auto whitespace-nowrap">
-      {links.map((l) => <a href={l.href} class={l.href === '/free' ? 'text-bronze-600' : ''}>{l.label}</a>)}
+    <div class="hidden lg:flex gap-4 text-sm text-ink-700 lg:ml-auto whitespace-nowrap">
+      {links.map((l) => <a href={l.href} class={`hover:text-bronze-600 ${l.href === '/free' ? 'text-bronze-600' : ''}`}>{l.label}</a>)}
     </div>
-    <div class="flex gap-4 text-sm text-ink-700 ml-auto lg:ml-4 items-center whitespace-nowrap">
-      <a href="/membership" class="hidden md:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
-      <a href="/cart" aria-label="Cart">Cart <span id="cart-count" class="text-bronze-600 font-medium"></span></a>
+    <div class="flex gap-3 text-sm text-ink-700 ml-auto lg:ml-3 items-center whitespace-nowrap shrink-0">
+      <a href="/membership" class="hidden xl:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
+      <a href="/cart" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 Cart <span id="cart-count" class="text-bronze-600 font-medium"></span></a>
     </div>
   </nav>
   <form action="/search" method="get" role="search" class="md:hidden px-4 pb-3 flex">
@@ -94,6 +94,22 @@ const categories = await getCategories();
   _overlay?.addEventListener('click', closeDrawer);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
+  // Reflect cart membership on every .add-to-cart button (turns green "✓ In cart").
+  function syncCartButtons() {
+    let cart = [];
+    try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch {}
+    const ids = new Set(cart.map((x) => x.id));
+    document.querySelectorAll('.add-to-cart[data-id]').forEach((btn) => {
+      const inCart = ids.has(btn.dataset.id);
+      btn.classList.toggle('in-cart', inCart);
+      btn.textContent = inCart ? '✓ In cart' : 'Add to cart';
+    });
+  }
+  window.dccSyncCartButtons = syncCartButtons;
+  syncCartButtons();
+  window.addEventListener('cart-changed', syncCartButtons);
+  window.addEventListener('storage', syncCartButtons);
+
   // Delegated "Add to cart" for any .add-to-cart button site-wide (product cards, etc.)
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('.add-to-cart');
@@ -101,13 +117,10 @@ const categories = await getCategories();
     e.preventDefault();
     const d = btn.dataset;
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    if (!cart.find((x) => x.id === d.id)) {
-      cart.push({ id: d.id, slug: d.slug, title: d.title, price: Number(d.price), img: d.img });
-      localStorage.setItem('cart', JSON.stringify(cart));
-    }
+    if (cart.find((x) => x.id === d.id)) { window.location.href = '/cart'; return; } // already added → go to cart
+    cart.push({ id: d.id, slug: d.slug, title: d.title, price: Number(d.price), img: d.img });
+    localStorage.setItem('cart', JSON.stringify(cart));
     window.dispatchEvent(new Event('cart-changed'));
-    const original = btn.textContent;
-    btn.textContent = '✓ Added';
-    setTimeout(() => { btn.textContent = original; }, 1400);
+    syncCartButtons();
   });
 </script>
