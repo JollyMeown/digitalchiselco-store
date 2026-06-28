@@ -1,5 +1,6 @@
 ---
 import Logo from './Logo.astro';
+import { getCategories } from '../lib/queries';
 const links = [
   { href: '/', label: 'Home' },
   { href: '/collections', label: 'Collections' },
@@ -9,12 +10,15 @@ const links = [
   { href: '/blog', label: 'Blog' },
 ];
 const q = Astro.url.searchParams.get('q') ?? '';
+const categories = await getCategories();
 ---
 <div class="bg-bronze-800 text-cream text-xs text-center py-1.5">
   Instant digital download · Commercial use included · 4.9★ from 577 reviews
 </div>
 <header class="sticky top-0 bg-white z-30 border-b border-black/10">
-  <nav class="flex items-center gap-4 px-4 sm:px-6 py-3 max-w-7xl mx-auto">
+  <nav class="flex items-center gap-3 px-4 sm:px-6 py-3 max-w-7xl mx-auto">
+    <!-- Hamburger: visible on mobile/tablet only -->
+    <button id="dcc-menu-open" class="lg:hidden text-bronze-700 text-2xl leading-none w-9 h-9 -ml-1 rounded hover:bg-cream" aria-label="Open menu" aria-controls="dcc-drawer" aria-expanded="false">☰</button>
     <Logo />
     <form action="/search" method="get" role="search" class="hidden md:flex flex-1 max-w-md mx-2">
       <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files"
@@ -36,12 +40,60 @@ const q = Astro.url.searchParams.get('q') ?? '';
     <button class="bg-bronze-600 text-cream px-4 rounded-r-md text-sm">Go</button>
   </form>
 </header>
+
+<!-- Mobile drawer: nav links + category list — same content the desktop header + sidebar show -->
+<div id="dcc-drawer-overlay" class="hidden lg:hidden fixed inset-0 bg-black/40 z-40" aria-hidden="true"></div>
+<aside id="dcc-drawer" class="lg:hidden fixed top-0 left-0 h-full w-[280px] max-w-[85vw] bg-white shadow-xl z-50 -translate-x-full transition-transform duration-200 overflow-y-auto" role="dialog" aria-modal="true" aria-label="Site navigation">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-black/10">
+    <span class="font-serif text-bronze-700">Menu</span>
+    <button id="dcc-menu-close" class="text-bronze-700 text-2xl leading-none w-9 h-9 rounded hover:bg-cream" aria-label="Close menu">✕</button>
+  </div>
+  <nav class="py-2 text-sm">
+    {links.map((l) => (
+      <a href={l.href} class={`block px-4 py-2.5 hover:bg-cream ${l.href === '/free' ? 'text-bronze-600 font-medium' : 'text-ink-800'}`}>{l.label}</a>
+    ))}
+    <a href="/membership" class="block px-4 py-2.5 text-bronze-600 font-medium hover:bg-cream">Become a member</a>
+    <a href="/account" class="block px-4 py-2.5 text-ink-800 hover:bg-cream">My account</a>
+    <a href="/cart" class="block px-4 py-2.5 text-ink-800 hover:bg-cream">Cart</a>
+  </nav>
+  <div class="border-t border-black/10 px-4 py-3">
+    <h2 class="text-[11px] font-medium text-ink-700/60 uppercase tracking-wide mb-2">Categories</h2>
+    <nav class="text-sm space-y-0.5">
+      <a href="/catalog" class="block py-1.5 px-2 rounded text-bronze-700 font-medium hover:bg-cream">All designs</a>
+      {categories.map((c) => (
+        <a href={`/collections/${c.slug}`} class="block py-1.5 px-2 rounded text-ink-700 hover:bg-cream">{c.name}</a>
+      ))}
+    </nav>
+  </div>
+</aside>
 <script is:inline>
   function cartCount() { try { return JSON.parse(localStorage.getItem('cart') || '[]').length; } catch { return 0; } }
   function renderCartCount() { const el = document.getElementById('cart-count'); if (el) { const n = cartCount(); el.textContent = n > 0 ? `(${n})` : ''; } }
   renderCartCount();
   window.addEventListener('cart-changed', renderCartCount);
   window.addEventListener('storage', renderCartCount);
+
+  // ── Mobile drawer (nav + categories) ──────────────────────────────
+  const _drawer = document.getElementById('dcc-drawer');
+  const _overlay = document.getElementById('dcc-drawer-overlay');
+  const _openBtn = document.getElementById('dcc-menu-open');
+  const _closeBtn = document.getElementById('dcc-menu-close');
+  function openDrawer() {
+    _drawer?.classList.remove('-translate-x-full');
+    _overlay?.classList.remove('hidden');
+    _openBtn?.setAttribute('aria-expanded', 'true');
+    document.documentElement.style.overflow = 'hidden';
+  }
+  function closeDrawer() {
+    _drawer?.classList.add('-translate-x-full');
+    _overlay?.classList.add('hidden');
+    _openBtn?.setAttribute('aria-expanded', 'false');
+    document.documentElement.style.overflow = '';
+  }
+  _openBtn?.addEventListener('click', openDrawer);
+  _closeBtn?.addEventListener('click', closeDrawer);
+  _overlay?.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
   // Delegated "Add to cart" for any .add-to-cart button site-wide (product cards, etc.)
   document.addEventListener('click', (e) => {

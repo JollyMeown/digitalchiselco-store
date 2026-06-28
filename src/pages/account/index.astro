@@ -4,6 +4,7 @@ import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { verifyAccountToken } from '../../lib/account-token';
+import { img } from '../../lib/img';
 
 export const prerender = false;
 
@@ -211,7 +212,7 @@ if (session?.email) {
                             {/* Medium product thumbnail */}
                             <a href={it.products?.slug ? `/product/${it.products.slug}` : '#'} class="block w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden bg-cream/60 flex-shrink-0">
                               {it.image_url
-                                ? <img src={it.image_url} alt="" class="w-full h-full object-cover" loading="lazy" />
+                                ? <img src={img(it.image_url, { w: 200, q: 75 })} alt="" class="w-full h-full object-cover" loading="lazy" decoding="async" />
                                 : <div class="w-full h-full flex items-center justify-center text-bronze-600/30 text-xs">no image</div>}
                             </a>
                             <div class="flex-1 min-w-0">
