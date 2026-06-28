@@ -407,9 +407,13 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
           </div>
         </div>
         <div className="md:col-span-2">
-          <label className={labelCls}>Download link (Google Drive)</label>
+          <label className={labelCls}>Download link (Google Drive) {f.is_customizable && <span className="text-bronze-600/70 font-normal">— optional for customized products</span>}</label>
           <input value={f.download_link} onChange={(e) => set('download_link', e.target.value)} placeholder="https://drive.google.com/uc?export=download&id=…" className={inputCls} />
-          <p className="text-xs text-ink-700/50 mt-1">Customers receive this after purchase. Server-only — never shown publicly.</p>
+          <p className="text-xs text-ink-700/50 mt-1">
+            {f.is_customizable
+              ? 'This product is customizable — the file is typically created post-purchase from the customer\'s inputs. Leave this blank, or set a template/preview URL if you want.'
+              : 'Customers receive this after purchase. Server-only — never shown publicly.'}
+          </p>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.active} onChange={(e) => set('active', e.target.checked)} /> Active (visible in catalog)</label>

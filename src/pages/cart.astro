@@ -8,6 +8,8 @@ import { pricing } from '../lib/pricing';
 const { percent } = pricing(1);
 const paddleEnv = (import.meta.env.PADDLE_ENV === 'production' ? 'production' : 'sandbox');
 const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
 ---
 <Base title="Cart | DigitalChiselCo">
   <Header />
@@ -69,22 +71,33 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
   <Footer />
   <!-- Paddle.js — overlay checkout -->
   <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
-  <script is:inline define:vars={{ DISCOUNT: percent, PADDLE_TOKEN: paddleToken, PADDLE_ENV: paddleEnv }}>
+  <script is:inline define:vars={{ DISCOUNT: percent, PADDLE_TOKEN: paddleToken, PADDLE_ENV: paddleEnv, SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: supabaseAnonKey }}>
     const fmt = (n) => '$' + Number(n).toFixed(2);
     const itemsEl = document.getElementById('items');
     const escAttr = (s) => String(s ?? '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+    // Customization fields keyed by product_id, fetched once per render
+    let customFieldsByProduct = {};
 
     function renderCart() {
       const c = JSON.parse(localStorage.getItem('cart') || '[]');
       document.getElementById('empty').classList.toggle('hidden', c.length > 0);
       document.getElementById('summary').classList.toggle('hidden', c.length === 0);
-      itemsEl.innerHTML = c.map((x) => `
-        <div class="flex items-center gap-4 py-4">
-          <div class="w-16 h-16 bg-cream rounded overflow-hidden flex-shrink-0">${x.img ? `<img src="${escAttr(x.img)}" class="w-full h-full object-cover">` : ''}</div>
-          <a href="/product/${escAttr(x.slug)}" class="flex-1 text-sm">${escAttr(x.title)}</a>
-          <span class="text-sm">${fmt(x.price)}</span>
-          <button data-id="${escAttr(x.id)}" class="rm text-ink-700/50 hover:text-red-600">✕</button>
-        </div>`).join('');
+      itemsEl.innerHTML = c.map((x, idx) => {
+        const fields = customFieldsByProduct[x.id] || [];
+        const fieldsHtml = fields.length ? renderCustomFieldsBlock(x, fields, idx) : '';
+        return `
+        <div class="py-4">
+          <div class="flex items-center gap-4">
+            <div class="w-16 h-16 bg-cream rounded overflow-hidden flex-shrink-0">${x.img ? `<img src="${escAttr(x.img)}" class="w-full h-full object-cover">` : ''}</div>
+            <a href="/product/${escAttr(x.slug)}" class="flex-1 text-sm">${escAttr(x.title)}</a>
+            <span class="text-sm">${fmt(x.price)}</span>
+            <button data-id="${escAttr(x.id)}" class="rm text-ink-700/50 hover:text-red-600">✕</button>
+          </div>
+          ${fieldsHtml}
+        </div>`;
+      }).join('');
+      wireCustomFieldInputs();
       const subtotalRaw = c.reduce((s, x) => s + Number(x.price), 0);
       // The store-wide discount is baked in: shown price IS the discounted price.
       // So the "original" total = price / (1 - d/100); savings = original − total.
@@ -240,9 +253,67 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
       }
     }
 
-    renderCart();
+    // ── Customization fields fetcher ─────────────────────────────────
+    // Public-read RLS allows direct Supabase REST query for the field definitions.
+    async function loadCustomFields() {
+      const c = JSON.parse(localStorage.getItem('cart') || '[]');
+      const ids = [...new Set(c.map((x) => x.id).filter((id) => id && !String(id).startsWith('membership:')))];
+      if (!ids.length) { customFieldsByProduct = {}; return; }
+      try {
+        const url = SUPABASE_URL + '/rest/v1/product_custom_fields?select=*&product_id=in.(' + ids.join(',') + ')&order=sort_order';
+        const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY } });
+        if (!res.ok) { customFieldsByProduct = {}; return; }
+        const data = await res.json();
+        const grouped = {};
+        for (const f of data) { (grouped[f.product_id] = grouped[f.product_id] || []).push(f); }
+        customFieldsByProduct = grouped;
+      } catch (e) { console.error('loadCustomFields failed', e); customFieldsByProduct = {}; }
+    }
+
+    function renderCustomFieldsBlock(cartItem, fields, idx) {
+      const stored = cartItem.customizations || {};
+      const inputs = fields.map((f) => {
+        const v = stored[f.field_key] ?? '';
+        const ml = f.max_length ? ' maxlength="' + f.max_length + '"' : '';
+        const req = f.required ? ' required' : '';
+        const ph = f.placeholder ? ' placeholder="' + escAttr(f.placeholder) + '"' : '';
+        const help = f.help_text ? '<p class="text-[11px] text-ink-700/50 mt-0.5">' + escAttr(f.help_text) + '</p>' : '';
+        const req_mark = f.required ? '<span class="text-red-600">*</span>' : '';
+        const cls = 'cf-input w-full px-2.5 py-1.5 text-sm border border-black/15 rounded focus:outline-none focus:border-bronze-600';
+        let input;
+        if (f.field_type === 'textarea') {
+          input = '<textarea data-cart-idx="' + idx + '" data-key="' + escAttr(f.field_key) + '" rows="2" class="' + cls + '"' + ph + req + ml + '>' + escAttr(v) + '</textarea>';
+        } else {
+          const type = f.field_type === 'file_url' ? 'url' : f.field_type === 'phone' ? 'tel' : f.field_type;
+          input = '<input data-cart-idx="' + idx + '" data-key="' + escAttr(f.field_key) + '" type="' + type + '" class="' + cls + '" value="' + escAttr(v) + '"' + ph + req + ml + '/>';
+        }
+        return '<label class="block"><span class="text-[11px] text-ink-700/70 block mb-0.5">' + escAttr(f.label) + ' ' + req_mark + '</span>' + input + help + '</label>';
+      }).join('');
+      return '<div class="mt-3 ml-20 p-3 rounded-md bg-bronze-50/40 border border-bronze-600/20 space-y-2"><div class="text-[11px] tracking-wider uppercase text-bronze-700/80 font-medium mb-1">✎ Personalize this item</div>' + inputs + '</div>';
+    }
+
+    function wireCustomFieldInputs() {
+      document.querySelectorAll('[data-cart-idx]').forEach((el) => {
+        el.addEventListener('input', () => {
+          const idx = Number(el.dataset.cartIdx);
+          const key = el.dataset.key;
+          const c = JSON.parse(localStorage.getItem('cart') || '[]');
+          if (!c[idx]) return;
+          c[idx].customizations = c[idx].customizations || {};
+          c[idx].customizations[key] = el.value;
+          localStorage.setItem('cart', JSON.stringify(c));
+        });
+      });
+    }
+
+    async function refreshAll() {
+      await loadCustomFields();
+      renderCart();
+    }
+
+    refreshAll();
     loadUpsell();
-    window.addEventListener('cart-changed', () => { renderCart(); loadUpsell(); });
+    window.addEventListener('cart-changed', () => { refreshAll(); loadUpsell(); });
 
     // ── Buyer email persistence ───────────────────────────────────────
     // Remember the last email between visits so the field is pre-filled.
@@ -344,13 +415,44 @@ const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
       }
       try { localStorage.setItem('buyer_email', buyerEmail); } catch {}
 
+      // Validate any required customization fields on customizable items.
+      // Walks the rendered inputs (which the user has been editing) and uses
+      // native form validity so empty required fields, bad emails, bad URLs etc.
+      // all surface with the browser's own error UI.
+      const cfInputs = Array.from(document.querySelectorAll('[data-cart-idx]'));
+      for (const el of cfInputs) {
+        if (!el.checkValidity()) {
+          el.reportValidity();
+          el.focus();
+          return;
+        }
+      }
+      // Stamp final customizations into cart from inputs (in case any input event hadn't fired)
+      cfInputs.forEach((el) => {
+        const idx = Number(el.dataset.cartIdx);
+        const key = el.dataset.key;
+        if (!cart[idx]) return;
+        cart[idx].customizations = cart[idx].customizations || {};
+        cart[idx].customizations[key] = el.value;
+      });
+      localStorage.setItem('cart', JSON.stringify(cart));
+
+      // Build a customization payload keyed by cart-line index, preserving
+      // label/type so the order display survives admin field edits later.
+      const customizationsPayload = cart.map((it) => {
+        const fields = customFieldsByProduct[it.id] || [];
+        if (!fields.length) return null;
+        const vals = it.customizations || {};
+        return fields.map((f) => ({ key: f.field_key, label: f.label, type: f.field_type, value: vals[f.field_key] || '' }));
+      });
+
       btn.disabled = true; btn.textContent = 'Starting checkout…';
       try {
         const promo = JSON.parse(localStorage.getItem('promo') || 'null');
         const res = await fetch('/api/checkout-init', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ items: cart, email: buyerEmail, discount_percent: DISCOUNT, coupon_code: promo?.code || null }),
+          body: JSON.stringify({ items: cart, email: buyerEmail, discount_percent: DISCOUNT, coupon_code: promo?.code || null, customizations: customizationsPayload }),
         });
         const data = await res.json();
         if (!res.ok || !data.transaction_id) throw new Error(data.error || 'Could not start checkout.');

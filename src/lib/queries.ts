@@ -183,6 +183,16 @@ export async function getLatestProducts(limit = 8): Promise<ProductCard[]> {
   } catch (e) { console.error('getLatestProducts failed:', e); return []; }
 }
 
+export async function getCustomizableProducts(limit = 12): Promise<ProductCard[]> {
+  try {
+    const { data, error } = await supabase
+      .from('products').select(CARD).eq('active', true).eq('is_customizable', true)
+      .not('image_url', 'is', null).order('title').limit(limit);
+    if (error) throw error;
+    return (data ?? []) as ProductCard[];
+  } catch (e) { console.error('getCustomizableProducts failed:', e); return []; }
+}
+
 export type Review = { id: string; name: string; text: string; rating: number; source: string | null; sort_order: number };
 export async function getReviews(limit = 12): Promise<Review[]> {
   try {

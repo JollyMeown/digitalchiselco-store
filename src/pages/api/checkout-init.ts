@@ -31,6 +31,9 @@ export const POST: APIRoute = async ({ request }) => {
     const email: string | undefined = body.email ? String(body.email).toLowerCase().trim() : undefined;
     let discountPercent: number = Number(body.discount_percent) || 0;
     const couponCode: string | undefined = body.coupon_code ? String(body.coupon_code).trim().toUpperCase() : undefined;
+    // Per-line customization snapshots aligned with cart order:
+    // customizations[i] = null OR [{key,label,type,value}, ...]
+    const customizations: any[] = Array.isArray(body.customizations) ? body.customizations : [];
 
     if (!cart.length) return json({ error: 'Cart is empty.' }, 400);
 
@@ -131,6 +134,10 @@ export const POST: APIRoute = async ({ request }) => {
           source: 'digitalchiselco-cart',
           cart_ids: cart.map((c) => c.id),
           ...(couponMeta ? { coupon_id: couponMeta.id, coupon_code: couponMeta.code, coupon_discount: couponMeta.amount } : {}),
+          // Pass per-line customization snapshots so the webhook can persist
+          // them into order_item_customizations once the order is created.
+          // Indices align with cart_ids; null means "no fields configured".
+          ...(customizations.some((c) => Array.isArray(c) && c.length) ? { customizations } : {}),
         },
       },
     });

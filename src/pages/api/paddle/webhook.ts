@@ -161,6 +161,10 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // item came through as ad-hoc (no paddle_price_id) and so title-matching is
   // the only handle we have.
   const cartIds: string[] = Array.isArray(txn.custom_data?.cart_ids) ? txn.custom_data.cart_ids : [];
+  // Per-line customization snapshots (aligned by index with cart_ids). The cart
+  // page sends these via /api/checkout-init; each entry is either null or
+  // [{ key, label, type, value }, ...].
+  const cartCustomizations: any[] = Array.isArray(txn.custom_data?.customizations) ? txn.custom_data.customizations : [];
   // Track membership plans in this order so we can ping ops afterwards.
   const purchasedMemberships: { name: string; slug: string; price_usd: number; qty: number }[] = [];
   for (let i = 0; i < items.length; i++) {
@@ -227,19 +231,37 @@ async function handleTransactionCompleted(db: any, txn: any) {
       if (p) { productId = p.id; }
     }
 
-    await db.from('order_items').insert({
+    const { data: insertedItem } = await db.from('order_items').insert({
       order_id: order.id,
       product_id: productId,
       title,
       price_usd: lineUnit || lineTotal,
       qty,
-    });
+    }).select('id').single();
 
     if (productId) {
       await db.from('entitlements').insert({
         order_id: order.id,
         email: email || 'unknown@digitalchiselco.com',
         product_id: productId,
+      });
+    }
+
+    // Persist captured customization values for this line, if any.
+    const lineCustom = cartCustomizations[i];
+    if (insertedItem && Array.isArray(lineCustom) && lineCustom.some((f) => f && String(f.value || '').trim())) {
+      const cleaned = lineCustom
+        .filter((f) => f && typeof f === 'object')
+        .map((f) => ({
+          key: String(f.key || '').slice(0, 60),
+          label: String(f.label || '').slice(0, 200),
+          type: String(f.type || 'text').slice(0, 20),
+          value: String(f.value || '').slice(0, 2000),
+        }));
+      await db.from('order_item_customizations').insert({
+        order_item_id: insertedItem.id,
+        product_id: productId,
+        fields: cleaned,
       });
     }
   }

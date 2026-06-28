@@ -16,7 +16,7 @@ export default function Orders() {
   useEffect(() => { load(); }, [status, dateFrom, dateTo, showDeleted]);
   async function load() {
     setLoading(true);
-    let q = supabase.from('orders').select('id,email,total,status,currency,provider,provider_order_id,created_at,deleted_at,admin_note,order_items(id,title,price_usd,qty)').order('created_at', { ascending: false }).limit(500);
+    let q = supabase.from('orders').select('id,email,total,status,currency,provider,provider_order_id,created_at,deleted_at,admin_note,order_items(id,title,price_usd,qty,order_item_customizations(fields))').order('created_at', { ascending: false }).limit(500);
     if (status !== 'all') q = q.eq('status', status);
     if (dateFrom) q = q.gte('created_at', new Date(dateFrom).toISOString());
     if (dateTo) {
@@ -161,9 +161,33 @@ export default function Orders() {
                   <tr><th className="p-2">Item</th><th className="p-2 text-right w-16">Qty</th><th className="p-2 text-right w-24">Price</th></tr>
                 </thead>
                 <tbody>
-                  {(open.order_items || []).map((it: any) => (
-                    <tr key={it.id} className="border-t border-black/5"><td className="p-2">{it.title}</td><td className="p-2 text-right">{it.qty}</td><td className="p-2 text-right">${Number(it.price_usd).toFixed(2)}</td></tr>
-                  ))}
+                  {(open.order_items || []).map((it: any) => {
+                    const custom = (it.order_item_customizations || []).flatMap((c: any) => Array.isArray(c.fields) ? c.fields : []);
+                    return (
+                      <>
+                        <tr key={it.id} className="border-t border-black/5"><td className="p-2">{it.title}{custom.length > 0 && <span className="ml-2 inline-block bg-bronze-100 text-bronze-700 text-[10px] font-medium px-1.5 py-0.5 rounded">✎ customized</span>}</td><td className="p-2 text-right">{it.qty}</td><td className="p-2 text-right">${Number(it.price_usd).toFixed(2)}</td></tr>
+                        {custom.length > 0 && (
+                          <tr><td colSpan={3} className="p-0">
+                            <div className="bg-bronze-50/50 border-t border-bronze-600/20 px-3 py-2 text-xs">
+                              <div className="font-medium text-bronze-700 mb-1 text-[11px] tracking-wider uppercase">✎ Customer's customization</div>
+                              <dl className="space-y-1">
+                                {custom.map((f: any, i: number) => (
+                                  <div key={i} className="grid grid-cols-[140px_1fr] gap-2">
+                                    <dt className="text-ink-700/60">{f.label || f.key}</dt>
+                                    <dd className="text-ink-800 break-words">
+                                      {f.type === 'file_url' && f.value
+                                        ? <a href={f.value} target="_blank" className="text-bronze-600 underline break-all">{f.value}</a>
+                                        : <span className="whitespace-pre-wrap">{f.value || <em className="text-ink-700/40">(empty)</em>}</span>}
+                                    </dd>
+                                  </div>
+                                ))}
+                              </dl>
+                            </div>
+                          </td></tr>
+                        )}
+                      </>
+                    );
+                  })}
                   <tr className="border-t border-black/10 font-medium"><td className="p-2" colSpan={2}>Total</td><td className="p-2 text-right">${Number(open.total).toFixed(2)}</td></tr>
                 </tbody>
               </table>
