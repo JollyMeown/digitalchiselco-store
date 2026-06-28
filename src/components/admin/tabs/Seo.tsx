@@ -30,8 +30,41 @@ export default function Seo() {
   const [loading, setLoading] = useState(true);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [open, setOpen] = useState<Row | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkMsg, setBulkMsg] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
 
-  useEffect(() => { load(); loadCounts(); }, [status]);
+  useEffect(() => { load(); loadCounts(); setSelected(new Set()); }, [status]);
+
+  function toggle(id: string) {
+    setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function toggleAllOnPage() {
+    setSelected((s) => {
+      const allSel = rows.length > 0 && rows.every((r) => s.has(r.id));
+      return allSel ? new Set() : new Set(rows.map((r) => r.id));
+    });
+  }
+
+  async function approveSelected() {
+    if (selected.size === 0) return;
+    if (!confirm(`Approve and publish ${selected.size} product${selected.size === 1 ? '' : 's'}? Their titles, descriptions, and SEO meta go live.`)) return;
+    setBulkBusy(true); setBulkMsg('Publishing…');
+    const { data, error } = await supabase.rpc('approve_seo', { p_ids: Array.from(selected) });
+    setBulkBusy(false);
+    if (error) { setBulkMsg('Error: ' + error.message); return; }
+    setBulkMsg(`✓ Published ${data}`); setSelected(new Set()); load(); loadCounts();
+  }
+
+  async function approveAll() {
+    const n = counts['generated'] ?? rows.length;
+    if (!confirm(`Approve and publish ALL ${n} products awaiting review? This goes live for every one of them. The original titles are backed up so you can revert.`)) return;
+    setBulkBusy(true); setBulkMsg('Publishing all…');
+    const { data, error } = await supabase.rpc('approve_seo', { p_ids: null });
+    setBulkBusy(false);
+    if (error) { setBulkMsg('Error: ' + error.message); return; }
+    setBulkMsg(`✓ Published ${data}`); setSelected(new Set()); load(); loadCounts();
+  }
 
   async function load() {
     setLoading(true);
@@ -75,13 +108,35 @@ export default function Seo() {
         ))}
       </div>
 
+      {status === 'generated' && rows.length > 0 && (
+        <div className="sticky top-0 z-10 bg-cream/95 backdrop-blur border border-bronze-600/20 rounded-md px-3 py-2 flex flex-wrap items-center gap-2 text-sm">
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" checked={rows.length > 0 && rows.every((r) => selected.has(r.id))} onChange={toggleAllOnPage} />
+            Select all ({rows.length})
+          </label>
+          <span className="text-ink-700/60">·</span>
+          <span className="text-ink-700/70">{selected.size} selected</span>
+          <button className={btnPrimary} disabled={bulkBusy || selected.size === 0} onClick={approveSelected}>✓ Approve selected ({selected.size})</button>
+          <button className={btnGhost} disabled={bulkBusy} onClick={approveAll}>✓ Approve ALL {counts['generated'] ?? ''}</button>
+          {selected.size > 0 && <button className={btnGhost} disabled={bulkBusy} onClick={() => setSelected(new Set())}>Clear</button>}
+          <span className={'ml-auto text-xs ' + (bulkMsg.startsWith('✓') ? 'text-green-700' : bulkMsg.startsWith('Error') ? 'text-red-600' : 'text-ink-700/60')}>{bulkMsg}</span>
+        </div>
+      )}
+
       {loading ? <div className="text-sm text-ink-700/60">Loading…</div> : rows.length === 0 ? (
         <Card><div className="text-center py-8 text-ink-700/60 text-sm">Nothing here. {status === 'generated' && 'Run npm run seo:generate to stage some copy.'}</div></Card>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {rows.map((r) => (
-            <div key={r.id} className="bg-white border border-black/10 rounded-lg overflow-hidden">
-              <div className="h-28 bg-cream">{r.image_url && <img src={r.image_url} className="w-full h-full object-cover" />}</div>
+            <div key={r.id} className={`bg-white border rounded-lg overflow-hidden ${selected.has(r.id) ? 'border-bronze-600 ring-1 ring-bronze-600' : 'border-black/10'}`}>
+              <div className="h-28 bg-cream relative">
+                {r.image_url && <img src={r.image_url} className="w-full h-full object-cover" />}
+                {status === 'generated' && (
+                  <label className="absolute top-2 left-2 bg-white/90 rounded px-1.5 py-1 flex items-center cursor-pointer shadow-sm">
+                    <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
+                  </label>
+                )}
+              </div>
               <div className="p-3">
                 <div className="font-medium text-sm text-ink-800 line-clamp-2 min-h-[2.5em]">{r.proposed_title || r.title}</div>
                 <div className="text-xs text-ink-700/50 mt-1 font-mono truncate">{r.slug}</div>
