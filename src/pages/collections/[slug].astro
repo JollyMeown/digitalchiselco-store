@@ -2,7 +2,7 @@
 import Shell from '../../layouts/Shell.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
-import { getCategoryBySlug, getProductsByCategory } from '../../lib/queries';
+import { getCategoryBySlug, getProductsByCategory, getSettings } from '../../lib/queries';
 
 const { slug } = Astro.params;
 const category = await getCategoryBySlug(slug!);
@@ -13,6 +13,7 @@ const { products, total, perPage } = await getProductsByCategory(category.id, pa
 const pages = Math.ceil(total / perPage);
 const meta = (category.description || '').slice(0, 155) || `Browse ${total} ${category.name} bas-relief STL files for CNC, 3D printing and laser engraving.`;
 const isPremium = category.slug === 'premium-bundle-offer';
+const settings = await getSettings();
 ---
 <Shell title={`${category.name} STL Files | DigitalChiselCo`} description={meta} scrollPastBanner={true}>
   <Breadcrumbs crumbs={[{ label: 'Collections', href: '/collections' }, { label: category.name }]} />
@@ -46,7 +47,7 @@ const isPremium = category.slug === 'premium-bundle-offer';
     </>
   )}
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-    {products.map((p) => <ProductCard product={p} />)}
+    {products.map((p) => <ProductCard product={p} discount={settings.discount_percent} />)}
   </div>
   {pages > 1 && (
     <nav class="flex justify-center gap-2 mt-10 text-sm">

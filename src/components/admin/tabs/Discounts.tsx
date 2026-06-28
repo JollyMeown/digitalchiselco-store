@@ -29,6 +29,7 @@ export default function Discounts() {
 
   return (
     <div className="space-y-4">
+      <SiteDiscount />
       <div className="flex gap-1 border-b border-black/10 -mt-1">
         {([['announcement', '📢 Announcement strip'], ['sales', '🏷️ Sales'], ['codes', '🎟️ Promo codes']] as const).map(([k, label]) => (
           <button key={k} onClick={() => setView(k)}
@@ -41,6 +42,37 @@ export default function Discounts() {
       {view === 'sales' && <Sales />}
       {view === 'codes' && <Codes />}
     </div>
+  );
+}
+
+// ─── Site-wide discount (moved here from Settings) ───────────────────────────
+function SiteDiscount() {
+  const [pct, setPct] = useState<number | null>(null);
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    supabase.from('site_settings').select('discount_percent').eq('id', 1).maybeSingle()
+      .then(({ data }) => setPct(Number(data?.discount_percent ?? 20)));
+  }, []);
+  async function save() {
+    setMsg('Saving…');
+    const v = Math.max(0, Math.min(90, Number(pct) || 0));
+    setPct(v);
+    const { error } = await supabase.from('site_settings').update({ discount_percent: v }).eq('id', 1);
+    setMsg(error ? 'Error: ' + error.message : '✓ Saved — applied across the whole storefront.');
+  }
+  if (pct === null) return null;
+  return (
+    <Card title="Site-wide discount">
+      <p className="text-xs text-ink-700/60 mb-3">The global % off shown on every product, the catalog/collections, and the cart. Strike-through price = price ÷ (1 − discount%). Set to <strong>0</strong> to hide discounts everywhere.</p>
+      <div className="flex items-end gap-3 flex-wrap">
+        <div>
+          <label className={labelCls}>Discount %</label>
+          <input type="number" min={0} max={90} value={pct} onChange={(e) => setPct(Number(e.target.value))} className={inputCls + ' w-32'} />
+        </div>
+        <button className={btnPrimary} onClick={save}>Save discount</button>
+        {msg && <span className="text-xs text-ink-700/70 pb-2">{msg}</span>}
+      </div>
+    </Card>
   );
 }
 

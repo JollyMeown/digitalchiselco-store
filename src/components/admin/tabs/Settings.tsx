@@ -14,7 +14,6 @@ const MARQUEE_SECTIONS: [string, string][] = [
 
 const fields: [string, string, string?][] = [
   ['donation_total', 'Donation total ($)', 'Shown on homepage + footer charity counter'],
-  ['discount_percent', 'Site-wide discount %', 'Strike-through price = price ÷ (1 − discount%)'],
   ['rating', 'Star rating'],
   ['reviews_count', 'Number of reviews'],
   ['sales_count', 'Number of sales'],
@@ -36,6 +35,7 @@ export default function Settings() {
     setMsg('Saving…');
     const payload = { ...s };
     delete payload.updated_at;
+    delete payload.discount_percent; // managed in the Discounts tab now
     const { error } = await supabase.from('site_settings').update(payload).eq('id', 1);
     setMsg(error ? 'Error: ' + error.message : '✓ Saved — live on the site.');
   }
@@ -66,7 +66,7 @@ export default function Settings() {
   return (
     <div className="space-y-5">
       <Card title="Site settings & stats">
-        <p className="text-xs text-ink-700/60 mb-4">These drive the homepage stats, the charity counter, and the global discount % shown across the storefront.</p>
+        <p className="text-xs text-ink-700/60 mb-4">These drive the homepage stats and the charity counter. (The site-wide discount % now lives in the <strong>Discounts</strong> tab.)</p>
         <div className="grid md:grid-cols-3 gap-3">
           {fields.map(([k, label, hint]) => (
             <label key={k} className="block">

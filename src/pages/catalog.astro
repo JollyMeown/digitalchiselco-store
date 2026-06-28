@@ -2,10 +2,11 @@
 import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import ProductCard from '../components/ProductCard.astro';
-import { getProducts } from '../lib/queries';
+import { getProducts, getSettings } from '../lib/queries';
 
 const page = Math.max(1, Number(Astro.url.searchParams.get('page') || '1'));
 const { products, total, perPage } = await getProducts(page);
+const settings = await getSettings();
 const pages = Math.ceil(total / perPage);
 const around = Array.from({ length: pages }, (_, i) => i + 1)
   .filter((p) => p === 1 || p === pages || Math.abs(p - page) <= 2);
@@ -16,7 +17,7 @@ const around = Array.from({ length: pages }, (_, i) => i + 1)
   <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} premium bas-relief STL files · ready for CNC, 3D print &amp; laser.</p>
 
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-    {products.map((p) => <ProductCard product={p} />)}
+    {products.map((p) => <ProductCard product={p} discount={settings.discount_percent} />)}
   </div>
 
   {pages > 1 && (

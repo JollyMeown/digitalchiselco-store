@@ -6,8 +6,8 @@ import Footer from '../components/Footer.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { pricing } from '../lib/pricing';
 import { getSettings } from '../lib/queries';
-const { percent } = pricing(1);
 const settings = await getSettings();
+const { percent } = pricing(1, settings.discount_percent);
 const showCartPromos = (settings as any).cart_promos_active !== false;
 const promoTiers = [
   { items: 6, percent: 15, code: '2026OFF15' },
