@@ -16,6 +16,7 @@ import Creations from './tabs/Creations';
 import Customized from './tabs/Customized';
 import Seo from './tabs/Seo';
 import Discounts from './tabs/Discounts';
+import Cults from './tabs/Cults';
 import OrderSoundListener from './OrderSoundListener';
 import { inputCls, btnPrimary } from './ui';
 
@@ -29,6 +30,7 @@ const TABS: Tab[] = [
   { key: 'customized',  label: 'Customized',   icon: '✎', Component: Customized },
   { key: 'categories',  label: 'Categories',   icon: '☷', Component: Categories },
   { key: 'orders',      label: 'Orders',       icon: '⊞', Component: Orders },
+  { key: 'cults',       label: 'Cults3D Sales', icon: '◈', Component: Cults },
   { key: 'discounts',   label: 'Discounts',    icon: '%', Component: Discounts },
   { key: 'creations',   label: 'Carved by you', icon: '✦', Component: Creations },
   { key: 'membership',  label: 'Membership',   icon: '◆', Component: Membership },
