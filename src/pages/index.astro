@@ -40,12 +40,20 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
   <div class="bg-cream/40 border-y border-black/5">
     <div class="dcc-trust max-w-7xl mx-auto md:px-6 md:py-3 md:grid md:grid-cols-5 md:gap-3 text-center text-xs text-ink-700
                 flex md:block overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-normal">
-      {s.trust_badges.map((b) => (
-        <div class="flex items-center justify-center gap-1.5 md:gap-2 py-2 md:py-1 px-3 md:px-0 flex-shrink-0">
-          <span class="text-base md:text-lg leading-none text-bronze-600">{b.icon}</span>
-          <span class="font-medium">{b.label}</span>
-        </div>
-      ))}
+      {s.trust_badges.map((b: any) => {
+        const cls = 'flex items-center justify-center gap-1.5 md:gap-2 py-2 md:py-1 px-3 md:px-0 flex-shrink-0';
+        return b.href ? (
+          <a href={b.href} class={cls + ' hover:text-bronze-700 transition'}>
+            <span class="text-base md:text-lg leading-none text-bronze-600">{b.icon}</span>
+            <span class="font-medium underline-offset-2 hover:underline">{b.label}</span>
+          </a>
+        ) : (
+          <div class={cls}>
+            <span class="text-base md:text-lg leading-none text-bronze-600">{b.icon}</span>
+            <span class="font-medium">{b.label}</span>
+          </div>
+        );
+      })}
     </div>
   </div>
   <style>

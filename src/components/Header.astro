@@ -8,6 +8,7 @@ const links = [
   { href: '/free', label: 'Free files' },
   { href: '/about', label: 'Our story' },
   { href: '/blog', label: 'Blog' },
+  { href: '/account', label: 'User Portal' },
 ];
 const q = Astro.url.searchParams.get('q') ?? '';
 const categories = await getCategories();
@@ -30,7 +31,6 @@ const categories = await getCategories();
     </div>
     <div class="flex gap-4 text-sm text-ink-700 ml-auto lg:ml-4 items-center whitespace-nowrap">
       <a href="/membership" class="hidden md:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
-      <a href="/account" class="hidden lg:inline-block" aria-label="Account">Account</a>
       <a href="/cart" aria-label="Cart">Cart <span id="cart-count" class="text-bronze-600 font-medium"></span></a>
     </div>
   </nav>
@@ -53,7 +53,6 @@ const categories = await getCategories();
       <a href={l.href} class={`block px-4 py-2.5 hover:bg-cream ${l.href === '/free' ? 'text-bronze-600 font-medium' : 'text-ink-800'}`}>{l.label}</a>
     ))}
     <a href="/membership" class="block px-4 py-2.5 text-bronze-600 font-medium hover:bg-cream">Become a member</a>
-    <a href="/account" class="block px-4 py-2.5 text-ink-800 hover:bg-cream">My account</a>
     <a href="/cart" class="block px-4 py-2.5 text-ink-800 hover:bg-cream">Cart</a>
   </nav>
   <div class="border-t border-black/10 px-4 py-3">

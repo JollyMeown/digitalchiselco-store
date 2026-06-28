@@ -7,6 +7,7 @@ type Cat = { id: string; name: string; slug: string };
 type Row = {
   id: string; title: string; slug: string; price_usd: number; image_url: string | null;
   link_status: string; active: boolean; is_bundle: boolean; description?: string;
+  is_bestseller?: boolean; is_latest_pick?: boolean;
   gallery?: string[]; product_categories?: { categories: Cat | null }[];
   product_downloads?: { id: string; verified_at: string | null; audit_status: string | null }[];
 };
@@ -46,7 +47,7 @@ export default function Products() {
   async function load() {
     const myReq = ++reqIdRef.current;
     setLoading(true);
-    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,product_downloads(id,verified_at,audit_status)';
+    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,is_latest_pick,product_downloads(id,verified_at,audit_status)';
     function buildQb() {
       let qb = catFilter
         ? supabase.from('products')
@@ -83,6 +84,17 @@ export default function Products() {
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) return alert('Delete failed: ' + error.message);
     setRows((r) => r.filter((x) => x.id !== id));
+  }
+
+  // Inline flag toggles for the Best seller / Latest pick homepage rows.
+  // Optimistic: flip local state immediately, revert if the write fails.
+  async function toggleFlag(id: string, field: 'is_bestseller' | 'is_latest_pick', value: boolean) {
+    setRows((r) => r.map((x) => (x.id === id ? { ...x, [field]: value } : x)));
+    const { error } = await supabase.from('products').update({ [field]: value }).eq('id', id);
+    if (error) {
+      alert('Update failed: ' + error.message);
+      setRows((r) => r.map((x) => (x.id === id ? { ...x, [field]: !value } : x)));
+    }
   }
 
   const visibleRows = useMemo(() => {
@@ -144,6 +156,8 @@ export default function Products() {
               <tr>
                 <th className="p-2 w-10"></th><th className="p-2 w-14"></th><th className="p-2">Title</th>
                 <th className="p-2">Categories</th><th className="p-2 w-20">Price</th>
+                <th className="p-2 w-16 text-center" title="Shows in the homepage Best Sellers row">★ Best</th>
+                <th className="p-2 w-16 text-center" title="Shows in the homepage Latest 3D Designs grid">✨ Latest</th>
                 <th className="p-2 w-20">Active</th><th className="p-2 w-32 text-right">Actions</th>
               </tr>
             </thead>
@@ -166,6 +180,14 @@ export default function Products() {
                   </td>
                   <td className="p-2 text-xs text-ink-700/70">{(r.product_categories ?? []).map((pc) => pc.categories?.name).filter(Boolean).join(', ') || '—'}</td>
                   <td className="p-2">${Number(r.price_usd).toFixed(2)}</td>
+                  <td className="p-2 text-center">
+                    <input type="checkbox" className="accent-yellow-500 cursor-pointer" checked={!!r.is_bestseller}
+                      onChange={(e) => toggleFlag(r.id, 'is_bestseller', e.target.checked)} title="Best seller" />
+                  </td>
+                  <td className="p-2 text-center">
+                    <input type="checkbox" className="accent-bronze-600 cursor-pointer" checked={!!r.is_latest_pick}
+                      onChange={(e) => toggleFlag(r.id, 'is_latest_pick', e.target.checked)} title="Latest 3D design" />
+                  </td>
                   <td className="p-2">{r.active ? '✓' : '—'}</td>
                   <td className="p-2 text-right space-x-1">
                     <button className={btnGhost} onClick={() => setEditing(r)}>Edit</button>

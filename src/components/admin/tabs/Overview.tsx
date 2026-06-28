@@ -144,6 +144,14 @@ export default function Overview() {
   if (loading) return <div className="text-sm text-ink-700/60">Loading…</div>;
 
   const maxBucket = Math.max(1, ...stats.buckets.map((b) => b.total));
+  const maxOrders = Math.max(1, ...stats.buckets.map((b) => b.orders));
+  // Cumulative revenue across the range (for the running-total line chart)
+  let run = 0;
+  const cum = stats.buckets.map((b) => (run += b.total));
+  const maxCum = Math.max(1, run);
+  const n = stats.buckets.length;
+  const cumPts = cum.map((v, i) => `${(i / Math.max(1, n - 1)) * 100},${100 - (v / maxCum) * 100}`).join(' ');
+  const cumArea = `0,100 ${cumPts} 100,100`;
 
   return (
     <div className="space-y-5">
@@ -205,6 +213,39 @@ export default function Overview() {
           </>
         )}
       </Card>
+
+      {/* Orders per day + cumulative revenue */}
+      <div className="grid lg:grid-cols-2 gap-5">
+        <Card title={`Orders per day · ${stats.ordersInRange} in range`}>
+          {stats.ordersInRange === 0 ? (
+            <p className="text-sm text-ink-700/60">No orders in this range.</p>
+          ) : (
+            <>
+              <div className="flex items-end gap-0.5 h-36 mb-2">
+                {stats.buckets.map((b) => (
+                  <div key={b.day} className="flex-1 flex items-end" title={`${b.day}: ${b.orders} order${b.orders === 1 ? '' : 's'}`}>
+                    <div className="w-full bg-bronze-400 rounded-t hover:bg-bronze-600 transition" style={{ height: `${(b.orders / maxOrders) * 100}%`, minHeight: b.orders > 0 ? 2 : 0 }} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-[10px] text-ink-700/50"><span>{stats.buckets[0]?.day}</span><span>peak {maxOrders}/day</span><span>{stats.buckets[n - 1]?.day}</span></div>
+            </>
+          )}
+        </Card>
+        <Card title="Cumulative revenue · in range">
+          {stats.revenueRange === 0 ? (
+            <p className="text-sm text-ink-700/60">No revenue in this range.</p>
+          ) : (
+            <>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-36">
+                <polygon points={cumArea} fill="rgba(133,79,11,0.12)" />
+                <polyline points={cumPts} fill="none" stroke="#854F0B" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+              </svg>
+              <div className="flex justify-between text-[10px] text-ink-700/50"><span>{stats.buckets[0]?.day}</span><span>total {fmt0(maxCum)}</span><span>{stats.buckets[n - 1]?.day}</span></div>
+            </>
+          )}
+        </Card>
+      </div>
 
       <div className="grid lg:grid-cols-2 gap-5">
         <Card title="Top selling items · in range">
