@@ -1,21 +1,16 @@
 ---
 import type { ProductCard } from '../lib/queries';
 import { pricing, money, DEFAULT_DISCOUNT } from '../lib/pricing';
-import { imgSrcSet } from '../lib/img';
 interface Props { product: ProductCard; discount?: number; }
 const { product, discount = DEFAULT_DISCOUNT } = Astro.props;
 const { price, original, percent } = pricing(product.price_usd, discount);
 const title = product.title.split('|')[0].trim();
-// Card image is rendered at ~220px on desktop, ~180px on mobile. Request 240
-// from Supabase so we cover the 2x-DPR mobile case without overshooting.
-const { src: imgSrc, srcset: imgSrcset } = imgSrcSet(product.image_url, 240, 75);
 ---
 <div class="group border border-black/10 rounded-md overflow-hidden hover:shadow-md transition flex flex-col bg-white">
   <a href={`/product/${product.slug}`} class="relative block aspect-square bg-cream overflow-hidden">
     {product.image_url ? (
-      <img src={imgSrc} srcset={imgSrcset} sizes="(max-width: 640px) 180px, 240px"
-           alt={`${title} bas-relief STL design`} loading="lazy" decoding="async" width="400" height="400"
-           class="w-full h-full object-contain group-hover:scale-[1.03] transition" />
+      <img src={product.image_url} alt={`${title} bas-relief STL design`} loading="lazy" width="400" height="400"
+           class="w-full h-full object-cover group-hover:scale-[1.03] transition" />
     ) : (
       <div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">{title}</div>
     )}

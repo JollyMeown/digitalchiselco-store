@@ -167,7 +167,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       return `
         <div class="border border-black/10 rounded-md overflow-hidden hover:shadow transition flex flex-col">
           <a href="/product/${escAttr(p.slug)}" class="block aspect-square bg-cream overflow-hidden">
-            ${p.image_url ? `<img src="${escAttr(p.image_url)}" alt="${escAttr(p.title)}" loading="lazy" class="w-full h-full object-contain">` : ''}
+            ${p.image_url ? `<img src="${escAttr(p.image_url)}" alt="${escAttr(p.title)}" loading="lazy" class="w-full h-full object-cover">` : ''}
           </a>
           <div class="p-3 flex flex-col flex-1">
             <a href="/product/${escAttr(p.slug)}" class="text-sm leading-snug text-ink-800 line-clamp-2 min-h-[2.5em]">${escAttr(p.title.split('|')[0].trim())}</a>

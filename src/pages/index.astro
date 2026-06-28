@@ -92,7 +92,7 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
             <a href={`/collections/${c.slug}`} class="block border border-black/10 rounded-lg overflow-hidden hover:shadow-md transition group">
               <div class="aspect-[16/9] bg-cream overflow-hidden">
                 {c.image_url
-                  ? <img src={c.image_url} alt={c.name} loading="lazy" class="w-full h-full object-contain group-hover:scale-[1.04] transition duration-500" />
+                  ? <img src={c.image_url} alt={c.name} loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.04] transition duration-500" />
                   : <div class="w-full h-full flex items-center justify-center font-serif text-bronze-600/50 text-center px-3">{c.name}</div>}
               </div>
               {!c.image_url && <div class="p-3 text-sm">{c.name}</div>}
