@@ -1,0 +1,41 @@
+name: Cults3D auto-publish
+
+# Posts ONE listing every 2 hours (~12/day) with a random pre-post delay so the
+# cadence looks human. Tracking lives in the database (products.cults3d_uploaded_at),
+# so runs are stateless and never re-upload. Secrets are configured in the repo's
+# Settings -> Secrets and variables -> Actions.
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'   # every 2 hours, on the hour (UTC); jitter randomizes the actual minute
+  workflow_dispatch:        # manual "Run workflow" button
+    inputs:
+      limit:
+        description: 'Listings to create this run'
+        default: '1'
+      jitter:
+        description: 'Random delay before posting (minutes)'
+        default: '0'
+
+concurrency:
+  group: cults3d-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Create Cults3D listing(s)
+        run: node scripts/cults3d_upload.mjs --apply --limit "${{ github.event.inputs.limit || '1' }}" --jitter "${{ github.event.inputs.jitter || '40' }}" --visibility PUBLIC
+        env:
+          PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CULTS3D_USERNAME: ${{ secrets.CULTS3D_USERNAME }}
+          CULTS3D_API_KEY: ${{ secrets.CULTS3D_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
