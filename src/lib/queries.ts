@@ -29,6 +29,7 @@ export const MARQUEE_DEFAULTS: SiteSettings['marquee_settings'] = {
   bestsellers: { enabled: true, speed: 50, direction: 'left' },
   premium: { enabled: true, speed: 90, direction: 'left' },
   madeforyou: { enabled: false, speed: 60, direction: 'left' },
+  creations: { enabled: true, speed: 55, direction: 'left' },
   reviews: { enabled: true, speed: 60, direction: 'left' },
 };
 

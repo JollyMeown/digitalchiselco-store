@@ -208,7 +208,7 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
   )}
 
   <!-- Carved by you — customer creations (social proof, placed with reviews) -->
-  <CarvedByYou />
+  <CarvedByYou enabled={mq('creations').enabled} speed={mq('creations').speed} direction={mq('creations').direction} />
 
   <!-- Made for You — customizable / personalized designs (centered, static) -->
   {madeForYou.length > 0 && (

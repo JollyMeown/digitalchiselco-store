@@ -8,6 +8,7 @@ const MARQUEE_SECTIONS: [string, string][] = [
   ['bestsellers', 'Best Sellers'],
   ['premium', 'Premium Bundles'],
   ['madeforyou', 'Made for You'],
+  ['creations', 'Carved by You'],
   ['reviews', 'Loved by Makers'],
 ];
 
