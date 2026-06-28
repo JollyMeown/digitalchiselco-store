@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { MARQUEE_DEFAULTS } from '../../../lib/queries';
 import { Card, btnGhost, btnPrimary, inputCls, labelCls } from '../ui';
@@ -27,7 +27,6 @@ const fields: [string, string, string?][] = [
 export default function Settings() {
   const [s, setS] = useState<any>(null);
   const [msg, setMsg] = useState('');
-  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     supabase.from('site_settings').select('*').eq('id', 1).maybeSingle().then(({ data }) => setS(data));
@@ -43,19 +42,9 @@ export default function Settings() {
 
   function testChime() {
     try {
-      const ctx = audioCtxRef.current || (audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)());
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-      const volPct = Math.min(100, Math.max(0, Number(s.order_sound_volume) || 80));
-      const vol = (volPct / 100) * 0.45;
-      [880, 1175, 1568].forEach((freq, i) => {
-        const o = ctx.createOscillator(); const g = ctx.createGain();
-        o.type = 'sine'; o.frequency.value = freq;
-        const start = ctx.currentTime + i * 0.12; const dur = 0.22;
-        g.gain.setValueAtTime(0, start);
-        g.gain.linearRampToValueAtTime(vol, start + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-        o.connect(g).connect(ctx.destination); o.start(start); o.stop(start + dur + 0.05);
-      });
+      const a = new Audio('/sounds/cha-ching.mp3');
+      a.volume = Math.min(1, Math.max(0, (Number(s.order_sound_volume) || 80) / 100));
+      a.play().catch(() => {});
     } catch {}
   }
 
@@ -104,8 +93,8 @@ export default function Settings() {
             <div className="text-[10px] text-ink-700/50 flex justify-between"><span>silent</span><span>loud</span></div>
           </div>
           <div>
-            <button className={btnGhost} onClick={testChime}>▶ Test chime</button>
-            <p className="text-[11px] text-ink-700/50 mt-1">Browsers require a click to enable audio — that's why this test button exists.</p>
+            <button className={btnGhost} onClick={testChime}>▶ Test cha-ching</button>
+            <p className="text-[11px] text-ink-700/50 mt-1">Plays the cha-ching order sound. Browsers require a click to enable audio — clicking this also unlocks the sound for live orders this session.</p>
           </div>
         </div>
       </Card>

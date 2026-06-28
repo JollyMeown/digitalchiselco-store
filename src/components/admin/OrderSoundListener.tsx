@@ -4,15 +4,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
-// Tiny pleasant chime, base64 WAV (kept short to avoid bloating the bundle).
-// 3 quick sine pulses — readable as a notification, not jarring.
-const CHIME =
-  'data:audio/wav;base64,UklGRrYIAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YZIIAAAAAH1NfaAQ' +
-  // (placeholder — replaced at runtime by a synthesised tone for tiny bundle size)
-  '';
+// Order notification sound — the "cha-ching" served from /public.
+const SOUND_URL = '/sounds/cha-ching.mp3';
 
 export default function OrderSoundListener() {
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const settingsRef = useRef<{ enabled: boolean; volume: number }>({ enabled: true, volume: 80 });
   const [bumpCount, setBumpCount] = useState(0); // visual "+N new orders" pip
 
@@ -44,23 +40,12 @@ export default function OrderSoundListener() {
   function playChime() {
     if (!settingsRef.current.enabled) return;
     try {
-      // Synthesised three-tone chime (no asset needed). Plays on top of any UI.
-      const ctx = audioCtxRef.current || (audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)());
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-      const vol = (settingsRef.current.volume / 100) * 0.45; // master limit to be polite
-      const notes = [880, 1175, 1568]; // A5 → D6 → G6
-      notes.forEach((freq, i) => {
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'sine'; o.frequency.value = freq;
-        const start = ctx.currentTime + i * 0.12;
-        const dur = 0.22;
-        g.gain.setValueAtTime(0, start);
-        g.gain.linearRampToValueAtTime(vol, start + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-        o.connect(g).connect(ctx.destination);
-        o.start(start); o.stop(start + dur + 0.05);
-      });
+      const a = audioRef.current || (audioRef.current = new Audio(SOUND_URL));
+      a.volume = Math.min(1, Math.max(0, settingsRef.current.volume / 100));
+      a.currentTime = 0;
+      // Browsers block audio until the admin has interacted with the page
+      // (clicking the "Test chime" button, navigating tabs, etc. unlocks it).
+      a.play().catch(() => {});
     } catch (e) { console.warn('chime failed', e); }
   }
 
