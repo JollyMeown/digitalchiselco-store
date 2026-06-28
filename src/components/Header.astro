@@ -19,20 +19,23 @@ const categories = await getCategories();
 <header class="sticky top-0 bg-white z-30 border-b border-black/10">
   <nav class="flex items-center gap-3 px-4 sm:px-6 py-3 max-w-7xl mx-auto">
     <!-- Hamburger: visible on mobile/tablet only -->
-    <button id="dcc-menu-open" class="lg:hidden text-bronze-700 text-2xl leading-none w-9 h-9 -ml-1 rounded hover:bg-cream" aria-label="Open menu" aria-controls="dcc-drawer" aria-expanded="false">☰</button>
-    <Logo />
-    <form action="/search" method="get" role="search" class="hidden md:flex flex-1 min-w-0 max-w-xs xl:max-w-md mx-2">
+    <button id="dcc-menu-open" class="lg:hidden shrink-0 text-bronze-700 text-2xl leading-none w-9 h-9 -ml-1 rounded hover:bg-cream" aria-label="Open menu" aria-controls="dcc-drawer" aria-expanded="false">☰</button>
+    <div class="shrink-0"><Logo /></div>
+    <!-- Search is the ONLY flexible item — it shrinks first, so the nav links and
+         cart (shrink-0 below) can never be overlapped, at any screen width. -->
+    <form action="/search" method="get" role="search" class="hidden md:flex flex-1 min-w-0 max-w-sm xl:max-w-md mx-1">
       <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files"
-        class="flex-1 px-4 py-2 text-sm rounded-l-md border border-r-0 border-black/15 focus:outline-none focus:border-bronze-600" />
-      <button class="bg-bronze-600 text-cream px-4 rounded-r-md text-sm" aria-label="Search">Search</button>
+        class="min-w-0 flex-1 px-4 py-2 text-sm rounded-l-md border border-r-0 border-black/15 focus:outline-none focus:border-bronze-600" />
+      <button class="shrink-0 bg-bronze-600 text-cream px-4 rounded-r-md text-sm" aria-label="Search">Search</button>
     </form>
-    <div class="hidden lg:flex gap-4 text-sm text-ink-700 lg:ml-auto whitespace-nowrap">
+    <!-- Desktop nav links + cart: pinned right, never shrinks. -->
+    <div class="hidden lg:flex items-center gap-4 text-sm text-ink-700 ml-auto whitespace-nowrap shrink-0">
       {links.map((l) => <a href={l.href} class={`hover:text-bronze-600 ${l.href === '/free' ? 'text-bronze-600' : ''}`}>{l.label}</a>)}
-    </div>
-    <div class="flex gap-3 text-sm text-ink-700 ml-auto lg:ml-3 items-center whitespace-nowrap shrink-0">
       <a href="/membership" class="hidden xl:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
-      <a href="/cart" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 Cart <span id="cart-count" class="text-bronze-600 font-medium"></span></a>
+      <a href="/cart" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 Cart <span class="cart-count text-bronze-600 font-medium"></span></a>
     </div>
+    <!-- Cart for mobile/tablet (shown when the desktop nav is hidden). -->
+    <a href="/cart" class="lg:hidden ml-auto shrink-0 font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 <span class="cart-count text-bronze-600 font-medium"></span></a>
   </nav>
   <form action="/search" method="get" role="search" class="md:hidden px-4 pb-3 flex">
     <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files"
@@ -67,7 +70,7 @@ const categories = await getCategories();
 </aside>
 <script is:inline>
   function cartCount() { try { return JSON.parse(localStorage.getItem('cart') || '[]').length; } catch { return 0; } }
-  function renderCartCount() { const el = document.getElementById('cart-count'); if (el) { const n = cartCount(); el.textContent = n > 0 ? `(${n})` : ''; } }
+  function renderCartCount() { const n = cartCount(); document.querySelectorAll('.cart-count').forEach((el) => { el.textContent = n > 0 ? `(${n})` : ''; }); }
   renderCartCount();
   window.addEventListener('cart-changed', renderCartCount);
   window.addEventListener('storage', renderCartCount);
