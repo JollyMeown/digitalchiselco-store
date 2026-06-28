@@ -7,6 +7,7 @@ type Item = { title: string; price_usd: number; qty: number; order_id: string };
 
 const fmt = (n: number) => '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt0 = (n: number) => '$' + Math.round(n).toLocaleString();
+const eur = (n: number, c = 'EUR') => new Intl.NumberFormat('en-IE', { style: 'currency', currency: c }).format(n || 0);
 // Local-time day key (not UTC) so buckets line up with the admin's calendar.
 const dayKey = (d: Date | string) => {
   const x = new Date(d);
@@ -19,6 +20,7 @@ export default function Overview() {
   const [recent, setRecent] = useState<any[]>([]);
   const [counts, setCounts] = useState({ products: 0, categories: 0, subscribers: 0 });
   const [donation, setDonation] = useState(0);
+  const [cults, setCults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   // default range: last 30 days
   const today = dayKey(new Date());
@@ -42,6 +44,11 @@ export default function Overview() {
     setRecent(recentRes.data ?? []);
     setCounts({ products: products.count ?? 0, categories: categories.count ?? 0, subscribers: subs.count ?? 0 });
     setDonation(Number(settings.data?.donation_total || 0));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/cults-sales', { headers: { authorization: `Bearer ${session?.access_token}` } });
+      if (res.ok) setCults(await res.json());
+    } catch {}
     setLoading(false);
   }
 
@@ -194,6 +201,18 @@ export default function Overview() {
         <StatBox label="Products" value={counts.products.toLocaleString()} sub="Active in catalog" />
         <StatBox label="Subscribers" value={counts.subscribers.toLocaleString()} sub="Free-pack list" />
       </div>
+
+      {/* Cults3D marketplace */}
+      {cults?.ok && (
+        <div>
+          <div className="text-xs font-medium text-ink-700/60 mb-2">Cults3D marketplace</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatBox label="Cults3D · total sales" value={eur(cults.totalIncome, cults.currency)} sub={`${cults.salesCount} sale${cults.salesCount === 1 ? '' : 's'} · ${cults.listed} listed`} />
+            <StatBox label="Cults3D · amount due" value={eur(cults.pendingPayout, cults.currency)} sub="not yet paid out" />
+            <StatBox label="Cults3D · payout due (est.)" value={cults.nextPayoutEst || '—'} sub="Cults pays ~monthly (15th)" />
+          </div>
+        </div>
+      )}
 
       {/* Revenue chart */}
       <Card title={`Revenue · ${dateFrom} → ${dateTo}`}>

@@ -76,6 +76,12 @@ export const GET: APIRoute = async ({ request }) => {
   const totalIncome = sales.reduce((s, x) => s + (x.income?.value || 0), 0);
   const pendingPayout = sales.filter((x) => !x.payedOutAt).reduce((s, x) => s + (x.income?.value || 0), 0);
 
+  // Cults3D doesn't expose a payout date via API; it pays out monthly (~15th).
+  // Estimate the next payout day so the dashboard can show a "due date".
+  const now = new Date();
+  const py = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + (now.getUTCDate() >= 15 ? 1 : 0), 15));
+  const nextPayoutEst = pendingPayout > 0 ? py.toISOString().slice(0, 10) : null;
+
   // How many of our products are live on Cults so far.
   let listed = 0;
   try {
@@ -89,6 +95,7 @@ export const GET: APIRoute = async ({ request }) => {
     currency,
     totalIncome: Math.round(totalIncome * 100) / 100,
     pendingPayout: Math.round(pendingPayout * 100) / 100,
+    nextPayoutEst,
     salesCount: sales.length,
     listed,
     sales,
