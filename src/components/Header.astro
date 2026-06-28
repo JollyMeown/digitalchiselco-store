@@ -95,6 +95,8 @@ const categories = await getCategories();
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
   // Reflect cart membership on every .add-to-cart button (turns green "✓ In cart").
+  // Writes only when a value actually changes, so it never triggers the
+  // MutationObserver below into a loop and stays cheap.
   function syncCartButtons() {
     let cart = [];
     try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch {}
@@ -102,13 +104,30 @@ const categories = await getCategories();
     document.querySelectorAll('.add-to-cart[data-id]').forEach((btn) => {
       const inCart = ids.has(btn.dataset.id);
       btn.classList.toggle('in-cart', inCart);
-      btn.textContent = inCart ? '✓ In cart' : 'Add to cart';
+      const label = inCart ? '✓ In cart' : 'Add to cart';
+      if (btn.textContent !== label) btn.textContent = label;
     });
   }
   window.dccSyncCartButtons = syncCartButtons;
-  syncCartButtons();
+  // This script sits in the header (top of page), so on a fresh load the product
+  // cards below haven't parsed yet — wait for DOMContentLoaded. Also re-sync on
+  // bfcache back/forward restores (scripts don't re-run then) and whenever the
+  // cart changes or another tab edits it.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncCartButtons, { once: true });
+  else syncCartButtons();
+  window.addEventListener('pageshow', syncCartButtons);
   window.addEventListener('cart-changed', syncCartButtons);
   window.addEventListener('storage', syncCartButtons);
+  // Catch dynamically-inserted cards (homepage marquees, cart upsell) without
+  // polling — one rAF-debounced pass per batch of DOM changes.
+  let _scbRaf = 0;
+  const _scbObserver = new MutationObserver(() => {
+    if (_scbRaf) return;
+    _scbRaf = requestAnimationFrame(() => { _scbRaf = 0; syncCartButtons(); });
+  });
+  function _startScbObserver() { if (document.body) _scbObserver.observe(document.body, { childList: true, subtree: true }); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _startScbObserver, { once: true });
+  else _startScbObserver();
 
   // Delegated "Add to cart" for any .add-to-cart button site-wide (product cards, etc.)
   document.addEventListener('click', (e) => {
