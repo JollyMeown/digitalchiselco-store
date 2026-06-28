@@ -15,7 +15,7 @@ const { src: imgSrc, srcset: imgSrcset } = imgSrcSet(product.image_url, 240, 75)
     {product.image_url ? (
       <img src={imgSrc} srcset={imgSrcset} sizes="(max-width: 640px) 180px, 240px"
            alt={`${title} bas-relief STL design`} loading="lazy" decoding="async" width="400" height="400"
-           class="w-full h-full object-cover group-hover:scale-[1.03] transition" />
+           class="w-full h-full object-contain group-hover:scale-[1.03] transition" />
     ) : (
       <div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">{title}</div>
     )}

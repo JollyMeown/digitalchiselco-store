@@ -38,14 +38,14 @@ const jsonld = {
     <div>
       <div class="aspect-square bg-cream rounded-lg overflow-hidden">
         {gallery[0]
-          ? <img id="main-img" src={gallery[0]} alt={mainAlt} width="800" height="800" class="w-full h-full object-cover" />
+          ? <img id="main-img" src={gallery[0]} alt={mainAlt} width="800" height="800" class="w-full h-full object-contain" />
           : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 p-6 text-center font-serif">{cleanTitle}</div>}
       </div>
       {gallery.length > 1 && (
         <div class="mt-3 grid grid-cols-5 gap-2">
           {gallery.slice(0, 10).map((g, i) => (
             <button class="thumb aspect-square bg-cream rounded overflow-hidden border-2 border-transparent" data-src={g} aria-label={`View image ${i + 1}`}>
-              <img src={g} alt={`${cleanTitle} view ${i + 1}`} loading="lazy" class="w-full h-full object-cover" />
+              <img src={g} alt={`${cleanTitle} view ${i + 1}`} loading="lazy" class="w-full h-full object-contain" />
             </button>
           ))}
         </div>
