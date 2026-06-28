@@ -222,6 +222,28 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
     </section>
   )}
 
+  <!-- Free files lead magnet -->
+  <section class="bg-cream/40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid md:grid-cols-2 gap-8 items-center">
+      <div class="dcc-free-img-wrap bg-cream rounded-lg overflow-hidden border border-black/10">
+        {s.free_image_url
+          ? <img src={s.free_image_url} alt="Free STL files pack" class="w-full h-auto block dcc-free-img" />
+          : <div class="aspect-[4/3] flex items-center justify-center text-bronze-600/40 font-serif text-center px-6">Upload a "free pack" image in admin → Media & Hero</div>}
+      </div>
+      <div>
+        <p class="text-xs tracking-widest text-bronze-600 mb-2">★ FREE FROM OUR STUDIO</p>
+        <h2 class="font-serif text-3xl text-bronze-800 leading-tight">Try five of our <em class="italic">most carved</em> files, on the house.</h2>
+        <p class="mt-4 text-ink-700">Drop your email and we'll send five hand-picked premium bas-relief STL files, plus a short PDF on scaling and finishing — everything tested on real CNC routers, 3D printers and laser engravers.</p>
+        <a href="/free" class="mt-6 inline-block bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Send me the pack →</a>
+        <p class="text-xs text-ink-700/50 mt-2">No spam. Unsubscribe anytime.</p>
+      </div>
+    </div>
+  </section>
+  <style>
+    .dcc-free-img { transition: transform 0.6s ease; }
+    .dcc-free-img-wrap:hover .dcc-free-img { transform: scale(1.05); }
+  </style>
+
   <!-- FAQ -->
   {faqs.length > 0 && (
     <section class="max-w-3xl mx-auto px-4 sm:px-6 py-14">
@@ -243,28 +265,6 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
     .dcc-faq[open] summary > span:last-child { transform: rotate(45deg); }
     .dcc-faq > div { animation: dcc-fade 0.25s ease-out; }
     @keyframes dcc-fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-  </style>
-
-  <!-- Free files lead magnet -->
-  <section class="bg-cream/40">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid md:grid-cols-2 gap-8 items-center">
-      <div class="dcc-free-img-wrap aspect-[4/3] bg-cream rounded-lg overflow-hidden border border-black/10">
-        {s.free_image_url
-          ? <img src={s.free_image_url} alt="Free STL files pack" class="w-full h-full object-cover dcc-free-img" />
-          : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 font-serif text-center px-6">Upload a "free pack" image in admin → Media & Hero</div>}
-      </div>
-      <div>
-        <p class="text-xs tracking-widest text-bronze-600 mb-2">★ FREE FROM OUR STUDIO</p>
-        <h2 class="font-serif text-3xl text-bronze-800 leading-tight">Try five of our <em class="italic">most carved</em> files, on the house.</h2>
-        <p class="mt-4 text-ink-700">Drop your email and we'll send five hand-picked premium bas-relief STL files, plus a short PDF on scaling and finishing — everything tested on real CNC routers, 3D printers and laser engravers.</p>
-        <a href="/free" class="mt-6 inline-block bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Send me the pack →</a>
-        <p class="text-xs text-ink-700/50 mt-2">No spam. Unsubscribe anytime.</p>
-      </div>
-    </div>
-  </section>
-  <style>
-    .dcc-free-img { transition: transform 0.6s ease; }
-    .dcc-free-img-wrap:hover .dcc-free-img { transform: scale(1.05); }
   </style>
 
   <!-- Closing brand strip (product-focused) -->
