@@ -207,6 +207,9 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
     </section>
   )}
 
+  <!-- Carved by you — customer creations (social proof, placed with reviews) -->
+  <CarvedByYou />
+
   <!-- Made for You — customizable / personalized designs (centered, static) -->
   {madeForYou.length > 0 && (
     <section class="relative">
@@ -324,8 +327,6 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
       <a href="/catalog" class="mt-6 inline-block bg-cream text-bronze-800 px-6 py-3 rounded-md text-sm font-medium hover:bg-white transition shadow-sm">Browse the catalog →</a>
     </div>
   </section>
-
-  <CarvedByYou />
 
   <Footer />
   <script type="application/ld+json" set:html={JSON.stringify({
