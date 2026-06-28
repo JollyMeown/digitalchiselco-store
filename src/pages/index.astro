@@ -95,39 +95,6 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
         </div>
       </section>
 
-      <!-- Become a member CTA -->
-      {featuredPlan && (
-        <section class="border border-bronze-600/20 rounded-2xl bg-gradient-to-br from-cream to-white p-6 md:p-8">
-          <div class="grid md:grid-cols-2 gap-6 items-center">
-            <div>
-              <p class="text-xs tracking-widest text-bronze-600 mb-2">★ MOST POPULAR PLAN</p>
-              <h2 class="font-serif text-3xl text-bronze-800 leading-tight">{s.membership_title}</h2>
-              <p class="mt-3 text-ink-700/85 leading-relaxed">{s.membership_subtitle}</p>
-              <ul class="mt-4 text-sm text-ink-700 space-y-1.5">
-                {featuredPlan.features.slice(0, 4).map((f) => (
-                  <li class="flex gap-2"><span class="text-bronze-600">✓</span>{f}</li>
-                ))}
-              </ul>
-              <div class="mt-6 flex flex-wrap gap-3">
-                <a href="/membership" class="bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition shadow-sm">
-                  Become a member — ${Number(featuredPlan.price_usd).toFixed(2)}
-                </a>
-                <a href="/membership" class="border border-bronze-600 text-bronze-700 px-6 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">
-                  Lock in your low price →
-                </a>
-              </div>
-            </div>
-            <div class="order-first md:order-last">
-              {s.membership_image_url
-                ? <img src={s.membership_image_url} alt="Premium Membership poster" class="w-full h-auto rounded-lg shadow-md max-h-[440px] object-contain bg-cream" />
-                : <div class="aspect-[3/4] bg-cream rounded-lg flex items-center justify-center text-bronze-600/40 font-serif text-center px-6 max-h-[440px]">
-                    Upload the Premium Membership poster in admin → Media & Hero → "Membership card"
-                  </div>}
-            </div>
-          </div>
-        </section>
-      )}
-
       <!-- Premium Bundles — slow marquee. Curated savings, top of the homepage stack. -->
       {premiumBundles.length > 0 && (
         <section class="relative">
@@ -220,6 +187,41 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
     </section>
   )}
 
+  <!-- Become a member CTA — placed just above FAQ -->
+  {featuredPlan && (
+    <section class="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+      <div class="border border-bronze-600/20 rounded-2xl bg-gradient-to-br from-cream to-white p-6 md:p-8">
+        <div class="grid md:grid-cols-2 gap-6 items-center">
+          <div>
+            <p class="text-xs tracking-widest text-bronze-600 mb-2">★ MOST POPULAR PLAN</p>
+            <h2 class="font-serif text-3xl text-bronze-800 leading-tight">{s.membership_title}</h2>
+            <p class="mt-3 text-ink-700/85 leading-relaxed">{s.membership_subtitle}</p>
+            <ul class="mt-4 text-sm text-ink-700 space-y-1.5">
+              {featuredPlan.features.slice(0, 4).map((f) => (
+                <li class="flex gap-2"><span class="text-bronze-600">✓</span>{f}</li>
+              ))}
+            </ul>
+            <div class="mt-6 flex flex-wrap gap-3">
+              <a href="/membership" class="bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition shadow-sm">
+                Become a member — ${Number(featuredPlan.price_usd).toFixed(2)}
+              </a>
+              <a href="/membership" class="border border-bronze-600 text-bronze-700 px-6 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">
+                Lock in your low price →
+              </a>
+            </div>
+          </div>
+          <div class="order-first md:order-last">
+            {s.membership_image_url
+              ? <img src={s.membership_image_url} alt="Premium Membership poster" class="w-full h-auto rounded-lg shadow-md max-h-[440px] object-contain bg-cream" />
+              : <div class="aspect-[3/4] bg-cream rounded-lg flex items-center justify-center text-bronze-600/40 font-serif text-center px-6 max-h-[440px]">
+                  Upload the Premium Membership poster in admin → Media & Hero → "Membership card"
+                </div>}
+          </div>
+        </div>
+      </div>
+    </section>
+  )}
+
   <!-- FAQ -->
   {faqs.length > 0 && (
     <section class="max-w-3xl mx-auto px-4 sm:px-6 py-14">
@@ -271,7 +273,7 @@ const featuredPlan = plans.find((p) => p.highlight) || plans[0];
       <p class="text-xs tracking-widest text-[#FAC775] mb-2">★ DIGITALCHISELCO STUDIO</p>
       <p class="font-serif text-2xl md:text-3xl leading-snug max-w-3xl mx-auto">Hand-finished bas-relief STL designs built for serious CNC, laser, and 3D-print makers.</p>
       <p class="mt-4 text-sm text-cream/80 max-w-2xl mx-auto">Every file is tested on real machines before it ships. Commercial use is included on every purchase — sell the pieces you carve.</p>
-      <a href="/catalog" class="mt-6 inline-block bg-[#FAC775] text-bronze-900 px-6 py-3 rounded-md text-sm font-medium hover:opacity-90 transition">Browse the catalog →</a>
+      <a href="/catalog" class="mt-6 inline-block bg-cream text-bronze-800 px-6 py-3 rounded-md text-sm font-medium hover:bg-white transition shadow-sm">Browse the catalog →</a>
     </div>
   </section>
 

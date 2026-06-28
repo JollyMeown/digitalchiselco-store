@@ -175,6 +175,13 @@ export async function getBestSellers(limit = 8): Promise<ProductCard[]> {
 
 export async function getLatestProducts(limit = 8): Promise<ProductCard[]> {
   try {
+    // Prefer admin-picked rows. If none are flagged, fall back to actual
+    // newest-by-created_at so the section never goes empty.
+    const { data: picked, error: pErr } = await supabase
+      .from('products').select(CARD).eq('active', true).eq('is_latest_pick', true)
+      .not('image_url', 'is', null).order('title').limit(limit);
+    if (pErr) throw pErr;
+    if (picked && picked.length > 0) return picked as ProductCard[];
     const { data, error } = await supabase
       .from('products').select(CARD).eq('active', true)
       .not('image_url', 'is', null).order('created_at', { ascending: false }).limit(limit);
