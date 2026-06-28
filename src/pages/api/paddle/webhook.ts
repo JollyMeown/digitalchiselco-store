@@ -317,10 +317,11 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // can still see their order on /account); we just log so we can resend later.
   if (email && email !== 'unknown@digitalchiselco.com') {
     try {
-      // Fetch order items + their download links + brand logo in parallel
+      // Fetch order items (+ their customizations + each product's is_customizable
+      // flag), product download links, and the brand logo — all in parallel.
       const [{ data: orderItems }, { data: settings }] = await Promise.all([
         db.from('order_items')
-          .select('title, qty, price_usd, product_id')
+          .select('id, title, qty, price_usd, product_id, order_item_customizations(fields), products(is_customizable)')
           .eq('order_id', order.id),
         db.from('site_settings').select('logo_image_url').eq('id', 1).maybeSingle(),
       ]);
@@ -336,12 +337,23 @@ async function handleTransactionCompleted(db: any, txn: any) {
         }
       }
 
-      const emailItems = (orderItems || []).map((it: any) => ({
-        title: it.title || 'Item',
-        qty: it.qty || 1,
-        price_usd: Number(it.price_usd) || 0,
-        download_links: it.product_id ? downloadsByProduct[it.product_id] : undefined,
-      }));
+      const emailItems = (orderItems || []).map((it: any) => {
+        const fields = (it.order_item_customizations || []).flatMap((c: any) => Array.isArray(c.fields) ? c.fields : []);
+        // A line is "customized" if either it has captured field values OR the
+        // product itself is flagged is_customizable (catches the edge case
+        // where a customizable product was bought without filling fields).
+        const isCustomized = fields.length > 0 || !!(it.products && it.products.is_customizable);
+        return {
+          title: it.title || 'Item',
+          qty: it.qty || 1,
+          price_usd: Number(it.price_usd) || 0,
+          // Skip download links entirely for customized lines — the file
+          // doesn't exist yet; the customer gets it once the artisan delivers.
+          download_links: isCustomized ? undefined : (it.product_id ? downloadsByProduct[it.product_id] : undefined),
+          is_customized: isCustomized,
+          customization_fields: fields,
+        };
+      });
 
       // customerName already looked up at top of function via /customers/{id}
       const finalCustomerName: string | null =

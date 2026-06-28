@@ -56,7 +56,16 @@ if (isSignOut) {
 }
 
 type DownloadRow = { file_name: string | null; download_link: string };
-type OrderItem = { id: string; title: string; qty: number; price_usd: number; product_id: string | null; downloads?: DownloadRow[] };
+type CustomizationField = { key: string; label: string; type: string; value: string };
+type OrderItem = {
+  id: string; title: string; qty: number; price_usd: number; product_id: string | null;
+  downloads?: DownloadRow[];
+  image_url?: string | null;
+  is_customized?: boolean;
+  customization_fields?: CustomizationField[];
+  order_item_customizations?: { fields: CustomizationField[] }[];
+  products?: { image_url: string | null; slug: string | null; is_customizable: boolean } | null;
+};
 type OrderRow = { id: string; total: number; currency: string; status: string; created_at: string; paddle_transaction_id: string | null; order_items: OrderItem[] };
 
 let orders: OrderRow[] = [];
@@ -67,7 +76,7 @@ if (session?.email) {
   const db = supabaseAdmin();
   const { data } = await db
     .from('orders')
-    .select('id, total, currency, status, created_at, paddle_transaction_id, order_items(id, title, qty, price_usd, product_id)')
+    .select('id, total, currency, status, created_at, paddle_transaction_id, order_items(id, title, qty, price_usd, product_id, order_item_customizations(fields), products(image_url, slug, is_customizable))')
     .ilike('email', session.email)
     .order('created_at', { ascending: false })
     .limit(100);
@@ -89,7 +98,12 @@ if (session?.email) {
   }
   for (const o of orders) {
     for (const it of o.order_items || []) {
-      it.downloads = (it.product_id && downloadsByProduct[it.product_id]) || [];
+      const fields = (it.order_item_customizations || []).flatMap((c) => Array.isArray(c.fields) ? c.fields : []);
+      it.customization_fields = fields;
+      it.is_customized = fields.length > 0 || !!it.products?.is_customizable;
+      it.image_url = it.products?.image_url || null;
+      // Customized lines never show static download links — the file is built post-purchase.
+      it.downloads = it.is_customized ? [] : ((it.product_id && downloadsByProduct[it.product_id]) || []);
     }
   }
   const paidOrders = orders.filter((o) => o.status === 'paid');
@@ -193,24 +207,62 @@ if (session?.email) {
                     <ul class="divide-y divide-black/10">
                       {(o.order_items || []).map((it) => (
                         <li class="py-3">
-                          <div class="flex justify-between items-baseline mb-2 gap-3">
-                            <span class="text-sm text-ink-800">{it.title}</span>
-                            <span class="text-xs text-ink-700/60 whitespace-nowrap">{it.qty}× ${Number(it.price_usd).toFixed(2)}</span>
+                          <div class="flex gap-4">
+                            {/* Medium product thumbnail */}
+                            <a href={it.products?.slug ? `/product/${it.products.slug}` : '#'} class="block w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden bg-cream/60 flex-shrink-0">
+                              {it.image_url
+                                ? <img src={it.image_url} alt="" class="w-full h-full object-cover" loading="lazy" />
+                                : <div class="w-full h-full flex items-center justify-center text-bronze-600/30 text-xs">no image</div>}
+                            </a>
+                            <div class="flex-1 min-w-0">
+                              <div class="flex justify-between items-baseline gap-3 mb-2">
+                                <div class="text-sm text-ink-800">
+                                  {it.products?.slug
+                                    ? <a href={`/product/${it.products.slug}`} class="hover:text-bronze-600">{it.title}</a>
+                                    : it.title}
+                                  {it.is_customized && <span class="ml-2 inline-block bg-[#FAC775] text-bronze-900 text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded align-middle">✎ Custom</span>}
+                                </div>
+                                <span class="text-xs text-ink-700/60 whitespace-nowrap">{it.qty}× ${Number(it.price_usd).toFixed(2)}</span>
+                              </div>
+                              {it.is_customized ? (
+                                <div class="space-y-2">
+                                  <div class="text-xs text-bronze-800 bg-cream/60 border-l-2 border-bronze-600 pl-3 py-2 rounded-r leading-relaxed">
+                                    ✨ <strong>Your custom design request is in.</strong> Our team is hand-crafting your one-of-a-kind STL. We'll email the download link once it's ready — and reach out separately if we need any clarification.
+                                  </div>
+                                  {it.customization_fields && it.customization_fields.length > 0 && (
+                                    <details class="text-xs">
+                                      <summary class="cursor-pointer text-ink-700/70 hover:text-bronze-700 select-none">View your submitted details</summary>
+                                      <dl class="mt-2 ml-3 space-y-1 text-ink-700">
+                                        {it.customization_fields.map((f) => (
+                                          <div class="grid grid-cols-[120px_1fr] gap-2">
+                                            <dt class="text-ink-700/60">{f.label || f.key}</dt>
+                                            <dd class="break-words">
+                                              {f.type === 'file_url' && f.value
+                                                ? <a href={f.value} target="_blank" class="text-bronze-600 underline break-all">{f.value}</a>
+                                                : <span class="whitespace-pre-wrap">{f.value || <em class="text-ink-700/40">(empty)</em>}</span>}
+                                            </dd>
+                                          </div>
+                                        ))}
+                                      </dl>
+                                    </details>
+                                  )}
+                                </div>
+                              ) : it.downloads && it.downloads.length > 0 ? (
+                                <div class="flex flex-wrap gap-2">
+                                  {it.downloads.map((d, i) => (
+                                    <a href={d.download_link} target="_blank" rel="noopener"
+                                      class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-4 py-2 rounded-md text-sm transition">
+                                      ⬇ Download{it.downloads!.length > 1 ? ` file ${i + 1}` : ''}{d.file_name && it.downloads!.length === 1 ? ` · ${d.file_name}` : ''}
+                                    </a>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div class="text-xs text-ink-700/60 italic">
+                                  Download link will be emailed within a few minutes if not already attached.
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {it.downloads && it.downloads.length > 0 ? (
-                            <div class="flex flex-wrap gap-2">
-                              {it.downloads.map((d, i) => (
-                                <a href={d.download_link} target="_blank" rel="noopener"
-                                  class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-4 py-2 rounded-md text-sm transition">
-                                  ⬇ Download{it.downloads!.length > 1 ? ` file ${i + 1}` : ''}{d.file_name && it.downloads!.length === 1 ? ` · ${d.file_name}` : ''}
-                                </a>
-                              ))}
-                            </div>
-                          ) : (
-                            <div class="text-xs text-ink-700/60 italic">
-                              Download link will be emailed within a few minutes if not already attached.
-                            </div>
-                          )}
                         </li>
                       ))}
                     </ul>

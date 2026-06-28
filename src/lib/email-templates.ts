@@ -16,6 +16,11 @@ export type OrderEmailItem = {
   qty: number;
   price_usd: number;
   download_links?: { name?: string; url: string }[];
+  // Customized items skip the download button and show a "we're crafting it"
+  // message. The captured field values are listed so the buyer has a record
+  // of exactly what they submitted.
+  is_customized?: boolean;
+  customization_fields?: { key: string; label: string; type: string; value: string }[];
 };
 
 export type OrderEmailData = {
@@ -52,6 +57,35 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
 
   // --- HTML ---
   const itemRowsHtml = d.items.map((it) => {
+    // Customized items take a totally different track — show a warm "we're
+    // crafting it" panel + a recap of the customer's submitted details, no
+    // download buttons (the file doesn't exist yet).
+    if (it.is_customized) {
+      const fields = it.customization_fields || [];
+      const fieldsHtml = fields.length ? `
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:10px;background:#FFFBF4;border:1px solid #E5DDD0;border-radius:6px;padding:10px 12px;">
+          <tr>
+            <td style="font-size:12px;color:${BRAND_BRONZE_DARK};font-weight:500;text-transform:uppercase;letter-spacing:1px;padding-bottom:6px;">Your submitted details</td>
+          </tr>
+          ${fields.map((f) => `
+            <tr>
+              <td style="padding:3px 0;font-size:13px;color:#555;font-family:Helvetica,Arial,sans-serif;">
+                <strong style="color:${BRAND_INK};">${esc(f.label || f.key)}:</strong> ${f.type === 'file_url' && f.value ? `<a href="${esc(f.value)}" style="color:${BRAND_BRONZE};word-break:break-all;">${esc(f.value)}</a>` : esc(f.value || '—')}
+              </td>
+            </tr>`).join('')}
+        </table>` : '';
+      return `
+        <tr>
+          <td style="padding:14px 0;border-bottom:1px solid #E5DDD0;font-family:Helvetica,Arial,sans-serif;">
+            <div style="font-size:15px;color:${BRAND_INK};font-weight:500;">${esc(it.title)} <span style="background:#FAC775;color:${BRAND_BRONZE_DARK};font-size:10px;padding:2px 6px;border-radius:8px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;vertical-align:middle;margin-left:4px;">✎ Custom</span></div>
+            <div style="font-size:13px;color:#777;margin-top:2px;">${it.qty}× &middot; ${money(it.price_usd)}</div>
+            <div style="margin-top:10px;background:${BRAND_CREAM};border-left:3px solid ${BRAND_BRONZE};padding:12px 14px;border-radius:0 6px 6px 0;font-size:13px;color:${BRAND_INK};line-height:1.55;">
+              ✨ <strong>Your custom design request is in!</strong> Our team is hand-crafting your one-of-a-kind STL based on the details below. We'll email the download link as soon as it's ready — and we'll reach out separately if we need any clarification along the way.
+            </div>
+            ${fieldsHtml}
+          </td>
+        </tr>`;
+    }
     const links = (it.download_links || []).map((l) => `
       <a href="${esc(l.url)}" style="display:inline-block;background:${BRAND_BRONZE};color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-size:14px;font-weight:500;margin-top:8px;margin-right:6px;font-family:Helvetica,Arial,sans-serif;">
         ⬇ Download${l.name ? ' &middot; ' + esc(l.name) : ''}
@@ -245,6 +279,11 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
 
   // --- Plain text fallback ---
   const itemsTxt = d.items.map((it) => {
+    if (it.is_customized) {
+      const fieldsTxt = (it.customization_fields || [])
+        .map((f) => `    ${f.label || f.key}: ${f.value || '—'}`).join('\n');
+      return `* ${it.title} [CUSTOM] (${it.qty}× ${money(it.price_usd)})\n  Your custom design is being hand-crafted — we'll email the download link once it's ready.\n  Your submitted details:\n${fieldsTxt || '    (no details)'}`;
+    }
     const linksTxt = (it.download_links || []).map((l) => `  - ${l.name ? l.name + ': ' : ''}${l.url}`).join('\n');
     return `* ${it.title} (${it.qty}× ${money(it.price_usd)})\n${linksTxt || '  (link will be sent separately)'}`;
   }).join('\n\n');
