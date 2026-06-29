@@ -9,6 +9,7 @@
 
 import { supabase } from '../lib/supabase';
 import { pricing } from '../lib/pricing';
+import { img } from '../lib/img';
 
 export const prerender = false;
 
@@ -56,7 +57,11 @@ export async function GET() {
           cell(title),
           cell(desc),
           cell(`${SITE}/product/${p.slug}`),
-          cell(p.image_url),
+          // Use Supabase's render/image endpoint at 1200px — Pinterest's
+          // recommended size, and it returns Cache-Control: max-age=3600
+          // (the /object/public/ endpoint returns no-cache, which Pinterest's
+          // catalog crawler rejects/skips).
+          cell(img(p.image_url, { w: 1200, q: 85 })),
           cell(`${original.toFixed(2)} USD`),
           cell(percent > 0 ? `${price.toFixed(2)} USD` : ''),
           cell('in stock'),
