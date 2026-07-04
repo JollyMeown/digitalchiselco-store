@@ -112,6 +112,38 @@ export default function Media() {
         </div>
       </Card>
 
+      <Card title="Laser Studio page (/laser-studio)">
+        <p className="text-xs text-ink-700/60 mb-3">
+          Every image on the Laser Studio product page, plus the "Get Laser Studio" button link (paste your
+          Google Drive / download / listing URL). Empty slots fall back to the built-in images.
+        </p>
+        <div className="mb-4">
+          <label className={labelCls}>"Get Laser Studio" button link</label>
+          <div className="flex gap-2">
+            <input value={s.ls_buy_url || ''} onChange={(e) => setS({ ...s, ls_buy_url: e.target.value })}
+              placeholder="https://drive.google.com/… or your Etsy listing" className={inputCls} />
+            <button className={btnPrimary} onClick={() => { saveField('ls_buy_url', s.ls_buy_url); setMsg('✓ Buy link saved'); }}>Save</button>
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {([
+            ['ls_hero_url', 'Hero — app screenshot (1400w)'],
+            ['ls_styles_url', 'Eleven-styles grid (~1000w)'],
+            ['ls_relief_url', 'STL relief example (square-ish)'],
+            ['ls_starmap_url', 'Star map (portrait)'],
+            ['ls_sundial_url', 'Sundial maker'],
+            ['ls_recipe_url', 'Recipe board'],
+            ['ls_tumbler_url', 'Tumbler wrap'],
+            ['ls_proof_url', 'Client proof card'],
+          ] as Array<[string, string]>).map(([key, label]) => (
+            <div key={key}>
+              <label className={labelCls}>{label}</label>
+              <ImageUpload value={s[key]} onChange={(url) => saveField(key, url)} folder="laser-studio" />
+            </div>
+          ))}
+        </div>
+      </Card>
+
       <Card title="Site banner">
         <p className="text-xs text-ink-700/60 mb-3">
           Wide brand banner shown at the top of every storefront page (except cart). Best at ~1700×720, lightweight JPG/WebP.

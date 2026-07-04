@@ -1,6 +1,20 @@
 ---
 import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { getSettings } from '../lib/queries';
+const s: any = await getSettings();
+// Every image slot is admin-managed (Admin → Media → Laser Studio page) with a static fallback.
+const IMG = {
+  hero:    s.ls_hero_url    || '/laser-studio/app.webp',
+  styles:  s.ls_styles_url  || '/laser-studio/styles.webp',
+  relief:  s.ls_relief_url  || '/laser-studio/relief.webp',
+  starmap: s.ls_starmap_url || '/laser-studio/starmap.webp',
+  sundial: s.ls_sundial_url || '/laser-studio/sundial.webp',
+  recipe:  s.ls_recipe_url  || '/laser-studio/recipe.webp',
+  tumbler: s.ls_tumbler_url || '/laser-studio/tumbler.webp',
+  proof:   s.ls_proof_url   || '/laser-studio/proof.webp',
+};
+const BUY = s.ls_buy_url || 'https://www.etsy.com/shop/DigitalChiselCo';
 ---
 <Shell
   title="Laser Studio · Photo to Laser File Software for Diode & CO2 — DigitalChiselCo"
@@ -12,7 +26,7 @@ import Breadcrumbs from '../components/Breadcrumbs.astro';
   <article class="max-w-5xl mx-auto">
 
     <!-- ===== HERO ===== -->
-    <header class="text-center mb-10">
+    <header class="text-center mb-10 reveal">
       <p class="text-xs tracking-widest text-bronze-600 mb-3">★ NEW FROM DIGITALCHISELCO · DESKTOP SOFTWARE</p>
       <h1 class="font-serif text-4xl md:text-6xl text-bronze-800 leading-tight">
         Laser <em class="italic text-bronze-600">Studio</em>
@@ -22,124 +36,127 @@ import Breadcrumbs from '../components/Breadcrumbs.astro';
         on your own computer, offline, forever.
       </p>
       <div class="mt-6 flex flex-wrap justify-center gap-3">
-        <a href="https://www.etsy.com/shop/DigitalChiselCo" target="_blank" rel="noopener"
-           class="bg-bronze-600 text-cream px-7 py-3 rounded-md text-sm hover:bg-bronze-700 transition shadow">Get Laser Studio →</a>
-        <a href="/contact" class="border border-bronze-600 text-bronze-700 px-7 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">Ask a question</a>
+        <a href={BUY} target="_blank" rel="noopener"
+           class="bg-bronze-600 text-cream px-8 py-3.5 rounded-md text-sm font-medium hover:bg-bronze-700 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow">Get Laser Studio →</a>
+        <a href="/contact" class="border border-bronze-600 text-bronze-700 px-8 py-3.5 rounded-md text-sm hover:bg-bronze-600/10 transition">Ask a question</a>
       </div>
       <p class="mt-3 text-xs text-ink-700/60">Windows 10/11 · one-time purchase · no subscription · nothing uploaded, ever</p>
     </header>
 
-    <figure class="rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg mb-16">
-      <img src="/laser-studio/app.jpg" alt="The Laser Studio workspace — a photo converted to a laser-ready 3D relief on the artboard" width="1400" height="787" loading="eager" class="w-full" />
+    <figure class="rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg mb-16 reveal">
+      <img src={IMG.hero} alt="The Laser Studio workspace — a photo converted to a laser-ready 3D relief on the artboard" width="1400" height="787" loading="eager" fetchpriority="high" decoding="async" class="w-full" />
       <figcaption class="text-center text-xs text-ink-700/60 py-2 bg-cream">The real Laser Studio workspace — five modes, one quiet artboard.</figcaption>
     </figure>
 
     <!-- ===== WHY GAME CHANGER ===== -->
     <section class="mb-16">
-      <h2 class="font-serif text-3xl md:text-4xl text-bronze-800 text-center">Why this is a game changer<br class="hidden md:block"/> for the laser market</h2>
-      <p class="mt-4 text-ink-700/85 text-center max-w-3xl mx-auto">
-        Laser makers today juggle a photo-prep website, a dithering tool, a star-map generator, a box maker and a
-        settings forum — plus a subscription or two. Laser Studio replaces the whole stack with one honest desktop app.
-      </p>
-      <div class="mt-8 grid md:grid-cols-3 gap-5">
-        <div class="border border-bronze-600/25 rounded-xl p-6 bg-gradient-to-br from-cream to-white">
-          <p class="text-2xl">🎨</p>
-          <h3 class="font-serif text-xl text-bronze-800 mt-2">Eleven products from one photo</h3>
-          <p class="mt-2 text-sm text-ink-700/85">Engrave, 3D-illusion relief, pencil sketch, stipple, word portrait, spiral, string art, ASCII, low-poly, contour and a solvable maze — the same customer photo becomes eleven sellable product lines, each in seconds. No other tool on the market does this.</p>
-        </div>
-        <div class="border border-bronze-600/25 rounded-xl p-6 bg-gradient-to-br from-cream to-white">
-          <p class="text-2xl">🔒</p>
-          <h3 class="font-serif text-xl text-bronze-800 mt-2">Offline. Owned. Private.</h3>
-          <p class="mt-2 text-sm text-ink-700/85">While the industry moves to cloud subscriptions, Laser Studio runs 100% on your PC. Your customers' photos never leave your computer, there's no monthly fee, and it keeps working with or without the internet — buy once, use forever.</p>
-        </div>
-        <div class="border border-bronze-600/25 rounded-xl p-6 bg-gradient-to-br from-cream to-white">
-          <p class="text-2xl">🎯</p>
-          <h3 class="font-serif text-xl text-bronze-800 mt-2">Measured settings, not guesses</h3>
-          <p class="mt-2 text-sm text-ink-700/85">The #1 frustration in laser forums is "what power and speed do I use?" Laser Studio's calibration reads a photo of your own test burn and recommends YOUR machine's best setting — measured on your material, not copied from a stranger's post.</p>
-        </div>
-        <div class="border border-bronze-600/25 rounded-xl p-6 bg-gradient-to-br from-cream to-white">
-          <p class="text-2xl">🌌</p>
-          <h3 class="font-serif text-xl text-bronze-800 mt-2">Whole product categories in a click</h3>
-          <p class="mt-2 text-sm text-ink-700/85">Real star maps for any date and place, working sundials computed for your latitude, handwriting recipe boards, tumbler wraps at true circumference, press-fit boxes — each one a finished product a print-shop tool simply can't make.</p>
-        </div>
-        <div class="border border-bronze-600/25 rounded-xl p-6 bg-gradient-to-br from-cream to-white">
-          <p class="text-2xl">⚡</p>
-          <h3 class="font-serif text-xl text-bronze-800 mt-2">Diode AND CO2, first-class</h3>
-          <p class="mt-2 text-sm text-ink-700/85">Every export ships one organised ZIP: 1-bit dithers for diode lasers, hi-res grayscale and 16-bit depth for CO2/fibre/galvo, and real-millimetre SVG cut lines — with a read-me that says exactly which folder your laser needs.</p>
-        </div>
-        <div class="border border-bronze-600/25 rounded-xl p-6 bg-gradient-to-br from-cream to-white">
-          <p class="text-2xl">🪪</p>
-          <h3 class="font-serif text-xl text-bronze-800 mt-2">Built for sellers</h3>
-          <p class="mt-2 text-sm text-ink-700/85">Watermarked client proofs with scan-to-approve QR codes end spelling-mistake refunds. A time &amp; cost estimator prices every job. A project journal remembers every export. Care cards ship with every order.</p>
-        </div>
+      <div class="text-center reveal">
+        <p class="text-xs tracking-widest text-bronze-600 mb-3">WHY IT MATTERS</p>
+        <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">A game changer<br class="hidden md:block"/> for the laser market</h2>
+        <p class="mt-4 text-ink-700/85 max-w-3xl mx-auto">
+          Laser makers today juggle a photo-prep website, a dithering tool, a star-map generator, a box maker and a
+          settings forum — plus a subscription or two. Laser Studio replaces the whole stack with one honest desktop app.
+        </p>
+      </div>
+      <div class="mt-10 grid md:grid-cols-3 gap-5">
+        {[
+          { i: '🎨', t: 'Eleven products from one photo', p: 'Engrave, 3D-illusion relief, pencil sketch, stipple, word portrait, spiral, string art, ASCII, low-poly, contour and a solvable maze — the same customer photo becomes eleven sellable product lines, each in seconds. No other tool on the market does this.' },
+          { i: '🔒', t: 'Offline. Owned. Private.', p: "While the industry moves to cloud subscriptions, Laser Studio runs 100% on your PC. Your customers' photos never leave your computer, there's no monthly fee, and it keeps working with or without the internet — buy once, use forever." },
+          { i: '🎯', t: 'Measured settings, not guesses', p: 'The #1 frustration in laser forums is "what power and speed do I use?" Laser Studio\'s calibration reads a photo of your own test burn and recommends YOUR machine\'s best setting — measured on your material, not copied from a stranger\'s post.' },
+          { i: '🌌', t: 'Whole product categories in a click', p: "Real star maps for any date and place, working sundials computed for your latitude, handwriting recipe boards, tumbler wraps at true circumference, press-fit boxes — each one a finished product a print-shop tool simply can't make." },
+          { i: '⚡', t: 'Diode AND CO2, first-class', p: 'Every export ships one organised ZIP: 1-bit dithers for diode lasers, hi-res grayscale and 16-bit depth for CO2/fibre/galvo, and real-millimetre SVG cut lines — with a read-me that says exactly which folder your laser needs.' },
+          { i: '🪪', t: 'Built for sellers', p: 'Watermarked client proofs with scan-to-approve QR codes end spelling-mistake refunds. A time & cost estimator prices every job. A project journal remembers every export. Care cards ship with every order.' },
+        ].map((c, n) => (
+          <div class={`gc-card reveal reveal-d${n % 3} group border border-bronze-600/25 rounded-xl p-6 bg-gradient-to-br from-cream to-white hover:-translate-y-1.5 hover:shadow-xl hover:border-bronze-600/50 transition-all duration-300`}>
+            <div class="w-12 h-12 rounded-full bg-bronze-600/10 border border-bronze-600/25 flex items-center justify-center text-2xl group-hover:bg-bronze-600/20 group-hover:scale-110 transition-all duration-300">{c.i}</div>
+            <h3 class="font-serif text-xl text-bronze-800 mt-4">{c.t}</h3>
+            <p class="mt-2 text-sm text-ink-700/85 leading-relaxed">{c.p}</p>
+          </div>
+        ))}
       </div>
     </section>
 
     <!-- ===== ELEVEN STYLES ===== -->
     <section class="mb-16">
-      <h2 class="font-serif text-3xl text-bronze-800 text-center">One photo. Eleven finished looks.</h2>
-      <p class="mt-3 text-ink-700/85 text-center max-w-2xl mx-auto">
-        Pick a style from one dropdown and its own sliders appear — every look below was generated from the same photograph.
-      </p>
-      <figure class="mt-8 rounded-xl overflow-hidden border border-bronze-600/25 shadow">
-        <img src="/laser-studio/styles.jpg" alt="Nine laser art styles generated from one photo: sketch, stipple, word portrait, spiral, string art, ASCII, low-poly, contour and maze" width="1200" height="1301" loading="lazy" class="w-full" />
-      </figure>
-      <p class="mt-4 text-sm text-ink-700/70 text-center">
-        Sketch · Stipple · Word Portrait · Spiral · String Art · ASCII · Low-Poly · Contour · Maze — plus the faithful photo engrave and the 3D-illusion relief.
-      </p>
-    </section>
-
-    <!-- ===== STL + STAR MAP split ===== -->
-    <section class="mb-16 grid md:grid-cols-2 gap-8 items-start">
-      <div>
-        <figure class="rounded-xl overflow-hidden border border-bronze-600/25 shadow mb-4">
-          <img src="/laser-studio/relief.jpg" alt="An STL 3D model converted into a hand-carved-looking laser relief engrave" width="1100" height="1093" loading="lazy" class="w-full" />
-        </figure>
-        <h3 class="font-serif text-2xl text-bronze-800">Drop an STL. Get a carving.</h3>
-        <p class="mt-2 text-ink-700/85 text-sm">
-          The 3D-illusion engine relights any STL model as a hand-carved masterpiece — swing the light around it,
-          dial the depth, boost the detail. Exports flat single-pass engraves for any laser <em>and</em> true 16-bit
-          depth maps for real 3D carving. It pairs perfectly with our <a href="/catalog" class="text-bronze-600">1,200+ bas-relief STL files</a>.
+      <div class="text-center reveal">
+        <p class="text-xs tracking-widest text-bronze-600 mb-3">THE ART ENGINES</p>
+        <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">One photo. Eleven finished looks.</h2>
+        <p class="mt-3 text-ink-700/85 max-w-2xl mx-auto">
+          Pick a style from one dropdown and its own sliders appear — every look below was generated from the same photograph.
         </p>
       </div>
-      <div>
-        <figure class="rounded-xl overflow-hidden border border-bronze-600/25 shadow mb-4">
-          <img src="/laser-studio/starmap.jpg" alt="A heart-shaped star map of the real night sky with names in script" width="1000" height="1282" loading="lazy" class="w-full" />
+      <figure class="mt-8 rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg reveal">
+        <img src={IMG.styles} alt="Nine laser art styles generated from one photo: sketch, stipple, word portrait, spiral, string art, ASCII, low-poly, contour and maze" width="980" height="1063" loading="lazy" decoding="async" class="w-full" />
+      </figure>
+      <div class="mt-5 flex flex-wrap justify-center gap-2 reveal">
+        {['Engrave', '3D Illusion', 'Sketch', 'Stipple', 'Word Portrait', 'Spiral', 'String Art', 'ASCII', 'Low-Poly', 'Contour', 'Maze'].map((t) => (
+          <span class="text-xs px-3 py-1.5 rounded-full border border-bronze-600/30 text-bronze-700 bg-cream">{t}</span>
+        ))}
+      </div>
+    </section>
+
+    <!-- ===== STL + STAR MAP · editorial split rows ===== -->
+    <section class="mb-16 space-y-12">
+      <div class="grid md:grid-cols-2 gap-8 items-center reveal">
+        <figure class="img-zoom rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg">
+          <img src={IMG.relief} alt="An STL 3D model converted into a hand-carved-looking laser relief engrave" width="1100" height="1093" loading="lazy" decoding="async" class="w-full transition-transform duration-500" />
         </figure>
-        <h3 class="font-serif text-2xl text-bronze-800">The sky, that night.</h3>
-        <p class="mt-2 text-ink-700/85 text-sm">
-          Astronomically real stars, the Moon at its true phase, the planets that were up — over any place and moment
-          on Earth. Heart-shaped skies, "where we met" street-map combos, a song's soundwave ringing the sky with a
-          QR that plays it. Engrave it, or print it in colour and frame it.
-        </p>
+        <div>
+          <p class="text-xs tracking-widest text-bronze-600 mb-2">STL TO LASER</p>
+          <h3 class="font-serif text-3xl text-bronze-800 leading-snug">Drop an STL.<br/>Get a carving.</h3>
+          <p class="mt-4 text-ink-700/85 leading-relaxed">
+            The 3D-illusion engine relights any STL model as a hand-carved masterpiece — swing the light around it,
+            dial the depth, boost the detail. Exports flat single-pass engraves for any laser <em>and</em> true 16-bit
+            depth maps for real 3D carving.
+          </p>
+          <p class="mt-3 text-sm text-ink-700/70">It pairs perfectly with our <a href="/catalog" class="text-bronze-600 underline underline-offset-2">1,200+ bas-relief STL files</a> — zero conversion needed.</p>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-8 items-center reveal">
+        <div class="md:order-1 order-2">
+          <p class="text-xs tracking-widest text-bronze-600 mb-2">THE STAR MAP ENGINE</p>
+          <h3 class="font-serif text-3xl text-bronze-800 leading-snug">The sky,<br/>that night.</h3>
+          <p class="mt-4 text-ink-700/85 leading-relaxed">
+            Astronomically real stars, the Moon at its true phase, the planets that were up — over any place and moment
+            on Earth. Heart-shaped skies, "where we met" street-map combos, a song's soundwave ringing the sky with a
+            QR that plays it.
+          </p>
+          <p class="mt-3 text-sm text-ink-700/70">Weddings, births, first dates, memorials — engrave it, or print it in colour and frame it.</p>
+        </div>
+        <figure class="img-zoom rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg md:order-2 order-1 max-w-md mx-auto md:mx-0">
+          <img src={IMG.starmap} alt="A heart-shaped star map of the real night sky with names in script" width="1000" height="1282" loading="lazy" decoding="async" class="w-full transition-transform duration-500" />
+        </figure>
       </div>
     </section>
 
     <!-- ===== PRODUCT MAKERS ===== -->
     <section class="mb-16">
-      <h2 class="font-serif text-3xl text-bronze-800 text-center">Product makers, built in</h2>
+      <div class="text-center reveal">
+        <p class="text-xs tracking-widest text-bronze-600 mb-3">BEYOND IMAGES</p>
+        <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">Product makers, built in</h2>
+      </div>
       <div class="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <figure class="border border-bronze-600/25 rounded-xl overflow-hidden bg-white">
-          <img src="/laser-studio/sundial.jpg" alt="A working sundial generated for a specific latitude" class="w-full" loading="lazy" />
-          <figcaption class="p-4"><strong class="text-bronze-800">A sundial that works.</strong><br/><span class="text-sm text-ink-700/80">Hour lines computed from real solar geometry for your latitude.</span></figcaption>
-        </figure>
-        <figure class="border border-bronze-600/25 rounded-xl overflow-hidden bg-white">
-          <img src="/laser-studio/recipe.jpg" alt="A recipe board composed from cleaned handwriting with a ruler edge" class="w-full" loading="lazy" />
-          <figcaption class="p-4"><strong class="text-bronze-800">Grandma's recipe, forever.</strong><br/><span class="text-sm text-ink-700/80">Photograph the card — the ink lifts clean off the paper.</span></figcaption>
-        </figure>
-        <figure class="border border-bronze-600/25 rounded-xl overflow-hidden bg-white">
-          <img src="/laser-studio/tumbler.jpg" alt="A tumbler wrap previewed on a 3D cup mockup" class="w-full" loading="lazy" />
-          <figcaption class="p-4"><strong class="text-bronze-800">Tumblers, done right.</strong><br/><span class="text-sm text-ink-700/80">True-circumference wraps with a spinnable 3D preview.</span></figcaption>
-        </figure>
-        <figure class="border border-bronze-600/25 rounded-xl overflow-hidden bg-white">
-          <img src="/laser-studio/proof.jpg" alt="A watermarked client proof card with approval QR code" class="w-full" loading="lazy" />
-          <figcaption class="p-4"><strong class="text-bronze-800">No more spelling refunds.</strong><br/><span class="text-sm text-ink-700/80">Watermarked client proofs with a scan-to-approve QR.</span></figcaption>
-        </figure>
+        {[
+          { img: IMG.sundial, alt: 'A working sundial generated for a specific latitude', t: 'A sundial that works.', p: 'Hour lines computed from real solar geometry for your latitude.' },
+          { img: IMG.recipe, alt: 'A recipe board composed from cleaned handwriting with a ruler edge', t: "Grandma's recipe, forever.", p: 'Photograph the card — the ink lifts clean off the paper.' },
+          { img: IMG.tumbler, alt: 'A tumbler wrap previewed on a 3D cup mockup', t: 'Tumblers, done right.', p: 'True-circumference wraps with a spinnable 3D preview.' },
+          { img: IMG.proof, alt: 'A watermarked client proof card with approval QR code', t: 'No more spelling refunds.', p: 'Watermarked client proofs with a scan-to-approve QR.' },
+        ].map((c, n) => (
+          <figure class={`reveal reveal-d${n} group border border-bronze-600/25 rounded-xl overflow-hidden bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col`}>
+            <div class="overflow-hidden aspect-square bg-cream flex items-center justify-center">
+              <img src={c.img} alt={c.alt} class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
+            </div>
+            <figcaption class="p-4 border-t border-bronze-600/15">
+              <strong class="text-bronze-800 font-serif">{c.t}</strong>
+              <p class="text-sm text-ink-700/80 mt-1">{c.p}</p>
+            </figcaption>
+          </figure>
+        ))}
       </div>
     </section>
 
     <!-- ===== COMPATIBILITY ===== -->
-    <section class="mb-16 border border-bronze-600/30 rounded-xl p-8 bg-gradient-to-br from-cream to-white">
+    <section class="mb-16 border border-bronze-600/30 rounded-xl p-8 bg-gradient-to-br from-cream to-white reveal">
       <h2 class="font-serif text-2xl text-bronze-800 text-center">Works with the laser you already own</h2>
       <div class="mt-6 grid md:grid-cols-2 gap-6 text-sm text-ink-700/85">
         <div>
@@ -166,7 +183,7 @@ import Breadcrumbs from '../components/Breadcrumbs.astro';
     </section>
 
     <!-- ===== FACTS + CTA ===== -->
-    <section class="mb-8 text-center">
+    <section class="mb-8 text-center reveal">
       <h2 class="font-serif text-3xl text-bronze-800">The plain facts</h2>
       <ul class="not-prose mt-5 grid sm:grid-cols-2 gap-3 text-sm max-w-2xl mx-auto text-left text-ink-700/85">
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Windows 10 / 11 — installs in one click, no setup</li>
@@ -178,14 +195,65 @@ import Breadcrumbs from '../components/Breadcrumbs.astro';
       </ul>
     </section>
 
-    <section class="mt-12 mb-4 border border-bronze-600/30 rounded-xl p-8 text-center bg-gradient-to-br from-cream to-white">
+    <section class="mt-12 mb-4 border border-bronze-600/30 rounded-xl p-8 text-center bg-gradient-to-br from-cream to-white reveal">
       <h3 class="font-serif text-2xl text-bronze-800">Turn your next photo into a product tonight.</h3>
       <p class="mt-2 text-ink-700">Laser Studio is available now from our shop — and every DigitalChiselCo STL file works in it with zero conversion.</p>
       <div class="mt-5 flex flex-wrap justify-center gap-3">
-        <a href="https://www.etsy.com/shop/DigitalChiselCo" target="_blank" rel="noopener" class="bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition shadow">Get Laser Studio →</a>
-        <a href="/catalog" class="border border-bronze-600 text-bronze-700 px-6 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">Browse STL designs for it</a>
+        <a href={BUY} target="_blank" rel="noopener" class="bg-bronze-600 text-cream px-7 py-3 rounded-md text-sm font-medium hover:bg-bronze-700 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow">Get Laser Studio →</a>
+        <a href="/catalog" class="border border-bronze-600 text-bronze-700 px-7 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">Browse STL designs for it</a>
       </div>
     </section>
 
   </article>
 </Shell>
+
+<style is:global>
+  /* Progressive enhancement: elements only start hidden AFTER JS tags <html class="js-anim">,
+     so the page can never render blank if the script fails to load. */
+  .js-anim .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+  .js-anim .reveal.in { opacity: 1; transform: none; }
+  .js-anim .reveal.now { transition: none !important; }
+  .js-anim .reveal-d1 { transition-delay: .12s; }
+  .js-anim .reveal-d2 { transition-delay: .24s; }
+  .js-anim .reveal-d3 { transition-delay: .36s; }
+  .img-zoom:hover img { transform: scale(1.03); }
+  @media (prefers-reduced-motion: reduce) { .js-anim .reveal { opacity: 1; transform: none; transition: none; } }
+</style>
+
+<script is:inline>
+  (function () {
+    var els = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+    if (!els.length) return;
+    document.documentElement.classList.add('js-anim');
+    function pass() {
+      var vh = window.innerHeight || 800;
+      els = els.filter(function (el) {
+        var r = el.getBoundingClientRect();
+        if (r.top < vh * 0.92 && r.bottom > 0) { el.classList.add('in'); return false; }
+        return true;
+      });
+      if (!els.length) {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onScroll);
+      }
+    }
+    var last = 0;
+    function onScroll() {
+      var now = Date.now();
+      if (now - last < 80) return;
+      last = now; pass();
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    pass();                                   // reveal everything already in view, immediately
+    setTimeout(pass, 300);                    // and once more after layout settles
+    setTimeout(function () {                  // failsafe for crawlers & throttled tabs: everything
+      document.querySelectorAll('.reveal').forEach(function (el) {     // visible, transitions done
+        el.classList.add('now', 'in');
+      });
+      els = [];
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    }, 2500);
+  })();
+</script>
