@@ -1,0 +1,46 @@
+name: Pinterest auto-publish
+
+# Creates ONE Pin every 2 hours (~12/day) directly via the Pinterest API v5, with
+# a random pre-post delay so the cadence looks organic. Replaces Pinterest's
+# unreliable native RSS auto-publish. Tracking lives in the database
+# (products.pinterest_posted_at), so runs are stateless and never re-pin.
+# Secrets: repo Settings -> Secrets and variables -> Actions.
+#   PINTEREST_APP_ID, PINTEREST_APP_SECRET, PINTEREST_REFRESH_TOKEN, PINTEREST_BOARD_ID
+# Until those are set, the job is a green no-op (the script skips cleanly).
+
+on:
+  schedule:
+    - cron: '30 */2 * * *'   # every 2 hours at :30 UTC (staggered from Cults3D at :00)
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Pins to create this run'
+        default: '1'
+      jitter:
+        description: 'Random delay before posting (minutes)'
+        default: '0'
+
+concurrency:
+  group: pinterest-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Create Pinterest Pin(s)
+        run: node scripts/pinterest_publish.mjs --apply --limit "${{ github.event.inputs.limit || '1' }}" --jitter "${{ github.event.inputs.jitter || '30' }}"
+        env:
+          PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PINTEREST_APP_ID: ${{ secrets.PINTEREST_APP_ID }}
+          PINTEREST_APP_SECRET: ${{ secrets.PINTEREST_APP_SECRET }}
+          PINTEREST_REFRESH_TOKEN: ${{ secrets.PINTEREST_REFRESH_TOKEN }}
+          PINTEREST_BOARD_ID: ${{ secrets.PINTEREST_BOARD_ID }}
+          PUBLIC_SITE_URL: https://digitalchiselco.com
