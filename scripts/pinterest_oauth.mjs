@@ -26,7 +26,7 @@ const val = (f, d) => { const i = argv.indexOf(f); return i >= 0 && argv[i + 1] 
 const APP_ID = process.env.PINTEREST_APP_ID || val('--app-id', '');
 const APP_SECRET = process.env.PINTEREST_APP_SECRET || val('--app-secret', '');
 const REDIRECT = val('--redirect', process.env.PINTEREST_REDIRECT_URI || 'https://digitalchiselco.com/');
-const SCOPES = 'boards:read,pins:read,pins:write';
+const SCOPES = 'boards:read,boards:write,pins:read,pins:write';
 
 if (!APP_ID || !APP_SECRET) {
   console.error('Set PINTEREST_APP_ID and PINTEREST_APP_SECRET in .env (or pass --app-id / --app-secret).');

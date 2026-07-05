@@ -198,7 +198,16 @@ async function main() {
       if (upErr) { console.error(`ABORT: created pin ${res.id} but DB update failed — fix tracking before re-running:`, upErr.message); process.exit(1); }
       ok++;
       console.log(`✓ ${pin.slug} -> pin ${res.id}`);
-    } else { fail++; console.log(`✗ ${pin.slug}: ${redact(res.error)}`); }
+    } else {
+      // Trial-access apps can't write to production yet. Treat as a green no-op
+      // (not a failure) so scheduled runs don't spam failure emails while we wait
+      // for Pinterest to grant Standard access. Apply at developers.pinterest.com.
+      if (/Trial access|api-sandbox|"code":\s*29/.test(res.error)) {
+        console.log('\nPinterest app is still on TRIAL access — production Pin creation is blocked until Pinterest grants STANDARD access. No-op for now (nothing published). Apply for Standard access in the developer portal.');
+        return;
+      }
+      fail++; console.log(`✗ ${pin.slug}: ${redact(res.error)}`);
+    }
     await sleep(1500); // gentle pacing, well under Pinterest's rate limits
   }
   console.log(`\nDone. Created ${ok}, failed ${fail}.`);
