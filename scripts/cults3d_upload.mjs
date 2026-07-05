@@ -315,7 +315,7 @@ async function main() {
     if (error) { console.error('ABORT: cannot write to DB (check SUPABASE_SERVICE_ROLE_KEY has service-role/write access):', error.message); process.exit(1); }
   }
 
-  let ok = 0, fail = 0;
+  let ok = 0, fail = 0, blocked = 0;
   for (const pl of ready) {
     const res = await createListing(pl);
     if (res.ok) {
@@ -327,11 +327,25 @@ async function main() {
       ledger[pl.productId] = { id: res.creation.id, url: res.creation.url, images: res.images, at: new Date().toISOString() };
       try { writeFileSync(LEDGER_PATH, JSON.stringify(ledger, null, 2)); } catch {}
       console.log(`✓ ${pl.slug} (${res.images} img) -> ${res.creation.url}`);
-    } else { fail++; console.log(`✗ ${pl.slug}: ${redact(JSON.stringify(res.errors))}`); }
+    } else {
+      fail++;
+      const errStr = redact(typeof res.errors === 'string' ? res.errors : JSON.stringify(res.errors));
+      // Cults' Cloudflare anti-bot serves a 403/429 non-JSON block page to shared
+      // cloud IPs. Count these so an all-blocked run can soft-skip instead of
+      // failing (transient + IP-based; the local task / next run covers it).
+      if (/Non-JSON response \((?:403|429|5\d\d)\)|cloudflare|attention required/i.test(errStr)) blocked++;
+      console.log(`✗ ${pl.slug}: ${errStr}`);
+    }
     await sleep(800); // stay well under 60 req / 30s
   }
   console.log(`\nDone. Created ${ok}, failed ${fail}.`);
-  if (fail > 0 && ok === 0) process.exit(1); // surface a red CI run when nothing succeeded
+  if (fail > 0 && ok === 0) {
+    // If EVERY failure was the anti-bot block, don't fail the run (no red CI, no
+    // failure email) — it's transient and IP-based; the local scheduled task and
+    // the next cloud run will publish. Hard-fail only on a genuine error.
+    if (blocked === fail) { console.log('All failures were Cults anti-bot (403/429) blocks — soft skip (not failing the run).'); return; }
+    process.exit(1); // surface a red CI run when a genuine error stopped everything
+  }
 }
 
 main().catch((e) => { console.error(redact((e && e.stack) || e)); process.exit(1); });
