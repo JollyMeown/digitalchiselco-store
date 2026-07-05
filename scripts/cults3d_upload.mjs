@@ -69,16 +69,42 @@ function authHeader() {
   return 'Basic ' + Buffer.from(`${USER}:${KEY}`).toString('base64');
 }
 
+// A browser-like User-Agent + Accept headers make Cloudflare far less likely to
+// serve an anti-bot 403 to shared cloud IPs (GitHub Actions runners), which was
+// intermittently blocking the daily job while local (residential-IP) runs worked.
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+
 async function gql(query, variables = {}) {
-  const res = await fetch(ENDPOINT, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: authHeader() },
-    body: JSON.stringify({ query, variables }),
-  });
-  const text = await res.text();
-  let json; try { json = JSON.parse(text); } catch { throw new Error(`Non-JSON response (${res.status}): ${text.slice(0, 300)}`); }
-  if (json.errors) throw new Error('GraphQL errors: ' + JSON.stringify(json.errors));
-  return json.data;
+  let lastStatus = 0, lastText = '';
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await sleep(2500 * attempt + Math.floor(Math.random() * 2000)); // backoff before retry
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json',
+        'accept-language': 'en-US,en;q=0.9',
+        'user-agent': UA,
+        authorization: authHeader(),
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+    lastStatus = res.status;
+    lastText = await res.text();
+    let json;
+    try { json = JSON.parse(lastText); }
+    catch {
+      // Non-JSON body = an anti-bot / Cloudflare block page. Retry transient blocks.
+      if (attempt < 3 && (res.status === 403 || res.status === 429 || res.status >= 500)) {
+        console.log(`  (Cults ${res.status} block — retry ${attempt + 1}/3 after backoff)`);
+        continue;
+      }
+      throw new Error(`Non-JSON response (${res.status}): ${lastText.slice(0, 300)}`);
+    }
+    if (json.errors) throw new Error('GraphQL errors: ' + JSON.stringify(json.errors));
+    return json.data;
+  }
+  throw new Error(`Non-JSON response (${lastStatus}): ${String(lastText).slice(0, 300)}`);
 }
 
 const driveId = (link) => {
