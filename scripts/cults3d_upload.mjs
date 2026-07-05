@@ -242,23 +242,30 @@ async function main() {
   }
 
   const { products, ledger } = await fetchProducts();
-  const slice = products.slice(0, LIMIT);
-  const dlMap = await fetchDownloadMap(slice.map((p) => p.id));
+  // Resolve download links + Drive files for the ENTIRE unpublished candidate set (not just the
+  // first LIMIT), then filter to publishable rows BEFORE slicing. This makes the job SKIP no-file
+  // rows (memberships, BUNDLE-MANUAL) instead of head-of-line blocking on them: previously
+  // `products.slice(0, LIMIT)` grabbed the first candidate even if it had no STL, so a single
+  // file-less product at the top of the order (e.g. a bestseller membership) stalled the whole
+  // rollout — every run re-picked it and published nothing. fetchDownloadMap paginates and
+  // buildPayload is in-memory, so scanning all candidates each run is cheap.
+  const dlMap = await fetchDownloadMap(products.map((p) => p.id));
   const driveRaw = existsSync('drive_stls.json') ? JSON.parse(readFileSync('drive_stls.json', 'utf8')) : [];
   const driveArr = Array.isArray(driveRaw) ? driveRaw : (driveRaw.files || Object.values(driveRaw));
   const driveMap = Object.fromEntries(driveArr.filter((f) => f && f.id).map((f) => [f.id, f]));
 
-  const payloads = slice.map((p) => buildPayload(p, dlMap[p.id], driveMap));
-  const missingFile = payloads.filter((x) => !x.fileUrls.length);
-  const ready = payloads.filter((x) => x.fileUrls.length && x.imageUrls.length);
+  const allPayloads = products.map((p) => buildPayload(p, dlMap[p.id], driveMap));
+  const publishable = allPayloads.filter((x) => x.fileUrls.length && x.imageUrls.length);
+  const noFile = allPayloads.filter((x) => !x.fileUrls.length);
+  const ready = publishable.slice(0, LIMIT);
 
-  console.log(`Candidates: ${slice.length} | ready: ${ready.length} | missing Drive file: ${missingFile.length}`);
-  if (missingFile.length) console.log('  no-file slugs:', missingFile.map((x) => x.slug).join(', '));
+  console.log(`Unpublished: ${products.length} | publishable: ${publishable.length} | no-file (skipped): ${noFile.length} | posting this run: ${ready.length}`);
+  if (noFile.length) console.log('  no-file slugs (skipped):', noFile.slice(0, 15).map((x) => x.slug).join(', ') + (noFile.length > 15 ? ` …+${noFile.length - 15} more` : ''));
 
   if (!APPLY) {
-    writeFileSync(PREVIEW_PATH, redact(JSON.stringify(payloads, null, 2)));
-    console.log(`\nDRY RUN — wrote ${ready.length}+ payloads to ${PREVIEW_PATH}. Review, then run with --apply.`);
-    console.log('\nFirst payload preview:\n', redact(JSON.stringify(payloads[0], null, 2)));
+    writeFileSync(PREVIEW_PATH, redact(JSON.stringify(ready, null, 2)));
+    console.log(`\nDRY RUN — wrote ${ready.length} payload(s) that WOULD post to ${PREVIEW_PATH}. Review, then run with --apply.`);
+    console.log('\nFirst payload preview:\n', redact(JSON.stringify(ready[0], null, 2)));
     return;
   }
 
