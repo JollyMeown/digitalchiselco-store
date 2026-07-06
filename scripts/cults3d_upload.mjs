@@ -190,7 +190,7 @@ function buildPayload(p, downloadLink, driveMap) {
 
 const CREATE_MUTATION = `
 mutation Create($name:String!,$description:String!,$imageUrls:[String!]!,$fileUrls:[String!]!,$locale:LocaleEnum!,$categoryId:ID!,$downloadPrice:Float,$currency:CurrencyEnum,$licenseCode:String,$tagNames:[String!],$usages:[String!],$visibility:CreationVisibilityEnum){
-  createCreation(name:$name, description:$description, imageUrls:$imageUrls, fileUrls:$fileUrls, locale:$locale, categoryId:$categoryId, downloadPrice:$downloadPrice, currency:$currency, licenseCode:$licenseCode, tagNames:$tagNames, usages:$usages, visibility:$visibility, madeWithAi:false){
+  createCreation(name:$name, description:$description, imageUrls:$imageUrls, fileUrls:$fileUrls, locale:$locale, categoryId:$categoryId, downloadPrice:$downloadPrice, currency:$currency, licenseCode:$licenseCode, tagNames:$tagNames, usages:$usages, visibility:$visibility, madeWithAi:true){
     creation { id url(locale:$locale) }
     errors
   }
