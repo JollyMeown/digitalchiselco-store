@@ -10,12 +10,12 @@ import Marquee from '../components/Marquee.astro';
 import {
   getCategories, getProducts, getSettings,
   getBestSellers, getLatestProducts, getReviews, getFaqs, getMembershipPlans,
-  getPremiumBundles, getCustomizableProducts, MARQUEE_DEFAULTS,
+  getPremiumBundles, MARQUEE_DEFAULTS,
 } from '../lib/queries';
 
 const s = await getSettings();
 const categories = await getCategories();
-const [bestsellers, latest, reviews, faqs, plans, { products }, premiumBundles, madeForYou] = await Promise.all([
+const [bestsellers, latest, reviews, faqs, plans, { products }, premiumBundles] = await Promise.all([
   getBestSellers(12),
   getLatestProducts(12),
   getReviews(12),
@@ -23,7 +23,6 @@ const [bestsellers, latest, reviews, faqs, plans, { products }, premiumBundles, 
   getMembershipPlans(),
   getProducts(1, 24),
   getPremiumBundles(12),
-  getCustomizableProducts(12),
 ]);
 
 // fallback bestsellers if admin hasn't flagged any yet — use first 8 with images
@@ -209,33 +208,6 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
   <!-- Carved by you — customer creations (social proof, placed with reviews) -->
   <CarvedByYou enabled={mq('creations').enabled} speed={mq('creations').speed} direction={mq('creations').direction} />
 
-  <!-- Made for You — customizable / personalized designs (centered, static) -->
-  {madeForYou.length > 0 && (
-    <section class="relative">
-      <div class="absolute inset-0 -mx-4 sm:-mx-6 rounded-2xl bg-gradient-to-br from-[#F5EBE0] via-[#fff5e6] to-[#E8C49D]/40 -z-10" aria-hidden="true"></div>
-      <div class="py-8 text-center">
-        <div class="text-[11px] tracking-[0.18em] uppercase text-bronze-700/80 font-medium">✨ Personalized for you</div>
-        <h2 class="font-serif text-xl sm:text-2xl md:text-3xl text-bronze-800 mt-0.5">MADE FOR YOU</h2>
-        <p class="text-xs sm:text-sm text-bronze-700/70 mt-1 max-w-xl mx-auto">Share a name, a date, or a photo — we'll carve a one-of-a-kind STL just for you.</p>
-        {mq('madeforyou').enabled ? (
-          <div class="mt-5">
-            <Marquee duration={mq('madeforyou').speed} direction={mq('madeforyou').direction}>
-              {madeForYou.map((p) => (
-                <div class="w-[220px] sm:w-[240px]"><ProductCard product={p} discount={s.discount_percent} /></div>
-              ))}
-            </Marquee>
-          </div>
-        ) : (
-          <div class="mt-5 flex flex-wrap justify-center gap-4 px-1">
-            {madeForYou.map((p) => (
-              <div class="w-[220px] sm:w-[240px]"><ProductCard product={p} discount={s.discount_percent} /></div>
-            ))}
-          </div>
-        )}
-        <a href="/collections/made-for-you" class="inline-block mt-5 text-sm text-bronze-700 hover:underline">See all personalized designs →</a>
-      </div>
-    </section>
-  )}
 
   <!-- Become a member CTA — placed just above FAQ -->
   {featuredPlan && (

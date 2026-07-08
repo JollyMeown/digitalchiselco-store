@@ -62,3 +62,6 @@
 
 # Pattern catch — any old /product/...html that wasn't matched above
 /product/*.html    /catalog    301
+
+# Removed "Made for You" personalization (Paddle AUP — human services). Redirect stray links.
+/collections/made-for-you    /    301
