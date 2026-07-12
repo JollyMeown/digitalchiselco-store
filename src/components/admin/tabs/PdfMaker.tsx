@@ -107,8 +107,9 @@ export default function PdfMaker() {
     try {
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-      const t = (title || 'Bundle Downloads').trim();
       const n = ready.length;
+      // single product → its own name on the cover, never the word "Bundle"
+      const t = (title || (n === 1 ? ready[0].title.split('|')[0].trim() : 'Bundle Downloads')).trim();
       const sub = (subtitle ||
         (n > 1 ? `${n} Premium Bas-Relief STL Files for CNC Routers`
                : 'Premium Bas-Relief STL File for CNC Routers')).trim();
@@ -204,7 +205,7 @@ export default function PdfMaker() {
         doc.setFont('times', 'bold'); doc.setFontSize(14); doc.setTextColor(...BRONZE_D);
         doc.text('DigitalChiselCo', 100, 40);
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK_SOFT);
-        doc.text(`${t} — STL Bundle`, 100, 53);
+        doc.text(`${t} — ${n === 1 ? 'STL Download' : 'STL Bundle'}`, 100, 53);
         doc.setFontSize(8.5); doc.setTextColor(...BRONZE);
         doc.text('Instant digital downloads', W - 54, 46, { align: 'right' });
         doc.setDrawColor(...GOLD); doc.setLineWidth(1.4); doc.line(0, 64, W, 64);

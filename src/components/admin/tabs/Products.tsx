@@ -380,11 +380,32 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
         </div>
         <div className="md:col-span-2">
           <label className={labelCls}>Gallery images</label>
-          <p className="text-xs text-ink-700/50 mb-2">Add images one at a time using the uploader, or paste URLs (one per line) in the text box below.</p>
+          <p className="text-xs text-ink-700/50 mb-2">
+            Add images one at a time using the uploader, or paste URLs (one per line) in the text box below.
+            <b className="text-ink-700/80"> Drag a picture to reposition it — the FIRST one is the hero</b> (catalog
+            card + big product photo); dropping a new picture into first place also updates the Main image.
+          </p>
           <div className="flex flex-wrap gap-2 mb-2">
             {f.gallery.split('\n').filter((u: string) => u.trim()).map((url: string, i: number) => (
-              <div key={i} className="relative group w-20 h-20 rounded border border-black/10 overflow-hidden flex-shrink-0">
-                <img src={url.trim()} className="w-full h-full object-cover" />
+              <div key={url.trim() + i} draggable
+                onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; }}
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const from = Number(e.dataTransfer.getData('text/plain'));
+                  if (Number.isNaN(from) || from === i) return;
+                  const urls = f.gallery.split('\n').filter((u: string) => u.trim());
+                  const [moved] = urls.splice(from, 1);
+                  urls.splice(i, 0, moved);
+                  // keep the site convention: hero (image_url) = gallery[0]
+                  setF((s: any) => ({ ...s, gallery: urls.join('\n'), image_url: urls[0] || s.image_url }));
+                }}
+                title={i === 0 ? '⭐ Hero — shown on the catalog card and as the big product photo' : 'Drag to reposition (drop on another picture) — first place = hero'}
+                className="relative group w-20 h-20 rounded border border-black/10 overflow-hidden flex-shrink-0 cursor-grab active:cursor-grabbing">
+                <img src={url.trim()} className="w-full h-full object-cover pointer-events-none" />
+                {i === 0 && (
+                  <span className="absolute bottom-0 left-0 right-0 bg-bronze-600/90 text-cream text-[9px] text-center py-0.5">⭐ HERO</span>
+                )}
                 <button
                   type="button"
                   onClick={() => {
