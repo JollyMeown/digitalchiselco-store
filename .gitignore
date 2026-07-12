@@ -35,3 +35,9 @@ migration_skipped_videos.json
 # Cults3D local state (do not commit — preview may contain API key in URLs)
 cults3d_uploaded.json
 cults3d-upload-preview.json
+
+# stray local operational artifacts (auto-added 2026-07-12)
+cults3d-local.log
+pinterest-publish-preview.json
+DownloadLinkGoogleDrive*.txt
+etsy cha-ching sound/
