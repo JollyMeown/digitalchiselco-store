@@ -17,6 +17,7 @@ import Customized from './tabs/Customized';
 import Seo from './tabs/Seo';
 import Discounts from './tabs/Discounts';
 import Cults from './tabs/Cults';
+import PdfMaker from './tabs/PdfMaker';
 import OrderSoundListener from './OrderSoundListener';
 import { inputCls, btnPrimary } from './ui';
 
@@ -27,6 +28,7 @@ const TABS: Tab[] = [
   { key: 'products',    label: 'Products',     icon: '▦', Component: Products },
   { key: 'seo',         label: 'SEO Review',   icon: '✦', Component: Seo },
   { key: 'bundles',     label: 'Bundle Composer', icon: '◫', Component: Bundles },
+  { key: 'pdfmaker',    label: 'PDF Maker',    icon: '⎙', Component: PdfMaker },
   { key: 'customized',  label: 'Customized',   icon: '✎', Component: Customized },
   { key: 'categories',  label: 'Categories',   icon: '☷', Component: Categories },
   { key: 'orders',      label: 'Orders',       icon: '⊞', Component: Orders },
