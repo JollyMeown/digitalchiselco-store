@@ -153,6 +153,29 @@ async function handleTransactionCompleted(db: any, txn: any) {
     .single();
   if (orderErr || !order) throw new Error(`Insert order failed: ${orderErr?.message}`);
 
+  // Stamp the coupon redemption now that payment has actually completed. The
+  // coupon_id rides along in custom_data from checkout-init. This is the ONLY
+  // place redemptions are counted (moved out of checkout-init so an
+  // unauthenticated caller can't burn a promo's max_redemptions without paying).
+  // The whole webhook is idempotent (order insert is skipped on retry above),
+  // so this runs at most once per paid order.
+  const couponId: string | null = txn.custom_data?.coupon_id || null;
+  if (couponId) {
+    try {
+      await db.from('coupon_redemptions').insert({
+        coupon_id: couponId,
+        email: email || null,
+        amount_off: Number(txn.custom_data?.coupon_discount) || 0,
+      });
+      await db.rpc('increment_coupon_redemption', { p_coupon_id: couponId }).then(() => {}, async () => {
+        const { data: cur } = await db.from('coupons').select('redemption_count').eq('id', couponId).maybeSingle();
+        await db.from('coupons').update({ redemption_count: (cur?.redemption_count || 0) + 1 }).eq('id', couponId);
+      });
+    } catch (e) {
+      console.error('coupon redemption stamp failed (order still valid):', e);
+    }
+  }
+
   // Resolve each line item → our product (by paddle_price_id) and create order_items + entitlements.
   const items = Array.isArray(txn.items) ? txn.items : [];
   // custom_data.cart_ids is the array our checkout-init pushed: the DB UUID per

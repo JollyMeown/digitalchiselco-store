@@ -4,6 +4,7 @@ import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import { getProductBySlug, getRelatedProducts, getSettings } from '../../lib/queries';
 import { pricing, money } from '../../lib/pricing';
+import { jsonLd } from '../../lib/jsonld';
 
 const { slug } = Astro.params;
 const p = await getProductBySlug(slug!);
@@ -93,7 +94,7 @@ const jsonld = {
     </section>
   )}
 
-  <script type="application/ld+json" set:html={JSON.stringify(jsonld)} />
+  <script type="application/ld+json" set:html={jsonLd(jsonld)} />
   <script is:inline>
     document.querySelectorAll('.thumb').forEach((t) => {
       t.addEventListener('click', () => {

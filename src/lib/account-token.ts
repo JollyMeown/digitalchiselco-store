@@ -10,7 +10,14 @@ function env(name: string): string | undefined {
 }
 
 function secret(): string {
-  return env('ACCOUNT_TOKEN_SECRET') || env('SUPABASE_SERVICE_ROLE_KEY') || 'dev-only-insecure-fallback';
+  const s = env('ACCOUNT_TOKEN_SECRET') || env('SUPABASE_SERVICE_ROLE_KEY');
+  if (s) return s;
+  // Fail closed in production: never sign/verify with a public constant (that
+  // would let anyone forge account tokens). Only dev/build gets the fallback.
+  if (env('NODE_ENV') === 'production' || (import.meta as any).env?.PROD) {
+    throw new Error('ACCOUNT_TOKEN_SECRET (or SUPABASE_SERVICE_ROLE_KEY) must be set in production');
+  }
+  return 'dev-only-insecure-fallback';
 }
 
 function b64url(buf: Buffer | string): string {

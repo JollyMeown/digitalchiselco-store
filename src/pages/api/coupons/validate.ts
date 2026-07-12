@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { validateCoupon, getActiveShopSale } from '../../../lib/discounts';
+import { rateLimit, clientIp, tooMany } from '../../../lib/rate-limit';
 
 export const prerender = false;
 
@@ -13,6 +14,11 @@ export const POST: APIRoute = async ({ request }) => {
     const email: string | null = body.email ? String(body.email).toLowerCase() : null;
     const cart = Array.isArray(body.items) ? body.items : [];
     if (!code) return json({ ok: false, error: 'Enter a code.' }, 400);
+
+    // Throttle so coupon codes can't be brute-force enumerated.
+    if (!(await rateLimit(`coupon:ip:${clientIp(request)}`, 20, 600))) {
+      return tooMany('Too many attempts. Please wait a moment.');
+    }
     const result = await validateCoupon(code, cart, email);
     if (!result.ok) return json(result, 400);
     return json(result);

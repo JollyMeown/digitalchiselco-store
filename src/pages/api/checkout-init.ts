@@ -16,6 +16,7 @@ import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { paddleApi } from '../../lib/paddle';
 import { validateCoupon, getActiveShopSale } from '../../lib/discounts';
+import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
 
 export const prerender = false;
 
@@ -29,13 +30,22 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json().catch(() => ({}));
     const cart: CartItem[] = Array.isArray(body.items) ? body.items : [];
     const email: string | undefined = body.email ? String(body.email).toLowerCase().trim() : undefined;
-    let discountPercent: number = Number(body.discount_percent) || 0;
+    // SECURITY: the discount is resolved entirely server-side (coupon lookup or
+    // active shop sale). We NEVER trust a browser-supplied percentage — doing so
+    // let a caller pass discount_percent:99 and check out at 1% of catalog price.
+    let discountPercent = 0;
     const couponCode: string | undefined = body.coupon_code ? String(body.coupon_code).trim().toUpperCase() : undefined;
     // Per-line customization snapshots aligned with cart order:
     // customizations[i] = null OR [{key,label,type,value}, ...]
     const customizations: any[] = Array.isArray(body.customizations) ? body.customizations : [];
 
     if (!cart.length) return json({ error: 'Cart is empty.' }, 400);
+
+    // Each call creates a Paddle transaction (a paid third-party write), so cap
+    // it per IP to stop automated abuse of that endpoint.
+    if (!(await rateLimit(`checkout:ip:${clientIp(request)}`, 30, 600))) {
+      return tooMany('Too many checkout attempts. Please wait a minute and try again.');
+    }
 
     const db = supabaseAdmin();
 
@@ -54,12 +64,12 @@ export const POST: APIRoute = async ({ request }) => {
       const { data: row } = await db.from('coupons').select('id').eq('code', validation.code).maybeSingle();
       if (row) {
         couponMeta = { id: row.id, code: validation.code, amount: validation.discount_amount, percent: validation.percent_off };
-        if (validation.percent_off) discountPercent = Math.max(discountPercent, validation.percent_off);
+        if (validation.percent_off) discountPercent = validation.percent_off;
         else if (validation.fixed_amount_off) fixedDiscount = validation.fixed_amount_off;
       }
     } else {
       const sale = await getActiveShopSale();
-      if (sale) discountPercent = Math.max(discountPercent, sale.percent_off);
+      if (sale) discountPercent = sale.percent_off;
     }
 
     // Split cart into product ids vs membership slugs
@@ -142,17 +152,11 @@ export const POST: APIRoute = async ({ request }) => {
       },
     });
 
-    // Stamp the coupon redemption immediately so single_use_per_buyer + global
-    // max_redemptions are enforced even if the buyer abandons checkout. (We can
-    // sweep stale "pending" redemptions later if needed.)
-    if (couponMeta && txn.data?.id) {
-      await db.from('coupon_redemptions').insert({ coupon_id: couponMeta.id, email: email || null, amount_off: couponMeta.amount });
-      await db.rpc('increment_coupon_redemption', { p_coupon_id: couponMeta.id }).then(() => {}, async () => {
-        // Fallback if the RPC doesn't exist yet: do it the manual way.
-        const { data: cur } = await db.from('coupons').select('redemption_count').eq('id', couponMeta!.id).maybeSingle();
-        await db.from('coupons').update({ redemption_count: (cur?.redemption_count || 0) + 1 }).eq('id', couponMeta!.id);
-      });
-    }
+    // NOTE: coupon redemption is NOT stamped here. It is recorded in the Paddle
+    // webhook (transaction.completed) AFTER payment succeeds — otherwise anyone
+    // could loop this unauthenticated endpoint to exhaust a coupon's
+    // max_redemptions and disable the promo without ever paying. The coupon_id
+    // is carried through in custom_data (above) so the webhook can stamp it.
 
     return json({ transaction_id: txn.data?.id, status: txn.data?.status, discount_amount: couponMeta?.amount || 0 });
   } catch (e: any) {

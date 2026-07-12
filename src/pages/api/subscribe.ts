@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../../lib/supabase';
 import { send as sendEmail } from '../../lib/resend';
 import { signSubscribeToken } from '../../lib/subscribe-token';
 import { freePackConfirmation } from '../../lib/email-templates';
+import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
 
 export const prerender = false;
 
@@ -20,6 +21,12 @@ export const POST: APIRoute = async ({ request }) => {
     const name = String(body.name || '').trim().slice(0, 120) || null;
     if (!EMAIL_RE.test(email)) {
       return json({ error: 'Please enter a valid email address.' }, 400);
+    }
+
+    const ip = clientIp(request);
+    if (!(await rateLimit(`subscribe:ip:${ip}`, 10, 3600)) ||
+        !(await rateLimit(`subscribe:email:${email}`, 4, 3600))) {
+      return tooMany();
     }
 
     // Always upsert into our subscribers table. confirmed_at stays null until

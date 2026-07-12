@@ -31,3 +31,7 @@ BRANDING/
 migration.log
 migration_errors.json
 migration_skipped_videos.json
+
+# Cults3D local state (do not commit — preview may contain API key in URLs)
+cults3d_uploaded.json
+cults3d-upload-preview.json

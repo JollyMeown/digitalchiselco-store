@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { signAccountToken } from '../../../lib/account-token';
 import { send } from '../../../lib/resend';
+import { rateLimit, clientIp, tooMany } from '../../../lib/rate-limit';
 
 export const prerender = false;
 
@@ -18,6 +19,14 @@ export const POST: APIRoute = async ({ request }) => {
   }
   if (!email || !EMAIL_RE.test(email)) {
     return Response.json({ ok: false, error: 'Please enter a valid email.' }, { status: 400 });
+  }
+
+  // Abuse control: cap sign-in emails per IP and per target address so this
+  // endpoint can't be looped to spam inboxes or burn the Resend quota.
+  const ip = clientIp(request);
+  if (!(await rateLimit(`signin:ip:${ip}`, 6, 3600)) ||
+      !(await rateLimit(`signin:email:${email}`, 4, 3600))) {
+    return tooMany('Too many sign-in requests. Please wait a few minutes.');
   }
 
   const token = signAccountToken(email);

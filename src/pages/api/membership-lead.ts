@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { subscribe as mailerliteSubscribe } from '../../lib/mailerlite';
+import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
 
 export const prerender = false;
 
@@ -16,6 +17,11 @@ export const POST: APIRoute = async ({ request }) => {
     }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return json({ error: 'Please enter a valid email address.' }, 400);
+    }
+    const ip = clientIp(request);
+    if (!(await rateLimit(`memberlead:ip:${ip}`, 10, 3600)) ||
+        !(await rateLimit(`memberlead:email:${email}`, 5, 3600))) {
+      return tooMany();
     }
     const db = supabaseAdmin();
     const { error } = await db

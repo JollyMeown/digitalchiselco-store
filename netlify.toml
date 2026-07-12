@@ -8,6 +8,22 @@
   # doesn't fail. (Without this, Netlify aborts the deploy when it sees the keys.)
   SECRETS_SCAN_OMIT_KEYS = "PUBLIC_SUPABASE_URL,PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,PADDLE_API_KEY,PUBLIC_PADDLE_CLIENT_TOKEN,PADDLE_WEBHOOK_SECRET,MAILERLITE_API_KEY,RESEND_API_KEY"
 
+# ── Security headers ─────────────────────────────────────────────────
+# Applied to every response. The CSP here is deliberately narrow: it locks
+# down framing (anti-clickjacking), plugins, and the <base> tag WITHOUT a
+# script-src directive, so it adds defense-in-depth without breaking Astro's
+# inline scripts, the Paddle checkout overlay, GA, or Google Fonts. (A full
+# script-src CSP would need per-request nonces, which static headers can't do.)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    Content-Security-Policy = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+
 # ── Redirects ────────────────────────────────────────────────────────
 # Canonical: www → apex (or vice versa — pick one)
 [[redirects]]

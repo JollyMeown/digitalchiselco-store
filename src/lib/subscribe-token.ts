@@ -10,7 +10,13 @@ function env(name: string): string | undefined {
 }
 
 function secret(): string {
-  return env('SUBSCRIBE_TOKEN_SECRET') || env('SUPABASE_SERVICE_ROLE_KEY') || 'dev-only-insecure-fallback';
+  const s = env('SUBSCRIBE_TOKEN_SECRET') || env('SUPABASE_SERVICE_ROLE_KEY');
+  if (s) return s;
+  // Fail closed in production — never sign/verify with a public constant.
+  if (env('NODE_ENV') === 'production' || (import.meta as any).env?.PROD) {
+    throw new Error('SUBSCRIBE_TOKEN_SECRET (or SUPABASE_SERVICE_ROLE_KEY) must be set in production');
+  }
+  return 'dev-only-insecure-fallback';
 }
 
 const SCOPE = 'subscribe-confirm';

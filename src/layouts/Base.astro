@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { getSettings } from '../lib/queries';
+import { jsonLd } from '../lib/jsonld';
 import AnnouncementBanner from '../components/AnnouncementBanner.astro';
 interface Props { title?: string; description?: string; image?: string; noindex?: boolean; ogType?: string; price?: number; currency?: string; availability?: string; }
 const {
@@ -91,7 +92,7 @@ const faviconType = settings.favicon_image_url
     <slot />
     <!-- Organization + WebSite structured data — helps Google build Knowledge Graph
          entries for the brand and enables the sitelinks search box. -->
-    <script type="application/ld+json" set:html={JSON.stringify({
+    <script type="application/ld+json" set:html={jsonLd({
       '@context': 'https://schema.org',
       '@graph': [
         {
