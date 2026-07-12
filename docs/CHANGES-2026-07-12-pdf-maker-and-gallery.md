@@ -23,6 +23,11 @@ a bundle's members), `site_settings.logo_image_url` (logo).
 
 **Rules**:
 - A product without a Drive link shows a red badge and is **skipped**.
+- **Each product row has an editable title** (`Sel.label`, defaults to the
+  catalog name minus any `| SEO tail`). Whatever the admin types there is the
+  exact name printed under that product in the PDF — works the same for a
+  single product or every member of a bundle. For a single-product PDF with no
+  explicit cover title, the cover also falls back to this edited label.
 - Admin picks each product's PDF picture from its catalog thumbnails.
 - Pictures are compressed client-side to 900 px JPEG q0.8 → the PDF stays far
   under Etsy's 20 MB digital-file cap.

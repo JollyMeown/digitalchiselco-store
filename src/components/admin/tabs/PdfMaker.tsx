@@ -10,10 +10,14 @@ import ProductSearchPicker, { type PickerProduct } from '../ProductSearchPicker'
 
 type Sel = {
   id: string; title: string; slug: string;
+  label: string;             // editable name shown under the product IN THE PDF
   images: string[];          // all catalog pictures (image_url + gallery)
   chosen: string;            // the picture that goes in the PDF
   link: string;              // Drive download link ('' = missing)
 };
+
+// the catalog title minus any SEO tail after the first pipe
+const cleanName = (t: string) => (t || '').split('|')[0].trim();
 
 const W = 612, H = 792;      // US-Letter in points
 const BRONZE: [number, number, number] = [133, 79, 11];
@@ -74,7 +78,8 @@ export default function PdfMaker() {
     return rows.map((r) => {
       const gallery: string[] = Array.isArray(r.gallery) ? r.gallery : [];
       const images = [...new Set([r.image_url, ...gallery].filter(Boolean))] as string[];
-      return { id: r.id, title: r.title, slug: r.slug, images, chosen: images[0] || '', link: linkBy[r.id] || '' };
+      return { id: r.id, title: r.title, slug: r.slug, label: cleanName(r.title),
+               images, chosen: images[0] || '', link: linkBy[r.id] || '' };
     });
   }
 
@@ -108,8 +113,8 @@ export default function PdfMaker() {
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({ unit: 'pt', format: 'letter' });
       const n = ready.length;
-      // single product → its own name on the cover, never the word "Bundle"
-      const t = (title || (n === 1 ? ready[0].title.split('|')[0].trim() : 'Bundle Downloads')).trim();
+      // single product → its (editable) name on the cover, never the word "Bundle"
+      const t = (title || (n === 1 ? (ready[0].label || cleanName(ready[0].title)) : 'Bundle Downloads')).trim();
       const sub = (subtitle ||
         (n > 1 ? `${n} Premium Bas-Relief STL Files for CNC Routers`
                : 'Premium Bas-Relief STL File for CNC Routers')).trim();
@@ -223,11 +228,12 @@ export default function PdfMaker() {
           const dw = props.width * s, dh = props.height * s;
           doc.addImage(imgs[it.id], 'JPEG', x + (colW - dw) / 2, yTop + 14 + (box - dh) / 2, dw, dh);
           doc.setFont('times', 'bold'); doc.setTextColor(...INK);
-          let nm = it.title.split('|')[0].trim(); let nfs = 12;
+          const full = (it.label || cleanName(it.title)).trim();
+          let nm = full; let nfs = 12;
           doc.setFontSize(nfs);
           if (doc.getTextWidth(nm) > colW - 20) { nfs = 10.5; doc.setFontSize(nfs); }
           while (doc.getTextWidth(nm) > colW - 20 && nm.length > 8) nm = nm.slice(0, -2);
-          if (nm !== it.title.split('|')[0].trim()) nm += '…';
+          if (nm !== full) nm += '…';
           doc.text(nm, x + colW / 2, yTop + rowH - 52, { align: 'center' });
           button(x + colW / 2, yTop + rowH - 42, 176, 26, it.link, 'DOWNLOAD  STL  FILE');
         });
@@ -270,8 +276,9 @@ export default function PdfMaker() {
             <ol className="list-decimal ml-4 mt-1 space-y-1">
               <li><b>Pick products</b>: load a whole bundle from the dropdown, and/or search and
                 click individual products (click again to remove).</li>
-              <li><b>Choose each product's picture</b> by clicking a thumbnail, and set the
-                cover title / subtitle.</li>
+              <li><b>Edit each product's title</b> (the box under every row — this exact text
+                prints under the product in the PDF) and <b>click a thumbnail</b> to choose its
+                picture, then set the cover title / subtitle.</li>
               <li>Press <b>Generate PDF</b>. Pictures are auto-compressed (900&nbsp;px JPEG), so the
                 file stays far under Etsy's <b>20&nbsp;MB</b> attachment limit.</li>
             </ol>
@@ -302,16 +309,21 @@ export default function PdfMaker() {
       {/* ------------------------- selected rows ------------------------ */}
       {sel.length > 0 && (
         <Card>
-          <h3 className="font-serif text-bronze-700 mb-2">Selected products ({sel.length}) — click a thumbnail to choose the PDF picture</h3>
+          <h3 className="font-serif text-bronze-700 mb-2">Selected products ({sel.length}) — edit each title and click a thumbnail to choose the PDF picture</h3>
           <div className="space-y-3">
             {sel.map((s, i) => (
               <div key={s.id} className="border border-black/10 rounded-md p-2.5">
                 <div className="flex items-center gap-2 text-sm mb-1.5">
                   <span className="text-ink-700/40 text-xs w-5">{i + 1}.</span>
-                  <span className="flex-1 truncate">{s.title}</span>
+                  <input
+                    value={s.label}
+                    onChange={(e) => setSel(sel.map((x) => x.id === s.id ? { ...x, label: e.target.value } : x))}
+                    placeholder={cleanName(s.title)}
+                    title={`Title shown under this product in the PDF (catalog name: ${s.title})`}
+                    className={inputCls + ' flex-1 !py-1 text-sm'} />
                   {s.link
-                    ? <span className="text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded">🔗 Drive link ✓</span>
-                    : <span className="text-[10px] text-red-700 bg-red-100 px-1.5 py-0.5 rounded" title="Add one in the Download Links tab — this product will be SKIPPED">⚠ no Drive link — skipped</span>}
+                    ? <span className="text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded whitespace-nowrap">🔗 Drive link ✓</span>
+                    : <span className="text-[10px] text-red-700 bg-red-100 px-1.5 py-0.5 rounded whitespace-nowrap" title="Add one in the Download Links tab — this product will be SKIPPED">⚠ no Drive link — skipped</span>}
                   <button onClick={() => setSel(sel.filter((x) => x.id !== s.id))} className={btnDanger + ' !py-0.5 !px-2 text-xs'}>remove</button>
                 </div>
                 <div className="flex gap-1.5 flex-wrap">
