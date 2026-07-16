@@ -14,7 +14,10 @@ const promoTiers = [
   { items: 10, percent: 20, code: '2026OFF20' },
   { items: 25, percent: 35, code: '2026OFF35' },
 ];
-const paddleEnv = (import.meta.env.PADDLE_ENV === 'production' ? 'production' : 'sandbox');
+// PADDLE_ENV is a non-PUBLIC var, so it is NOT exposed on import.meta.env (that
+// resolves to undefined -> always 'sandbox'). Read process.env at SSR runtime
+// first, matching the server helper in src/lib/paddle.ts.
+const paddleEnv = ((process.env.PADDLE_ENV ?? import.meta.env.PADDLE_ENV) === 'production' ? 'production' : 'sandbox');
 const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
