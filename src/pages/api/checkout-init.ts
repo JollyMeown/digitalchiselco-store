@@ -177,7 +177,7 @@ function adhocItem(name: string, priceUsd: number, qty: number) {
   return {
     quantity: qty,
     price: {
-      description: name.slice(0, 200),
+      description: 'Instant digital download — commercial use included',
       name: name.slice(0, 200),
       product: {
         name: name.slice(0, 200),
