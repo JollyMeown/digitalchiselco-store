@@ -86,6 +86,14 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
     </div>
   </main>
 
+  <!-- Inline Paddle checkout — branded, embedded on-site (uses the dashboard Inline theme) -->
+  <section id="dcc-checkout-section" class="hidden px-4 sm:px-6 pb-16 max-w-3xl mx-auto">
+    <button id="dcc-checkout-back" type="button" class="text-sm text-bronze-700 hover:underline mb-4">&larr; Back to cart</button>
+    <h1 class="font-serif text-2xl sm:text-3xl text-bronze-800 mb-1">Complete your purchase</h1>
+    <p class="text-sm text-ink-700/60 mb-5">Secure checkout — your STL files are emailed instantly after payment.</p>
+    <div class="dcc-inline-frame rounded-xl border border-bronze-600/15 bg-white p-2 sm:p-4 min-h-[420px]"></div>
+  </section>
+
   <!-- Relevant-to-cart upsell (filled by JS using /api/related) -->
   <section id="upsell-wrap" class="px-6 pb-14 max-w-6xl mx-auto hidden">
     <h2 id="upsell-title" class="text-xl mb-1">You may also like</h2>
@@ -482,12 +490,22 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         });
         const data = await res.json();
         if (!res.ok || !data.transaction_id) throw new Error(data.error || 'Could not start checkout.');
-        // Passing customer.email here pre-fills + locks the email field in
-        // Paddle's overlay, so the receipt can only go to the same address
-        // we already captured.
+        // Reveal our on-site inline checkout and render Paddle INSIDE it — fully
+        // branded via the dashboard Inline settings — instead of the popup overlay.
+        // Passing customer.email pre-fills + locks the email to what we captured.
+        document.querySelector('main')?.classList.add('hidden');
+        document.getElementById('upsell-wrap')?.classList.add('hidden');
+        document.getElementById('dcc-checkout-section')?.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         Paddle.Checkout.open({
           transactionId: data.transaction_id,
           customer: { email: buyerEmail },
+          settings: {
+            displayMode: 'inline',
+            frameTarget: 'dcc-inline-frame',
+            frameInitialHeight: 480,
+            frameStyle: 'width:100%; min-width:312px; background-color: transparent; border: none;',
+          },
         });
         btn.disabled = false; btn.textContent = 'Checkout';
       } catch (err) {
@@ -496,5 +514,8 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         btn.disabled = false; btn.textContent = 'Checkout';
       }
     });
+
+    // Back to cart from the inline checkout — reload to restore cart state + clear the frame.
+    document.getElementById('dcc-checkout-back')?.addEventListener('click', () => window.location.reload());
   </script>
 </Base>
