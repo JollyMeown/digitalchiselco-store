@@ -124,11 +124,12 @@ export const POST: APIRoute = async ({ request }) => {
           const share = (unit * qty / productSubtotal) * fixedDiscount;
           unit = Math.max(0, +(unit - share / qty).toFixed(2));
         }
-        if (hasDiscount || !p.paddle_price_id) {
-          items.push(adhocItem(p.title, unit, qty));
-        } else {
-          items.push({ price_id: p.paddle_price_id, quantity: qty });
-        }
+        // Always send the storefront price as an ad-hoc line so products.price_usd
+        // is the single source of truth. Using the Paddle catalog price_id would
+        // let a stale synced price (e.g. after a website price change) override the
+        // current website price. Paddle still taxes + receipts ad-hoc items; the
+        // webhook resolves the product via custom_data.cart_ids / title match.
+        items.push(adhocItem(p.title, unit, qty));
       }
     }
     if (!items.length) return json({ error: 'No valid items in cart.' }, 400);
