@@ -113,6 +113,31 @@ function CreationForm({ c, products, onDone }: { c: Creation | null; products: P
   const [sortOrder, setSortOrder] = useState<number | string>(c?.sort_order ?? 0);
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
   const [busy, setBusy] = useState(false);
+  const [storyBusy, setStoryBusy] = useState(false);
+
+  // ✨ Generate a warm creation story from the maker's name + shared photo.
+  async function genStory() {
+    if (!name.trim()) { setMsg({ kind: 'error', text: 'Enter the maker name first.' }); return; }
+    setStoryBusy(true); setMsg({ kind: 'info', text: 'Writing the story…' });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/creation-story', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({
+          name, notes: description || '',
+          product_title: initialPreview?.title || '',
+          image_url: gallery[0] || '',
+        }),
+      });
+      const j = await res.json();
+      if (!res.ok || !j.story) throw new Error(j.error || 'no story');
+      setDescription(j.story);
+      setMsg({ kind: 'success', text: '✓ Story written — edit it if you like, then save.' });
+    } catch (e: any) {
+      setMsg({ kind: 'error', text: 'AI story failed: ' + (e?.message || e) });
+    } finally { setStoryBusy(false); }
+  }
   // The picker is server-backed. If the existing creation already has a
   // product_id, fetch THAT one product so we can render its image preview
   // before the user types anything.
@@ -160,8 +185,14 @@ function CreationForm({ c, products, onDone }: { c: Creation | null; products: P
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mike T." className={inputCls} />
           </div>
           <div>
-            <label className={labelCls}>Description / story</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="A short story — wood used, finish, occasion, anything they shared." className={inputCls} />
+            <div className="flex items-center justify-between">
+              <label className={labelCls}>Description / story</label>
+              <button type="button" onClick={genStory} disabled={storyBusy}
+                className={btnGhost + ' text-xs'} title="Generate a warm story from the maker's name + first photo">
+                {storyBusy ? '✨ Writing…' : '✨ AI story'}
+              </button>
+            </div>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="A short story — wood used, finish, occasion, anything they shared. Or click ✨ AI story." className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Source product <span className="text-ink-700/40">(optional — links the creation to the catalog)</span></label>

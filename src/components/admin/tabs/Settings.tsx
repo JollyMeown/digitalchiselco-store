@@ -26,10 +26,30 @@ const fields: [string, string, string?][] = [
 export default function Settings() {
   const [s, setS] = useState<any>(null);
   const [msg, setMsg] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     supabase.from('site_settings').select('*').eq('id', 1).maybeSingle().then(({ data }) => setS(data));
   }, []);
+
+  // 🔄 Pull sales / rating / reviews / designs live from Etsy (admirers via the
+  // local `npm run etsy:stats` sync, which pages every listing).
+  async function syncEtsy() {
+    setSyncing(true); setMsg('Syncing live stats from Etsy…');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/etsy-stats-refresh', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${session?.access_token || ''}` },
+      });
+      const j = await res.json();
+      if (!res.ok || !j.ok) throw new Error(j.error || 'sync failed');
+      setS((prev: any) => ({ ...prev, ...j.updated }));
+      setMsg('✓ Live Etsy stats pulled in — review and Save to publish.');
+    } catch (e: any) {
+      setMsg('Etsy sync failed: ' + (e?.message || e));
+    } finally { setSyncing(false); }
+  }
 
   async function save() {
     setMsg('Saving…');
@@ -66,7 +86,13 @@ export default function Settings() {
   return (
     <div className="space-y-5">
       <Card title="Site settings & stats">
-        <p className="text-xs text-ink-700/60 mb-4">These drive the homepage stats and the charity counter. (The site-wide discount % now lives in the <strong>Discounts</strong> tab.)</p>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <p className="text-xs text-ink-700/60">These drive the homepage stats and the charity counter. (The site-wide discount % now lives in the <strong>Discounts</strong> tab.)</p>
+          <button className={btnGhost + ' whitespace-nowrap'} onClick={syncEtsy} disabled={syncing}
+            title="Pull sales, rating, reviews and design counts live from the Etsy shop">
+            {syncing ? '🔄 Syncing…' : '🔄 Sync live from Etsy'}
+          </button>
+        </div>
         <div className="grid md:grid-cols-3 gap-3">
           {fields.map(([k, label, hint]) => (
             <label key={k} className="block">

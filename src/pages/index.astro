@@ -47,7 +47,7 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
 
   <!-- Stats row (moved up — sits right below the announcement + nav, above the hero) -->
   <div class="bg-white border-b border-black/5">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
       <div>
         <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.sales_count).toLocaleString()}+</div>
         <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">STL Files Sold</div>
@@ -55,6 +55,10 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
       <div>
         <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.rating)} <span class="text-yellow-500">★</span></div>
         <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Avg. Rating · {s.reviews_count}+ Reviews</div>
+      </div>
+      <div>
+        <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.admirers_count).toLocaleString()}+</div>
+        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Shop Admirers</div>
       </div>
       <div>
         <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.products_count).toLocaleString()}+</div>

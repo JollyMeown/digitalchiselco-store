@@ -20,7 +20,9 @@
     "audit:downloads": "node scripts/audit_download_filenames.mjs",
     "audit:duplicates": "node scripts/audit_duplicate_downloads.mjs",
     "apply:download-fixes": "node scripts/apply_download_link_fixes.mjs",
-    "seo:generate": "node scripts/generate_seo_copy.mjs"
+    "seo:generate": "node scripts/generate_seo_copy.mjs",
+    "etsy:stats": "node scripts/etsy_stats_sync.mjs",
+    "etsy:reviews": "node scripts/etsy_reviews_sync.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
