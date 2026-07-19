@@ -6,8 +6,10 @@
 -- transaction_id (or listing_id:buyer:create_ts) and dedup on it.
 alter table reviews add column if not exists etsy_review_id  text;
 alter table reviews add column if not exists etsy_created_at timestamptz;
+-- Full (non-partial) unique index so Supabase upsert `onConflict: etsy_review_id`
+-- matches it. NULLs are still allowed for the hand-picked seed reviews.
 create unique index if not exists reviews_etsy_review_id_uidx
-  on reviews(etsy_review_id) where etsy_review_id is not null;
+  on reviews(etsy_review_id);
 
 -- ---------- site_settings: last-synced stamp for the live stats ----------
 alter table site_settings add column if not exists etsy_synced_at timestamptz;
