@@ -54,10 +54,17 @@ console.log('');
 
 // --- keep only 5-star with real text --------------------------------------
 const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim();
-const idOf = (r) => `etsy:${r.transaction_id || `${r.listing_id}:${r.buyer_user_id}:${r.create_timestamp || r.created_timestamp}`}`;
+// Content-based dedup key: the SAME buyer leaving the SAME review text counts
+// as ONE (e.g. someone who bought several files and left an identical review on
+// each). Also keeps re-runs stable so nothing duplicates over time.
+const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+const hash = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); };
+const idOf = (r) => `etsy:${r.buyer_user_id || 'x'}:${hash(norm(r.review))}`;
 
-const good = reviews
-  .filter((r) => Number(r.rating) === 5 && clean(r.review).length >= MIN_LEN)
+const fiveStar = reviews.filter((r) => Number(r.rating) === 5 && clean(r.review).length >= MIN_LEN);
+const seen = new Set();
+const good = fiveStar
+  .filter((r) => { const k = idOf(r); if (seen.has(k)) return false; seen.add(k); return true; })
   .map((r, i) => ({
     etsy_review_id: idOf(r),
     name: 'Verified Buyer',
@@ -70,10 +77,18 @@ const good = reviews
     etsy_created_at: new Date((r.create_timestamp || r.created_timestamp || 0) * 1000).toISOString(),
   }));
 
-console.log(`5-star reviews with text: ${good.length} of ${reviews.length}`);
+console.log(`5-star reviews with text: ${fiveStar.length}; unique after dedup: ${good.length} (${fiveStar.length - good.length} duplicate(s) collapsed)`);
 if (!good.length) { console.log('Nothing to import.'); process.exit(0); }
 
-// --- upsert (dedup on etsy_review_id) -------------------------------------
+// Clear the previously auto-imported Etsy reviews (older key scheme could hold
+// duplicates), then re-insert the content-deduped set. The 3 hand-picked seed
+// reviews have a NULL etsy_review_id and are left untouched.
+{
+  const { error: delErr } = await db.from('reviews').delete().eq('source', 'Etsy').not('etsy_review_id', 'is', null);
+  if (delErr) { console.error('cleanup of old imported reviews failed:', delErr.message); process.exit(1); }
+}
+
+// --- insert the deduped set -----------------------------------------------
 let ok = 0;
 for (let i = 0; i < good.length; i += 100) {
   const batch = good.slice(i, i + 100);
@@ -82,5 +97,5 @@ for (let i = 0; i < good.length; i += 100) {
   ok += batch.length;
   process.stdout.write(`\r  upserted ${ok}/${good.length}…`);
 }
-console.log(`\nDone — ${ok} five-star Etsy reviews live on the site (deduped).`);
+console.log(`\nDone — ${ok} unique five-star Etsy reviews live (same buyer + same text counted once).`);
 console.log('They appear in the homepage "Loved by makers" section on the next load.');
