@@ -14,15 +14,19 @@
 # script-src directive, so it adds defense-in-depth without breaking Astro's
 # inline scripts, the Paddle checkout overlay, GA, or Google Fonts. (A full
 # script-src CSP would need per-request nonces, which static headers can't do.)
+# frame-ancestors: 'self' + localhost so the Laser Studio desktop app's "My Shop"
+# tab (an iframe served from http://localhost:<port>) can embed the site. Web
+# attackers can't serve from a visitor's localhost, so clickjacking protection is
+# effectively unchanged. X-Frame-Options is dropped on purpose: it can't express
+# an allow-list, and every current browser prefers frame-ancestors when present.
 [[headers]]
   for = "/*"
   [headers.values]
-    X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
-    Content-Security-Policy = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+    Content-Security-Policy = "frame-ancestors 'self' http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
 
 # ── Redirects ────────────────────────────────────────────────────────
 # Canonical: www → apex (or vice versa — pick one)

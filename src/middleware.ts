@@ -8,7 +8,11 @@
 import { defineMiddleware } from 'astro:middleware';
 
 const SECURITY_HEADERS: Record<string, string> = {
-  'X-Frame-Options': 'DENY',
+  // NOTE: no X-Frame-Options. The Laser Studio desktop app's "My Shop" tab embeds
+  // this site from http://localhost:<port>, and XFO can't express an allow-list —
+  // frame-ancestors below allows exactly 'self' + localhost, which every current
+  // browser prefers over XFO anyway. Web attackers can't serve from a visitor's
+  // localhost, so clickjacking protection is effectively unchanged.
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
@@ -18,7 +22,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   // overlay + GA. This still stops framing, plugin/object injection, and
   // <base> hijacking, and upgrades any stray http subresource to https.
   'Content-Security-Policy':
-    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; upgrade-insecure-requests",
+    "frame-ancestors 'self' http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'self'; upgrade-insecure-requests",
 };
 
 export const onRequest = defineMiddleware(async (_context, next) => {
