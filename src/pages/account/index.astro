@@ -111,6 +111,52 @@ if (session?.email) {
   totalSpent = paidOrders.reduce((s, o) => s + Number(o.total || 0), 0);
   totalFiles = paidOrders.reduce((n, o) => n + (o.order_items || []).reduce((m, it) => m + (it.downloads || []).length, 0), 0);
 }
+
+// ── Membership packs ──────────────────────────────────────────────────
+// A member is entitled to one pack per month for their term. A pack unlocks
+// once its calendar month has arrived (start_date + (k-1) months <= this month).
+const _MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function addMonthsYM(startYMD: string, n: number): string {
+  const [y, m] = startYMD.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7);
+}
+function ymLabel(ym: string): string { const [y, m] = ym.split('-').map(Number); return `${_MONTHS[m - 1]} ${y}`; }
+
+type EntitledPack = { monthYM: string; monthLabel: string; accessible: boolean; dropNumber: number; title: string | null; standard: string | null; bonus: string | null };
+type MemberBlock = { planName: string; status: string; dropsSent: number; totalDrops: number; tier: string; packs: EntitledPack[] };
+let memberBlocks: MemberBlock[] = [];
+
+if (session?.email) {
+  const db = supabaseAdmin();
+  const { data: subs } = await db
+    .from('member_subscriptions')
+    .select('id, plan_slug, months, tier, status, start_date, end_date, total_drops, drops_sent')
+    .ilike('email', session.email)
+    .order('start_date', { ascending: false });
+  if (subs && subs.length) {
+    const [{ data: plans }, { data: packs }] = await Promise.all([
+      db.from('membership_plans').select('slug, name'),
+      db.from('monthly_files').select('month, title, standard_drive_link, bonus_drive_link'),
+    ]);
+    const planName = (slug: string) => (plans || []).find((p: any) => p.slug === slug)?.name || 'CNC STL Membership';
+    const packByMonth = new Map((packs || []).map((p: any) => [p.month, p]));
+    const currentYM = new Date().toISOString().slice(0, 7);
+    memberBlocks = subs.map((s: any) => {
+      const list: EntitledPack[] = [];
+      for (let k = 1; k <= s.total_drops; k++) {
+        const ym = addMonthsYM(s.start_date, k - 1);
+        const pack: any = packByMonth.get(ym) || null;
+        list.push({
+          monthYM: ym, monthLabel: ymLabel(ym), accessible: ym <= currentYM, dropNumber: k,
+          title: pack?.title || null,
+          standard: pack?.standard_drive_link || null,
+          bonus: s.tier === 'premium' ? (pack?.bonus_drive_link || null) : null,
+        });
+      }
+      return { planName: planName(s.plan_slug), status: s.status, dropsSent: s.drops_sent, totalDrops: s.total_drops, tier: s.tier, packs: list };
+    });
+  }
+}
 ---
 <Base title="My Account · DigitalChiselCo" noindex>
   <Header />
@@ -149,6 +195,43 @@ if (session?.email) {
           </div>
           <a href="/account?signout=1" class="text-sm text-bronze-600 underline" data-signout>Sign out</a>
         </div>
+
+        {memberBlocks.length > 0 && (
+          <section class="mb-10">
+            <h2 class="font-serif text-2xl text-bronze-800 mb-1">Your membership packs</h2>
+            <p class="text-sm text-ink-700/60 mb-4">A fresh pack unlocks each month of your term. Files never expire — they're always here.</p>
+            {memberBlocks.map((m) => (
+              <div class="bg-white border border-black/10 rounded-xl p-5 mb-4">
+                <div class="flex flex-wrap justify-between items-baseline gap-2 mb-3">
+                  <div class="font-medium text-ink-800">{m.planName}{m.tier === 'premium' && <span class="ml-2 text-[10px] uppercase tracking-wide bg-[#FAC775] text-bronze-900 px-1.5 py-0.5 rounded align-middle">Premium</span>}</div>
+                  <div class="text-xs text-ink-700/60">{m.dropsSent} of {m.totalDrops} delivered · <span class="capitalize">{m.status}</span></div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {m.packs.map((p) => (
+                    <div class={`rounded-lg border p-3 ${p.accessible && (p.standard || p.bonus) ? 'border-bronze-600/30 bg-cream/30' : 'border-black/10'}`}>
+                      <div class="flex justify-between items-baseline">
+                        <div class="text-sm font-medium text-ink-800">{p.monthLabel}</div>
+                        <div class="text-[11px] text-ink-700/50">Pack {p.dropNumber}</div>
+                      </div>
+                      {p.title && <div class="text-xs text-ink-700/70 mt-0.5">{p.title}</div>}
+                      {!p.accessible ? (
+                        <div class="text-xs text-ink-700/50 italic mt-2">🔒 Arrives {p.monthLabel}</div>
+                      ) : (p.standard || p.bonus) ? (
+                        <div class="flex flex-wrap gap-2 mt-2">
+                          {p.standard && <a href={p.standard} target="_blank" rel="noopener" class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-3 py-1.5 rounded text-xs transition">⬇ Open pack</a>}
+                          {p.bonus && <a href={p.bonus} target="_blank" rel="noopener" class="inline-flex items-center border border-bronze-600 text-bronze-700 hover:bg-cream px-3 py-1.5 rounded text-xs transition">⭐ Bonus files</a>}
+                        </div>
+                      ) : (
+                        <div class="text-xs text-ink-700/50 italic mt-2">Being prepared — check back soon.</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+
         {orders.length === 0 ? (
           <div class="bg-cream/40 border border-bronze-600/20 rounded-lg p-8 text-center">
             <div class="text-5xl mb-3" aria-hidden="true">📭</div>

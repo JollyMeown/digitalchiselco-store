@@ -11,6 +11,9 @@ import Links from './tabs/Links';
 import Reviews from './tabs/Reviews';
 import Faqs from './tabs/Faqs';
 import Membership from './tabs/Membership';
+import MonthlyDrops from './tabs/MonthlyDrops';
+import MemberSubs from './tabs/MemberSubs';
+import MemberEmails from './tabs/MemberEmails';
 import Bundles from './tabs/Bundles';
 import Creations from './tabs/Creations';
 import Customized from './tabs/Customized';
@@ -36,6 +39,9 @@ const TABS: Tab[] = [
   { key: 'discounts',   label: 'Discounts',    icon: '%', Component: Discounts },
   { key: 'creations',   label: 'Carved by you', icon: '✦', Component: Creations },
   { key: 'membership',  label: 'Membership',   icon: '◆', Component: Membership },
+  { key: 'monthly',     label: 'Monthly Drops', icon: '🗓', Component: MonthlyDrops },
+  { key: 'membersubs',  label: 'Subscriptions', icon: '♺', Component: MemberSubs },
+  { key: 'memberemails', label: 'Member Emails', icon: '✈', Component: MemberEmails },
   { key: 'reviews',     label: 'Reviews',      icon: '★', Component: Reviews },
   { key: 'faqs',        label: 'FAQs',         icon: '?', Component: Faqs },
   { key: 'subscribers', label: 'Subscribers',  icon: '✉', Component: Subscribers },

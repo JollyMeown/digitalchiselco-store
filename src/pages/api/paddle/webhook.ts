@@ -15,6 +15,7 @@ import { supabaseAdmin } from '../../../lib/supabase';
 import { verifyWebhookSignature, paddleApi } from '../../../lib/paddle';
 import { send as sendEmail } from '../../../lib/resend';
 import { orderConfirmation, membershipPurchaseNotification } from '../../../lib/email-templates';
+import { createSubscriptionForPurchase } from '../../../lib/subscriptions';
 
 const OPS_INBOX = 'jolly@digitalchiselco.com';
 
@@ -189,7 +190,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // [{ key, label, type, value }, ...].
   const cartCustomizations: any[] = Array.isArray(txn.custom_data?.customizations) ? txn.custom_data.customizations : [];
   // Track membership plans in this order so we can ping ops afterwards.
-  const purchasedMemberships: { name: string; slug: string; price_usd: number; qty: number }[] = [];
+  const purchasedMemberships: { name: string; slug: string; price_usd: number; months: number; files_per_month: number; qty: number }[] = [];
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const priceId = it.price?.id;
@@ -201,11 +202,11 @@ async function handleTransactionCompleted(db: any, txn: any) {
     let title: string = String(it.price?.description || it.price?.name || '').slice(0, 240);
 
     // Detect membership-plan items: match by paddle_price_id OR by membership:<slug> cart marker.
-    let membershipPlan: { name: string; slug: string; price_usd: number } | null = null;
+    let membershipPlan: { name: string; slug: string; price_usd: number; months: number; files_per_month: number } | null = null;
     if (priceId) {
       const { data: mp } = await db
         .from('membership_plans')
-        .select('name, slug, price_usd')
+        .select('name, slug, price_usd, months, files_per_month')
         .eq('paddle_price_id', priceId)
         .maybeSingle();
       if (mp) membershipPlan = mp;
@@ -214,7 +215,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
       const slug = cartIds[i].slice('membership:'.length);
       const { data: mp } = await db
         .from('membership_plans')
-        .select('name, slug, price_usd')
+        .select('name, slug, price_usd, months, files_per_month')
         .eq('slug', slug)
         .maybeSingle();
       if (mp) membershipPlan = mp;
@@ -331,6 +332,27 @@ async function handleTransactionCompleted(db: any, txn: any) {
       }
     } catch (e) {
       console.error(`[email] Membership ops notification threw for order ${order.id}:`, e);
+    }
+  }
+
+  // ── Membership automation: create the subscription + send pack 1 ──────
+  // Fixed-term drip. createSubscriptionForPurchase inserts the term row and
+  // emails the buyer their first monthly pack. Idempotent per (txn, plan) so a
+  // webhook retry never double-creates. Best-effort — never rolls back the order.
+  if (purchasedMemberships.length && email && email !== 'unknown@digitalchiselco.com') {
+    for (const mp of purchasedMemberships) {
+      try {
+        const r = await createSubscriptionForPurchase({
+          email,
+          customerName: earlyOpsCustomerName,
+          plan: { slug: mp.slug, name: mp.name, months: mp.months, files_per_month: mp.files_per_month, price_usd: mp.price_usd },
+          orderId: order.id,
+          paddleTransactionId: `${txn.id}:${mp.slug}`,
+        });
+        console.log(`[membership] ${r.created ? `created subscription ${r.subscriptionId}` : `skipped (${r.reason})`} for ${email} (${mp.slug})`);
+      } catch (e) {
+        console.error(`[membership] subscription creation failed for order ${order.id} (${mp.slug}):`, e);
+      }
     }
   }
 
