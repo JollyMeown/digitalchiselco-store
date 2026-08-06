@@ -15,6 +15,7 @@ import MonthlyDrops from './tabs/MonthlyDrops';
 import MemberSubs from './tabs/MemberSubs';
 import MemberEmails from './tabs/MemberEmails';
 import Finance from './tabs/Finance';
+import Traffic from './tabs/Traffic';
 import Bundles from './tabs/Bundles';
 import Creations from './tabs/Creations';
 import Customized from './tabs/Customized';
@@ -30,6 +31,7 @@ type Tab = { key: string; label: string; icon: string; Component: any };
 const TABS: Tab[] = [
   { key: 'overview',    label: 'Overview',     icon: '◎', Component: Overview },
   { key: 'finance',     label: 'Finance',      icon: '💰', Component: Finance },
+  { key: 'traffic',     label: 'Traffic',      icon: '📊', Component: Traffic },
   { key: 'products',    label: 'Products',     icon: '▦', Component: Products },
   { key: 'seo',         label: 'SEO Review',   icon: '✦', Component: Seo },
   { key: 'bundles',     label: 'Bundle Composer', icon: '◫', Component: Bundles },

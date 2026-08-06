@@ -75,6 +75,14 @@ const faviconType = settings.favicon_image_url
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Instrument+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <!-- First-party pageview beacon (no cookies, no PII — feeds admin Traffic tab) -->
+    <script is:inline>
+      try {
+        var d = JSON.stringify({ p: location.pathname, r: document.referrer || '' });
+        if (navigator.sendBeacon) navigator.sendBeacon('/api/track', new Blob([d], { type: 'application/json' }));
+        else fetch('/api/track', { method: 'POST', body: d, keepalive: true, headers: { 'content-type': 'application/json' } });
+      } catch (_) {}
+    </script>
     {gaId && (
       <>
         <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script>
