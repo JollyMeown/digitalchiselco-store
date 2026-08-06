@@ -80,14 +80,29 @@ export default function Finance() {
   const [gran, setGran] = useState<Gran>('month');
   const [loading, setLoading] = useState(true);
 
+  const [web30, setWeb30] = useState(0);
   useEffect(() => { load(); }, []);
   async function load() {
     setLoading(true);
-    const [{ data: d }, { data: s }] = await Promise.all([
+    const since = new Date(); since.setUTCFullYear(since.getUTCFullYear() - 1);
+    const [{ data: d }, { data: s }, { data: ord }] = await Promise.all([
       supabase.from('finance_daily').select('day, channel, revenue_usd, ad_spend_usd, fees_usd').order('day'),
       supabase.from('finance_status').select('data, synced_at').eq('id', 1).maybeSingle(),
+      // Website revenue LIVE from orders — so a new sale shows instantly, no refresh wait.
+      supabase.from('orders').select('total, created_at').eq('status', 'paid').gte('created_at', since.toISOString()).limit(5000),
     ]);
-    setDaily((d || []) as Daily[]);
+    // Build website daily rows from live orders; keep Etsy/Cults from the cache.
+    const webByDay = new Map<string, number>();
+    let w30 = 0; const cut30 = Date.now() - 30 * 86400000;
+    for (const o of (ord || []) as any[]) {
+      const day = String(o.created_at).slice(0, 10);
+      webByDay.set(day, (webByDay.get(day) || 0) + (Number(o.total) || 0));
+      if (new Date(o.created_at).getTime() >= cut30) w30 += Number(o.total) || 0;
+    }
+    const cachedNonWebsite = ((d || []) as Daily[]).filter((r) => r.channel !== 'website');
+    const liveWebsite: Daily[] = [...webByDay.entries()].map(([day, rev]) => ({ day, channel: 'website', revenue_usd: rev, ad_spend_usd: 0, fees_usd: 0 }));
+    setDaily([...cachedNonWebsite, ...liveWebsite]);
+    setWeb30(Math.round(w30 * 100) / 100);
     setStatus((s?.data as any) || {});
     setSyncedAt(s?.synced_at || null);
     setLoading(false);
@@ -108,8 +123,8 @@ export default function Finance() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-xs text-ink-700/60">
-        <span>💰 All figures normalised to USD (Cults €→$ at {cults.eur_usd || '~1.08'}).</span>
-        <span className="ml-auto">Last synced: {syncedAt ? new Date(syncedAt).toLocaleString() : 'never'}</span>
+        <span>💰 USD (Cults €→$ at {cults.eur_usd || '~1.08'}). <b>Website = live</b>; Etsy/Cults from last sync.</span>
+        <span className="ml-auto">Etsy/Cults synced: {syncedAt ? new Date(syncedAt).toLocaleString() : 'never'}</span>
         <button className="underline text-bronze-700" onClick={load}>reload</button>
       </div>
 
@@ -119,7 +134,7 @@ export default function Finance() {
 
       {/* Channel stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Website (Paddle)" value={usd(web.revenue_30d)} sub="revenue · last 30 days" accent="#2a78d6" />
+        <StatCard label="Website (Paddle)" value={usd(web30)} sub="revenue · last 30 days · live" accent="#2a78d6" />
         <StatCard label="Etsy balance" value={usd(etsy.balance)} sub={etsy.next_payout_est ? `next payout ~${etsy.next_payout_est}` : 'awaiting sync'} accent="#eb6834" />
         <StatCard label="Cults3D available" value={eur(cults.available)} sub={`pending ${eur(cults.pending)}`} accent="#1baf7a" />
         <StatCard label="Etsy ad spend" value={usd(totalAd)} sub={`Promoted Listings · ${gran === 'year' ? 'shown' : 'total window'}`} accent="#993c1d" />
