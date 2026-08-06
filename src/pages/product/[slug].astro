@@ -18,22 +18,41 @@ const cleanTitle = p.title.split('|')[0].trim();
 const gallery: string[] = (Array.isArray(p.gallery) && p.gallery.length ? p.gallery : [p.image_url]).filter(Boolean);
 const related = await getRelatedProducts(p.id, 5);
 
-// Social proof: two shop reviews (imported 5★ Etsy), rotated per product so
-// different pages show different voices. Deterministic hash keeps it stable.
+// Social proof: two CURATED reviews (generic=true — English, 5★, never naming a
+// specific design so they read true under any product), rotated per product via
+// slug hash. Count badge still reflects ALL active 5★ reviews.
 let reviews: { name: string; text: string; rating: number }[] = [];
 let reviewCount = 0;
+// Active shop-wide sale → ticking countdown near the price (the product page
+// hides the site banner, so it carries its own clock like the big stores do).
+let sale: { name: string; percent_off: number; expires_at: string } | null = null;
 try {
   const { supabaseAdmin } = await import('../../lib/supabase');
-  const { data: revs, count } = await supabaseAdmin()
-    .from('reviews').select('name, text, rating', { count: 'exact' })
-    .eq('active', true).eq('rating', 5).order('sort_order').limit(60);
+  const nowIso = new Date().toISOString();
+  const [{ data: revs }, { count }, { data: saleRows }] = await Promise.all([
+    supabaseAdmin().from('reviews').select('name, text, rating')
+      .eq('active', true).eq('generic', true).order('sort_order').limit(60),
+    supabaseAdmin().from('reviews').select('id', { count: 'exact', head: true })
+      .eq('active', true).eq('rating', 5),
+    supabaseAdmin().from('sales').select('name, percent_off, expires_at')
+      .eq('active', true).eq('scope', 'all').lte('starts_at', nowIso).gte('expires_at', nowIso)
+      .order('percent_off', { ascending: false }).limit(1),
+  ]);
   reviewCount = count || 0;
+  sale = (saleRows?.[0] as any) ?? null;
   if (revs?.length) {
-    let h = 0; for (const ch of p.slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    const i = h % revs.length;
-    reviews = [revs[i], revs[(i + 7) % revs.length]].filter((r, idx, a) => a.indexOf(r) === idx);
+    // two independent hashes → wider pair spread across products
+    let h1 = 0, h2 = 5381;
+    for (const ch of p.slug) { h1 = (h1 * 31 + ch.charCodeAt(0)) >>> 0; h2 = ((h2 * 33) ^ ch.charCodeAt(0)) >>> 0; }
+    const i = h1 % revs.length;
+    let j = h2 % revs.length;
+    if (j === i) j = (j + 1) % revs.length;
+    reviews = revs.length > 1 ? [revs[i], revs[j]] : [revs[i]];
   }
-} catch { /* reviews are optional */ }
+} catch { /* reviews + sale are optional */ }
+// "Verified Buyer" is the imported-name placeholder — don't print it twice.
+const reviewerLabel = (name: string) =>
+  /^\s*verified\s*buyer\s*$/i.test(name || '') ? 'Verified buyer' : `${name}, verified buyer`;
 
 const desc = p.description || `${cleanTitle} is a high-detail 3D relief STL designed for clean carving on CNC routers, laser engravers and 3D printers. After checkout you'll receive an instant download link by email and in your account.`;
 
@@ -82,6 +101,32 @@ const jsonld = {
         <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">{percent}% off</span>
       </div>
 
+      {sale && (
+        <div class="mt-3 flex items-center gap-2.5 bg-[#5E380A] text-[#F5EFE3] rounded-md px-3 py-2.5 text-sm">
+          <span aria-hidden="true">🔥</span>
+          <span><strong>{sale.name}</strong> — extra {sale.percent_off}% off at checkout</span>
+          <span class="ml-auto font-mono font-medium whitespace-nowrap" id="dcc-p-sale-cd" data-ends={sale.expires_at}>…</span>
+        </div>
+      )}
+      {sale && (
+        <script is:inline>
+          (function () {
+            var el = document.getElementById('dcc-p-sale-cd');
+            if (!el) return;
+            var end = new Date(el.dataset.ends).getTime();
+            function tick() {
+              var ms = end - Date.now();
+              if (ms <= 0) { el.textContent = 'ended'; return; }
+              var d = Math.floor(ms / 86400000), h = Math.floor(ms / 3600000) % 24,
+                  m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
+              el.textContent = (d > 0 ? d + 'd ' : '') + h + 'h ' + m + 'm ' + s + 's';
+              setTimeout(tick, 1000);
+            }
+            tick();
+          })();
+        </script>
+      )}
+
       <button class="add-to-cart mt-5 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition"
         data-id={p.id} data-slug={p.slug} data-title={cleanTitle} data-price={price} data-img={gallery[0] || ''}>
         Add to cart
@@ -104,7 +149,7 @@ const jsonld = {
           {reviews.map((r) => (
             <blockquote class="text-sm text-ink-700/90 bg-cream/40 border-l-2 border-bronze-600/40 pl-3 py-2 rounded-r mb-2">
               "{r.text.length > 180 ? r.text.slice(0, 178) + '…' : r.text}"
-              <footer class="text-xs text-ink-700/50 mt-1">— {r.name}, verified buyer</footer>
+              <footer class="text-xs text-ink-700/50 mt-1">— {reviewerLabel(r.name)}</footer>
             </blockquote>
           ))}
         </div>

@@ -62,7 +62,11 @@ if (token) {
 }
 
 // --- write into site_settings (row id = 1) ---------------------------------
-const patch = { sales_count, products_count, etsy_synced_at: new Date().toISOString() };
+const patch = { sales_count, etsy_synced_at: new Date().toISOString() };
+// While the shop sits in Developer Mode its active-listing count can read 0 —
+// never let that wipe the real designs number on the homepage.
+if (products_count > 100) patch.products_count = products_count;
+else console.log(`  (products_count=${products_count} looks like Developer Mode — left unchanged)`);
 if (reviews_count) patch.reviews_count = reviews_count;
 if (rating != null) patch.rating = rating;
 if (admirers_count != null) patch.admirers_count = admirers_count;

@@ -1,11 +1,12 @@
 ---
 import Logo from './Logo.astro';
-import { getCategories } from '../lib/queries';
+import { getCategories, getSettings } from '../lib/queries';
 const links = [
   { href: '/', label: 'Home' },
   { href: '/collections', label: 'Collections' },
   { href: '/catalog', label: 'Catalog' },
   { href: '/bundle-builder', label: '5 for $25' },
+  { href: '/gift-cards', label: 'Gift Cards' },
   { href: '/free', label: 'Free files' },
   { href: '/laser-studio', label: 'Laser Studio' },
   { href: '/about', label: 'Our story' },
@@ -14,9 +15,11 @@ const links = [
 ];
 const q = Astro.url.searchParams.get('q') ?? '';
 const categories = await getCategories();
+// Live Etsy numbers (refreshed daily by scripts/etsy_stats_sync.mjs)
+const hs = await getSettings();
 ---
 <div class="bg-bronze-800 text-cream text-xs text-center py-1.5">
-  Instant digital download · Commercial use included · 4.9★ from 577 reviews
+  Instant digital download · Commercial use included · {Number(hs.rating) || 4.9}★ from {Number(hs.reviews_count).toLocaleString()} reviews
 </div>
 <header class="sticky top-0 bg-white z-30 border-b border-black/10">
   <nav class="flex items-center gap-3 px-4 sm:px-6 py-3 max-w-7xl mx-auto">

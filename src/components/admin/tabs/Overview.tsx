@@ -20,6 +20,7 @@ export default function Overview() {
   const [recent, setRecent] = useState<any[]>([]);
   const [counts, setCounts] = useState({ products: 0, categories: 0, subscribers: 0 });
   const [donation, setDonation] = useState(0);
+  const [etsyStats, setEtsyStats] = useState<any>(null);
   const [cults, setCults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   // default range: last 30 days
@@ -37,13 +38,14 @@ export default function Overview() {
       supabase.from('products').select('id', { count: 'exact', head: true }).eq('active', true),
       supabase.from('categories').select('id', { count: 'exact', head: true }),
       supabase.from('subscribers').select('id', { count: 'exact', head: true }),
-      supabase.from('site_settings').select('donation_total').eq('id', 1).maybeSingle(),
+      supabase.from('site_settings').select('donation_total, sales_count, rating, reviews_count, admirers_count, products_count, etsy_synced_at').eq('id', 1).maybeSingle(),
     ]);
     setOrders((allOrdersRes.data ?? []) as any);
     setItems((allItemsRes.data ?? []) as any);
     setRecent(recentRes.data ?? []);
     setCounts({ products: products.count ?? 0, categories: categories.count ?? 0, subscribers: subs.count ?? 0 });
     setDonation(Number(settings.data?.donation_total || 0));
+    setEtsyStats(settings.data || null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/admin/cults-sales', { headers: { authorization: `Bearer ${session?.access_token}` } });
@@ -201,6 +203,22 @@ export default function Overview() {
         <StatBox label="Products" value={counts.products.toLocaleString()} sub="Active in catalog" />
         <StatBox label="Subscribers" value={counts.subscribers.toLocaleString()} sub="Free-pack list" />
       </div>
+
+      {/* Etsy shop stats — refreshed by scripts/etsy_stats_sync.mjs (local, needs the Etsy token) */}
+      {etsyStats && (
+        <div>
+          <div className="text-xs font-medium text-ink-700/60 mb-2">
+            Etsy shop (live) {etsyStats.etsy_synced_at ? `· synced ${new Date(etsyStats.etsy_synced_at).toLocaleString()}` : '· never synced'}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <StatBox label="Etsy · files sold" value={Number(etsyStats.sales_count || 0).toLocaleString()} />
+            <StatBox label="Etsy · rating" value={`${Number(etsyStats.rating || 0)} ★`} sub={`${Number(etsyStats.reviews_count || 0).toLocaleString()} reviews`} />
+            <StatBox label="Etsy · favorites" value={Number(etsyStats.admirers_count || 0).toLocaleString()} />
+            <StatBox label="Etsy · active listings" value={Number(etsyStats.products_count || 0).toLocaleString()} />
+            <StatBox label="Refresh" value="↻" sub="run scripts/etsy_stats_sync.mjs" />
+          </div>
+        </div>
+      )}
 
       {/* Cults3D marketplace */}
       {cults?.ok && (

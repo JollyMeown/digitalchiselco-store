@@ -12,6 +12,7 @@ const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'review7', label: 'Review request (+7 days)', group: 'Post-purchase' },
   { key: 'arrivals30', label: 'New arrivals (+30 days)', group: 'Post-purchase' },
   { key: 'loyalty', label: 'Loyalty 10% (3rd order)', group: 'Post-purchase' },
+  { key: 'weekly', label: 'Weekly fresh-designs digest (Mondays)', group: 'Broadcasts' },
 ];
 
 // ── Block-based template builder ─────────────────────────────────────
@@ -235,12 +236,14 @@ export default function Automations() {
           stat={`${carts.open} open carts · ${carts.reminded} reminded · ${carts.recovered} recovered`} />
         <Toggle field="followups_enabled" label="Post-purchase followups"
           desc="Review request (+7d), new arrivals (+30d), permanent loyalty code on the 3rd order." />
+        <Toggle field="weekly_digest_enabled" label="Weekly fresh-designs digest"
+          desc="Every Monday: one email to all confirmed subscribers with the designs added that week + a branded lookbook PDF (product-page links). Skips quiet weeks automatically." />
       </div>
 
       <Card>
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <select value={kind} onChange={(e) => setKind(e.target.value)} className={inputCls + ' max-w-xs'}>
-            {['Subscriber drip', 'Cart recovery', 'Post-purchase'].map((grp) => (
+            {['Subscriber drip', 'Cart recovery', 'Post-purchase', 'Broadcasts'].map((grp) => (
               <optgroup key={grp} label={grp}>
                 {KINDS.filter((k) => k.group === grp).map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
               </optgroup>

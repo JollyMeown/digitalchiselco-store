@@ -10,9 +10,10 @@ import { supabaseAdmin } from './supabase';
 import { send as sendEmail } from './resend';
 import {
   dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
-  applyOverride, TEMPLATE_HEADINGS,
+  weeklyDigestEmail, applyOverride, TEMPLATE_HEADINGS,
   type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
+import { buildWeeklyPdf, isoWeekKey } from './weekly-digest';
 
 type DB = ReturnType<typeof supabaseAdmin>;
 const DRIP_GAP_DAYS = 4;
@@ -176,6 +177,59 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       if (s.loyalty >= 20) break;                                          // safety cap per run
     }
     stats.followups = s;
+  }
+
+  // ── 4. weekly fresh-designs digest (Mondays) ────────────────────────
+  stats.weekly = 'off';
+  if (g.weekly_digest_enabled) {
+    const now = new Date();
+    if (now.getUTCDay() !== 1) {
+      stats.weekly = 'waiting for Monday';
+    } else {
+      const week = isoWeekKey(now);
+      // PK claim → exactly one send per ISO week, even across cron retries
+      const { error: claimErr } = await db.from('weekly_digest_log').insert({ week_key: week });
+      if (claimErr) {
+        stats.weekly = `already sent (${week})`;
+      } else {
+        const s = { week, products: 0, sent: 0, failed: 0, pdf: false };
+        const { data: fresh } = await db.from('products')
+          .select('title, slug, price_usd, image_url')
+          .eq('active', true).gte('created_at', daysAgo(7))
+          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
+          .order('created_at', { ascending: false }).limit(12);
+        s.products = fresh?.length || 0;
+        if (fresh?.length) {
+          // branded lookbook PDF → public storage (product-page links only)
+          let pdfUrl: string | null = null;
+          try {
+            const bytes = await buildWeeklyPdf(fresh as any, week);
+            const path = `weekly/DCC-Fresh-Designs-${week}.pdf`;
+            const up = await db.storage.from('site-media').upload(path, bytes, { contentType: 'application/pdf', upsert: true });
+            if (!up.error) { pdfUrl = db.storage.from('site-media').getPublicUrl(path).data.publicUrl; s.pdf = true; }
+          } catch (e) { console.error('[weekly] pdf build failed (email still sends):', e); }
+
+          const weekNumber = Number(week.split('-W')[1]) || 0;
+          const { data: subs } = await db.from('subscribers').select('email')
+            .not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(3000);
+          let i = 0;
+          for (const r of subs || []) {
+            const email = r.email.toLowerCase();
+            try {
+              const { subject, html, text } = withOvr('weekly',
+                weeklyDigestEmail({ email, products: fresh as MiniProduct[], pdfUrl, weekNumber }), email);
+              const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `digest:${week}:${email}` });
+              res.ok ? s.sent++ : s.failed++;
+            } catch { s.failed++; }
+            if (++i % 10 === 0) await new Promise((r2) => setTimeout(r2, 1100)); // Resend rate limit
+          }
+          await db.from('weekly_digest_log').update({ sent_count: s.sent, product_count: s.products, pdf_url: pdfUrl }).eq('week_key', week);
+        } else {
+          await db.from('weekly_digest_log').update({ sent_count: 0, product_count: 0 }).eq('week_key', week);
+        }
+        stats.weekly = s;
+      }
+    }
   }
 
   return stats;

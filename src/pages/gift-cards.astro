@@ -1,0 +1,71 @@
+---
+// Gift-card landing page. The three gift-card products ($10/$25/$50) are normal
+// Paddle purchases; the webhook mints a single-use GIFT-XXXX coupon per card and
+// emails the buyer a branded, forwardable card. Face values are shown plainly —
+// gift cards are never discounted (enforced server-side in checkout-init).
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { supabaseAdmin } from '../lib/supabase';
+
+export const prerender = false;
+
+const { data: cards } = await supabaseAdmin()
+  .from('products')
+  .select('id, slug, title, price_usd, image_url')
+  .like('slug', 'gift-card-%').eq('active', true)
+  .order('price_usd', { ascending: true });
+const giftCards = (cards || []).map((c) => ({
+  id: c.id, slug: c.slug, price: Number(c.price_usd), img: c.image_url || '',
+  title: `$${Number(c.price_usd)} Gift Card`,
+}));
+---
+<Base
+  title="Gift Cards — Give the Gift of Carving | DigitalChiselCo"
+  description="DigitalChiselCo gift cards ($10, $25, $50): a unique code delivered by email, redeemable on any bas-relief STL design. Never expires."
+>
+  <Header />
+  <Breadcrumbs crumbs={[{ label: 'Gift cards' }]} />
+  <main class="px-4 sm:px-6 pb-16 max-w-5xl mx-auto">
+    <div class="text-center max-w-2xl mx-auto mb-8">
+      <div class="text-4xl mb-2">🎁</div>
+      <h1 class="text-3xl sm:text-4xl">Give the gift of carving</h1>
+      <p class="mt-2 text-sm text-ink-700/70">
+        Know a woodworker with a CNC, laser or 3D printer? A DigitalChiselCo gift card lets them
+        pick exactly the designs they'll love — from {'hundreds'} of museum-grade reliefs.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+      {giftCards.map((c) => (
+        <div class="border border-bronze-600/25 rounded-xl overflow-hidden bg-white flex flex-col hover:shadow-md transition">
+          <a href={`/product/${c.slug}`} class="block aspect-[4/3] bg-cream overflow-hidden relative">
+            {c.img && <img src={c.img} alt={`DigitalChiselCo ${c.title}`} loading="lazy" class="w-full h-full object-cover" />}
+            <span class="absolute bottom-2 right-2 bg-[#5E380A] text-[#F5EFE3] font-serif text-lg px-3 py-1 rounded-md shadow">${c.price}</span>
+          </a>
+          <div class="p-4 flex flex-col flex-1 text-center">
+            <h2 class="font-serif text-lg text-bronze-800">{c.title}</h2>
+            <p class="text-xs text-ink-700/60 mt-1 mb-3">Unique code by email · never expires · use on anything</p>
+            <button class="add-to-cart mt-auto w-full text-sm bg-bronze-600 text-cream py-2.5 rounded-md hover:bg-bronze-700 transition"
+              data-id={c.id} data-slug={c.slug} data-title={c.title} data-price={c.price} data-img={c.img}>
+              Add to cart — ${c.price}
+            </button>
+          </div>
+        </div>
+      ))}
+      {!giftCards.length && <p class="col-span-full text-center text-ink-700/60 py-10">Gift cards are being restocked — check back shortly.</p>}
+    </div>
+
+    <div class="bg-[#FAEEDA] border border-bronze-600/25 rounded-xl p-6">
+      <h2 class="font-serif text-xl text-bronze-800 text-center mb-4">How it works</h2>
+      <ol class="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm text-ink-800">
+        <li class="text-center"><span class="block text-2xl mb-1">🛒</span><strong>1. Buy a card</strong><br /><span class="text-xs text-ink-700/70">Checkout like any design — gift cards are always full face value.</span></li>
+        <li class="text-center"><span class="block text-2xl mb-1">📧</span><strong>2. Get the code</strong><br /><span class="text-xs text-ink-700/70">A beautiful card email with a unique GIFT-code arrives in minutes.</span></li>
+        <li class="text-center"><span class="block text-2xl mb-1">💌</span><strong>3. Pass it on</strong><br /><span class="text-xs text-ink-700/70">Forward the email or print it — perfect for birthdays &amp; holidays.</span></li>
+        <li class="text-center"><span class="block text-2xl mb-1">🪵</span><strong>4. They carve</strong><br /><span class="text-xs text-ink-700/70">Redeemed in the cart's promo box, on any design. Never expires.</span></li>
+      </ol>
+    </div>
+  </main>
+  <Footer />
+</Base>

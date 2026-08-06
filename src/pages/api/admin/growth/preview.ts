@@ -6,7 +6,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { send as sendEmail } from '../../../../lib/resend';
-import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
+import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, weeklyDigestEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
 
 export const prerender = false;
 
@@ -27,7 +27,7 @@ async function isCallerAdmin(request: Request): Promise<boolean> {
   return !!prof?.is_admin;
 }
 
-const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'review7', 'arrivals30', 'loyalty'] as const;
+const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'review7', 'arrivals30', 'loyalty', 'weekly'] as const;
 
 async function render(kind: string, email: string): Promise<{ subject: string; html: string; text: string }> {
   const db = supabaseAdmin();
@@ -50,6 +50,20 @@ async function render(kind: string, email: string): Promise<{ subject: string; h
   } else if (kind === 'review7') out = reviewRequestEmail({ email, name: 'Sample Customer', itemTitles: [bestsellers[0]?.title || 'Sample Bas-Relief STL'] });
   else if (kind === 'arrivals30') out = newArrivalsEmail({ email, name: 'Sample Customer', products: (newest || []) as MiniProduct[] });
   else if (kind === 'loyalty') out = loyaltyEmail({ email, name: 'Sample Customer', code: 'LOYAL-DEMO' });
+  else if (kind === 'weekly') {
+    // preview with this week's products; fall back to the newest 6 so the
+    // owner always sees a populated layout
+    const { data: week } = await db.from('products').select('title, slug, image_url, price_usd')
+      .eq('active', true).gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
+      .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
+      .order('created_at', { ascending: false }).limit(12);
+    const { data: fb } = week?.length ? { data: null } : await db.from('products')
+      .select('title, slug, image_url, price_usd').eq('active', true)
+      .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
+      .order('created_at', { ascending: false }).limit(6);
+    const { data: lastLog } = await db.from('weekly_digest_log').select('pdf_url').order('created_at', { ascending: false }).limit(1).maybeSingle();
+    out = weeklyDigestEmail({ email, products: ((week?.length ? week : fb) || []) as MiniProduct[], pdfUrl: lastLog?.pdf_url || null, weekNumber: Math.floor(Date.now() / 604800000) });
+  }
   else throw new Error('unknown kind');
 
   // owner-saved edits (subject / heading / body) apply to preview + test-sends

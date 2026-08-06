@@ -67,6 +67,7 @@ export const TEMPLATE_HEADINGS: Record<string, string> = {
   review7: 'Show us your carve 🪵',
   arrivals30: 'New designs are in',
   loyalty: 'A permanent thank-you',
+  weekly: 'Fresh from the workshop 🪵',
 };
 
 function shell(subject: string, heading: string, bodyHtml: string, email: string): string {
@@ -227,4 +228,29 @@ export function giftCardEmail(d: { email: string; buyerName?: string | null; car
     ${btn(SITE + '/catalog', 'Browse the catalog')}
     <p style="margin:12px 0 0;font-size:12px;color:#999;">Redeeming: add designs to the cart at digitalchiselco.com, open "Have a promo code?", paste the code.</p>`;
   return { subject, html: shell(subject, `A $${total.toFixed(0)} gift of carving`, body, d.email), text: `Your DigitalChiselCo gift card code(s): ${d.cards.map((c) => c.code + ' ($' + c.amount + ')').join(', ')}\nRedeem in the cart promo box at ${SITE}` };
+}
+
+// ── Weekly fresh-designs digest (Monday broadcast, toggle-gated) ─────
+export function weeklyDigestEmail(d: {
+  email: string; products: MiniProduct[]; pdfUrl?: string | null; weekNumber?: number;
+}): Out {
+  const n = d.products.length;
+  const titles = [
+    (k: number) => `Fresh Off the Chisel — ${k} New Design${k === 1 ? '' : 's'} This Week`,
+    (k: number) => `Hot Off the CNC: ${k} Brand-New Carving${k === 1 ? '' : 's'}`,
+    (k: number) => `This Week at the Workshop: ${k} New Relief${k === 1  ? '' : 's'}`,
+  ];
+  const subject = titles[(d.weekNumber ?? 0) % titles.length](n);
+  // grid in rows of 3
+  const rows: string[] = [];
+  for (let i = 0; i < Math.min(12, n); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  const body = `
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">Hi fellow maker,</p>
+    <p style="margin:10px 0 16px;font-size:15px;line-height:1.6;color:#555;">The chisels have not been idle — <strong>${n} brand-new design${n === 1 ? '' : 's'}</strong> landed in the shop this week. Fresh geometry, clean toolpaths, ready to carve:</p>
+    ${rows.join('')}
+    ${d.pdfUrl ? `<p style="text-align:center;margin:18px 0 4px;"><a href="${esc(d.pdfUrl)}" style="display:inline-block;border:2px solid ${BRONZE_DARK};color:${BRONZE_DARK};text-decoration:none;padding:10px 22px;border-radius:8px;font-size:14px;font-weight:500;">📄 Download this week's lookbook (PDF)</a></p>` : ''}
+    ${btn(SITE + '/catalog', 'See everything new')}
+    <p style="margin:14px 0 0;font-size:13px;color:#777;text-align:center;">Buying a few? <a href="${SITE}/bundle-builder" style="color:${BRONZE};">Pick any 5 for a flat $25 →</a></p>`;
+  const text = `${n} new designs this week at DigitalChiselCo: ` + d.products.slice(0, 12).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join(' · ') + `\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'Fresh from the workshop 🪵', body, d.email), text };
 }
