@@ -264,7 +264,7 @@ export default function Automations() {
   return (
     <div className="space-y-4">
       <div className="text-xs text-ink-700/70 bg-cream/40 border border-bronze-600/15 rounded-lg px-3 py-2">
-        🛡 <b>Review-first:</b> every system below is OFF until you switch it on. Preview each email (right), test-send it to yourself, then enable. The daily cron (08:00 UTC) does the sending — max 80 drip emails/day, one reminder per cart, each followup once per order.
+        🛡 <b>Review-first:</b> each system starts OFF — a <b>green</b> toggle means it's <b>ON</b>. Preview each email (right) and test-send it to yourself before enabling. The daily cron (08:00 UTC) does the actual sending, so the counters below stay at <b>0</b> until it next runs and there's activity to report — that's normal, not "off".
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
