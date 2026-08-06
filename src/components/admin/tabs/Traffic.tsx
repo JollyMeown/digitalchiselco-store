@@ -50,9 +50,15 @@ function TopList({ title, rows, total }: { title: string; rows: [string, number]
   );
 }
 
+type Ev = { day: string; type: string; product_id: string | null; q: string | null; n: number | null; visitor_hash: string | null };
+
 export default function Traffic() {
   const [days, setDays] = useState<number>(30);
   const [rows, setRows] = useState<Visit[]>([]);
+  const [events, setEvents] = useState<Ev[]>([]);
+  const [paidCount, setPaidCount] = useState(0);
+  const [prodNames, setProdNames] = useState<Record<string, string>>({});
+  const [salesByProduct, setSalesByProduct] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [capped, setCapped] = useState(false);
 
@@ -60,6 +66,7 @@ export default function Traffic() {
   async function load() {
     setLoading(true);
     const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+    const sinceTs = new Date(Date.now() - days * 86400000).toISOString();
     const out: Visit[] = [];
     for (let from = 0; from < 60000; from += 1000) {
       const { data } = await supabase.from('site_visits')
@@ -69,7 +76,29 @@ export default function Traffic() {
       if (!data || data.length < 1000) { setCapped(false); break; }
       if (from + 1000 >= 60000) setCapped(true);
     }
-    setRows(out); setLoading(false);
+    setRows(out);
+
+    // funnel events + paid orders + product-heat context
+    const [{ data: evs }, { count: paid }, { data: oi }] = await Promise.all([
+      supabase.from('site_events').select('day, type, product_id, q, n, visitor_hash').gte('day', since).limit(20000),
+      supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'paid').gte('created_at', sinceTs),
+      supabase.from('order_items').select('product_id, orders!inner(status, created_at)').eq('orders.status', 'paid').gte('orders.created_at', sinceTs).limit(5000),
+    ]);
+    setEvents((evs || []) as Ev[]);
+    setPaidCount(paid || 0);
+    const sales: Record<string, number> = {};
+    for (const r of (oi || []) as any[]) if (r.product_id) sales[r.product_id] = (sales[r.product_id] || 0) + 1;
+    setSalesByProduct(sales);
+
+    // resolve product titles for the heat list (top viewed + top sold)
+    const viewCounts: Record<string, number> = {};
+    for (const e of (evs || []) as Ev[]) if (e.type === 'view_product' && e.product_id) viewCounts[e.product_id] = (viewCounts[e.product_id] || 0) + 1;
+    const ids = [...new Set([...Object.keys(viewCounts), ...Object.keys(sales)])].slice(0, 200);
+    if (ids.length) {
+      const { data: ps } = await supabase.from('products').select('id, title').in('id', ids);
+      setProdNames(Object.fromEntries((ps || []).map((p: any) => [p.id, p.title.split('|')[0].trim()])));
+    } else setProdNames({});
+    setLoading(false);
   }
 
   const stats = useMemo(() => {
@@ -132,7 +161,11 @@ export default function Traffic() {
             {capped && <p className="text-[11px] text-ink-700/50 mt-1">Showing the first 60k rows of the range.</p>}
           </Card>
 
+          <FunnelCard visitors={stats.visitors} events={events} paid={paidCount} days={days} />
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <HeatList events={events} names={prodNames} sales={salesByProduct} />
+            <SearchTerms events={events} />
             <TopList title="Top pages" rows={stats.topPages} total={stats.pv} />
             <TopList title="Referrer sources" rows={stats.topRefs} total={stats.pv} />
             <TopList title="Devices" rows={stats.devices} total={stats.pv} />
@@ -141,5 +174,82 @@ export default function Traffic() {
         </>
       )}
     </div>
+  );
+}
+
+function FunnelCard({ visitors, events, paid, days }: { visitors: number; events: Ev[]; paid: number; days: number }) {
+  const uniq = (t: string) => new Set(events.filter((e) => e.type === t).map((e) => e.day + (e.visitor_hash || ''))).size;
+  const steps = [
+    { label: 'Visitors', n: visitors },
+    { label: 'Viewed a product', n: uniq('view_product') },
+    { label: 'Added to cart', n: uniq('add_to_cart') },
+    { label: 'Started checkout', n: uniq('checkout_start') },
+    { label: 'Paid orders', n: paid },
+  ];
+  const max = Math.max(1, ...steps.map((s) => s.n));
+  return (
+    <Card>
+      <div className="text-sm font-medium text-ink-900 mb-3">Conversion funnel ({days}d)</div>
+      <div className="space-y-2">
+        {steps.map((s, i) => {
+          const prev = i > 0 ? steps[i - 1].n : 0;
+          const pct = i > 0 && prev > 0 ? Math.round((s.n / prev) * 100) : null;
+          return (
+            <div key={s.label} className="flex items-center gap-3 text-xs">
+              <span className="w-32 text-ink-700/70">{s.label}</span>
+              <div className="flex-1 h-4 bg-cream rounded overflow-hidden"><div className="h-full bg-bronze-600" style={{ width: `${Math.max(2, Math.round((s.n / max) * 100))}%` }} /></div>
+              <span className="w-14 text-right font-medium text-ink-900">{s.n.toLocaleString()}</span>
+              <span className="w-12 text-right text-ink-700/50">{pct != null ? pct + '%' : ''}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[11px] text-ink-700/50 mt-2">Percentages are step-to-step. Product/cart/checkout counts collect from the latest deploy onward.</p>
+    </Card>
+  );
+}
+
+function HeatList({ events, names, sales }: { events: Ev[]; names: Record<string, string>; sales: Record<string, number> }) {
+  const views: Record<string, number> = {};
+  for (const e of events) if (e.type === 'view_product' && e.product_id) views[e.product_id] = (views[e.product_id] || 0) + 1;
+  const top = Object.entries(views).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  return (
+    <Card>
+      <div className="text-sm font-medium text-ink-900 mb-1">Product heat — views vs sales</div>
+      <p className="text-[11px] text-ink-700/50 mb-2">High views + zero sales = fix price, images or copy.</p>
+      {top.length === 0 ? <p className="text-xs text-ink-700/50">No product views recorded yet.</p> : (
+        <div className="space-y-1.5">
+          {top.map(([pid, v]) => (
+            <div key={pid} className="flex items-center justify-between gap-2 text-xs">
+              <span className="truncate text-ink-800">{names[pid] || pid.slice(0, 8)}</span>
+              <span className="whitespace-nowrap text-ink-700/60">{v} views · <span className={sales[pid] ? 'text-green-700' : 'text-red-600'}>{sales[pid] || 0} sold</span></span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function SearchTerms({ events }: { events: Ev[] }) {
+  const terms: Record<string, { n: number; zero: boolean }> = {};
+  for (const e of events) if (e.type === 'search' && e.q) {
+    const t = terms[e.q] || { n: 0, zero: false };
+    t.n++; if ((e.n ?? 0) === 0) t.zero = true;
+    terms[e.q] = t;
+  }
+  const top = Object.entries(terms).sort((a, b) => b[1].n - a[1].n).slice(0, 12);
+  return (
+    <Card>
+      <div className="text-sm font-medium text-ink-900 mb-1">Search terms</div>
+      <p className="text-[11px] text-ink-700/50 mb-2"><span className="text-red-600 font-medium">Red</span> = searched but found nothing → a design you should make.</p>
+      {top.length === 0 ? <p className="text-xs text-ink-700/50">No searches recorded yet.</p> : (
+        <div className="flex flex-wrap gap-1.5">
+          {top.map(([q, t]) => (
+            <span key={q} className={`text-xs px-2 py-0.5 rounded border ${t.zero ? 'border-red-300 text-red-700 bg-red-50' : 'border-black/10 text-ink-700 bg-cream/50'}`}>{q} · {t.n}</span>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }

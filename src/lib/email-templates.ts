@@ -45,6 +45,8 @@ export type OrderEmailData = {
     cardBrand?: string | null;       // 'visa' | 'mastercard' | ...
     last4?: string | null;
   } | null;
+  // "Carvers also bought" — 3 same-category products rendered under the order.
+  crossSells?: { title: string; slug: string; image_url: string | null; price_usd: number }[];
 };
 
 /**
@@ -220,6 +222,24 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
               </div>
             </td>
           </tr>
+
+          ${(d.crossSells && d.crossSells.length) ? `
+          <!-- Carvers also bought (cross-sell) -->
+          <tr>
+            <td style="padding:8px 28px 16px;">
+              <div style="font-size:14px;font-weight:600;color:${BRAND_BRONZE_DARK};margin-bottom:10px;">Carvers of these designs also carved…</div>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%"><tr>
+                ${d.crossSells.slice(0, 3).map((c) => `
+                <td width="33%" style="padding:4px;vertical-align:top;">
+                  <a href="${SITE}/product/${esc(c.slug)}" style="text-decoration:none;color:${BRAND_INK};">
+                    ${c.image_url ? `<img src="${esc(c.image_url)}" width="165" style="width:100%;border-radius:8px;display:block;" alt="${esc(c.title)}">` : ''}
+                    <div style="font-size:12px;line-height:1.4;margin-top:5px;color:${BRAND_INK};">${esc(c.title.split('|')[0].trim().slice(0, 50))}</div>
+                    <div style="font-size:13px;color:${BRAND_BRONZE};font-weight:500;">$${Number(c.price_usd).toFixed(2)}</div>
+                  </a>
+                </td>`).join('')}
+              </tr></table>
+            </td>
+          </tr>` : ''}
 
           <!-- Charity callout -->
           <tr>

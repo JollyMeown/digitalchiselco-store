@@ -46,6 +46,18 @@ export const POST: APIRoute = async ({ request }) => {
     const device = deviceOf(ua);
     if (device === 'bot') return new Response(null, { status: 204 });
 
+    // Funnel events (t != 'pv') land in site_events instead of site_visits.
+    const type = String(body.t || 'pv');
+    if (type !== 'pv') {
+      if (!['view_product', 'add_to_cart', 'checkout_start'].includes(type)) return new Response(null, { status: 204 });
+      const day0 = new Date().toISOString().slice(0, 10);
+      const secret0 = process.env.ACCOUNT_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'trk';
+      const vh = crypto.createHash('sha256').update(`${ip}|${ua}|${day0}|${secret0}`).digest('hex').slice(0, 32);
+      const pid = typeof body.pid === 'string' && /^[0-9a-f-]{36}$/i.test(body.pid) ? body.pid : null;
+      await supabaseAdmin().from('site_events').insert({ day: day0, type, path, product_id: pid, visitor_hash: vh });
+      return new Response(null, { status: 204 });
+    }
+
     let referrer_host: string | null = null;
     try {
       const ref = String(body.r || '');

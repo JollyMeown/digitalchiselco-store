@@ -3,10 +3,21 @@ import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import ProductCard from '../components/ProductCard.astro';
 import { searchProducts, getSettings } from '../lib/queries';
+import { supabaseAdmin } from '../lib/supabase';
 
 const q = (Astro.url.searchParams.get('q') || '').trim();
 const results = q ? await searchProducts(q) : [];
 const settings = await getSettings();
+
+// Log the search term + result count for the admin search-terms report.
+// Fire-and-forget: analytics must never slow or break the page.
+if (q) {
+  try {
+    supabaseAdmin().from('site_events')
+      .insert({ type: 'search', path: '/search', q: q.slice(0, 120).toLowerCase(), n: results.length })
+      .then(() => {}, () => {});
+  } catch { /* noop */ }
+}
 ---
 <Shell title={q ? `Search: ${q} | DigitalChiselCo` : 'Search STL Files | DigitalChiselCo'} noindex={true}>
   <Breadcrumbs crumbs={[{ label: 'Search' }]} />

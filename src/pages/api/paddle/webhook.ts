@@ -298,6 +298,15 @@ async function handleTransactionCompleted(db: any, txn: any) {
 
   console.log(`Order ${order.id} created for txn ${txn.id} (${email}, $${total}).`);
 
+  // Abandoned-cart recovery: they paid — close any open cart snapshot so the
+  // reminder cron never emails a buyer who already completed checkout.
+  if (email && email !== 'unknown@digitalchiselco.com') {
+    try {
+      await db.from('abandoned_carts').update({ recovered_at: new Date().toISOString() })
+        .ilike('email', email).is('recovered_at', null);
+    } catch { /* best-effort */ }
+  }
+
   // ── Ops notification: new membership purchase ─────────────────────
   // Sends to OPS_INBOX so Jolly can spin up the manual fulfilment side
   // (first 8-file pack + monthly schedule). Best-effort — failure here
@@ -404,6 +413,30 @@ async function handleTransactionCompleted(db: any, txn: any) {
       const finalCustomerName: string | null =
         customerName || (txn.custom_data && txn.custom_data.customer_name) || null;
 
+      // "Carvers also bought" cross-sells for the delivery email: 3 active
+      // products from the same categories as the purchase, excluding what they own.
+      let crossSells: { title: string; slug: string; image_url: string | null; price_usd: number }[] = [];
+      try {
+        const boughtIds = productIds;
+        if (boughtIds.length) {
+          const { data: pcs } = await db.from('product_categories').select('category_id').in('product_id', boughtIds).limit(6);
+          const catIds = [...new Set((pcs || []).map((r: any) => r.category_id))];
+          if (catIds.length) {
+            const { data: pool } = await db.from('product_categories')
+              .select('products!inner(id, slug, title, price_usd, image_url, active)')
+              .in('category_id', catIds).limit(40);
+            const seen = new Set(boughtIds);
+            for (const r of (pool || []) as any[]) {
+              const pr = r.products;
+              if (!pr?.active || seen.has(pr.id)) continue;
+              seen.add(pr.id);
+              crossSells.push({ title: pr.title, slug: pr.slug, image_url: pr.image_url, price_usd: Number(pr.price_usd) });
+              if (crossSells.length >= 3) break;
+            }
+          }
+        }
+      } catch { /* cross-sells are optional */ }
+
       // Pull receipt-grade fields straight from Paddle's payload so our email
       // can fully replace Paddle's generic receipt.
       const tax = Number(txn.details?.totals?.tax ?? 0) / 100 || 0;
@@ -424,6 +457,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
       const { subject, html, text } = orderConfirmation({
         email,
         customerName: finalCustomerName,
+        crossSells,
         orderId: order.id,
         orderShortId: String(order.id).slice(0, 8),
         createdAt: new Date().toISOString(),

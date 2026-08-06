@@ -87,7 +87,10 @@ const jsonld = {
 
   {related.length > 0 && (
     <section class="mt-14">
-      <h2 class="text-xl mb-4">You may also like</h2>
+      <h2 class="text-xl mb-1">Complete the set</h2>
+      <p class="text-sm text-ink-700/70 mb-4">
+        From the same collection — <span class="font-medium text-bronze-700">buy any 2+ designs and save an extra 10%</span> (code <code class="font-mono text-xs bg-cream border border-bronze-600/20 rounded px-1.5 py-0.5">SET10</code>, shown in your cart).
+      </p>
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {related.map((r) => <ProductCard product={r} discount={settings.discount_percent} />)}
       </div>

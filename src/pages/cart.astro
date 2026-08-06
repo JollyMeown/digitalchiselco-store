@@ -10,10 +10,19 @@ const settings = await getSettings();
 const { percent } = pricing(1, settings.discount_percent);
 const showCartPromos = (settings as any).cart_promos_active !== false;
 const promoTiers = [
+  { items: 2, percent: 10, code: 'SET10' },
   { items: 6, percent: 15, code: '2026OFF15' },
   { items: 10, percent: 20, code: '2026OFF20' },
   { items: 25, percent: 35, code: '2026OFF35' },
 ];
+// Order-bump: the complete catalogue PDF offered as a one-click add-on at checkout.
+let bump: { id: string; title: string; price: number } | null = null;
+try {
+  const { supabaseAdmin } = await import('../lib/supabase');
+  const { data: bp } = await supabaseAdmin().from('products')
+    .select('id, title, price_usd, active').like('slug', 'catalogue-1000-stl%').eq('active', true).limit(1).maybeSingle();
+  if (bp) bump = { id: bp.id, title: bp.title.split('|')[0].trim(), price: Number(bp.price_usd) };
+} catch { /* bump is optional */ }
 // PADDLE_ENV is a non-PUBLIC var, so it is NOT exposed on import.meta.env (that
 // resolves to undefined -> always 'sandbox'). Read process.env at SSR runtime
 // first, matching the server helper in src/lib/paddle.ts.
@@ -81,6 +90,15 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         <p class="mt-1 text-[11px] text-ink-700/50">We send your STL files and receipt here. This is the same email you'll see in the payment popup.</p>
       </div>
 
+      {bump && (
+        <label class="mt-4 flex items-start gap-2.5 bg-[#FAEEDA] border border-bronze-600/30 rounded-md px-3 py-2.5 cursor-pointer select-none">
+          <input id="bump-check" type="checkbox" class="mt-0.5 accent-[#854F0B]" data-bump-id={bump.id} data-bump-price={bump.price} />
+          <span class="text-sm text-bronze-800 leading-snug">
+            <strong>Add the {bump.title}</strong> — browse every design we make, offline, forever.
+            <span class="whitespace-nowrap font-medium">+ ${bump.price.toFixed(2)}</span>
+          </span>
+        </label>
+      )}
       <button id="checkout" class="mt-4 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">Checkout</button>
       <p class="text-xs text-ink-700/60 mt-2 text-center">Secure checkout · instant download links emailed after purchase</p>
     </div>
@@ -165,6 +183,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       // Tiers must mirror seed_bulk_promos.mjs. Find the next tier the
       // cart hasn't reached and tell the customer how to unlock it.
       const tiers = [
+        { items: 2,  percent: 10, code: 'SET10' },
         { items: 6,  percent: 15, code: '2026OFF15' },
         { items: 10, percent: 20, code: '2026OFF20' },
         { items: 25, percent: 35, code: '2026OFF35' },
@@ -361,6 +380,22 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       emailMsg.classList.add('hidden');
       try { localStorage.setItem('buyer_email', emailInput.value.trim()); } catch {}
     });
+    // Abandoned-cart capture: once a valid email is typed, snapshot the cart
+    // server-side so we can send ONE gentle reminder if checkout never completes.
+    let cartNoteT = null;
+    emailInput?.addEventListener('input', () => {
+      clearTimeout(cartNoteT);
+      cartNoteT = setTimeout(() => {
+        const em = (emailInput.value || '').trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return;
+        const c = JSON.parse(localStorage.getItem('cart') || '[]');
+        if (!c.length) return;
+        try {
+          fetch('/api/cart-note', { method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email: em, items: c.map((x) => ({ id: x.id, title: x.title, price: x.price, qty: x.qty || 1 })) }), keepalive: true });
+        } catch (_) {}
+      }, 1200);
+    });
 
     // ── Promo code ────────────────────────────────────────────────────
     const promoMsg = document.getElementById('promo-msg');
@@ -481,12 +516,22 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       });
 
       btn.disabled = true; btn.textContent = 'Starting checkout…';
+      // funnel event: checkout started
+      try { navigator.sendBeacon('/api/track', new Blob([JSON.stringify({ p: '/cart', t: 'checkout_start' })], { type: 'application/json' })); } catch (_) {}
       try {
         const promo = JSON.parse(localStorage.getItem('promo') || 'null');
+        // Order-bump: append the catalogue as a one-time extra line (price is
+        // server-verified by checkout-init from the DB, never trusted from here).
+        const itemsForCheckout = cart.slice();
+        const bumpEl = document.getElementById('bump-check');
+        if (bumpEl?.checked && bumpEl.dataset.bumpId && !cart.some((x) => x.id === bumpEl.dataset.bumpId)) {
+          itemsForCheckout.push({ id: bumpEl.dataset.bumpId, title: 'Complete Catalogue', price: Number(bumpEl.dataset.bumpPrice) || 0, qty: 1 });
+          customizationsPayload.push(null);
+        }
         const res = await fetch('/api/checkout-init', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ items: cart, email: buyerEmail, discount_percent: DISCOUNT, coupon_code: promo?.code || null, customizations: customizationsPayload }),
+          body: JSON.stringify({ items: itemsForCheckout, email: buyerEmail, discount_percent: DISCOUNT, coupon_code: promo?.code || null, customizations: customizationsPayload }),
         });
         const data = await res.json();
         if (!res.ok || !data.transaction_id) throw new Error(data.error || 'Could not start checkout.');

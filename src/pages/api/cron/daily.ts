@@ -8,6 +8,7 @@
 
 import type { APIRoute } from 'astro';
 import { runDailyAutomation } from '../../../lib/subscriptions';
+import { runGrowthAutomation } from '../../../lib/growth';
 
 export const prerender = false;
 
@@ -28,7 +29,12 @@ async function handle(request: Request): Promise<Response> {
 
   try {
     const stats = await runDailyAutomation();
-    return json({ ok: true, ranAt: new Date().toISOString(), stats });
+    // Growth systems (drip / cart reminders / followups) run after the
+    // membership drops; each is individually toggled in Admin → Automations.
+    let growth: Record<string, any> = {};
+    try { growth = await runGrowthAutomation(); }
+    catch (e: any) { growth = { error: e?.message || 'growth failed' }; }
+    return json({ ok: true, ranAt: new Date().toISOString(), stats, growth });
   } catch (e: any) {
     console.error('[cron/daily] failed:', e);
     return json({ ok: false, error: e?.message || 'automation failed' }, 500);

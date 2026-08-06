@@ -77,11 +77,26 @@ const faviconType = settings.favicon_image_url
     />
     <!-- First-party pageview beacon (no cookies, no PII — feeds admin Traffic tab) -->
     <script is:inline>
-      try {
-        var d = JSON.stringify({ p: location.pathname, r: document.referrer || '' });
-        if (navigator.sendBeacon) navigator.sendBeacon('/api/track', new Blob([d], { type: 'application/json' }));
-        else fetch('/api/track', { method: 'POST', body: d, keepalive: true, headers: { 'content-type': 'application/json' } });
-      } catch (_) {}
+      (function () {
+        function trk(o) {
+          try {
+            var d = JSON.stringify(o);
+            if (navigator.sendBeacon) navigator.sendBeacon('/api/track', new Blob([d], { type: 'application/json' }));
+            else fetch('/api/track', { method: 'POST', body: d, keepalive: true, headers: { 'content-type': 'application/json' } });
+          } catch (_) {}
+        }
+        trk({ p: location.pathname, r: document.referrer || '' });
+        document.addEventListener('DOMContentLoaded', function () {
+          if (location.pathname.indexOf('/product/') === 0) {
+            var b = document.querySelector('.add-to-cart');
+            trk({ p: location.pathname, t: 'view_product', pid: (b && b.dataset && b.dataset.id) || null });
+          }
+        });
+        document.addEventListener('click', function (ev) {
+          var b = ev.target && ev.target.closest ? ev.target.closest('.add-to-cart') : null;
+          if (b) trk({ p: location.pathname, t: 'add_to_cart', pid: (b.dataset && b.dataset.id) || null });
+        });
+      })();
     </script>
     {gaId && (
       <>

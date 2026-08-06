@@ -13,10 +13,40 @@ if (txnId) {
   const db = supabaseAdmin();
   const { data } = await db
     .from('orders')
-    .select('id, email, total, currency, created_at, order_items(title, qty, price_usd)')
+    .select('id, email, total, currency, created_at, order_items(title, qty, price_usd, product_id)')
     .eq('paddle_transaction_id', txnId)
     .maybeSingle();
   order = data;
+}
+
+// Post-purchase upsell: same-collection designs they don't own yet + membership.
+// Trust is at its highest right now — one gentle, relevant offer.
+let moreLikeThese: any[] = [];
+let plan: any = null;
+if (order) {
+  try {
+    const db = supabaseAdmin();
+    const boughtIds = (order.order_items || []).map((i: any) => i.product_id).filter(Boolean);
+    if (boughtIds.length) {
+      const { data: pcs } = await db.from('product_categories').select('category_id').in('product_id', boughtIds).limit(6);
+      const catIds = [...new Set((pcs || []).map((r: any) => r.category_id))];
+      if (catIds.length) {
+        const { data: pool } = await db.from('product_categories')
+          .select('product_id, products!inner(id, slug, title, price_usd, image_url, active)')
+          .in('category_id', catIds).limit(40);
+        const seen = new Set(boughtIds);
+        for (const r of (pool || []) as any[]) {
+          const pr = r.products;
+          if (!pr?.active || seen.has(pr.id)) continue;
+          seen.add(pr.id);
+          moreLikeThese.push(pr);
+          if (moreLikeThese.length >= 3) break;
+        }
+      }
+    }
+    const { data: mp } = await db.from('membership_plans').select('slug, name, months, files_per_month, price_usd').eq('active', true).order('sort_order').limit(1).maybeSingle();
+    plan = mp;
+  } catch { /* upsell is optional */ }
 }
 ---
 <Base title="Order confirmed · DigitalChiselCo" noindex>
@@ -52,6 +82,35 @@ if (txnId) {
           <a href="/account" class="inline-block bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Go to my account</a>
           <a href="/catalog" class="ml-3 inline-block text-bronze-700 px-6 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">Continue shopping</a>
         </div>
+
+        {moreLikeThese.length > 0 && (
+          <section class="mt-10">
+            <h2 class="font-serif text-2xl text-bronze-800 mb-1">Complete your collection</h2>
+            <p class="text-sm text-ink-700/70 mb-4">
+              From the same collections you just bought — and your next order gets <span class="font-medium text-bronze-700">10% off</span> with code
+              <code class="font-mono text-xs bg-cream border border-bronze-600/20 rounded px-1.5 py-0.5">THANKYOU10</code> 🎁
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {moreLikeThese.map((r: any) => (
+                <a href={`/product/${r.slug}`} class="bg-white border border-black/10 rounded-xl overflow-hidden hover:border-bronze-600/40 transition">
+                  {r.image_url && <img src={r.image_url} alt={r.title} class="w-full aspect-square object-cover" loading="lazy" />}
+                  <div class="p-3">
+                    <div class="text-sm text-ink-800 line-clamp-2">{r.title.split('|')[0].trim()}</div>
+                    <div class="text-bronze-700 font-medium text-sm mt-1">${Number(r.price_usd).toFixed(2)}</div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {plan && (
+          <div class="mt-8 bg-[#5E380A] text-[#F5EFE3] rounded-xl p-6 text-center">
+            <div class="font-serif text-xl">Love carving? Get {plan.files_per_month} fresh designs every month.</div>
+            <p class="text-sm opacity-80 mt-1">The {plan.name} works out under ${(Number(plan.price_usd) / (plan.months * plan.files_per_month)).toFixed(2)} per design.</p>
+            <a href="/#membership" class="inline-block mt-4 bg-[#FAC775] text-[#5E380A] font-medium px-6 py-2.5 rounded-md text-sm">Explore the membership →</a>
+          </div>
+        )}
       </>
     ) : (
       <>

@@ -1,0 +1,79 @@
+// Admin-only: render any marketing/automation email with REAL store data so the
+// owner can review every template before enabling the systems, and test-send
+// any of them to their own inbox. GET ?kind=… → {subject, html}; POST {kind, to}.
+
+import type { APIRoute } from 'astro';
+import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '../../../../lib/supabase';
+import { send as sendEmail } from '../../../../lib/resend';
+import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, type MiniProduct } from '../../../../lib/marketing-emails';
+
+export const prerender = false;
+
+const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY!;
+
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+
+async function isCallerAdmin(request: Request): Promise<boolean> {
+  const auth = request.headers.get('authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!token) return false;
+  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON, { global: { headers: { Authorization: `Bearer ${token}` } } });
+  const { data: who } = await userClient.auth.getUser();
+  if (!who?.user?.id) return false;
+  const { data: prof } = await supabaseAdmin().from('profiles').select('is_admin').eq('id', who.user.id).maybeSingle();
+  return !!prof?.is_admin;
+}
+
+const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'review7', 'arrivals30', 'loyalty'] as const;
+
+async function render(kind: string, email: string): Promise<{ subject: string; html: string; text: string }> {
+  const db = supabaseAdmin();
+  const [{ data: best }, { data: bundle }, { data: plan }, { data: newest }] = await Promise.all([
+    db.from('products').select('title, slug, image_url, price_usd').eq('active', true).eq('is_bestseller', true).limit(3),
+    db.from('products').select('title, slug, image_url, price_usd').eq('active', true).eq('is_bundle', true).order('price_usd', { ascending: false }).limit(1).maybeSingle(),
+    db.from('membership_plans').select('name, months, files_per_month, price_usd').eq('active', true).order('sort_order').limit(1).maybeSingle(),
+    db.from('products').select('title, slug, image_url, price_usd').eq('active', true).order('created_at', { ascending: false }).limit(3),
+  ]);
+  let bestsellers = (best || []) as MiniProduct[];
+  if (!bestsellers.length) bestsellers = (newest || []) as MiniProduct[];
+
+  if (kind.startsWith('drip')) {
+    const stage = Number(kind.slice(4)) || 1;
+    return dripEmail(stage, { email, bestsellers, bundle: bundle as MiniProduct | null, plan: plan as any, couponCode: 'CARVE15' });
+  }
+  if (kind === 'cart') {
+    const items = bestsellers.slice(0, 2).map((b) => ({ title: b.title, price: Number(b.price_usd) || 7.99 }));
+    return cartReminderEmail({ email, items: items.length ? items : [{ title: 'Sample Bas-Relief STL', price: 7.99 }], subtotal: items.reduce((s, i) => s + i.price, 0) });
+  }
+  if (kind === 'review7') return reviewRequestEmail({ email, name: 'Sample Customer', itemTitles: [bestsellers[0]?.title || 'Sample Bas-Relief STL'] });
+  if (kind === 'arrivals30') return newArrivalsEmail({ email, name: 'Sample Customer', products: (newest || []) as MiniProduct[] });
+  if (kind === 'loyalty') return loyaltyEmail({ email, name: 'Sample Customer', code: 'LOYAL-DEMO' });
+  throw new Error('unknown kind');
+}
+
+export const GET: APIRoute = async ({ request, url }) => {
+  if (!(await isCallerAdmin(request))) return json({ error: 'Admin authentication required.' }, 401);
+  const kind = url.searchParams.get('kind') || 'drip1';
+  if (!KINDS.includes(kind as any)) return json({ error: 'unknown kind' }, 400);
+  try {
+    const out = await render(kind, 'preview@example.com');
+    return json({ ok: true, kind, subject: out.subject, html: out.html });
+  } catch (e: any) { return json({ error: e?.message || 'render failed' }, 500); }
+};
+
+export const POST: APIRoute = async ({ request }) => {
+  if (!(await isCallerAdmin(request))) return json({ error: 'Admin authentication required.' }, 401);
+  try {
+    const body = await request.json().catch(() => ({}));
+    const kind = String(body.kind || '');
+    const to = String(body.to || '').toLowerCase().trim();
+    if (!KINDS.includes(kind as any)) return json({ error: 'unknown kind' }, 400);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return json({ error: 'valid "to" email required' }, 400);
+    const { subject, html, text } = await render(kind, to);
+    const res = await sendEmail({ to, subject: `[TEST] ${subject}`, html, text });
+    return res.ok ? json({ ok: true, sent: to }) : json({ error: res.error || 'send failed' }, 502);
+  } catch (e: any) { return json({ error: e?.message || 'test send failed' }, 500); }
+};
