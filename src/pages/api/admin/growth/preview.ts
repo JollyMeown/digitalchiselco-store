@@ -45,7 +45,7 @@ async function render(kind: string, email: string): Promise<{ subject: string; h
     const stage = Number(kind.slice(4)) || 1;
     out = dripEmail(stage, { email, bestsellers, bundle: bundle as MiniProduct | null, plan: plan as any, couponCode: 'CARVE15' });
   } else if (kind === 'cart') {
-    const items = bestsellers.slice(0, 2).map((b) => ({ title: b.title, price: Number(b.price_usd) || 7.99 }));
+    const items = bestsellers.slice(0, 2).map((b) => ({ title: b.title, price: Number(b.price_usd) || 7.99, image_url: b.image_url, slug: b.slug }));
     out = cartReminderEmail({ email, items: items.length ? items : [{ title: 'Sample Bas-Relief STL', price: 7.99 }], subtotal: items.reduce((s, i) => s + i.price, 0) });
   } else if (kind === 'browse') out = abandonedBrowseEmail({ email, products: (bestsellers.length ? bestsellers : newest || []) as MiniProduct[] });
   else if (kind === 'review7') out = reviewRequestEmail({ email, name: 'Sample Customer', itemTitles: [bestsellers[0]?.title || 'Sample Bas-Relief STL'] });

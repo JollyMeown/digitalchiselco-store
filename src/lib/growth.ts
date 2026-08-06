@@ -108,8 +108,17 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           s.recovered++; continue;
         }
         if (await isUnsubscribed(db, c.email)) { s.skipped++; continue; }
-        const items = (Array.isArray(c.cart) ? c.cart : []) as { title: string; price: number }[];
-        if (!items.length) { s.skipped++; continue; }
+        const rawItems = (Array.isArray(c.cart) ? c.cart : []) as { id?: string; title: string; price: number }[];
+        if (!rawItems.length) { s.skipped++; continue; }
+        // Enrich with product thumbnails + slugs so the email shows pictures
+        // (the cart snapshot only stores id/title/price).
+        const ids = rawItems.map((i) => i.id).filter((id): id is string => !!id && /^[0-9a-f-]{36}$/i.test(id));
+        const imgBy: Record<string, { image_url: string | null; slug: string }> = {};
+        if (ids.length) {
+          const { data: prods } = await db.from('products').select('id, image_url, slug').in('id', ids);
+          for (const p of prods || []) imgBy[p.id] = { image_url: p.image_url, slug: p.slug };
+        }
+        const items = rawItems.map((i) => ({ title: i.title, price: i.price, image_url: (i.id && imgBy[i.id]?.image_url) || null, slug: (i.id && imgBy[i.id]?.slug) || null }));
         const { subject, html, text } = withOvr('cart', cartReminderEmail({ email: c.email, items, subtotal: Number(c.subtotal) || 0 }), c.email);
         const res = await sendEmail({ to: c.email, subject, html, text, idempotencyKey: `cartrem:${c.id}`, tags: [{ name: 'kind', value: 'cart' }] });
         if (res.ok) { await db.from('abandoned_carts').update({ reminded_at: new Date().toISOString() }).eq('id', c.id); s.sent++; }

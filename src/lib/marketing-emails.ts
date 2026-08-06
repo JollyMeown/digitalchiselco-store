@@ -167,9 +167,20 @@ export function dripEmail(stage: number, d: {
 }
 
 // ── Abandoned cart (one reminder, ~20h later) ────────────────────────
-export function cartReminderEmail(d: { email: string; items: { title: string; price: number }[]; subtotal: number }): Out {
+export function cartReminderEmail(d: { email: string; items: { title: string; price: number; image_url?: string | null; slug?: string | null }[]; subtotal: number }): Out {
   const subject = 'Your cart is saved — your designs are waiting';
-  const rows = d.items.slice(0, 6).map((i) => `<tr><td style="padding:6px 0;font-size:14px;color:${INK};">${esc(i.title.split('|')[0].trim().slice(0, 60))}</td><td style="padding:6px 0;font-size:14px;color:#777;text-align:right;">$${Number(i.price).toFixed(2)}</td></tr>`).join('');
+  const rows = d.items.slice(0, 6).map((i) => {
+    const t = esc(i.title.split('|')[0].trim().slice(0, 60));
+    const link = i.slug ? `${SITE}/product/${esc(i.slug)}` : `${SITE}/cart`;
+    const thumb = i.image_url
+      ? `<a href="${link}"><img src="${esc(i.image_url)}" width="54" height="54" style="width:54px;height:54px;border-radius:6px;object-fit:cover;display:block;border:1px solid #E5DDD0;" alt=""></a>`
+      : '';
+    return `<tr>
+      <td style="padding:8px 10px 8px 0;width:54px;vertical-align:middle;">${thumb}</td>
+      <td style="padding:8px 8px 8px 0;font-size:14px;color:${INK};vertical-align:middle;"><a href="${link}" style="color:${INK};text-decoration:none;">${t}</a></td>
+      <td style="padding:8px 0;font-size:14px;color:#777;text-align:right;vertical-align:middle;white-space:nowrap;">$${Number(i.price).toFixed(2)}</td>
+    </tr>`;
+  }).join('');
   const body = `
     <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">You left ${d.items.length === 1 ? 'a design' : d.items.length + ' designs'} in your cart — no rush, it's saved on your device. Here's what's waiting:</p>
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:12px;border-top:1px solid #E5DDD0;">${rows}</table>
