@@ -6,7 +6,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { send as sendEmail } from '../../../../lib/resend';
-import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, type MiniProduct } from '../../../../lib/marketing-emails';
+import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
 
 export const prerender = false;
 
@@ -40,18 +40,21 @@ async function render(kind: string, email: string): Promise<{ subject: string; h
   let bestsellers = (best || []) as MiniProduct[];
   if (!bestsellers.length) bestsellers = (newest || []) as MiniProduct[];
 
+  let out: { subject: string; html: string; text: string };
   if (kind.startsWith('drip')) {
     const stage = Number(kind.slice(4)) || 1;
-    return dripEmail(stage, { email, bestsellers, bundle: bundle as MiniProduct | null, plan: plan as any, couponCode: 'CARVE15' });
-  }
-  if (kind === 'cart') {
+    out = dripEmail(stage, { email, bestsellers, bundle: bundle as MiniProduct | null, plan: plan as any, couponCode: 'CARVE15' });
+  } else if (kind === 'cart') {
     const items = bestsellers.slice(0, 2).map((b) => ({ title: b.title, price: Number(b.price_usd) || 7.99 }));
-    return cartReminderEmail({ email, items: items.length ? items : [{ title: 'Sample Bas-Relief STL', price: 7.99 }], subtotal: items.reduce((s, i) => s + i.price, 0) });
-  }
-  if (kind === 'review7') return reviewRequestEmail({ email, name: 'Sample Customer', itemTitles: [bestsellers[0]?.title || 'Sample Bas-Relief STL'] });
-  if (kind === 'arrivals30') return newArrivalsEmail({ email, name: 'Sample Customer', products: (newest || []) as MiniProduct[] });
-  if (kind === 'loyalty') return loyaltyEmail({ email, name: 'Sample Customer', code: 'LOYAL-DEMO' });
-  throw new Error('unknown kind');
+    out = cartReminderEmail({ email, items: items.length ? items : [{ title: 'Sample Bas-Relief STL', price: 7.99 }], subtotal: items.reduce((s, i) => s + i.price, 0) });
+  } else if (kind === 'review7') out = reviewRequestEmail({ email, name: 'Sample Customer', itemTitles: [bestsellers[0]?.title || 'Sample Bas-Relief STL'] });
+  else if (kind === 'arrivals30') out = newArrivalsEmail({ email, name: 'Sample Customer', products: (newest || []) as MiniProduct[] });
+  else if (kind === 'loyalty') out = loyaltyEmail({ email, name: 'Sample Customer', code: 'LOYAL-DEMO' });
+  else throw new Error('unknown kind');
+
+  // owner-saved edits (subject / heading / body) apply to preview + test-sends
+  const { data: ov } = await db.from('email_template_overrides').select('*').eq('kind', kind).maybeSingle();
+  return applyOverride(out, ov as any, email, TEMPLATE_HEADINGS[kind] || '');
 }
 
 export const GET: APIRoute = async ({ request, url }) => {

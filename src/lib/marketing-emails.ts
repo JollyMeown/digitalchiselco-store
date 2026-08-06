@@ -8,6 +8,9 @@ import crypto from 'node:crypto';
 
 const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
 const BRONZE = '#854F0B', BRONZE_DARK = '#5E380A', CREAM = '#F5EFE3', INK = '#2A1A0E';
+// The carved-wood shop logo (same file as site_settings.logo_image_url).
+const LOGO_URL = process.env.EMAIL_LOGO_URL
+  || 'https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/brand/1782452499676-lgzcu7.png';
 
 function esc(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
@@ -23,12 +26,56 @@ export function unsubUrl(email: string): string {
 
 export type MiniProduct = { title: string; slug: string; image_url?: string | null; price_usd?: number | null };
 
+export function renderShell(subject: string, heading: string, bodyHtml: string, email: string): string {
+  return shell(subject, heading, bodyHtml, email);
+}
+
+export type TemplateOverride = { kind: string; subject?: string | null; heading?: string | null; body_html?: string | null };
+
+/** Apply an owner-saved override (Admin → Automations) on top of a built
+ *  template. Subject/heading swap in-place; a body_html override re-renders
+ *  the inner body inside the brand shell (logo + footer + unsubscribe kept). */
+export function applyOverride(
+  out: { subject: string; html: string; text: string },
+  ovr: TemplateOverride | undefined | null,
+  email: string,
+  defaultHeading: string,
+): { subject: string; html: string; text: string } {
+  if (!ovr) return out;
+  const subject = (ovr.subject || '').trim() || out.subject;
+  const heading = (ovr.heading || '').trim() || defaultHeading;
+  if ((ovr.body_html || '').trim()) {
+    const html = shell(subject, heading, ovr.body_html as string, email);
+    const text = (ovr.body_html as string).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1200) + `\nUnsubscribe: ${unsubUrl(email)}`;
+    return { subject, html, text };
+  }
+  if (subject === out.subject && heading === defaultHeading) return out;
+  // subject/heading-only override: patch the rendered html
+  let html = out.html.replace(/<title>[^<]*<\/title>/, `<title>${esc(subject)}</title>`);
+  html = html.replace(/(<h1[^>]*>)[^<]*(<\/h1>)/, `$1${esc(heading)}$2`);
+  return { subject, html, text: out.text };
+}
+
+/** Default headings per template kind (used when an override sets only body/subject). */
+export const TEMPLATE_HEADINGS: Record<string, string> = {
+  drip1: 'How did the free pack carve?',
+  drip2: 'Our most-carved designs',
+  drip3: 'One bundle, a whole collection',
+  drip4: 'The membership pays for itself',
+  drip5: 'Here is 15% off — our treat',
+  cart: 'Still thinking it over?',
+  review7: 'Show us your carve 🪵',
+  arrivals30: 'New designs are in',
+  loyalty: 'A permanent thank-you',
+};
+
 function shell(subject: string, heading: string, bodyHtml: string, email: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(subject)}</title></head>
 <body style="margin:0;padding:0;background:${CREAM};font-family:Helvetica,Arial,sans-serif;color:${INK};">
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:${CREAM};padding:32px 12px;"><tr><td align="center">
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #E5DDD0;">
 <tr><td style="background:${BRONZE_DARK};color:${CREAM};padding:28px 24px;text-align:center;">
+  <img src="${LOGO_URL}" alt="DigitalChiselCo" width="72" height="72" style="display:block;margin:0 auto 10px;border-radius:12px;">
   <div style="font-size:11px;letter-spacing:2px;color:#FAC775;text-transform:uppercase;margin-bottom:8px;">DigitalChiselCo</div>
   <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.25;color:#ffffff;">${esc(heading)}</h1>
 </td></tr>

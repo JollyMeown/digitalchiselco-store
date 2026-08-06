@@ -23,6 +23,12 @@ export default function Automations() {
   const [busy, setBusy] = useState(false);
   const [testTo, setTestTo] = useState('');
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
+  // template editing (email_template_overrides — blank field = use the default)
+  const [editOpen, setEditOpen] = useState(false);
+  const [ovrSubject, setOvrSubject] = useState('');
+  const [ovrHeading, setOvrHeading] = useState('');
+  const [ovrBody, setOvrBody] = useState('');
+  const [ovrSaved, setOvrSaved] = useState(false);
 
   useEffect(() => { load(); }, []);
   useEffect(() => { loadPreview(kind); }, [kind]);
@@ -56,6 +62,33 @@ export default function Automations() {
     const data = await res.json();
     if (res.ok) setPreview({ subject: data.subject, html: data.html });
     else setMsg({ kind: 'error', text: data.error || 'preview failed' });
+    // load any saved override for the edit panel
+    const { data: ov } = await supabase.from('email_template_overrides').select('*').eq('kind', k).maybeSingle();
+    setOvrSubject(ov?.subject || ''); setOvrHeading(ov?.heading || ''); setOvrBody(ov?.body_html || '');
+    setOvrSaved(!!ov);
+  }
+
+  async function saveOverride() {
+    const payload = {
+      kind,
+      subject: ovrSubject.trim() || null,
+      heading: ovrHeading.trim() || null,
+      body_html: ovrBody.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (!payload.subject && !payload.heading && !payload.body_html) return resetOverride();
+    const { error } = await supabase.from('email_template_overrides').upsert(payload, { onConflict: 'kind' });
+    if (error) { setMsg({ kind: 'error', text: error.message }); return; }
+    setMsg({ kind: 'success', text: '✓ Saved — preview updated' });
+    setOvrSaved(true);
+    loadPreview(kind);
+  }
+
+  async function resetOverride() {
+    await supabase.from('email_template_overrides').delete().eq('kind', kind);
+    setOvrSubject(''); setOvrHeading(''); setOvrBody(''); setOvrSaved(false);
+    setMsg({ kind: 'success', text: '✓ Reset to the default template' });
+    loadPreview(kind);
   }
 
   async function sendTest() {
@@ -123,8 +156,22 @@ export default function Automations() {
           <input value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="you@email.com" className={inputCls + ' max-w-[220px]'} />
           <button className={btnPrimary} disabled={busy} onClick={sendTest}>{busy ? 'Sending…' : 'Send test to me'}</button>
           <button className={btnGhost} onClick={() => loadPreview(kind)}>Refresh preview</button>
+          <button className={btnGhost} onClick={() => setEditOpen((v) => !v)}>{editOpen ? 'Close editor' : (ovrSaved ? '✎ Edit (customised)' : '✎ Edit template')}</button>
           <Toast message={msg.text} kind={msg.kind} />
         </div>
+
+        {editOpen && (
+          <div className="mb-4 border border-bronze-600/20 bg-cream/30 rounded-lg p-3 space-y-2">
+            <p className="text-xs text-ink-700/60">Leave a field <b>blank</b> to keep the default. The logo, brand shell and unsubscribe footer always stay. Body accepts simple HTML (&lt;p&gt;, &lt;strong&gt;, &lt;a href&gt;, &lt;ul&gt;…).</p>
+            <input value={ovrSubject} onChange={(e) => setOvrSubject(e.target.value)} placeholder="Custom subject (blank = default)" className={inputCls} />
+            <input value={ovrHeading} onChange={(e) => setOvrHeading(e.target.value)} placeholder="Custom header title (blank = default)" className={inputCls} />
+            <textarea value={ovrBody} onChange={(e) => setOvrBody(e.target.value)} rows={8} placeholder="Custom body HTML (blank = default template body)" className={inputCls + ' font-mono text-xs'} />
+            <div className="flex gap-2">
+              <button className={btnPrimary} onClick={saveOverride}>Save changes</button>
+              {ovrSaved && <button className={btnGhost} onClick={resetOverride}>Reset to default</button>}
+            </div>
+          </div>
+        )}
         {preview ? (
           <>
             <div className="text-xs text-ink-700/60 mb-2">Subject: <span className="text-ink-900 font-medium">{preview.subject}</span></div>

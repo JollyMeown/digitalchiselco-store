@@ -10,7 +10,8 @@ import { supabaseAdmin } from './supabase';
 import { send as sendEmail } from './resend';
 import {
   dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
-  type MiniProduct,
+  applyOverride, TEMPLATE_HEADINGS,
+  type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
 
 type DB = ReturnType<typeof supabaseAdmin>;
@@ -34,6 +35,11 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   const stats: Record<string, any> = { drip: 'off', carts: 'off', followups: 'off' };
   const { data: g } = await db.from('growth_settings').select('*').eq('id', 1).maybeSingle();
   if (!g) return { error: 'growth_settings missing' };
+  // owner-edited template overrides (Admin → Automations)
+  const { data: ovrRows } = await db.from('email_template_overrides').select('*');
+  const ovr = new Map<string, TemplateOverride>((ovrRows || []).map((r: any) => [r.kind, r]));
+  const withOvr = (kind: string, out: { subject: string; html: string; text: string }, email: string) =>
+    applyOverride(out, ovr.get(kind), email, TEMPLATE_HEADINGS[kind] || '');
 
   // ── 1. nurture drip ─────────────────────────────────────────────────
   if (g.drip_enabled) {
@@ -74,7 +80,8 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           s.converted++; continue;
         }
         const stage = r.stage + 1;
-        const { subject, html, text } = dripEmail(stage, { email: r.email, bestsellers, bundle: bundle as MiniProduct | null, plan: plan as any, couponCode: 'CARVE15' });
+        const { subject, html, text } = withOvr(`drip${stage}`,
+          dripEmail(stage, { email: r.email, bestsellers, bundle: bundle as MiniProduct | null, plan: plan as any, couponCode: 'CARVE15' }), r.email);
         const res = await sendEmail({ to: r.email, subject, html, text, idempotencyKey: `drip:${r.email}:${stage}` });
         if (res.ok) {
           await db.from('subscriber_drip').update({ stage, last_sent_at: new Date().toISOString(), ...(stage >= 5 ? { status: 'done' } : {}) }).eq('email', r.email);
@@ -102,7 +109,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         if (await isUnsubscribed(db, c.email)) { s.skipped++; continue; }
         const items = (Array.isArray(c.cart) ? c.cart : []) as { title: string; price: number }[];
         if (!items.length) { s.skipped++; continue; }
-        const { subject, html, text } = cartReminderEmail({ email: c.email, items, subtotal: Number(c.subtotal) || 0 });
+        const { subject, html, text } = withOvr('cart', cartReminderEmail({ email: c.email, items, subtotal: Number(c.subtotal) || 0 }), c.email);
         const res = await sendEmail({ to: c.email, subject, html, text, idempotencyKey: `cartrem:${c.id}` });
         if (res.ok) { await db.from('abandoned_carts').update({ reminded_at: new Date().toISOString() }).eq('id', c.id); s.sent++; }
         else s.failed++;
@@ -128,7 +135,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     for (const o of reviewOrders || []) {
       if (done.has(`${o.id}:review7`) || await isUnsubscribed(db, o.email)) continue;
       if (!(await claim(o.id, 'review7'))) continue;
-      const { subject, html, text } = reviewRequestEmail({ email: o.email, name: o.customer_name, itemTitles: (o.order_items || []).map((i: any) => i.title) });
+      const { subject, html, text } = withOvr('review7', reviewRequestEmail({ email: o.email, name: o.customer_name, itemTitles: (o.order_items || []).map((i: any) => i.title) }), o.email);
       const res = await sendEmail({ to: o.email, subject, html, text, idempotencyKey: `review7:${o.id}` });
       res.ok ? s.review++ : s.failed++;
     }
@@ -141,7 +148,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     for (const o of arrOrders || []) {
       if (done.has(`${o.id}:arrivals30`) || await isUnsubscribed(db, o.email)) continue;
       if (!(await claim(o.id, 'arrivals30'))) continue;
-      const { subject, html, text } = newArrivalsEmail({ email: o.email, name: o.customer_name, products: (newest || []) as MiniProduct[] });
+      const { subject, html, text } = withOvr('arrivals30', newArrivalsEmail({ email: o.email, name: o.customer_name, products: (newest || []) as MiniProduct[] }), o.email);
       const res = await sendEmail({ to: o.email, subject, html, text, idempotencyKey: `arrivals30:${o.id}` });
       res.ok ? s.arrivals++ : s.failed++;
     }
@@ -163,7 +170,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       if (!(await claim(anchor, 'loyalty'))) continue;
       const code = 'LOYAL-' + Math.random().toString(36).slice(2, 6).toUpperCase();
       await db.from('coupons').insert({ code, percent_off: 10, active: true, description: `loyalty reward for ${email}` });
-      const { subject, html, text } = loyaltyEmail({ email, name: info.name, code });
+      const { subject, html, text } = withOvr('loyalty', loyaltyEmail({ email, name: info.name, code }), email);
       const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `loyalty:${email}` });
       res.ok ? s.loyalty++ : s.failed++;
       if (s.loyalty >= 20) break;                                          // safety cap per run
