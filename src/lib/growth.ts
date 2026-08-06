@@ -1,4 +1,4 @@
-// Growth automation engine — runs inside the daily cron next to the membership
+﻿// Growth automation engine — runs inside the daily cron next to the membership
 // drip. THREE independent systems, each gated by its growth_settings toggle
 // (all default OFF until the owner previews + enables in Admin → Automations):
 //   1. Subscriber nurture drip (5 stages, ~4 days apart, stops on purchase)
@@ -7,7 +7,7 @@
 // Every send is idempotent (Resend idempotency keys + ledger tables).
 
 import { supabaseAdmin } from './supabase';
-import { send as sendEmail } from './resend';
+import { send as sendEmail, sendBatch } from './resend';
 import {
   dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
   weeklyDigestEmail, applyOverride, TEMPLATE_HEADINGS,
@@ -83,7 +83,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         const stage = r.stage + 1;
         const { subject, html, text } = withOvr(`drip${stage}`,
           dripEmail(stage, { email: r.email, bestsellers, bundle: bundle as MiniProduct | null, plan: plan as any, couponCode: 'CARVE15' }), r.email);
-        const res = await sendEmail({ to: r.email, subject, html, text, idempotencyKey: `drip:${r.email}:${stage}` });
+        const res = await sendEmail({ to: r.email, subject, html, text, idempotencyKey: `drip:${r.email}:${stage}`, tags: [{ name: 'kind', value: `drip${stage}` }] });
         if (res.ok) {
           await db.from('subscriber_drip').update({ stage, last_sent_at: new Date().toISOString(), ...(stage >= 5 ? { status: 'done' } : {}) }).eq('email', r.email);
           s.sent++;
@@ -111,7 +111,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         const items = (Array.isArray(c.cart) ? c.cart : []) as { title: string; price: number }[];
         if (!items.length) { s.skipped++; continue; }
         const { subject, html, text } = withOvr('cart', cartReminderEmail({ email: c.email, items, subtotal: Number(c.subtotal) || 0 }), c.email);
-        const res = await sendEmail({ to: c.email, subject, html, text, idempotencyKey: `cartrem:${c.id}` });
+        const res = await sendEmail({ to: c.email, subject, html, text, idempotencyKey: `cartrem:${c.id}`, tags: [{ name: 'kind', value: 'cart' }] });
         if (res.ok) { await db.from('abandoned_carts').update({ reminded_at: new Date().toISOString() }).eq('id', c.id); s.sent++; }
         else s.failed++;
       } catch { s.failed++; }
@@ -137,7 +137,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       if (done.has(`${o.id}:review7`) || await isUnsubscribed(db, o.email)) continue;
       if (!(await claim(o.id, 'review7'))) continue;
       const { subject, html, text } = withOvr('review7', reviewRequestEmail({ email: o.email, name: o.customer_name, itemTitles: (o.order_items || []).map((i: any) => i.title) }), o.email);
-      const res = await sendEmail({ to: o.email, subject, html, text, idempotencyKey: `review7:${o.id}` });
+      const res = await sendEmail({ to: o.email, subject, html, text, idempotencyKey: `review7:${o.id}`, tags: [{ name: 'kind', value: 'review7' }] });
       res.ok ? s.review++ : s.failed++;
     }
 
@@ -150,7 +150,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       if (done.has(`${o.id}:arrivals30`) || await isUnsubscribed(db, o.email)) continue;
       if (!(await claim(o.id, 'arrivals30'))) continue;
       const { subject, html, text } = withOvr('arrivals30', newArrivalsEmail({ email: o.email, name: o.customer_name, products: (newest || []) as MiniProduct[] }), o.email);
-      const res = await sendEmail({ to: o.email, subject, html, text, idempotencyKey: `arrivals30:${o.id}` });
+      const res = await sendEmail({ to: o.email, subject, html, text, idempotencyKey: `arrivals30:${o.id}`, tags: [{ name: 'kind', value: 'arrivals30' }] });
       res.ok ? s.arrivals++ : s.failed++;
     }
 
@@ -172,7 +172,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       const code = 'LOYAL-' + Math.random().toString(36).slice(2, 6).toUpperCase();
       await db.from('coupons').insert({ code, percent_off: 10, active: true, description: `loyalty reward for ${email}` });
       const { subject, html, text } = withOvr('loyalty', loyaltyEmail({ email, name: info.name, code }), email);
-      const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `loyalty:${email}` });
+      const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `loyalty:${email}`, tags: [{ name: 'kind', value: 'loyalty' }] });
       res.ok ? s.loyalty++ : s.failed++;
       if (s.loyalty >= 20) break;                                          // safety cap per run
     }
@@ -193,11 +193,13 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         stats.weekly = `already sent (${week})`;
       } else {
         const s = { week, products: 0, sent: 0, failed: 0, pdf: false };
+        // EVERYTHING added this week (30 new designs → all 30 go out), capped at
+        // a sane 60. Product-page links ONLY — never raw download links.
         const { data: fresh } = await db.from('products')
-          .select('title, slug, price_usd, image_url')
+          .select('title, slug, price_usd, image_url, created_at')
           .eq('active', true).gte('created_at', daysAgo(7))
           .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
-          .order('created_at', { ascending: false }).limit(12);
+          .order('created_at', { ascending: false }).limit(60);
         s.products = fresh?.length || 0;
         if (fresh?.length) {
           // branded lookbook PDF → public storage (product-page links only)
@@ -210,18 +212,24 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           } catch (e) { console.error('[weekly] pdf build failed (email still sends):', e); }
 
           const weekNumber = Number(week.split('-W')[1]) || 0;
+          const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          const range = `${fmtDay(fresh[fresh.length - 1].created_at)} – ${fmtDay(fresh[0].created_at)}`;
           const { data: subs } = await db.from('subscribers').select('email')
             .not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(3000);
-          let i = 0;
-          for (const r of subs || []) {
-            const email = r.email.toLowerCase();
-            try {
+          // Batch strategy: 100 emails per Resend call → a 3,000-subscriber list
+          // is 30 fast HTTP calls (no serverless timeout, no rate-limit choking;
+          // Resend queues + paces actual delivery on their side). One idempotency
+          // key per chunk so a cron retry can never double-send a chunk.
+          const list = (subs || []).map((r) => r.email.toLowerCase());
+          const tags = [{ name: 'kind', value: 'weekly' }, { name: 'week', value: week }];
+          for (let c = 0; c < list.length; c += 100) {
+            const chunk = list.slice(c, c + 100).map((email) => {
               const { subject, html, text } = withOvr('weekly',
-                weeklyDigestEmail({ email, products: fresh as MiniProduct[], pdfUrl, weekNumber }), email);
-              const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `digest:${week}:${email}` });
-              res.ok ? s.sent++ : s.failed++;
-            } catch { s.failed++; }
-            if (++i % 10 === 0) await new Promise((r2) => setTimeout(r2, 1100)); // Resend rate limit
+                weeklyDigestEmail({ email, products: fresh as MiniProduct[], pdfUrl, weekNumber, range }), email);
+              return { to: email, subject, html, text, tags };
+            });
+            const res = await sendBatch(chunk, `digest:${week}:chunk${c / 100}`);
+            if (res.ok) s.sent += res.sent; else s.failed += chunk.length;
           }
           await db.from('weekly_digest_log').update({ sent_count: s.sent, product_count: s.products, pdf_url: pdfUrl }).eq('week_key', week);
         } else {

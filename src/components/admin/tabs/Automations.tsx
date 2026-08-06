@@ -56,10 +56,17 @@ function renderBlocksHtml(blocks: Block[]): string {
   }).filter(Boolean).join('\n');
 }
 
+const KIND_LABELS: Record<string, string> = {
+  weekly: 'Weekly digest', drip1: 'Drip 1', drip2: 'Drip 2', drip3: 'Drip 3', drip4: 'Drip 4', drip5: 'Drip 5',
+  cart: 'Cart reminder', review7: 'Review request', arrivals30: 'New arrivals', loyalty: 'Loyalty code',
+  order: 'Order confirmation', gift: 'Gift card', '(untagged)': 'Other emails',
+};
+
 export default function Automations() {
   const [settings, setSettings] = useState<any>(null);
   const [drip, setDrip] = useState<{ active: number; done: number; converted: number; stopped: number }>({ active: 0, done: 0, converted: 0, stopped: 0 });
   const [carts, setCarts] = useState<{ open: number; reminded: number; recovered: number }>({ open: 0, reminded: 0, recovered: 0 });
+  const [emailStats, setEmailStats] = useState<{ rows: any[]; recent: any[]; total: number } | null>(null);
   const [kind, setKind] = useState('drip1');
   const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -95,6 +102,38 @@ export default function Automations() {
     setCarts(cc);
     const email = sess?.session?.user?.email;
     if (email) setTestTo((t) => t || email);
+    loadEmailStats();
+  }
+
+  // ── Email performance (email_events via Resend webhook) ──────────
+  async function loadEmailStats() {
+    const { data: evs } = await supabase.from('email_events')
+      .select('provider_id, event, email, kind, created_at, url')
+      .order('created_at', { ascending: false }).limit(5000);
+    if (!evs) { setEmailStats({ rows: [], recent: [], total: 0 }); return; }
+    // aggregate per kind; opens/clicks counted UNIQUE per email id
+    const agg: Record<string, { sent: number; delivered: number; opened: Set<string>; clicked: Set<string>; bounced: number; complained: number }> = {};
+    for (const e of evs) {
+      const k = e.kind || '(untagged)';
+      const a = (agg[k] ||= { sent: 0, delivered: 0, opened: new Set(), clicked: new Set(), bounced: 0, complained: 0 });
+      const pid = e.provider_id || e.email || String(Math.random());
+      if (e.event === 'sent') a.sent++;
+      else if (e.event === 'delivered') a.delivered++;
+      else if (e.event === 'opened') a.opened.add(pid);
+      else if (e.event === 'clicked') a.clicked.add(pid);
+      else if (e.event === 'bounced') a.bounced++;
+      else if (e.event === 'complained') a.complained++;
+    }
+    const rows = Object.entries(agg).map(([kind, a]) => {
+      const base = a.delivered || a.sent;
+      return {
+        kind, sent: a.sent, delivered: a.delivered, opened: a.opened.size, clicked: a.clicked.size,
+        bounced: a.bounced, complained: a.complained,
+        openRate: base ? Math.round((a.opened.size / base) * 100) : 0,
+        clickRate: base ? Math.round((a.clicked.size / base) * 100) : 0,
+      };
+    }).sort((x, y) => y.sent + y.delivered - (x.sent + x.delivered));
+    setEmailStats({ rows, recent: evs.slice(0, 25), total: evs.length });
   }
 
   async function token(): Promise<string> {
@@ -345,6 +384,63 @@ export default function Automations() {
             <iframe title="email preview" srcDoc={preview.html} className="w-full bg-white border border-black/10 rounded-lg" style={{ height: 640 }} />
           </>
         ) : <div className="text-sm text-ink-700/60 py-10 text-center">Rendering preview…</div>}
+      </Card>
+
+      {/* ── Email performance (Resend webhook events) ─────────────── */}
+      <Card>
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="font-medium text-ink-900 text-sm">📊 Email performance</h3>
+          <button className={btnGhost + ' ml-auto'} onClick={loadEmailStats}>↻ Refresh</button>
+        </div>
+        {!emailStats || emailStats.total === 0 ? (
+          <div className="text-xs text-ink-700/70 bg-cream/40 border border-bronze-600/15 rounded-lg px-3 py-2.5 leading-relaxed">
+            No events yet. One-time setup: in the <b>Resend dashboard → Webhooks</b>, add endpoint
+            <code className="mx-1 bg-white border border-black/10 rounded px-1.5 py-0.5">https://digitalchiselco.com/api/resend/webhook</code>
+            with the <i>sent / delivered / opened / clicked / bounced / complained</i> events, then put the signing
+            secret (whsec_…) into the Netlify env var <code className="bg-white border border-black/10 rounded px-1.5 py-0.5">RESEND_WEBHOOK_SECRET</code> and redeploy.
+            From then on every email (weekly digest, drips, cart reminders, order confirmations…) reports deliveries, opens and clicks here.
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-xs text-ink-700/60 text-left">
+                  <tr><th className="py-1.5">Email</th><th className="text-right">Sent</th><th className="text-right">Delivered</th><th className="text-right">Opened</th><th className="text-right">Clicked</th><th className="text-right">Open %</th><th className="text-right">Click %</th><th className="text-right">Bounced</th></tr>
+                </thead>
+                <tbody>
+                  {emailStats.rows.map((r) => (
+                    <tr key={r.kind} className="border-t border-black/5">
+                      <td className="py-1.5">{KIND_LABELS[r.kind] || r.kind}</td>
+                      <td className="text-right">{r.sent}</td>
+                      <td className="text-right">{r.delivered}</td>
+                      <td className="text-right">{r.opened}</td>
+                      <td className="text-right">{r.clicked}</td>
+                      <td className="text-right text-green-700">{r.openRate}%</td>
+                      <td className="text-right text-bronze-700">{r.clickRate}%</td>
+                      <td className={'text-right ' + (r.bounced ? 'text-red-600' : '')}>{r.bounced}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <details className="mt-3">
+              <summary className="text-xs text-bronze-700 cursor-pointer select-none">Recent activity (last 25 events)</summary>
+              <table className="w-full text-xs mt-2">
+                <tbody>
+                  {emailStats.recent.map((e, i) => (
+                    <tr key={i} className="border-t border-black/5">
+                      <td className="py-1 pr-2 text-ink-700/60 whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</td>
+                      <td className="pr-2">{e.email || '—'}</td>
+                      <td className="pr-2">{KIND_LABELS[e.kind || '(untagged)'] || e.kind}</td>
+                      <td className={({ opened: 'text-green-700', clicked: 'text-bronze-700', bounced: 'text-red-600', complained: 'text-red-600' } as any)[e.event] || 'text-ink-700/70'}>{e.event}{e.url ? ` → ${String(e.url).replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}` : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+            <p className="text-[11px] text-ink-700/50 mt-2">Opens/clicks are unique per email. Opens undercount slightly (image blocking); clicks are exact.</p>
+          </>
+        )}
       </Card>
     </div>
   );

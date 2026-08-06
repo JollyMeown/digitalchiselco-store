@@ -420,7 +420,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
         }
         if (minted.length) {
           const { subject, html, text } = giftCardEmail({ email, buyerName: earlyOpsCustomerName, cards: minted });
-          await sendEmail({ to: email, subject, html, text, idempotencyKey: `gift:${order.id}` });
+          await sendEmail({ to: email, subject, html, text, idempotencyKey: `gift:${order.id}`, tags: [{ name: 'kind', value: 'gift' }] });
           console.log(`[gift] minted ${minted.length} card(s) for order ${shortId}`);
         }
       }
@@ -541,6 +541,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
         html,
         text,
         idempotencyKey: `order:${order.id}`,   // Resend dedupes if we accidentally retry
+        tags: [{ name: 'kind', value: 'order' }],
       });
 
       if (sendResult.ok && !sendResult.skipped) {

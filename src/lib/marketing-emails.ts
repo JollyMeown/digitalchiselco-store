@@ -233,6 +233,9 @@ export function giftCardEmail(d: { email: string; buyerName?: string | null; car
 // ── Weekly fresh-designs digest (Monday broadcast, toggle-gated) ─────
 export function weeklyDigestEmail(d: {
   email: string; products: MiniProduct[]; pdfUrl?: string | null; weekNumber?: number;
+  /** e.g. "Jul 28 – Aug 3" — shown under the heading so readers know exactly
+   *  what window these designs were added in. */
+  range?: string;
 }): Out {
   const n = d.products.length;
   const titles = [
@@ -241,10 +244,12 @@ export function weeklyDigestEmail(d: {
     (k: number) => `This Week at the Workshop: ${k} New Relief${k === 1  ? '' : 's'}`,
   ];
   const subject = titles[(d.weekNumber ?? 0) % titles.length](n);
-  // grid in rows of 3
+  // EVERY design added this week (rows of 3, up to 60) — 30 new designs means
+  // all 30 are shown. Links are PRODUCT PAGES only, never download links.
   const rows: string[] = [];
-  for (let i = 0; i < Math.min(12, n); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  for (let i = 0; i < Math.min(60, n); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
   const body = `
+    ${d.range ? `<p style="margin:0 0 4px;text-align:center;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:${BRONZE};">Added this week · ${esc(d.range)}</p>` : ''}
     <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">Hi fellow maker,</p>
     <p style="margin:10px 0 16px;font-size:15px;line-height:1.6;color:#555;">The chisels have not been idle — <strong>${n} brand-new design${n === 1 ? '' : 's'}</strong> landed in the shop this week. Fresh geometry, clean toolpaths, ready to carve:</p>
     ${rows.join('')}

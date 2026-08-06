@@ -62,7 +62,7 @@ export async function buildWeeklyPdf(products: DigestProduct[], weekLabel: strin
   for (const p of products) {
     if (!p.image_url) continue;
     try { usable.push({ p, img: await fetchImage(pdfDoc, p.image_url) }); } catch { /* skip */ }
-    if (usable.length >= 12) break;
+    if (usable.length >= 60) break;   // every design of the week (6 per page)
   }
   if (!usable.length) throw new Error('no products with loadable images');
 

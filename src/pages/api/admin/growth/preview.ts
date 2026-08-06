@@ -53,16 +53,19 @@ async function render(kind: string, email: string): Promise<{ subject: string; h
   else if (kind === 'weekly') {
     // preview with this week's products; fall back to the newest 6 so the
     // owner always sees a populated layout
-    const { data: week } = await db.from('products').select('title, slug, image_url, price_usd')
+    const { data: week } = await db.from('products').select('title, slug, image_url, price_usd, created_at')
       .eq('active', true).gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
       .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
-      .order('created_at', { ascending: false }).limit(12);
+      .order('created_at', { ascending: false }).limit(60);
     const { data: fb } = week?.length ? { data: null } : await db.from('products')
-      .select('title, slug, image_url, price_usd').eq('active', true)
+      .select('title, slug, image_url, price_usd, created_at').eq('active', true)
       .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
       .order('created_at', { ascending: false }).limit(6);
     const { data: lastLog } = await db.from('weekly_digest_log').select('pdf_url').order('created_at', { ascending: false }).limit(1).maybeSingle();
-    out = weeklyDigestEmail({ email, products: ((week?.length ? week : fb) || []) as MiniProduct[], pdfUrl: lastLog?.pdf_url || null, weekNumber: Math.floor(Date.now() / 604800000) });
+    const pool = ((week?.length ? week : fb) || []) as any[];
+    const fmtDay = (x: string) => new Date(x).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const range = pool.length ? `${fmtDay(pool[pool.length - 1].created_at || new Date().toISOString())} – ${fmtDay(pool[0].created_at || new Date().toISOString())}` : undefined;
+    out = weeklyDigestEmail({ email, products: pool as MiniProduct[], pdfUrl: lastLog?.pdf_url || null, weekNumber: Math.floor(Date.now() / 604800000), range });
   }
   else throw new Error('unknown kind');
 

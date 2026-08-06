@@ -15,14 +15,9 @@ const promoTiers = [
   { items: 10, percent: 20, code: '2026OFF20' },
   { items: 25, percent: 35, code: '2026OFF35' },
 ];
-// Order-bump: the complete catalogue PDF offered as a one-click add-on at checkout.
-let bump: { id: string; title: string; price: number } | null = null;
-try {
-  const { supabaseAdmin } = await import('../lib/supabase');
-  const { data: bp } = await supabaseAdmin().from('products')
-    .select('id, title, price_usd, active').like('slug', 'catalogue-1000-stl%').eq('active', true).limit(1).maybeSingle();
-  if (bp) bump = { id: bp.id, title: bp.title.split('|')[0].trim(), price: Number(bp.price_usd) };
-} catch { /* bump is optional */ }
+// Order-bump REMOVED 2026-08-06 (owner: the catalogue is outdated — don't offer
+// it at checkout). The catalogue product itself stays purchasable standalone.
+const bump: { id: string; title: string; price: number } | null = null;
 // PADDLE_ENV is a non-PUBLIC var, so it is NOT exposed on import.meta.env (that
 // resolves to undefined -> always 'sandbox'). Read process.env at SSR runtime
 // first, matching the server helper in src/lib/paddle.ts.
