@@ -254,7 +254,6 @@ export function weeklyDigestEmail(d: {
     <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">Hi fellow maker,</p>
     <p style="margin:10px 0 16px;font-size:15px;line-height:1.6;color:#555;">The chisels have not been idle — <strong>${n} brand-new design${n === 1 ? '' : 's'}</strong> landed in the shop this week. Fresh geometry, clean toolpaths, ready to carve:</p>
     ${rows.join('')}
-    ${d.pdfUrl ? `<p style="text-align:center;margin:18px 0 4px;"><a href="${esc(d.pdfUrl)}" style="display:inline-block;border:2px solid ${BRONZE_DARK};color:${BRONZE_DARK};text-decoration:none;padding:10px 22px;border-radius:8px;font-size:14px;font-weight:500;">📄 Download this week's lookbook (PDF)</a></p>` : ''}
     ${btn(SITE + '/catalog', 'See everything new')}
     <p style="margin:14px 0 0;font-size:13px;color:#777;text-align:center;">Buying a few? <a href="${SITE}/bundle-builder" style="color:${BRONZE};">Pick any 5 for a flat $25 →</a></p>`;
   const text = `${n} new designs this week at DigitalChiselCo: ` + d.products.slice(0, 12).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join(' · ') + `\nUnsubscribe: ${unsubUrl(d.email)}`;

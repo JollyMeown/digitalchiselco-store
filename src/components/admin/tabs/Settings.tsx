@@ -56,18 +56,10 @@ export default function Settings() {
     const payload = { ...s };
     delete payload.updated_at;
     delete payload.discount_percent; // managed in the Discounts tab now
-    // Free-gift: resolve the typed product slug → id (clears the gift if blank).
-    const giftSlug = String(payload._free_gift_slug || '').trim();
-    delete payload._free_gift_slug;
-    if (giftSlug) {
-      const { data: gp } = await supabase.from('products').select('id').eq('slug', giftSlug).maybeSingle();
-      if (!gp) { setMsg(`Error: no product found with slug "${giftSlug}"`); return; }
-      payload.free_gift_product_id = gp.id;
-    }
+    delete payload._free_gift_slug;  // legacy field, no longer used (gift auto-picked)
     payload.free_gift_threshold = Number(payload.free_gift_threshold) || 0;
     const { error } = await supabase.from('site_settings').update(payload).eq('id', 1);
     setMsg(error ? 'Error: ' + error.message : '✓ Saved — live on the site.');
-    if (!error) setS((prev: any) => ({ ...prev, _free_gift_slug: '' }));
   }
 
   function testChime() {
@@ -114,26 +106,15 @@ export default function Settings() {
         </div>
       </Card>
 
-      <Card title="🎁 Free-gift threshold">
+      <Card title="🎁 Free-gift threshold (smart)">
         <p className="text-xs text-ink-700/60 mb-3">
-          Show a cart progress bar ("$X away from a free gift") and auto-grant a free sampler when a customer's paid subtotal reaches your threshold. Set the amount to <strong>0 to turn it off</strong>. The gift is granted server-side on the real paid total, so it can't be gamed.
+          Just set a spend amount — the shop <strong>picks the gift automatically</strong>. When a customer's paid subtotal reaches your threshold, the webhook chooses a free design for them: <strong>same style</strong> as what they bought if their order is themed (e.g. all wildlife → a wildlife gift), or a <strong>surprise pick</strong> if their cart is mixed. It never gives a design they already own, works for first-time and guest buyers too, and is granted on the real paid total so it can't be gamed. Set to <strong>0 to turn it off</strong>.
         </p>
-        <div className="grid md:grid-cols-2 gap-3">
-          <label className="block">
-            <span className={labelCls}>Spend threshold ($) — 0 = off</span>
-            <input type="number" min={0} step="0.01" value={s.free_gift_threshold ?? 0}
-              onChange={(e) => setS({ ...s, free_gift_threshold: e.target.value })} className={inputCls} />
-          </label>
-          <label className="block">
-            <span className={labelCls}>Free gift — product slug</span>
-            <input value={s._free_gift_slug ?? ''} placeholder="e.g. serving-trays-bundle-stl-files-for-cnc-router-…"
-              onChange={(e) => setS({ ...s, _free_gift_slug: e.target.value })} className={inputCls} />
-            <span className="text-[11px] text-ink-700/50">
-              {s.free_gift_product_id ? '✓ A gift product is currently set. ' : 'No gift set yet. '}
-              Paste the slug from the product URL, then Save.
-            </span>
-          </label>
-        </div>
+        <label className="block max-w-xs">
+          <span className={labelCls}>Spend threshold ($) — 0 = off</span>
+          <input type="number" min={0} step="0.01" value={s.free_gift_threshold ?? 0}
+            onChange={(e) => setS({ ...s, free_gift_threshold: e.target.value })} className={inputCls} />
+        </label>
       </Card>
 
       <Card title="🔔 Order sound notifications">

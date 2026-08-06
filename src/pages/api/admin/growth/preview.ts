@@ -62,11 +62,10 @@ async function render(kind: string, email: string): Promise<{ subject: string; h
       .select('title, slug, image_url, price_usd, created_at').eq('active', true)
       .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
       .order('created_at', { ascending: false }).limit(6);
-    const { data: lastLog } = await db.from('weekly_digest_log').select('pdf_url').order('created_at', { ascending: false }).limit(1).maybeSingle();
     const pool = ((week?.length ? week : fb) || []) as any[];
     const fmtDay = (x: string) => new Date(x).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const range = pool.length ? `${fmtDay(pool[pool.length - 1].created_at || new Date().toISOString())} – ${fmtDay(pool[0].created_at || new Date().toISOString())}` : undefined;
-    out = weeklyDigestEmail({ email, products: pool as MiniProduct[], pdfUrl: lastLog?.pdf_url || null, weekNumber: Math.floor(Date.now() / 604800000), range });
+    out = weeklyDigestEmail({ email, products: pool as MiniProduct[], weekNumber: Math.floor(Date.now() / 604800000), range });
   }
   else throw new Error('unknown kind');
 

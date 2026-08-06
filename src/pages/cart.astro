@@ -19,19 +19,14 @@ const promoTiers = [
 // Order-bump REMOVED 2026-08-06 (owner: the catalogue is outdated — don't offer
 // it at checkout). The catalogue product itself stays purchasable standalone.
 const bump: { id: string; title: string; price: number } | null = null;
-// Free-gift threshold: "spend $X, get this sampler free". Shown as a progress
-// bar in the cart; the gift is granted server-side by the webhook off the real
-// paid total, so the bar is purely motivational (no browser trust).
-let freeGift: { threshold: number; title: string; img: string | null } | null = null;
-try {
+// Free-gift threshold: "spend $X, unlock a free surprise design". The gift is
+// auto-picked + granted server-side by the webhook off the real paid total, so
+// the bar is purely motivational (no browser trust, no fixed product).
+let freeGift: { threshold: number } | null = null;
+{
   const threshold = Number((settings as any).free_gift_threshold) || 0;
-  const giftId = (settings as any).free_gift_product_id || null;
-  if (threshold > 0 && giftId) {
-    const { supabaseAdmin } = await import('../lib/supabase');
-    const { data: gp } = await supabaseAdmin().from('products').select('title, image_url, active').eq('id', giftId).maybeSingle();
-    if (gp?.active) freeGift = { threshold, title: gp.title.split('|')[0].trim(), img: gp.image_url };
-  }
-} catch { /* free gift optional */ }
+  if (threshold > 0) freeGift = { threshold };
+}
 // PADDLE_ENV is a non-PUBLIC var, so it is NOT exposed on import.meta.env (that
 // resolves to undefined -> always 'sandbox'). Read process.env at SSR runtime
 // first, matching the server helper in src/lib/paddle.ts.
@@ -71,8 +66,8 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       {freeGift && (
         <div id="free-gift-bar" class="mb-4 bg-[#FAEEDA] border border-bronze-600/30 rounded-md px-3 py-2.5" data-threshold={freeGift.threshold}>
           <div class="flex items-center gap-2.5">
-            {freeGift.img && <img src={freeGift.img} alt={freeGift.title} class="w-10 h-10 rounded object-cover flex-shrink-0" />}
-            <p id="free-gift-text" class="text-sm text-bronze-800 leading-snug flex-1">Spend ${freeGift.threshold.toFixed(0)} and get <strong>{freeGift.title}</strong> free 🎁</p>
+            <span class="text-xl flex-shrink-0" aria-hidden="true">🎁</span>
+            <p id="free-gift-text" class="text-sm text-bronze-800 leading-snug flex-1">Spend ${freeGift.threshold.toFixed(0)} and unlock a <strong>free surprise design</strong>, matched to your order 🎁</p>
           </div>
           <div class="mt-2 h-2 rounded-full bg-white/70 overflow-hidden"><div id="free-gift-fill" class="h-full bg-bronze-600 transition-all" style="width:0%"></div></div>
         </div>

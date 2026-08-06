@@ -328,25 +328,78 @@ async function handleTransactionCompleted(db: any, txn: any) {
 
   console.log(`Order ${order.id} created for txn ${txn.id} (${email}, $${total}).`);
 
-  // ── Free-gift threshold: grant the sampler when the paid subtotal qualifies ──
-  // Enforced ENTIRELY here off the real Paddle-paid amount, so the browser can
-  // never fake qualifying. The gift becomes a $0 order_item + entitlement, so it
-  // flows into the confirmation email's download links like any other purchase.
+  // ── Free-gift threshold: SMART auto-pick when the paid subtotal qualifies ──
+  // Owner sets only a $ threshold. Enforced here off the real Paddle-paid amount
+  // (browser can't fake it). The shop chooses the gift itself:
+  //   • themed order (bought items share a category)  → gift from that category
+  //   • mixed / single-category-tie order             → a surprise pick
+  // Never re-gifts a design the customer already owns; works for guests + first
+  // timers too. The gift becomes a $0 order_item + entitlement, so it flows into
+  // the confirmation email's download links like any purchase.
   if (email && email !== 'unknown@digitalchiselco.com') {
     try {
-      const { data: st } = await db.from('site_settings')
-        .select('free_gift_threshold, free_gift_product_id').eq('id', 1).maybeSingle();
+      const { data: st } = await db.from('site_settings').select('free_gift_threshold').eq('id', 1).maybeSingle();
       const threshold = Number(st?.free_gift_threshold) || 0;
-      const giftId = st?.free_gift_product_id || null;
-      if (threshold > 0 && giftId && subtotal >= threshold) {
-        // don't grant if they already own it (from this or a past order)
-        const { data: owned } = await db.from('entitlements').select('id').eq('email', email).eq('product_id', giftId).limit(1);
-        const alreadyThisOrder = (await db.from('order_items').select('id').eq('order_id', order.id).eq('product_id', giftId).limit(1)).data?.length;
-        if (!owned?.length && !alreadyThisOrder) {
-          const { data: gp } = await db.from('products').select('title').eq('id', giftId).maybeSingle();
-          await db.from('order_items').insert({ order_id: order.id, product_id: giftId, title: `🎁 Free gift: ${gp?.title || 'Sampler pack'}`, price_usd: 0, qty: 1 });
-          await db.from('entitlements').insert({ order_id: order.id, email, product_id: giftId });
-          console.log(`[free-gift] granted ${giftId} on order ${String(order.id).slice(0, 8)} (subtotal $${subtotal} >= $${threshold})`);
+      if (threshold > 0 && subtotal >= threshold) {
+        const shortId = String(order.id).slice(0, 8);
+        const GIFT_PRICE_CAP = 15;   // only give away modestly-priced singles
+
+        // real products bought in this order
+        const { data: oi2 } = await db.from('order_items').select('product_id').eq('order_id', order.id);
+        const boughtIds = [...new Set((oi2 || []).map((r: any) => r.product_id).filter(Boolean))];
+
+        // everything this email already owns (entitlements cover every past order)
+        const ownedSet = new Set<string>(boughtIds);
+        const { data: ents } = await db.from('entitlements').select('product_id').ilike('email', email);
+        for (const e of ents || []) if (e.product_id) ownedSet.add(e.product_id);
+
+        // decide "themed" vs "surprise" from the bought products' categories
+        let pool: any[] = [];
+        if (boughtIds.length) {
+          const { data: pcs } = await db.from('product_categories').select('product_id, category_id').in('product_id', boughtIds);
+          const catCount: Record<string, number> = {};
+          for (const r of pcs || []) catCount[r.category_id] = (catCount[r.category_id] || 0) + 1;
+          const top = Object.entries(catCount).sort((a, b) => b[1] - a[1])[0];
+          // themed if the top category is shared by ≥2 items, or a single-item order
+          const useCat = top && (top[1] >= 2 || boughtIds.length === 1) ? top[0] : null;
+          if (useCat) {
+            const { data: catPool } = await db.from('product_categories')
+              .select('products!inner(id, slug, title, price_usd, active, is_bundle, is_subscription)')
+              .eq('category_id', useCat).limit(300);
+            pool = (catPool || []).map((r: any) => r.products).filter(Boolean);
+          }
+        }
+        // surprise / fallback pool: any active singles
+        if (!pool.length) {
+          const { data: anyPool } = await db.from('products')
+            .select('id, slug, title, price_usd, active, is_bundle, is_subscription')
+            .eq('active', true).gt('price_usd', 0).lte('price_usd', GIFT_PRICE_CAP).limit(500);
+          pool = anyPool || [];
+        }
+
+        // eligibility: active single, not owned, not gift-card/catalogue, within cap
+        const seenId = new Set<string>();
+        let candidates = pool.filter((p: any) => p && p.active && !p.is_bundle && !p.is_subscription
+          && !ownedSet.has(p.id)
+          && !String(p.slug || '').startsWith('gift-card-')
+          && !String(p.slug || '').startsWith('catalogue-')
+          && Number(p.price_usd) > 0 && Number(p.price_usd) <= GIFT_PRICE_CAP
+          && !seenId.has(p.id) && seenId.add(p.id));
+
+        // must have a downloadable file so the gift actually delivers
+        if (candidates.length) {
+          const { data: dls } = await db.from('product_downloads').select('product_id').in('product_id', candidates.map((p: any) => p.id));
+          const hasDl = new Set((dls || []).map((d: any) => d.product_id));
+          candidates = candidates.filter((p: any) => hasDl.has(p.id));
+        }
+
+        if (candidates.length) {
+          const gift = candidates[Math.floor(Math.random() * candidates.length)];
+          await db.from('order_items').insert({ order_id: order.id, product_id: gift.id, title: `🎁 Free gift: ${String(gift.title).split('|')[0].trim()}`, price_usd: 0, qty: 1 });
+          await db.from('entitlements').insert({ order_id: order.id, email, product_id: gift.id });
+          console.log(`[free-gift] granted ${gift.slug} (smart pick) on order ${shortId} — subtotal $${subtotal} >= $${threshold}`);
+        } else {
+          console.log(`[free-gift] order ${shortId} qualified but no eligible gift candidate found`);
         }
       }
     } catch (e) { console.error('[free-gift] grant failed (order still valid):', e); }

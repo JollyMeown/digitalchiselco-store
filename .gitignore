@@ -56,3 +56,5 @@ link-mismatch-report.json
 link-review-resolved.json
 sandbox-test-data-backup.json
 paddle-sync-*.log
+
+.digest_send/

@@ -13,7 +13,7 @@ import {
   weeklyDigestEmail, abandonedBrowseEmail, applyOverride, TEMPLATE_HEADINGS,
   type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
-import { buildWeeklyPdf, isoWeekKey } from './weekly-digest';
+import { isoWeekKey } from './weekly-digest';
 
 type DB = ReturnType<typeof supabaseAdmin>;
 const DRIP_GAP_DAYS = 4;
@@ -192,49 +192,44 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       if (claimErr) {
         stats.weekly = `already sent (${week})`;
       } else {
-        const s = { week, products: 0, sent: 0, failed: 0, pdf: false };
-        // EVERYTHING added this week (30 new designs → all 30 go out), capped at
-        // a sane 60. Product-page links ONLY — never raw download links.
+        const s = { week, products: 0, sent: 0, failed: 0 };
+        // Only designs added SINCE the last digest went out — never repeats what
+        // subscribers already saw. Falls back to the last 7 days on first run.
+        const { data: mk } = await db.from('site_settings').select('weekly_last_sent_at').eq('id', 1).maybeSingle();
+        const sinceIso = (mk?.weekly_last_sent_at as string) || daysAgo(7);
         const { data: fresh } = await db.from('products')
           .select('title, slug, price_usd, image_url, created_at')
-          .eq('active', true).gte('created_at', daysAgo(7))
+          .eq('active', true).gt('created_at', sinceIso)
           .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
-          .order('created_at', { ascending: false }).limit(60);
+          .order('created_at', { ascending: false }).limit(80);
         s.products = fresh?.length || 0;
+        const nowIso = new Date().toISOString();
         if (fresh?.length) {
-          // branded lookbook PDF → public storage (product-page links only)
-          let pdfUrl: string | null = null;
-          try {
-            const bytes = await buildWeeklyPdf(fresh as any, week);
-            const path = `weekly/DCC-Fresh-Designs-${week}.pdf`;
-            const up = await db.storage.from('site-media').upload(path, bytes, { contentType: 'application/pdf', upsert: true });
-            if (!up.error) { pdfUrl = db.storage.from('site-media').getPublicUrl(path).data.publicUrl; s.pdf = true; }
-          } catch (e) { console.error('[weekly] pdf build failed (email still sends):', e); }
-
+          // Email is pictures + product-page links (like every other upsell email)
+          // — no PDF. Product-page links ONLY, never raw download links.
           const weekNumber = Number(week.split('-W')[1]) || 0;
           const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           const range = `${fmtDay(fresh[fresh.length - 1].created_at)} – ${fmtDay(fresh[0].created_at)}`;
           const { data: subs } = await db.from('subscribers').select('email')
             .not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(3000);
-          // Batch strategy: 100 emails per Resend call → a 3,000-subscriber list
-          // is 30 fast HTTP calls (no serverless timeout, no rate-limit choking;
-          // Resend queues + paces actual delivery on their side). One idempotency
-          // key per chunk so a cron retry can never double-send a chunk.
+          // Resend batch: 100 emails/call, one idempotency key per chunk.
           const list = (subs || []).map((r) => r.email.toLowerCase());
           const tags = [{ name: 'kind', value: 'weekly' }, { name: 'week', value: week }];
           for (let c = 0; c < list.length; c += 100) {
             const chunk = list.slice(c, c + 100).map((email) => {
               const { subject, html, text } = withOvr('weekly',
-                weeklyDigestEmail({ email, products: fresh as MiniProduct[], pdfUrl, weekNumber, range }), email);
+                weeklyDigestEmail({ email, products: fresh as MiniProduct[], weekNumber, range }), email);
               return { to: email, subject, html, text, tags };
             });
             const res = await sendBatch(chunk, `digest:${week}:chunk${c / 100}`);
             if (res.ok) s.sent += res.sent; else s.failed += chunk.length;
           }
-          await db.from('weekly_digest_log').update({ sent_count: s.sent, product_count: s.products, pdf_url: pdfUrl }).eq('week_key', week);
+          await db.from('weekly_digest_log').update({ sent_count: s.sent, product_count: s.products }).eq('week_key', week);
         } else {
           await db.from('weekly_digest_log').update({ sent_count: 0, product_count: 0 }).eq('week_key', week);
         }
+        // Advance the marker so next Monday starts fresh from here (even a quiet week).
+        await db.from('site_settings').update({ weekly_last_sent_at: nowIso }).eq('id', 1);
         stats.weekly = s;
       }
     }
