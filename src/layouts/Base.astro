@@ -23,6 +23,17 @@ const gaId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || 'G-MB5KF3D03Y';
 const canonical = new URL(Astro.url.pathname, site).href;
 const ogImage = image.startsWith('http') ? image : new URL(image, site).href;
 const settings = await getSettings();
+// Active shop-wide sale (auto-applied at checkout) → countdown banner.
+let sale: { name: string; percent_off: number; expires_at: string } | null = null;
+try {
+  const { supabaseAdmin } = await import('../lib/supabase');
+  const now = new Date().toISOString();
+  const { data: s } = await supabaseAdmin().from('sales')
+    .select('name, percent_off, expires_at')
+    .eq('active', true).eq('scope', 'all').lte('starts_at', now).gte('expires_at', now)
+    .order('percent_off', { ascending: false }).limit(1);
+  sale = (s?.[0] as any) ?? null;
+} catch { /* banner optional */ }
 const faviconUrl = settings.favicon_image_url || '/favicon.svg';
 const faviconType = settings.favicon_image_url
   ? (settings.favicon_image_url.endsWith('.svg') ? 'image/svg+xml'
@@ -111,8 +122,80 @@ const faviconType = settings.favicon_image_url
     )}
   </head>
   <body class="overflow-x-clip">
+    {sale && (
+      <div class="bg-[#5E380A] text-[#F5EFE3] text-center text-sm py-2 px-3">
+        🔥 <strong>{sale.name}</strong> — {sale.percent_off}% off everything, applied automatically ·
+        ends in <span id="dcc-sale-cd" class="font-mono font-medium" data-ends={sale.expires_at}>…</span>
+      </div>
+    )}
+    {sale && (
+      <script is:inline>
+        (function () {
+          var el = document.getElementById('dcc-sale-cd');
+          if (!el) return;
+          var end = new Date(el.dataset.ends).getTime();
+          function tick() {
+            var ms = end - Date.now();
+            if (ms <= 0) { el.textContent = 'ended'; return; }
+            var d = Math.floor(ms / 86400000), h = Math.floor(ms / 3600000) % 24,
+                m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
+            el.textContent = (d > 0 ? d + 'd ' : '') + h + 'h ' + m + 'm' + (d === 0 ? ' ' + s + 's' : '');
+            setTimeout(tick, 1000);
+          }
+          tick();
+        })();
+      </script>
+    )}
     <AnnouncementBanner />
     <slot />
+
+    <!-- Exit-intent free-pack popup: shows once per 14 days when the cursor
+         leaves the top of the viewport (desktop). Feeds the double-opt-in
+         subscriber flow → nurture drip. -->
+    <div id="dcc-exit" style="position:fixed;inset:0;background:rgba(42,26,14,.55);z-index:60;display:none;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:28px;text-align:center;position:relative;border:1px solid #E5DDD0;">
+        <button id="dcc-exit-x" aria-label="Close" style="position:absolute;top:10px;right:14px;font-size:20px;color:#999;background:none;border:none;cursor:pointer;">×</button>
+        <div style="font-size:34px;">🎁</div>
+        <h2 class="font-serif" style="color:#5E380A;font-size:22px;margin:8px 0 4px;">Wait — take 5 free STL files</h2>
+        <p style="font-size:14px;color:#666;margin:0 0 14px;">Our 5 best-selling bas-relief designs, free. CNC-tested, commercial use included.</p>
+        <form id="dcc-exit-form" style="display:flex;gap:8px;">
+          <input id="dcc-exit-email" type="email" required placeholder="you@email.com" style="flex:1;padding:10px 12px;border:1px solid #d8cdbb;border-radius:8px;font-size:14px;" />
+          <button type="submit" style="background:#854F0B;color:#F5EFE3;border:none;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;">Send them</button>
+        </form>
+        <p id="dcc-exit-msg" style="font-size:12px;margin:10px 0 0;color:#666;"></p>
+      </div>
+    </div>
+    <script is:inline>
+      (function () {
+        var KEY = 'dcc_exit_seen';
+        try { if (Date.now() - Number(localStorage.getItem(KEY) || 0) < 14 * 86400000) return; } catch (_) { return; }
+        if (location.pathname.startsWith('/cart') || location.pathname.startsWith('/account') || location.pathname.startsWith('/free') || location.pathname.startsWith('/admin')) return;
+        var box = document.getElementById('dcc-exit');
+        var shown = false;
+        function show() {
+          if (shown) return; shown = true;
+          try { localStorage.setItem(KEY, String(Date.now())); } catch (_) {}
+          box.style.display = 'flex';
+        }
+        document.addEventListener('mouseout', function (e) {
+          if (!e.relatedTarget && e.clientY <= 0) show();
+        });
+        document.getElementById('dcc-exit-x').addEventListener('click', function () { box.style.display = 'none'; });
+        box.addEventListener('click', function (e) { if (e.target === box) box.style.display = 'none'; });
+        document.getElementById('dcc-exit-form').addEventListener('submit', async function (e) {
+          e.preventDefault();
+          var msg = document.getElementById('dcc-exit-msg');
+          msg.textContent = 'Sending…';
+          try {
+            var res = await fetch('/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ email: document.getElementById('dcc-exit-email').value.trim() }) });
+            var data = await res.json();
+            msg.style.color = res.ok ? '#188038' : '#c00';
+            msg.textContent = res.ok ? '✓ Check your inbox to confirm and get the files!' : (data.error || 'Something went wrong.');
+          } catch (_) { msg.style.color = '#c00'; msg.textContent = 'Network error — please try again.'; }
+        });
+      })();
+    </script>
     <!-- Organization + WebSite structured data — helps Google build Knowledge Graph
          entries for the brand and enables the sitelinks search box. -->
     <script type="application/ld+json" set:html={jsonLd({

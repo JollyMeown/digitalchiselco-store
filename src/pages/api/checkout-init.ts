@@ -70,6 +70,16 @@ export const POST: APIRoute = async ({ request }) => {
     } else {
       const sale = await getActiveShopSale();
       if (sale) discountPercent = sale.percent_off;
+      // Member perk: buyers with an ACTIVE membership get 10% off products —
+      // best-of against a running sale, never stacked on a coupon (coupon branch
+      // above returns its own discount). Server-side only: the email is verified
+      // by Paddle at payment, so nobody gains by typing a member email they
+      // don't control (the receipt + downloads go to that inbox).
+      if (email) {
+        const { data: mem } = await db.from('member_subscriptions')
+          .select('id').ilike('email', email).eq('status', 'active').limit(1);
+        if (mem?.length && discountPercent < 10) discountPercent = 10;
+      }
     }
 
     // Split cart into product ids vs membership slugs

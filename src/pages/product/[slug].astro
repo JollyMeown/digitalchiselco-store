@@ -18,6 +18,23 @@ const cleanTitle = p.title.split('|')[0].trim();
 const gallery: string[] = (Array.isArray(p.gallery) && p.gallery.length ? p.gallery : [p.image_url]).filter(Boolean);
 const related = await getRelatedProducts(p.id, 5);
 
+// Social proof: two shop reviews (imported 5★ Etsy), rotated per product so
+// different pages show different voices. Deterministic hash keeps it stable.
+let reviews: { name: string; text: string; rating: number }[] = [];
+let reviewCount = 0;
+try {
+  const { supabaseAdmin } = await import('../../lib/supabase');
+  const { data: revs, count } = await supabaseAdmin()
+    .from('reviews').select('name, text, rating', { count: 'exact' })
+    .eq('active', true).order('sort_order').limit(60);
+  reviewCount = count || 0;
+  if (revs?.length) {
+    let h = 0; for (const ch of p.slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const i = h % revs.length;
+    reviews = [revs[i], revs[(i + 7) % revs.length]].filter((r, idx, a) => a.indexOf(r) === idx);
+  }
+} catch { /* reviews are optional */ }
+
 const desc = p.description || `${cleanTitle} is a high-detail 3D relief STL designed for clean carving on CNC routers, laser engravers and 3D printers. After checkout you'll receive an instant download link by email and in your account.`;
 
 const pageTitle = p.seo_title || `${cleanTitle.slice(0, 60)} · DigitalChiselCo`;
@@ -77,6 +94,21 @@ const jsonld = {
         <li>♾ Unlimited re-downloads</li>
         <li>✅ Personal &amp; commercial-use license</li>
       </ul>
+
+      {reviews.length > 0 && (
+        <div class="mt-6 border-t border-black/10 pt-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-yellow-500 text-sm" aria-hidden="true">★★★★★</span>
+            <span class="text-xs text-ink-700/70">{reviewCount} five-star reviews from carvers</span>
+          </div>
+          {reviews.map((r) => (
+            <blockquote class="text-sm text-ink-700/90 bg-cream/40 border-l-2 border-bronze-600/40 pl-3 py-2 rounded-r mb-2">
+              "{r.text.length > 180 ? r.text.slice(0, 178) + '…' : r.text}"
+              <footer class="text-xs text-ink-700/50 mt-1">— {r.name}, verified buyer</footer>
+            </blockquote>
+          ))}
+        </div>
+      )}
 
       <div class="mt-6 border-t border-black/10 pt-4">
         <h2 class="text-sm font-medium mb-2">About this design</h2>
