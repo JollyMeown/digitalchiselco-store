@@ -218,7 +218,8 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           // — no PDF. Product-page links ONLY, never raw download links.
           const weekNumber = Number(week.split('-W')[1]) || 0;
           const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          const range = `${fmtDay(fresh[fresh.length - 1].created_at)} – ${fmtDay(fresh[0].created_at)}`;
+          const startD = fmtDay(fresh[fresh.length - 1].created_at), endD = fmtDay(fresh[0].created_at);
+          const range = startD === endD ? startD : `${startD} – ${endD}`;
           const { data: subs } = await db.from('subscribers').select('email')
             .not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(3000);
           // Resend batch: 100 emails/call, one idempotency key per chunk.

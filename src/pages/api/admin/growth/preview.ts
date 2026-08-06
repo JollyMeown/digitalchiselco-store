@@ -64,7 +64,12 @@ async function render(kind: string, email: string): Promise<{ subject: string; h
       .order('created_at', { ascending: false }).limit(6);
     const pool = ((week?.length ? week : fb) || []) as any[];
     const fmtDay = (x: string) => new Date(x).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const range = pool.length ? `${fmtDay(pool[pool.length - 1].created_at || new Date().toISOString())} – ${fmtDay(pool[0].created_at || new Date().toISOString())}` : undefined;
+    let range: string | undefined;
+    if (pool.length) {
+      const sD = fmtDay(pool[pool.length - 1].created_at || new Date().toISOString());
+      const eD = fmtDay(pool[0].created_at || new Date().toISOString());
+      range = sD === eD ? sD : `${sD} – ${eD}`;
+    }
     out = weeklyDigestEmail({ email, products: pool as MiniProduct[], weekNumber: Math.floor(Date.now() / 604800000), range });
   }
   else throw new Error('unknown kind');
