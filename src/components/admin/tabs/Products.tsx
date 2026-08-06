@@ -22,6 +22,12 @@ export default function Products() {
   const [catFilter, setCatFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [bestsellerOnly, setBestsellerOnly] = useState(false);
+  // "Newly added" filter — show only products created within the chosen window,
+  // sorted newest-first, with their added date visible.
+  const [newOnly, setNewOnly] = useState(false);
+  const [newRange, setNewRange] = useState<'7' | '30' | '90' | 'custom'>('7');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [badgeFilter, setBadgeFilter] = useState<'all' | 'verified' | 'auto_ok' | 'flagged' | 'unaudited'>('all');
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Row | null>(null);
@@ -38,7 +44,7 @@ export default function Products() {
   useEffect(() => {
     const t = setTimeout(() => { load(); }, 220);
     return () => clearTimeout(t);
-  }, [q, catFilter, statusFilter, bestsellerOnly]);
+  }, [q, catFilter, statusFilter, bestsellerOnly, newOnly, newRange, customFrom, customTo]);
 
   async function loadCats() {
     const { data } = await supabase.from('categories').select('id,name,slug').order('name');
@@ -47,7 +53,7 @@ export default function Products() {
   async function load() {
     const myReq = ++reqIdRef.current;
     setLoading(true);
-    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,is_latest_pick,product_downloads(id,verified_at,audit_status)';
+    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,is_latest_pick,created_at,product_downloads(id,verified_at,audit_status)';
     function buildQb() {
       let qb = catFilter
         ? supabase.from('products')
@@ -55,12 +61,21 @@ export default function Products() {
             .eq('product_categories.category_id', catFilter)
         : supabase.from('products')
             .select(`${baseSelect},product_categories(categories(id,name,slug))`);
-      qb = qb.order('title');
+      // Newly-added mode sorts newest first; default stays alphabetical.
+      qb = newOnly ? qb.order('created_at', { ascending: false }) : qb.order('title');
       const search = q.trim();
       if (search) qb = qb.ilike('title', `%${search}%`);
       if (statusFilter === 'active') qb = qb.eq('active', true);
       if (statusFilter === 'inactive') qb = qb.eq('active', false);
       if (bestsellerOnly) qb = qb.eq('is_bestseller', true);
+      if (newOnly) {
+        if (newRange === 'custom') {
+          if (customFrom) qb = qb.gte('created_at', customFrom + 'T00:00:00Z');
+          if (customTo) qb = qb.lte('created_at', customTo + 'T23:59:59Z');
+        } else {
+          qb = qb.gte('created_at', new Date(Date.now() - Number(newRange) * 86400000).toISOString());
+        }
+      }
       return qb;
     }
     // Supabase REST hard-caps a single response at 1000 rows. Page through
@@ -140,6 +155,26 @@ export default function Products() {
           <label className="flex items-center gap-1.5 text-xs text-ink-700 cursor-pointer">
             <input type="checkbox" checked={bestsellerOnly} onChange={(e) => setBestsellerOnly(e.target.checked)} /> ★ Bestsellers only
           </label>
+          <label className="flex items-center gap-1.5 text-xs text-ink-700 cursor-pointer">
+            <input type="checkbox" checked={newOnly} onChange={(e) => setNewOnly(e.target.checked)} /> 🆕 Newly added
+          </label>
+          {newOnly && (
+            <>
+              <select value={newRange} onChange={(e) => setNewRange(e.target.value as any)} className={inputCls + ' max-w-[10rem]'}>
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="custom">Custom range…</option>
+              </select>
+              {newRange === 'custom' && (
+                <>
+                  <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className={inputCls + ' max-w-[10rem]'} title="From date" />
+                  <span className="text-xs text-ink-700/50">→</span>
+                  <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className={inputCls + ' max-w-[10rem]'} title="To date" />
+                </>
+              )}
+            </>
+          )}
           <span className="text-xs text-ink-700/60 ml-auto">{visibleRows.length} of {rows.length} shown</span>
           <button className={btnGhost} onClick={() => setImportOpen(true)} title="Bulk import products from a CSV">⇪ Import CSV</button>
           <button className={btnPrimary} onClick={() => setCreating(true)}>+ New product</button>
@@ -169,6 +204,9 @@ export default function Products() {
                   <td className="p-2">
                     {(r as any).is_bestseller && <span className="text-yellow-500 mr-1" title="Best seller">★</span>}
                     <a href={`/product/${r.slug}`} target="_blank" className="text-ink-800 hover:text-bronze-600">{r.title.slice(0, 60)}</a>
+                    {newOnly && (r as any).created_at && (
+                      <span className="ml-2 text-[10px] bg-cream text-bronze-700 border border-bronze-600/20 rounded px-1.5 py-0.5 whitespace-nowrap">added {String((r as any).created_at).slice(0, 10)}</span>
+                    )}
                     <VerifyBadge row={r} onToggled={(downloadId, newTs) => {
                       setRows((cur) => cur.map((x) => x.id !== r.id ? x : {
                         ...x,
