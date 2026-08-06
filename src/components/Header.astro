@@ -1,16 +1,19 @@
 ---
 import Logo from './Logo.astro';
 import { getCategories, getSettings } from '../lib/queries';
+// desk: 'none' → mobile drawer only (the logo already links Home);
+// desk: 'xl'   → desktop nav only from 1280px up (keeps the row from
+//                crushing the search box on smaller desktops).
 const links = [
-  { href: '/', label: 'Home' },
+  { href: '/', label: 'Home', desk: 'none' },
   { href: '/collections', label: 'Collections' },
   { href: '/catalog', label: 'Catalog' },
   { href: '/bundle-builder', label: '5 for $25' },
   { href: '/gift-cards', label: 'Gift Cards' },
   { href: '/free', label: 'Free files' },
-  { href: '/laser-studio', label: 'Laser Studio' },
-  { href: '/about', label: 'Our story' },
-  { href: '/blog', label: 'Blog' },
+  { href: '/laser-studio', label: 'Laser Studio', desk: 'xl' },
+  { href: '/about', label: 'Our story', desk: 'xl' },
+  { href: '/blog', label: 'Blog', desk: 'xl' },
   { href: '/account', label: 'User Portal' },
 ];
 const q = Astro.url.searchParams.get('q') ?? '';
@@ -26,16 +29,17 @@ const hs = await getSettings();
     <!-- Hamburger: visible on mobile/tablet only -->
     <button id="dcc-menu-open" class="lg:hidden shrink-0 text-bronze-700 text-2xl leading-none w-9 h-9 -ml-1 rounded hover:bg-cream" aria-label="Open menu" aria-controls="dcc-drawer" aria-expanded="false">☰</button>
     <div class="shrink-0"><Logo /></div>
-    <!-- Search is the ONLY flexible item — it shrinks first, so the nav links and
-         cart (shrink-0 below) can never be overlapped, at any screen width. -->
-    <form action="/search" method="get" role="search" class="hidden md:flex flex-1 min-w-0 max-w-sm xl:max-w-md mx-1">
+    <!-- Search flexes, but never below 190px — the guaranteed floor keeps the
+         nav links (shrink-0 below) from ever overlapping it. -->
+    <form action="/search" method="get" role="search" class="hidden md:flex flex-1 min-w-[190px] max-w-sm xl:max-w-md mx-1">
       <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files"
         class="min-w-0 flex-1 px-4 py-2 text-sm rounded-l-md border border-r-0 border-black/15 focus:outline-none focus:border-bronze-600" />
       <button class="shrink-0 bg-bronze-600 text-cream px-4 rounded-r-md text-sm" aria-label="Search">Search</button>
     </form>
-    <!-- Desktop nav links + cart: pinned right, never shrinks. -->
-    <div class="hidden lg:flex items-center gap-4 text-sm text-ink-700 ml-auto whitespace-nowrap shrink-0">
-      {links.map((l) => <a href={l.href} class={`hover:text-bronze-600 ${l.href === '/free' ? 'text-bronze-600' : ''}`}>{l.label}</a>)}
+    <!-- Desktop nav links + cart: pinned right, never shrinks. Secondary links
+         (Laser Studio / Our story / Blog) appear from xl so the row always fits. -->
+    <div class="hidden lg:flex items-center gap-3 text-sm text-ink-700 ml-auto whitespace-nowrap shrink-0">
+      {links.filter((l) => l.desk !== 'none').map((l) => <a href={l.href} class={`hover:text-bronze-600 ${l.href === '/free' ? 'text-bronze-600' : ''} ${l.desk === 'xl' ? 'hidden xl:inline' : ''}`}>{l.label}</a>)}
       <a href="/membership" class="hidden xl:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
       <a href="/cart" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 Cart <span class="cart-count text-bronze-600 font-medium"></span></a>
     </div>
