@@ -30,6 +30,8 @@ export default function Discounts() {
   return (
     <div className="space-y-4">
       <SiteDiscount />
+      <AddonConfig />
+      <LoyaltyConfig />
       <div className="flex gap-1 border-b border-black/10 -mt-1">
         {([['announcement', '📢 Announcement strip'], ['sales', '🏷️ Sales'], ['codes', '🎟️ Promo codes']] as const).map(([k, label]) => (
           <button key={k} onClick={() => setView(k)}
@@ -70,6 +72,83 @@ function SiteDiscount() {
           <input type="number" min={0} max={90} value={pct} onChange={(e) => setPct(Number(e.target.value))} className={inputCls + ' w-32'} />
         </div>
         <button className={btnPrimary} onClick={save}>Save discount</button>
+        {msg && <span className="text-xs text-ink-700/70 pb-2">{msg}</span>}
+      </div>
+    </Card>
+  );
+}
+
+// ─── One-click post-purchase add-on ─────────────────────────────────────────
+function AddonConfig() {
+  const [s, setS] = useState<any>(null);
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    supabase.from('site_settings').select('addon_enabled, addon_discount_percent').eq('id', 1).maybeSingle()
+      .then(({ data }) => setS(data || { addon_enabled: true, addon_discount_percent: 25 }));
+  }, []);
+  async function save() {
+    setMsg('Saving…');
+    const pct = Math.max(0, Math.min(90, Number(s.addon_discount_percent) || 0));
+    const { error } = await supabase.from('site_settings').update({ addon_enabled: !!s.addon_enabled, addon_discount_percent: pct }).eq('id', 1);
+    if (error) { setMsg('Error: ' + error.message); return; }
+    // keep the ADDON coupon's percent in sync (the success page applies it)
+    const { error: ce } = await supabase.from('coupons').upsert({ code: 'ADDON', percent_off: pct, active: true, description: 'post-purchase one-click add-on' }, { onConflict: 'code' });
+    setMsg(ce ? 'Saved settings, but coupon sync failed: ' + ce.message : '✓ Saved — live on the order-confirmation page.');
+  }
+  if (!s) return null;
+  return (
+    <Card title="🎯 One-click post-purchase add-on">
+      <p className="text-xs text-ink-700/60 mb-3">On the order-confirmation page, offer the buyer one more relevant design at a discount — one tap, email pre-filled. Great impulse revenue at the moment of highest trust.</p>
+      <div className="flex items-end gap-4 flex-wrap">
+        <label className="flex items-center gap-2 text-sm pb-2">
+          <input type="checkbox" checked={!!s.addon_enabled} onChange={(e) => setS({ ...s, addon_enabled: e.target.checked })} /> Show the add-on offer
+        </label>
+        <div>
+          <label className={labelCls}>Add-on discount %</label>
+          <input type="number" min={0} max={90} value={s.addon_discount_percent ?? 25} onChange={(e) => setS({ ...s, addon_discount_percent: e.target.value })} className={inputCls + ' w-32'} />
+        </div>
+        <button className={btnPrimary} onClick={save}>Save add-on</button>
+        {msg && <span className="text-xs text-ink-700/70 pb-2">{msg}</span>}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Loyalty points / store credit ───────────────────────────────────────────
+function LoyaltyConfig() {
+  const [s, setS] = useState<any>(null);
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    supabase.from('site_settings').select('loyalty_enabled, loyalty_earn_per_dollar, loyalty_redeem_per_dollar').eq('id', 1).maybeSingle()
+      .then(({ data }) => setS(data || { loyalty_enabled: false, loyalty_earn_per_dollar: 10, loyalty_redeem_per_dollar: 100 }));
+  }, []);
+  async function save() {
+    setMsg('Saving…');
+    const earn = Math.max(1, Math.min(1000, Number(s.loyalty_earn_per_dollar) || 10));
+    const redeem = Math.max(1, Math.min(100000, Number(s.loyalty_redeem_per_dollar) || 100));
+    const { error } = await supabase.from('site_settings').update({ loyalty_enabled: !!s.loyalty_enabled, loyalty_earn_per_dollar: earn, loyalty_redeem_per_dollar: redeem }).eq('id', 1);
+    setMsg(error ? 'Error: ' + error.message : '✓ Saved.');
+  }
+  if (!s) return null;
+  const earn = Number(s.loyalty_earn_per_dollar) || 10;
+  const redeem = Number(s.loyalty_redeem_per_dollar) || 100;
+  const backPct = redeem > 0 ? Math.round((earn / redeem) * 100) : 0;
+  return (
+    <Card title="⭐ Loyalty points / store credit">
+      <p className="text-xs text-ink-700/60 mb-3">Customers earn points on every purchase and redeem them for store-credit codes in their account. With these defaults, $1 earns {earn} points and {redeem} points = $1 credit — effectively <strong>{backPct}% back</strong>.</p>
+      <div className="flex items-end gap-4 flex-wrap">
+        <label className="flex items-center gap-2 text-sm pb-2">
+          <input type="checkbox" checked={!!s.loyalty_enabled} onChange={(e) => setS({ ...s, loyalty_enabled: e.target.checked })} /> Enable loyalty
+        </label>
+        <div>
+          <label className={labelCls}>Points earned per $1</label>
+          <input type="number" min={1} value={s.loyalty_earn_per_dollar ?? 10} onChange={(e) => setS({ ...s, loyalty_earn_per_dollar: e.target.value })} className={inputCls + ' w-28'} />
+        </div>
+        <div>
+          <label className={labelCls}>Points for $1 credit</label>
+          <input type="number" min={1} value={s.loyalty_redeem_per_dollar ?? 100} onChange={(e) => setS({ ...s, loyalty_redeem_per_dollar: e.target.value })} className={inputCls + ' w-28'} />
+        </div>
+        <button className={btnPrimary} onClick={save}>Save loyalty</button>
         {msg && <span className="text-xs text-ink-700/70 pb-2">{msg}</span>}
       </div>
     </Card>

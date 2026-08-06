@@ -1,0 +1,127 @@
+---
+// Community design-request board: customers suggest designs, vote on ideas, and
+// see what's planned/in-progress/done. Feeds the owner a ranked backlog of what
+// carvers actually want next.
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { supabaseAdmin } from '../lib/supabase';
+
+const { data: requests } = await supabaseAdmin()
+  .from('design_requests')
+  .select('id, title, description, name, image_url, votes, status, admin_response, product_slug, created_at')
+  .neq('status', 'declined')
+  .order('votes', { ascending: false }).order('created_at', { ascending: false })
+  .limit(200);
+
+const STATUS: Record<string, { label: string; cls: string }> = {
+  open: { label: 'Idea', cls: 'bg-cream text-bronze-700 border border-bronze-600/20' },
+  planned: { label: 'Planned', cls: 'bg-blue-100 text-blue-800' },
+  in_progress: { label: 'In progress', cls: 'bg-amber-100 text-amber-800' },
+  done: { label: '✓ Made', cls: 'bg-green-100 text-green-800' },
+};
+const rows = requests || [];
+---
+<Base title="Request a Design — Community Board | DigitalChiselCo"
+  description="Suggest a bas-relief design, vote on ideas from other carvers, and see what we're making next.">
+  <Header />
+  <Breadcrumbs crumbs={[{ label: 'Request a design' }]} />
+  <main class="px-4 sm:px-6 pb-16 max-w-3xl mx-auto">
+    <div class="text-center max-w-2xl mx-auto mb-8">
+      <div class="text-4xl mb-2">💡</div>
+      <h1 class="text-3xl sm:text-4xl">What should we carve next?</h1>
+      <p class="mt-2 text-sm text-ink-700/70">Suggest a design, vote on ideas, and watch them get made. Subscriber ideas regularly become real STL files.</p>
+    </div>
+
+    <details class="mb-8 bg-[#FAEEDA] border border-bronze-600/25 rounded-xl p-4" open>
+      <summary class="cursor-pointer text-sm font-medium text-bronze-800 select-none">✍️ Suggest a design</summary>
+      <form id="dreq-form" class="mt-4 space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input name="title" required maxlength="120" placeholder="Design idea (e.g. Bald eagle over mountains)" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600" />
+          <input name="name" maxlength="60" placeholder="Your name (optional)" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600" />
+        </div>
+        <textarea name="description" rows="3" maxlength="1000" placeholder="Any detail — style, size, mood, what you'd use it for…" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600"></textarea>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input name="email" type="email" placeholder="Email (optional — we'll tell you if we make it)" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600" />
+          <input name="image" type="file" accept="image/jpeg,image/png,image/webp" class="w-full text-sm text-ink-700" />
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="submit" class="bg-bronze-600 text-cream px-5 py-2.5 rounded-md text-sm hover:bg-bronze-700 transition">Submit idea</button>
+          <span id="dreq-msg" class="text-xs"></span>
+        </div>
+      </form>
+    </details>
+
+    <div class="space-y-3" id="dreq-list">
+      {rows.map((r) => (
+        <div class="border border-black/10 rounded-lg bg-white p-4 flex gap-4" data-id={r.id}>
+          <button class="dreq-vote flex flex-col items-center justify-center w-14 flex-shrink-0 border border-bronze-600/30 rounded-md py-2 hover:bg-cream transition" data-id={r.id} aria-label="Upvote">
+            <span class="text-bronze-600 text-lg leading-none">▲</span>
+            <span class="dreq-count font-medium text-sm text-ink-800">{r.votes}</span>
+          </button>
+          {r.image_url && <img src={r.image_url} alt="" class="w-16 h-16 rounded object-cover flex-shrink-0" loading="lazy" />}
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-medium text-ink-800">{r.title}</span>
+              <span class={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS[r.status]?.cls || ''}`}>{STATUS[r.status]?.label || r.status}</span>
+            </div>
+            {r.description && <p class="text-sm text-ink-700/80 mt-1">{r.description}</p>}
+            {r.name && <div class="text-xs text-ink-700/50 mt-1">suggested by {r.name}</div>}
+            {r.admin_response && <p class="text-xs text-bronze-700 mt-2 bg-cream/50 border-l-2 border-bronze-600/40 pl-2 py-1">DigitalChiselCo: {r.admin_response}</p>}
+            {r.status === 'done' && r.product_slug && <a href={`/product/${r.product_slug}`} class="inline-block mt-2 text-sm text-bronze-700 underline">See the finished design →</a>}
+          </div>
+        </div>
+      ))}
+      {rows.length === 0 && <p class="text-center text-ink-700/60 py-10">No ideas yet — be the first to suggest one!</p>}
+    </div>
+  </main>
+  <Footer />
+
+  <script is:inline>
+    (function () {
+      // Voting (deduped server-side + locally so the UI doesn't double-count)
+      var voted = {};
+      try { voted = JSON.parse(localStorage.getItem('dcc_dreq_voted') || '{}'); } catch (_) {}
+      function markVoted(id) { voted[id] = 1; try { localStorage.setItem('dcc_dreq_voted', JSON.stringify(voted)); } catch (_) {} }
+      document.querySelectorAll('.dreq-vote').forEach(function (btn) {
+        var id = btn.dataset.id;
+        if (voted[id]) btn.classList.add('bg-cream');
+        btn.addEventListener('click', async function () {
+          if (voted[id]) return;
+          var countEl = btn.querySelector('.dreq-count');
+          countEl.textContent = String(Number(countEl.textContent) + 1);
+          markVoted(id); btn.classList.add('bg-cream');
+          try { await fetch('/api/design-requests/vote', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: id }) }); } catch (_) {}
+        });
+      });
+
+      // Submission
+      var form = document.getElementById('dreq-form');
+      var msg = document.getElementById('dreq-msg');
+      function readFile(file) {
+        return new Promise(function (resolve, reject) {
+          if (!file) return resolve(null);
+          if (file.size > 5 * 1024 * 1024) return reject(new Error('Image over 5MB.'));
+          var fr = new FileReader(); fr.onload = function () { resolve(fr.result); }; fr.onerror = function () { reject(new Error('Could not read image.')); }; fr.readAsDataURL(file);
+        });
+      }
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true; msg.textContent = 'Sending…'; msg.className = 'text-xs text-ink-700/60';
+        try {
+          var fd = new FormData(form);
+          var image = await readFile(fd.get('image'));
+          var res = await fetch('/api/design-requests/submit', { method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ title: fd.get('title'), description: fd.get('description'), name: fd.get('name'), email: fd.get('email'), image: image }) });
+          var data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error || 'Could not submit.');
+          msg.textContent = '✓ Thanks! Your idea is on the board. Reload to see it.'; msg.className = 'text-xs text-green-700';
+          form.reset();
+          setTimeout(function () { location.reload(); }, 1200);
+        } catch (err) { msg.textContent = '✕ ' + (err.message || 'Error.'); msg.className = 'text-xs text-red-600'; btn.disabled = false; }
+      });
+    })();
+  </script>
+</Base>

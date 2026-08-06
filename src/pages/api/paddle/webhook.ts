@@ -384,6 +384,22 @@ async function handleTransactionCompleted(db: any, txn: any) {
     } catch (e) { console.error('[referral] handling failed (order still valid):', e); }
   }
 
+  // ── Loyalty: award points on every paid order (if enabled) ──────────
+  // points = round(total × earn_per_dollar). Idempotent per order via the
+  // unique index on loyalty_ledger(order_id) where reason='earned'.
+  if (email && email !== 'unknown@digitalchiselco.com' && total > 0) {
+    try {
+      const { data: ls } = await db.from('site_settings').select('loyalty_enabled, loyalty_earn_per_dollar').eq('id', 1).maybeSingle();
+      if (ls?.loyalty_enabled) {
+        const pts = Math.round(total * (Number(ls.loyalty_earn_per_dollar) || 10));
+        if (pts > 0) {
+          const { error: le } = await db.from('loyalty_ledger').insert({ email, points: pts, reason: 'earned', order_id: order.id });
+          if (!le) console.log(`[loyalty] +${pts} pts to ${email} for order ${String(order.id).slice(0, 8)}`);
+        }
+      }
+    } catch (e) { console.error('[loyalty] award failed (order still valid):', e); }
+  }
+
   // Abandoned-cart recovery: they paid — close any open cart snapshot so the
   // reminder cron never emails a buyer who already completed checkout.
   if (email && email !== 'unknown@digitalchiselco.com') {

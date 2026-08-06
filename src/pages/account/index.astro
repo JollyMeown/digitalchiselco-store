@@ -189,6 +189,21 @@ if (session?.email) {
     };
   } catch (e) { console.error('referral block failed:', e); }
 }
+
+// ── Loyalty points / store credit ─────────────────────────────────────
+let loyalty: { balance: number; perDollar: number; earn: number; maxDollars: number; history: any[] } | null = null;
+if (session?.email) {
+  try {
+    const db = supabaseAdmin();
+    const { data: st } = await db.from('site_settings').select('loyalty_enabled, loyalty_earn_per_dollar, loyalty_redeem_per_dollar').eq('id', 1).maybeSingle();
+    if (st?.loyalty_enabled) {
+      const { data: led } = await db.from('loyalty_ledger').select('points, reason, coupon_code, created_at').ilike('email', session.email).order('created_at', { ascending: false }).limit(20);
+      const balance = (led || []).reduce((s: number, r: any) => s + Number(r.points || 0), 0);
+      const perDollar = Math.max(1, Number(st.loyalty_redeem_per_dollar) || 100);
+      loyalty = { balance, perDollar, earn: Number(st.loyalty_earn_per_dollar) || 10, maxDollars: Math.floor(balance / perDollar), history: led || [] };
+    }
+  } catch (e) { console.error('loyalty block failed:', e); }
+}
 ---
 <Base title="My Account · DigitalChiselCo" noindex>
   <Header />
@@ -227,6 +242,74 @@ if (session?.email) {
           </div>
           <a href="/account?signout=1" class="text-sm text-bronze-600 underline" data-signout>Sign out</a>
         </div>
+
+        {loyalty && (
+          <section class="mb-10 bg-white border border-bronze-600/25 rounded-xl p-5">
+            <div class="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+              <h2 class="font-serif text-2xl text-bronze-800">⭐ Your points</h2>
+              <div class="text-sm text-ink-700/70">You earn <strong>{loyalty.earn}</strong> points per $1 spent</div>
+            </div>
+            <div class="flex flex-wrap items-end gap-6 mt-2">
+              <div>
+                <div class="font-serif text-4xl text-bronze-700">{loyalty.balance.toLocaleString()}</div>
+                <div class="text-xs text-ink-700/60">points · worth up to <strong>${loyalty.maxDollars}</strong> in credit</div>
+              </div>
+              {loyalty.maxDollars >= 1 ? (
+                <div class="flex items-end gap-2">
+                  <label class="block">
+                    <span class="text-xs text-ink-700/70 block mb-1">Redeem for store credit</span>
+                    <select id="loyalty-dollars" class="px-3 py-2 text-sm border border-black/15 rounded-md bg-white">
+                      {Array.from({ length: Math.min(20, loyalty.maxDollars) }, (_, i) => i + 1).map((d) => (
+                        <option value={d}>${d} credit — {d * loyalty.perDollar} pts</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button id="loyalty-redeem" class="bg-bronze-600 text-cream px-4 py-2 rounded-md text-sm hover:bg-bronze-700 transition">Redeem</button>
+                </div>
+              ) : (
+                <div class="text-sm text-ink-700/60">Earn {loyalty.perDollar - (loyalty.balance % loyalty.perDollar)} more points to unlock your first $1 of credit.</div>
+              )}
+            </div>
+            <p id="loyalty-msg" class="text-sm mt-3"></p>
+            {loyalty.history.length > 0 && (
+              <details class="mt-3">
+                <summary class="text-xs text-bronze-700 cursor-pointer select-none">Points history</summary>
+                <table class="w-full text-xs mt-2">
+                  <tbody>
+                    {loyalty.history.map((h) => (
+                      <tr class="border-t border-black/5">
+                        <td class="py-1 text-ink-700/60">{new Date(h.created_at).toLocaleDateString()}</td>
+                        <td class="py-1 capitalize">{h.reason}{h.coupon_code ? ` · ${h.coupon_code}` : ''}</td>
+                        <td class={'py-1 text-right font-medium ' + (h.points >= 0 ? 'text-green-700' : 'text-bronze-700')}>{h.points >= 0 ? '+' : ''}{h.points}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            )}
+            <script is:inline>
+              (function () {
+                var btn = document.getElementById('loyalty-redeem'); if (!btn) return;
+                var msg = document.getElementById('loyalty-msg');
+                btn.addEventListener('click', async function () {
+                  var dollars = Number(document.getElementById('loyalty-dollars').value) || 0;
+                  btn.disabled = true; msg.textContent = 'Redeeming…'; msg.className = 'text-sm mt-3 text-ink-700/60';
+                  try {
+                    var res = await fetch('/api/loyalty/redeem', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dollars: dollars }) });
+                    var data = await res.json();
+                    if (!res.ok || data.error) throw new Error(data.error || 'Failed.');
+                    msg.innerHTML = '✓ Done! Your $' + data.dollars + ' credit code: <strong style="font-family:monospace">' + data.code + '</strong> — apply it in the cart promo box. (Balance: ' + data.balance + ' pts)';
+                    msg.className = 'text-sm mt-3 text-green-700';
+                    btn.disabled = false;
+                  } catch (err) {
+                    msg.textContent = '✕ ' + (err.message || 'Something went wrong.'); msg.className = 'text-sm mt-3 text-red-600';
+                    btn.disabled = false;
+                  }
+                });
+              })();
+            </script>
+          </section>
+        )}
 
         {referral && (
           <section class="mb-10 bg-[#FAEEDA] border border-bronze-600/25 rounded-xl p-5">

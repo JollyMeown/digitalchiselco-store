@@ -50,12 +50,21 @@ if (order) {
 }
 
 // One-click add-on: the single most-relevant design, offered with an express
-// checkout (email pre-filled, ADDON15 = 15% off) so it's genuinely one more tap.
-const addon = moreLikeThese[0] || null;
-const addonRest = moreLikeThese.slice(1);
+// checkout (email pre-filled, ADDON coupon) so it's genuinely one more tap.
+// The discount % is owner-configurable in admin → Discounts (default 25%).
+let addonEnabled = true;
+let addonPct = 25;
+try {
+  const db = supabaseAdmin();
+  const { data: st } = await db.from('site_settings').select('addon_enabled, addon_discount_percent').eq('id', 1).maybeSingle();
+  addonEnabled = st?.addon_enabled !== false;
+  addonPct = Math.max(0, Math.min(90, Number(st?.addon_discount_percent) || 25));
+} catch { /* defaults */ }
+const addon = (addonEnabled && moreLikeThese[0]) || null;
+const addonRest = addon ? moreLikeThese.slice(1) : moreLikeThese;
 const paddleEnv = ((process.env.PADDLE_ENV ?? import.meta.env.PADDLE_ENV) === 'production' ? 'production' : 'sandbox');
 const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
-const addonPrice = addon ? +(Number(addon.price_usd) * 0.85).toFixed(2) : 0;
+const addonPrice = addon ? +(Number(addon.price_usd) * (100 - addonPct) / 100).toFixed(2) : 0;
 ---
 <Base title="Order confirmed · DigitalChiselCo" noindex>
   <Header />
@@ -94,7 +103,7 @@ const addonPrice = addon ? +(Number(addon.price_usd) * 0.85).toFixed(2) : 0;
         {addon && (
           <section class="mt-10">
             <h2 class="font-serif text-2xl text-bronze-800 mb-1">Add one more — one click, no re-typing 🎁</h2>
-            <p class="text-sm text-ink-700/70 mb-4">A carver favourite from the same collection, <span class="font-medium text-bronze-700">15% off</span> for the next few minutes. It goes to the same email &amp; account.</p>
+            <p class="text-sm text-ink-700/70 mb-4">A carver favourite from the same collection, <span class="font-medium text-bronze-700">{addonPct}% off</span> for the next few minutes. It goes to the same email &amp; account.</p>
             <div class="bg-white border-2 border-bronze-600/40 rounded-xl p-4 flex items-center gap-4">
               {addon.image_url && <img src={addon.image_url} alt={addon.title} class="w-24 h-24 rounded-lg object-cover flex-shrink-0" loading="lazy" />}
               <div class="flex-1 min-w-0">
@@ -199,7 +208,7 @@ const addonPrice = addon ? +(Number(addon.price_usd) * 0.85).toFixed(2) : 0;
             try {
               var res = await fetch('/api/checkout-init', {
                 method: 'POST', headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ items: [{ id: btn.dataset.id, price: Number(btn.dataset.price), qty: 1 }], email: EMAIL, coupon_code: 'ADDON15' }),
+                body: JSON.stringify({ items: [{ id: btn.dataset.id, price: Number(btn.dataset.price), qty: 1 }], email: EMAIL, coupon_code: 'ADDON' }),
               });
               var data = await res.json();
               if (!res.ok || !data.transaction_id) throw new Error(data.error || 'Could not start.');

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import Overview from './tabs/Overview';
 import Products from './tabs/Products';
@@ -25,6 +25,7 @@ import Discounts from './tabs/Discounts';
 import Cults from './tabs/Cults';
 import PdfMaker from './tabs/PdfMaker';
 import Seasonal from './tabs/Seasonal';
+import DesignBoard from './tabs/DesignBoard';
 import OrderSoundListener from './OrderSoundListener';
 import { inputCls, btnPrimary } from './ui';
 
@@ -46,6 +47,7 @@ const TABS: Tab[] = [
   { key: 'discounts',   label: 'Discounts',    icon: '%', Component: Discounts },
   { key: 'creations',   label: 'Carved by you', icon: '✦', Component: Creations },
   { key: 'seasonal',    label: 'Seasonal',     icon: '❄', Component: Seasonal },
+  { key: 'designboard', label: 'Design Board', icon: '💡', Component: DesignBoard },
   { key: 'membership',  label: 'Membership',   icon: '◆', Component: Membership },
   { key: 'monthly',     label: 'Monthly Drops', icon: '🗓', Component: MonthlyDrops },
   { key: 'membersubs',  label: 'Subscriptions', icon: '♺', Component: MemberSubs },
@@ -63,6 +65,46 @@ export default function AdminApp() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<string>(() => (typeof window !== 'undefined' && window.location.hash.slice(1)) || 'overview');
   const [collapsed, setCollapsed] = useState(false);
+  // Custom sidebar order (drag-to-reorder, saved per browser).
+  const ORDER_KEY = 'dcc_admin_tab_order';
+  const [order, setOrder] = useState<string[]>([]);
+  const dragKey = useRef<string | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(ORDER_KEY) || 'null');
+      if (Array.isArray(saved) && saved.length) setOrder(saved);
+    } catch {}
+  }, []);
+  // Ordered tabs = saved order first (valid keys only), then any new tabs appended.
+  const orderedTabs = (() => {
+    if (!order.length) return TABS;
+    const byKey = new Map(TABS.map((t) => [t.key, t]));
+    const seen = new Set<string>();
+    const out: Tab[] = [];
+    for (const k of order) { const t = byKey.get(k); if (t && !seen.has(k)) { out.push(t); seen.add(k); } }
+    for (const t of TABS) if (!seen.has(t.key)) out.push(t);
+    return out;
+  })();
+  function persistOrder(next: Tab[]) {
+    const keys = next.map((t) => t.key);
+    setOrder(keys);
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(keys)); } catch {}
+  }
+  function onDrop(targetKey: string) {
+    const from = dragKey.current;
+    dragKey.current = null; setDragOver(null);
+    if (!from || from === targetKey) return;
+    const list = orderedTabs.slice();
+    const fromIdx = list.findIndex((t) => t.key === from);
+    const toIdx = list.findIndex((t) => t.key === targetKey);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = list.splice(fromIdx, 1);
+    list.splice(toIdx, 0, moved);
+    persistOrder(list);
+  }
+  function resetOrder() { setOrder([]); try { localStorage.removeItem(ORDER_KEY); } catch {} }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -103,16 +145,26 @@ export default function AdminApp() {
           {!collapsed && <span className="font-serif text-bronze-700 text-sm">Admin</span>}
         </div>
         <nav className="flex-1 py-2 overflow-y-auto">
-          {TABS.map((t) => (
+          {orderedTabs.map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-cream transition ${tab === t.key ? 'bg-cream text-bronze-700 border-l-2 border-bronze-600' : 'text-ink-700'}`}
-              title={t.label}>
+              draggable
+              onDragStart={() => { dragKey.current = t.key; }}
+              onDragOver={(e) => { e.preventDefault(); if (dragOver !== t.key) setDragOver(t.key); }}
+              onDragLeave={() => { if (dragOver === t.key) setDragOver(null); }}
+              onDrop={(e) => { e.preventDefault(); onDrop(t.key); }}
+              onDragEnd={() => { dragKey.current = null; setDragOver(null); }}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-cream transition cursor-grab active:cursor-grabbing ${tab === t.key ? 'bg-cream text-bronze-700 border-l-2 border-bronze-600' : 'text-ink-700'} ${dragOver === t.key ? 'border-t-2 border-t-bronze-500 bg-bronze-50/40' : ''}`}
+              title={collapsed ? t.label : 'Drag to reorder'}>
               <span className="text-base w-5 text-center">{t.icon}</span>
-              {!collapsed && <span>{t.label}</span>}
+              {!collapsed && <span className="flex-1 text-left">{t.label}</span>}
+              {!collapsed && <span className="text-ink-700/25 select-none text-xs" aria-hidden="true">⠿</span>}
             </button>
           ))}
         </nav>
         <div className="border-t border-black/10 p-3 text-xs">
+          {!collapsed && order.length > 0 && (
+            <button onClick={resetOrder} className="text-ink-700/50 hover:text-bronze-600 hover:underline text-[11px] mb-2 block">↺ Reset tab order</button>
+          )}
           {!collapsed && <div className="text-ink-700/60 mb-2 truncate">{session.user.email}</div>}
           <button onClick={() => supabase.auth.signOut()} className="text-bronze-600 hover:underline text-xs">{collapsed ? '↪' : 'Sign out'}</button>
         </div>
