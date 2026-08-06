@@ -9,6 +9,7 @@ const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'drip4', label: '4 · Membership pitch', group: 'Subscriber drip' },
   { key: 'drip5', label: '5 · CARVE15 coupon', group: 'Subscriber drip' },
   { key: 'cart', label: 'Abandoned-cart reminder', group: 'Cart recovery' },
+  { key: 'browse', label: 'Abandoned-browse reminder', group: 'Cart recovery' },
   { key: 'review7', label: 'Review request (+7 days)', group: 'Post-purchase' },
   { key: 'arrivals30', label: 'New arrivals (+30 days)', group: 'Post-purchase' },
   { key: 'loyalty', label: 'Loyalty 10% (3rd order)', group: 'Post-purchase' },
@@ -277,6 +278,10 @@ export default function Automations() {
           desc="Review request (+7d), new arrivals (+30d), permanent loyalty code on the 3rd order." />
         <Toggle field="weekly_digest_enabled" label="Weekly fresh-designs digest"
           desc="Every Monday: one email to all confirmed subscribers with the designs added that week + a branded lookbook PDF (product-page links). Skips quiet weeks automatically." />
+        <Toggle field="abandoned_browse_enabled" label="Abandoned-browse reminder"
+          desc="One email to a confirmed subscriber who viewed 3+ designs but never added to cart or bought. Once per person, product-page links only." />
+        <Toggle field="referral_rewards_enabled" label="Referral rewards"
+          desc="When a friend orders with someone's REF- share link, email the referrer a 15% reward code. The 15%-off for friends works whether this is on or off." />
       </div>
 
       <Card>

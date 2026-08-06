@@ -10,7 +10,7 @@ import { supabaseAdmin } from './supabase';
 import { send as sendEmail, sendBatch } from './resend';
 import {
   dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
-  weeklyDigestEmail, applyOverride, TEMPLATE_HEADINGS,
+  weeklyDigestEmail, abandonedBrowseEmail, applyOverride, TEMPLATE_HEADINGS,
   type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
 import { buildWeeklyPdf, isoWeekKey } from './weekly-digest';
@@ -238,6 +238,49 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         stats.weekly = s;
       }
     }
+  }
+
+  // ── 5. abandoned-browse: viewed ≥3 designs, never carted, never bought ──
+  stats.browse = 'off';
+  if (g.abandoned_browse_enabled) {
+    const s = { candidates: 0, sent: 0, skipped: 0, failed: 0 };
+    // recent browse events with a known email (last 3 days)
+    const { data: evs } = await db.from('browse_events')
+      .select('email, product_id, created_at')
+      .gte('created_at', daysAgo(3)).order('created_at', { ascending: false }).limit(3000);
+    // group distinct products per email
+    const byEmail = new Map<string, Set<string>>();
+    for (const e of evs || []) {
+      if (!e.product_id) continue;
+      const k = String(e.email).toLowerCase();
+      (byEmail.get(k) || byEmail.set(k, new Set()).get(k)!).add(e.product_id);
+    }
+    // only confirmed, non-unsubscribed subscribers already reminded=never
+    const { data: already } = await db.from('browse_reminders').select('email');
+    const reminded = new Set((already || []).map((r) => r.email.toLowerCase()));
+    for (const [email, pidSet] of byEmail) {
+      if (pidSet.size < 3 || reminded.has(email)) { s.skipped++; continue; }
+      try {
+        const { data: sub } = await db.from('subscribers').select('confirmed_at, unsubscribed_at').ilike('email', email).maybeSingle();
+        if (!sub?.confirmed_at || sub.unsubscribed_at) { s.skipped++; continue; }
+        if (await hasPaidOrder(db, email)) { s.skipped++; continue; }
+        // skip if they have an open cart (the cart reminder covers them)
+        const { data: oc } = await db.from('abandoned_carts').select('id').ilike('email', email).is('recovered_at', null).limit(1);
+        if (oc?.length) { s.skipped++; continue; }
+        // claim the one-per-email reminder BEFORE sending (idempotent)
+        const { error: claimErr } = await db.from('browse_reminders').insert({ email });
+        if (claimErr) { s.skipped++; continue; }
+        const { data: prods } = await db.from('products')
+          .select('title, slug, image_url, price_usd').in('id', [...pidSet].slice(0, 6)).eq('active', true).not('image_url', 'is', null);
+        if (!prods?.length) { s.skipped++; continue; }
+        const { subject, html, text } = withOvr('browse', abandonedBrowseEmail({ email, products: prods as MiniProduct[] }), email);
+        const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `browse:${email}`, tags: [{ name: 'kind', value: 'browse' }] });
+        res.ok ? s.sent++ : s.failed++;
+        if (s.sent >= FOLLOWUP_MAX_PER_RUN) break;
+      } catch { s.failed++; }
+    }
+    s.candidates = byEmail.size;
+    stats.browse = s;
   }
 
   return stats;

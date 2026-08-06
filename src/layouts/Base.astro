@@ -97,10 +97,17 @@ const faviconType = settings.favicon_image_url
           } catch (_) {}
         }
         trk({ p: location.pathname, r: document.referrer || '' });
+        // Capture a referral code from a shared ?ref= link → auto-applies in cart.
+        try {
+          var rp = new URLSearchParams(location.search).get('ref');
+          if (rp && /^REF-[A-Z0-9]{4,12}$/i.test(rp)) localStorage.setItem('dcc_ref', rp.toUpperCase());
+        } catch (_) {}
         document.addEventListener('DOMContentLoaded', function () {
           if (location.pathname.indexOf('/product/') === 0) {
             var b = document.querySelector('.add-to-cart');
-            trk({ p: location.pathname, t: 'view_product', pid: (b && b.dataset && b.dataset.id) || null });
+            var em = '';
+            try { em = localStorage.getItem('buyer_email') || localStorage.getItem('dcc_email') || ''; } catch (_) {}
+            trk({ p: location.pathname, t: 'view_product', pid: (b && b.dataset && b.dataset.id) || null, em: em });
           }
         });
         document.addEventListener('click', function (ev) {
@@ -195,7 +202,7 @@ const faviconType = settings.favicon_image_url
             var data = await res.json();
             msg.style.color = res.ok ? '#188038' : '#c00';
             msg.textContent = res.ok ? '✓ Check your inbox to confirm and get the files!' : (data.error || 'Something went wrong.');
-            if (res.ok) { try { localStorage.setItem(SUB, '1'); } catch (_) {} }
+            if (res.ok) { try { localStorage.setItem(SUB, '1'); localStorage.setItem('dcc_email', document.getElementById('dcc-exit-email').value.trim().toLowerCase()); } catch (_) {} }
           } catch (_) { msg.style.color = '#c00'; msg.textContent = 'Network error — please try again.'; }
         });
       })();

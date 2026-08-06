@@ -48,6 +48,14 @@ if (order) {
     plan = mp;
   } catch { /* upsell is optional */ }
 }
+
+// One-click add-on: the single most-relevant design, offered with an express
+// checkout (email pre-filled, ADDON15 = 15% off) so it's genuinely one more tap.
+const addon = moreLikeThese[0] || null;
+const addonRest = moreLikeThese.slice(1);
+const paddleEnv = ((process.env.PADDLE_ENV ?? import.meta.env.PADDLE_ENV) === 'production' ? 'production' : 'sandbox');
+const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
+const addonPrice = addon ? +(Number(addon.price_usd) * 0.85).toFixed(2) : 0;
 ---
 <Base title="Order confirmed · DigitalChiselCo" noindex>
   <Header />
@@ -83,15 +91,31 @@ if (order) {
           <a href="/catalog" class="ml-3 inline-block text-bronze-700 px-6 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">Continue shopping</a>
         </div>
 
-        {moreLikeThese.length > 0 && (
+        {addon && (
           <section class="mt-10">
-            <h2 class="font-serif text-2xl text-bronze-800 mb-1">Complete your collection</h2>
-            <p class="text-sm text-ink-700/70 mb-4">
-              From the same collections you just bought — and your next order gets <span class="font-medium text-bronze-700">10% off</span> with code
-              <code class="font-mono text-xs bg-cream border border-bronze-600/20 rounded px-1.5 py-0.5">THANKYOU10</code> 🎁
-            </p>
+            <h2 class="font-serif text-2xl text-bronze-800 mb-1">Add one more — one click, no re-typing 🎁</h2>
+            <p class="text-sm text-ink-700/70 mb-4">A carver favourite from the same collection, <span class="font-medium text-bronze-700">15% off</span> for the next few minutes. It goes to the same email &amp; account.</p>
+            <div class="bg-white border-2 border-bronze-600/40 rounded-xl p-4 flex items-center gap-4">
+              {addon.image_url && <img src={addon.image_url} alt={addon.title} class="w-24 h-24 rounded-lg object-cover flex-shrink-0" loading="lazy" />}
+              <div class="flex-1 min-w-0">
+                <div class="text-sm text-ink-800 font-medium line-clamp-2">{addon.title.split('|')[0].trim()}</div>
+                <div class="mt-1"><span class="text-bronze-700 font-medium">${addonPrice.toFixed(2)}</span> <span class="text-ink-700/40 line-through text-xs ml-1">${Number(addon.price_usd).toFixed(2)}</span></div>
+              </div>
+              <button id="addon-btn" data-id={addon.id} data-price={Number(addon.price_usd)}
+                class="flex-shrink-0 bg-bronze-600 text-cream px-5 py-3 rounded-md text-sm hover:bg-bronze-700 transition disabled:opacity-50">
+                + Add for ${addonPrice.toFixed(2)}
+              </button>
+            </div>
+            <p id="addon-msg" class="text-xs mt-2"></p>
+          </section>
+        )}
+
+        {(addonRest.length > 0) && (
+          <section class="mt-8">
+            <h3 class="font-serif text-xl text-bronze-800 mb-1">More from your collections</h3>
+            <p class="text-sm text-ink-700/70 mb-4">Your next order gets <span class="font-medium text-bronze-700">10% off</span> with code <code class="font-mono text-xs bg-cream border border-bronze-600/20 rounded px-1.5 py-0.5">THANKYOU10</code>.</p>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {moreLikeThese.map((r: any) => (
+              {addonRest.map((r: any) => (
                 <a href={`/product/${r.slug}`} class="bg-white border border-black/10 rounded-xl overflow-hidden hover:border-bronze-600/40 transition">
                   {r.image_url && <img src={r.image_url} alt={r.title} class="w-full aspect-square object-cover" loading="lazy" />}
                   <div class="p-3">
@@ -142,4 +166,52 @@ if (order) {
     )}
   </main>
   <Footer />
+
+  {addon && paddleToken && order && (
+    <>
+      <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+      <script is:inline define:vars={{ PADDLE_TOKEN: paddleToken, PADDLE_ENV: paddleEnv, EMAIL: order.email }}>
+        (function () {
+          var btn = document.getElementById('addon-btn');
+          var msg = document.getElementById('addon-msg');
+          if (!btn) return;
+          function initPaddle() {
+            if (typeof Paddle === 'undefined' || !PADDLE_TOKEN) return false;
+            try {
+              if (PADDLE_ENV === 'sandbox') Paddle.Environment.set('sandbox');
+              Paddle.Initialize({
+                token: PADDLE_TOKEN,
+                eventCallback: function (e) {
+                  if (e.name === 'checkout.completed') {
+                    msg.textContent = '✓ Added! Your new download is on its way to your email.';
+                    msg.className = 'text-xs mt-2 text-green-700';
+                    btn.textContent = 'Added ✓'; btn.disabled = true;
+                  }
+                },
+              });
+              return true;
+            } catch (_) { return false; }
+          }
+          var tries = 0;
+          var t = setInterval(function () { if (typeof Paddle !== 'undefined') { clearInterval(t); initPaddle(); } else if (++tries > 50) clearInterval(t); }, 100);
+          btn.addEventListener('click', async function () {
+            btn.disabled = true; msg.textContent = 'Starting…'; msg.className = 'text-xs mt-2 text-ink-700/60';
+            try {
+              var res = await fetch('/api/checkout-init', {
+                method: 'POST', headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ items: [{ id: btn.dataset.id, price: Number(btn.dataset.price), qty: 1 }], email: EMAIL, coupon_code: 'ADDON15' }),
+              });
+              var data = await res.json();
+              if (!res.ok || !data.transaction_id) throw new Error(data.error || 'Could not start.');
+              Paddle.Checkout.open({ transactionId: data.transaction_id, customer: { email: EMAIL } });
+              btn.disabled = false;
+            } catch (err) {
+              msg.textContent = '✕ ' + (err.message || 'Something went wrong.'); msg.className = 'text-xs mt-2 text-red-600';
+              btn.disabled = false;
+            }
+          });
+        })();
+      </script>
+    </>
+  )}
 </Base>

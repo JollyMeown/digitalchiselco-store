@@ -4,13 +4,22 @@ import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls } from
 
 export default function Reviews() {
   const [rows, setRows] = useState<any[]>([]);
+  const [pending, setPending] = useState<any[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => { load(); }, []);
   async function load() {
-    const { data } = await supabase.from('reviews').select('*').order('sort_order').order('created_at');
+    const [{ data }, { data: pend }] = await Promise.all([
+      supabase.from('reviews').select('*').neq('status', 'pending').order('sort_order').order('created_at'),
+      supabase.from('reviews').select('*, products(title, slug)').eq('status', 'pending').order('created_at', { ascending: false }),
+    ]);
     setRows(data ?? []);
+    setPending(pend ?? []);
+  }
+  async function moderate(id: string, status: 'approved' | 'rejected') {
+    await supabase.from('reviews').update({ status }).eq('id', id);
+    load();
   }
   async function remove(id: string) {
     if (!confirm('Delete this review?')) return;
@@ -25,6 +34,31 @@ export default function Reviews() {
 
   return (
     <div className="space-y-4">
+      {pending.length > 0 && (
+        <Card>
+          <h3 className="font-medium text-ink-900 text-sm mb-3">🕓 Pending customer reviews ({pending.length}) — approve to show on the product page</h3>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {pending.map((r) => (
+              <div key={r.id} className="border border-amber-300 bg-amber-50/50 rounded-lg p-3 flex gap-3">
+                {r.photo_url && <img src={r.photo_url} alt="" className="w-20 h-20 rounded object-cover flex-shrink-0" />}
+                <div className="min-w-0 flex-1">
+                  <div className="text-bronze-600 text-sm">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</div>
+                  {r.title && <div className="text-sm font-medium text-ink-800">{r.title}</div>}
+                  <div className="text-sm text-ink-700 leading-snug">"{r.text}"</div>
+                  <div className="text-xs text-ink-700/60 mt-1">
+                    — {r.name} · {r.email}
+                    {r.products?.slug && <> · on <a href={`/product/${r.products.slug}`} target="_blank" className="text-bronze-700 underline">{String(r.products.title).split('|')[0].trim().slice(0, 40)}</a></>}
+                  </div>
+                  <div className="mt-2 flex gap-1">
+                    <button className={btnPrimary} onClick={() => moderate(r.id, 'approved')}>✓ Approve</button>
+                    <button className={btnDanger} onClick={() => moderate(r.id, 'rejected')}>Reject</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
       <Card>
         <div className="flex justify-between items-center">
           <span className="text-sm text-ink-700/60">{rows.length} reviews · shown on homepage "Loved by makers" carousel (active only)</span>

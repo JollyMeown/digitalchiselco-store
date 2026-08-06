@@ -157,6 +157,38 @@ if (session?.email) {
     });
   }
 }
+
+// ── Referral program: a stable REF-XXXX share code per customer ───────
+// The code IS a real 15% coupon (so it flows through the normal cart discount
+// path); a referral_codes row maps code → this email so the webhook can reward
+// the referrer when a friend orders. Deterministic code → get-or-create once.
+const SITE_URL = (import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
+let referral: { code: string; link: string; referred: number; rewarded: number; rewards: string[] } | null = null;
+if (session?.email) {
+  try {
+    const crypto = await import('node:crypto');
+    const db = supabaseAdmin();
+    const email = session.email.toLowerCase();
+    let { data: rc } = await db.from('referral_codes').select('code').eq('email', email).maybeSingle();
+    if (!rc) {
+      const secret = import.meta.env.ACCOUNT_TOKEN_SECRET || import.meta.env.SUPABASE_SERVICE_ROLE_KEY || 'ref';
+      const code = 'REF-' + crypto.createHmac('sha256', secret).update('ref:' + email).digest('hex').slice(0, 6).toUpperCase();
+      await db.from('referral_codes').upsert({ email, code }, { onConflict: 'email' });
+      // create/refresh the matching coupon (ignore conflict if it already exists)
+      await db.from('coupons').upsert({ code, percent_off: 15, active: true, description: `referral share code for ${email}` }, { onConflict: 'code' });
+      rc = { code };
+    }
+    const { data: refs } = await db.from('referrals').select('status, reward_code').eq('referrer_email', email);
+    const rewards = (refs || []).map((r: any) => r.reward_code).filter(Boolean);
+    referral = {
+      code: rc.code,
+      link: `${SITE_URL}/?ref=${rc.code}`,
+      referred: (refs || []).length,
+      rewarded: (refs || []).filter((r: any) => r.status === 'rewarded').length,
+      rewards,
+    };
+  } catch (e) { console.error('referral block failed:', e); }
+}
 ---
 <Base title="My Account · DigitalChiselCo" noindex>
   <Header />
@@ -195,6 +227,34 @@ if (session?.email) {
           </div>
           <a href="/account?signout=1" class="text-sm text-bronze-600 underline" data-signout>Sign out</a>
         </div>
+
+        {referral && (
+          <section class="mb-10 bg-[#FAEEDA] border border-bronze-600/25 rounded-xl p-5">
+            <h2 class="font-serif text-2xl text-bronze-800 mb-1">Give 15%, get 15% 🎁</h2>
+            <p class="text-sm text-ink-700/70 mb-3">Share your link. Friends get <strong>15% off</strong> their first order — and when they buy, <strong>you</strong> get a 15% reward code by email.</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <input id="ref-link" readonly value={referral.link} class="flex-1 min-w-[220px] px-3 py-2 text-sm border border-bronze-600/30 rounded-md bg-white font-mono" />
+              <button id="ref-copy" type="button" class="bg-bronze-600 text-cream px-4 py-2 rounded-md text-sm hover:bg-bronze-700 transition">Copy link</button>
+            </div>
+            <div class="flex flex-wrap gap-5 mt-4 text-sm">
+              <div><span class="font-serif text-2xl text-bronze-700">{referral.referred}</span> <span class="text-ink-700/60">friends referred</span></div>
+              <div><span class="font-serif text-2xl text-bronze-700">{referral.rewarded}</span> <span class="text-ink-700/60">rewards earned</span></div>
+            </div>
+            {referral.rewards.length > 0 && (
+              <p class="text-xs text-ink-700/70 mt-3">Your reward codes: {referral.rewards.map((c) => <code class="font-mono bg-white border border-bronze-600/20 rounded px-1.5 py-0.5 mr-1">{c}</code>)}</p>
+            )}
+            <script is:inline>
+              (function () {
+                var b = document.getElementById('ref-copy'); if (!b) return;
+                b.addEventListener('click', function () {
+                  var i = document.getElementById('ref-link');
+                  i.select();
+                  navigator.clipboard.writeText(i.value).then(function () { b.textContent = '✓ Copied!'; setTimeout(function () { b.textContent = 'Copy link'; }, 1800); }, function () {});
+                });
+              })();
+            </script>
+          </section>
+        )}
 
         {memberBlocks.length > 0 && (
           <section class="mb-10">

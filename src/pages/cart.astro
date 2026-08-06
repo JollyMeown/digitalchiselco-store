@@ -4,6 +4,7 @@ import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
+import RecentlyViewed from '../components/RecentlyViewed.astro';
 import { pricing } from '../lib/pricing';
 import { getSettings } from '../lib/queries';
 const settings = await getSettings();
@@ -18,6 +19,19 @@ const promoTiers = [
 // Order-bump REMOVED 2026-08-06 (owner: the catalogue is outdated — don't offer
 // it at checkout). The catalogue product itself stays purchasable standalone.
 const bump: { id: string; title: string; price: number } | null = null;
+// Free-gift threshold: "spend $X, get this sampler free". Shown as a progress
+// bar in the cart; the gift is granted server-side by the webhook off the real
+// paid total, so the bar is purely motivational (no browser trust).
+let freeGift: { threshold: number; title: string; img: string | null } | null = null;
+try {
+  const threshold = Number((settings as any).free_gift_threshold) || 0;
+  const giftId = (settings as any).free_gift_product_id || null;
+  if (threshold > 0 && giftId) {
+    const { supabaseAdmin } = await import('../lib/supabase');
+    const { data: gp } = await supabaseAdmin().from('products').select('title, image_url, active').eq('id', giftId).maybeSingle();
+    if (gp?.active) freeGift = { threshold, title: gp.title.split('|')[0].trim(), img: gp.image_url };
+  }
+} catch { /* free gift optional */ }
 // PADDLE_ENV is a non-PUBLIC var, so it is NOT exposed on import.meta.env (that
 // resolves to undefined -> always 'sandbox'). Read process.env at SSR runtime
 // first, matching the server helper in src/lib/paddle.ts.
@@ -54,6 +68,15 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         <span id="tier-hint-text" class="leading-snug">Add more items to unlock a bigger discount.</span>
         <a href="/catalog" class="flex-shrink-0 text-xs font-medium text-bronze-700 underline whitespace-nowrap self-start sm:self-auto">Add items →</a>
       </div>
+      {freeGift && (
+        <div id="free-gift-bar" class="mb-4 bg-[#FAEEDA] border border-bronze-600/30 rounded-md px-3 py-2.5" data-threshold={freeGift.threshold}>
+          <div class="flex items-center gap-2.5">
+            {freeGift.img && <img src={freeGift.img} alt={freeGift.title} class="w-10 h-10 rounded object-cover flex-shrink-0" />}
+            <p id="free-gift-text" class="text-sm text-bronze-800 leading-snug flex-1">Spend ${freeGift.threshold.toFixed(0)} and get <strong>{freeGift.title}</strong> free 🎁</p>
+          </div>
+          <div class="mt-2 h-2 rounded-full bg-white/70 overflow-hidden"><div id="free-gift-fill" class="h-full bg-bronze-600 transition-all" style="width:0%"></div></div>
+        </div>
+      )}
       <div class="flex justify-between text-sm text-ink-700/60"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
       <div class="flex justify-between text-sm text-green-700"><span>Discount ({percent}% off)</span><span id="savings">$0.00</span></div>
 
@@ -116,6 +139,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
     <div id="upsell" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
   </section>
 
+  <RecentlyViewed title="Recently viewed" />
   <Footer />
   <!-- Paddle.js — overlay checkout -->
   <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
@@ -155,7 +179,23 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       document.getElementById('savings').textContent = '−' + fmt(savings);
       const promo = JSON.parse(localStorage.getItem('promo') || 'null');
       const promoOff = promo?.discount_amount ? Math.min(subtotalRaw, Number(promo.discount_amount)) : 0;
-      document.getElementById('total').textContent = fmt(Math.max(0, subtotalRaw - promoOff));
+      const payable = Math.max(0, subtotalRaw - promoOff);
+      document.getElementById('total').textContent = fmt(payable);
+
+      // Free-gift progress bar (matches the webhook's paid-subtotal check).
+      const fgBar = document.getElementById('free-gift-bar');
+      if (fgBar) {
+        const thr = Number(fgBar.dataset.threshold) || 0;
+        const fill = document.getElementById('free-gift-fill');
+        const txt = document.getElementById('free-gift-text');
+        const pct = thr > 0 ? Math.min(100, Math.round((payable / thr) * 100)) : 0;
+        if (fill) fill.style.width = pct + '%';
+        if (txt && payable >= thr && thr > 0) {
+          txt.innerHTML = '🎁 <strong>Free gift unlocked!</strong> It will be added to your downloads automatically.';
+        } else if (txt && thr > 0) {
+          txt.innerHTML = 'Spend <strong>' + fmt(thr - payable) + '</strong> more to unlock your <strong>free gift</strong> 🎁';
+        }
+      }
       const promoRow = document.getElementById('promo-row');
       const promoLabel = document.getElementById('promo-label');
       const promoAmount = document.getElementById('promo-amount');
@@ -402,6 +442,18 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
     {
       const existing = JSON.parse(localStorage.getItem('promo') || 'null');
       if (existing?.code) { promoCodeInput.value = existing.code; promoMsg.textContent = '✓ ' + (existing.description || existing.code) + ' applied.'; promoMsg.className = 'mt-2 text-xs text-green-700'; }
+      else {
+        // Auto-apply a referral code captured from a shared ?ref= link (one-shot).
+        try {
+          const ref = localStorage.getItem('dcc_ref');
+          const cartNow = JSON.parse(localStorage.getItem('cart') || '[]');
+          if (ref && cartNow.length) {
+            localStorage.removeItem('dcc_ref');
+            promoCodeInput.value = ref;
+            setTimeout(() => document.getElementById('promo-apply')?.click(), 300);
+          }
+        } catch (_) {}
+      }
     }
     document.getElementById('promo-apply')?.addEventListener('click', async () => {
       const code = (promoCodeInput.value || '').trim().toUpperCase();

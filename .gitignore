@@ -44,3 +44,15 @@ etsy cha-ching sound/
 .etsy_token.json
 
 finance-refresh.log
+
+# local data dumps + logs (session artifacts)
+drive_*.json
+drive_enumerate_full.py
+drive_stls_OLD.json
+etsy-*.json
+etsy_link_targets.json
+etsy_listing_files.json
+link-mismatch-report.json
+link-review-resolved.json
+sandbox-test-data-backup.json
+paddle-sync-*.log

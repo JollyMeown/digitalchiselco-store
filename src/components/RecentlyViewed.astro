@@ -1,0 +1,43 @@
+---
+// "Recently viewed" row — pure client-side, driven by localStorage `dcc_recent`
+// (product slugs, most-recent-first, written by the product page). Renders only
+// when there are ≥2 to show. Excludes the current product on a product page.
+interface Props { currentSlug?: string; title?: string; }
+const { currentSlug = '', title = 'Recently viewed' } = Astro.props;
+---
+<section id="dcc-recent-wrap" class="hidden px-6 pb-12 max-w-6xl mx-auto">
+  <h2 class="text-xl mb-4">{title}</h2>
+  <div id="dcc-recent-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"></div>
+</section>
+<script is:inline define:vars={{ currentSlug }}>
+  (function () {
+    var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
+    var fmt = function (n) { return '$' + Number(n).toFixed(2); };
+    var slugs;
+    try { slugs = (JSON.parse(localStorage.getItem('dcc_recent') || '[]') || []).filter(function (s) { return s && s !== currentSlug; }); } catch (_) { return; }
+    if (slugs.length < 2) return;
+    slugs = slugs.slice(0, 10);
+    fetch('/api/products-by-slugs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slugs: slugs }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var ps = (data.products || []);
+        if (ps.length < 2) return;
+        var grid = document.getElementById('dcc-recent-grid');
+        grid.innerHTML = ps.map(function (p) {
+          var t = String(p.title).split('|')[0].trim();
+          return '<div class="border border-black/10 rounded-md overflow-hidden hover:shadow transition flex flex-col bg-white">' +
+            '<a href="/product/' + esc(p.slug) + '" class="block aspect-square bg-cream overflow-hidden">' +
+            (p.image_url ? '<img src="' + esc(p.image_url) + '" alt="' + esc(t) + '" loading="lazy" class="w-full h-full object-cover">' : '') + '</a>' +
+            '<div class="p-2.5 flex flex-col flex-1">' +
+            '<a href="/product/' + esc(p.slug) + '" class="text-xs leading-snug text-ink-800 line-clamp-2 min-h-[2.4em]">' + esc(t) + '</a>' +
+            '<div class="mt-1 text-bronze-600 text-sm font-medium">' + fmt(p.price_usd) + '</div>' +
+            '<button class="add-to-cart mt-2 w-full text-xs border border-bronze-600 text-bronze-700 py-1.5 rounded hover:bg-bronze-600 hover:text-cream transition" ' +
+            'data-id="' + esc(p.id) + '" data-slug="' + esc(p.slug) + '" data-title="' + esc(t) + '" data-price="' + Number(p.price_usd) + '" data-img="' + esc(p.image_url || '') + '">Add to cart</button>' +
+            '</div></div>';
+        }).join('');
+        document.getElementById('dcc-recent-wrap').classList.remove('hidden');
+        if (window.dccSyncCartButtons) window.dccSyncCartButtons();
+      })
+      .catch(function () {});
+  })();
+</script>

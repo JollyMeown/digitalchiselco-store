@@ -68,6 +68,7 @@ export const TEMPLATE_HEADINGS: Record<string, string> = {
   arrivals30: 'New designs are in',
   loyalty: 'A permanent thank-you',
   weekly: 'Fresh from the workshop 🪵',
+  browse: 'Still thinking it over? 🪵',
 };
 
 function shell(subject: string, heading: string, bodyHtml: string, email: string): string {
@@ -258,4 +259,33 @@ export function weeklyDigestEmail(d: {
     <p style="margin:14px 0 0;font-size:13px;color:#777;text-align:center;">Buying a few? <a href="${SITE}/bundle-builder" style="color:${BRONZE};">Pick any 5 for a flat $25 →</a></p>`;
   const text = `${n} new designs this week at DigitalChiselCo: ` + d.products.slice(0, 12).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join(' · ') + `\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'Fresh from the workshop 🪵', body, d.email), text };
+}
+
+// ── Referral reward (referrer earns their 15% after a friend orders) ──
+export function referralRewardEmail(d: { email: string; code: string; friendEmail?: string }): Out {
+  const subject = 'Your friend just carved — here is your 15% reward 🎉';
+  const body = `
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">Great news —</p>
+    <p style="margin:10px 0 16px;font-size:15px;line-height:1.6;color:#555;">Someone you shared DigitalChiselCo with just placed their first order. As a thank-you, here is <strong>15% off your next design, bundle or membership</strong>:</p>
+    <div style="text-align:center;margin:6px 0 18px;">
+      <div style="display:inline-block;background:#fff;border:1px dashed ${BRONZE};border-radius:8px;padding:12px 28px;font-family:monospace;font-size:22px;letter-spacing:3px;color:${BRONZE_DARK};font-weight:bold;">${esc(d.code)}</div>
+    </div>
+    ${btn(SITE + '/catalog', 'Spend my reward')}
+    <p style="margin:14px 0 0;font-size:13px;color:#777;text-align:center;">Keep sharing your link — every friend who orders earns you another reward.</p>`;
+  return { subject, html: shell(subject, 'You earned a reward 🎉', body, d.email), text: `Your referral reward code: ${d.code} — 15% off at ${SITE}\nUnsubscribe: ${unsubUrl(d.email)}` };
+}
+
+// ── Abandoned browse (viewed designs, never carted) ──────────────────
+export function abandonedBrowseEmail(d: { email: string; products: MiniProduct[] }): Out {
+  const subject = 'Still thinking about these designs?';
+  const rows: string[] = [];
+  for (let i = 0; i < Math.min(6, d.products.length); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  const body = `
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">Hi fellow maker,</p>
+    <p style="margin:10px 0 16px;font-size:15px;line-height:1.6;color:#555;">You were browsing a few designs at the workshop recently — here they are again in case one is calling to your machine:</p>
+    ${rows.join('')}
+    ${btn(SITE + '/catalog', 'Back to browsing')}
+    <p style="margin:14px 0 0;font-size:13px;color:#777;text-align:center;">Buying a few? <a href="${SITE}/bundle-builder" style="color:${BRONZE};">Pick any 5 for a flat $25 →</a></p>`;
+  const text = `Designs you viewed at DigitalChiselCo: ` + d.products.slice(0, 6).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join(' · ') + `\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'Still thinking it over? 🪵', body, d.email), text };
 }

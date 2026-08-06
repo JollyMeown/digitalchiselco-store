@@ -328,6 +328,62 @@ async function handleTransactionCompleted(db: any, txn: any) {
 
   console.log(`Order ${order.id} created for txn ${txn.id} (${email}, $${total}).`);
 
+  // ── Free-gift threshold: grant the sampler when the paid subtotal qualifies ──
+  // Enforced ENTIRELY here off the real Paddle-paid amount, so the browser can
+  // never fake qualifying. The gift becomes a $0 order_item + entitlement, so it
+  // flows into the confirmation email's download links like any other purchase.
+  if (email && email !== 'unknown@digitalchiselco.com') {
+    try {
+      const { data: st } = await db.from('site_settings')
+        .select('free_gift_threshold, free_gift_product_id').eq('id', 1).maybeSingle();
+      const threshold = Number(st?.free_gift_threshold) || 0;
+      const giftId = st?.free_gift_product_id || null;
+      if (threshold > 0 && giftId && subtotal >= threshold) {
+        // don't grant if they already own it (from this or a past order)
+        const { data: owned } = await db.from('entitlements').select('id').eq('email', email).eq('product_id', giftId).limit(1);
+        const alreadyThisOrder = (await db.from('order_items').select('id').eq('order_id', order.id).eq('product_id', giftId).limit(1)).data?.length;
+        if (!owned?.length && !alreadyThisOrder) {
+          const { data: gp } = await db.from('products').select('title').eq('id', giftId).maybeSingle();
+          await db.from('order_items').insert({ order_id: order.id, product_id: giftId, title: `🎁 Free gift: ${gp?.title || 'Sampler pack'}`, price_usd: 0, qty: 1 });
+          await db.from('entitlements').insert({ order_id: order.id, email, product_id: giftId });
+          console.log(`[free-gift] granted ${giftId} on order ${String(order.id).slice(0, 8)} (subtotal $${subtotal} >= $${threshold})`);
+        }
+      }
+    } catch (e) { console.error('[free-gift] grant failed (order still valid):', e); }
+  }
+
+  // ── Referral program: friend used a REF-XXXX share code ──────────────
+  // The code is a normal 15% coupon; here we log the referral and (if reward
+  // sending is enabled) mint + email the referrer their own 15% thank-you code.
+  const usedCode: string | null = txn.custom_data?.coupon_code || null;
+  if (usedCode && usedCode.startsWith('REF-') && email && email !== 'unknown@digitalchiselco.com') {
+    try {
+      const { data: rc } = await db.from('referral_codes').select('email').eq('code', usedCode).maybeSingle();
+      const referrer = rc?.email ? String(rc.email).toLowerCase() : null;
+      if (referrer && referrer !== email) {
+        // idempotent on order (unique index referrals_order_uidx)
+        const { data: refRow, error: refErr } = await db.from('referrals').insert({
+          code: usedCode, referrer_email: referrer, referred_email: email,
+          order_id: order.id, amount_usd: total, status: 'pending',
+        }).select('id').maybeSingle();
+        if (!refErr && refRow) {
+          const { data: g2 } = await db.from('growth_settings').select('referral_rewards_enabled').eq('id', 1).maybeSingle();
+          if (g2?.referral_rewards_enabled) {
+            const rewardCode = 'THANKS-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+            await db.from('coupons').insert({ code: rewardCode, percent_off: 15, active: true, max_redemptions: 1, description: `referral reward for ${referrer}` });
+            await db.from('referrals').update({ status: 'rewarded', reward_code: rewardCode }).eq('id', refRow.id);
+            try {
+              const { referralRewardEmail } = await import('../../../lib/marketing-emails');
+              const { subject, html, text } = referralRewardEmail({ email: referrer, code: rewardCode, friendEmail: email });
+              await sendEmail({ to: referrer, subject, html, text, idempotencyKey: `refreward:${refRow.id}`, tags: [{ name: 'kind', value: 'referral' }] });
+            } catch (e) { console.error('[referral] reward email failed:', e); }
+            console.log(`[referral] ${email} referred by ${referrer} → reward ${rewardCode}`);
+          }
+        }
+      }
+    } catch (e) { console.error('[referral] handling failed (order still valid):', e); }
+  }
+
   // Abandoned-cart recovery: they paid — close any open cart snapshot so the
   // reminder cron never emails a buyer who already completed checkout.
   if (email && email !== 'unknown@digitalchiselco.com') {

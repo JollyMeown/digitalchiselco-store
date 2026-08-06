@@ -24,6 +24,7 @@ import Seo from './tabs/Seo';
 import Discounts from './tabs/Discounts';
 import Cults from './tabs/Cults';
 import PdfMaker from './tabs/PdfMaker';
+import Seasonal from './tabs/Seasonal';
 import OrderSoundListener from './OrderSoundListener';
 import { inputCls, btnPrimary } from './ui';
 
@@ -44,6 +45,7 @@ const TABS: Tab[] = [
   { key: 'cults',       label: 'Cults3D Sales', icon: '◈', Component: Cults },
   { key: 'discounts',   label: 'Discounts',    icon: '%', Component: Discounts },
   { key: 'creations',   label: 'Carved by you', icon: '✦', Component: Creations },
+  { key: 'seasonal',    label: 'Seasonal',     icon: '❄', Component: Seasonal },
   { key: 'membership',  label: 'Membership',   icon: '◆', Component: Membership },
   { key: 'monthly',     label: 'Monthly Drops', icon: '🗓', Component: MonthlyDrops },
   { key: 'membersubs',  label: 'Subscriptions', icon: '♺', Component: MemberSubs },

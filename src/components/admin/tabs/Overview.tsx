@@ -21,6 +21,7 @@ export default function Overview() {
   const [counts, setCounts] = useState({ products: 0, categories: 0, subscribers: 0 });
   const [donation, setDonation] = useState(0);
   const [etsyStats, setEtsyStats] = useState<any>(null);
+  const [refStats, setRefStats] = useState<{ codes: number; referred: number; rewarded: number; revenue: number } | null>(null);
   const [cults, setCults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   // default range: last 30 days
@@ -46,6 +47,19 @@ export default function Overview() {
     setCounts({ products: products.count ?? 0, categories: categories.count ?? 0, subscribers: subs.count ?? 0 });
     setDonation(Number(settings.data?.donation_total || 0));
     setEtsyStats(settings.data || null);
+    try {
+      const [{ count: codeCount }, { data: refs }] = await Promise.all([
+        supabase.from('referral_codes').select('email', { count: 'exact', head: true }),
+        supabase.from('referrals').select('status, amount_usd'),
+      ]);
+      const rr = refs || [];
+      setRefStats({
+        codes: codeCount || 0,
+        referred: rr.length,
+        rewarded: rr.filter((r: any) => r.status === 'rewarded').length,
+        revenue: rr.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0),
+      });
+    } catch { setRefStats(null); }
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/admin/cults-sales', { headers: { authorization: `Bearer ${session?.access_token}` } });
@@ -216,6 +230,19 @@ export default function Overview() {
             <StatBox label="Etsy · favorites" value={Number(etsyStats.admirers_count || 0).toLocaleString()} />
             <StatBox label="Etsy · active listings" value={Number(etsyStats.products_count || 0).toLocaleString()} />
             <StatBox label="Refresh" value="↻" sub="run scripts/etsy_stats_sync.mjs" />
+          </div>
+        </div>
+      )}
+
+      {/* Referral program */}
+      {refStats && refStats.codes > 0 && (
+        <div>
+          <div className="text-xs font-medium text-ink-700/60 mb-2">Referral program (give 15% / get 15%)</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatBox label="Share codes issued" value={refStats.codes.toLocaleString()} sub="one per customer" />
+            <StatBox label="Friends referred" value={refStats.referred.toLocaleString()} sub="orders via a share link" />
+            <StatBox label="Rewards paid" value={refStats.rewarded.toLocaleString()} sub="15% codes to referrers" />
+            <StatBox label="Referral revenue" value={fmt0(refStats.revenue)} sub="from referred orders" />
           </div>
         </div>
       )}

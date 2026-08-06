@@ -1,9 +1,33 @@
 ---
 import Shell from '../../layouts/Shell.astro';
 import { getCategories } from '../../lib/queries';
+import { supabaseAdmin } from '../../lib/supabase';
 const categories = await getCategories();
+// Live seasonal collections (active + inside their date window) — featured on top.
+let seasonal: any[] = [];
+try {
+  const nowIso = new Date().toISOString();
+  const { data } = await supabaseAdmin().from('seasonal_collections')
+    .select('slug, title, subtitle, hero_image_url, starts_at, ends_at')
+    .eq('active', true).order('sort_order');
+  seasonal = (data || []).filter((s: any) => (!s.starts_at || s.starts_at <= nowIso) && (!s.ends_at || s.ends_at >= nowIso));
+} catch { /* optional */ }
 ---
 <Shell title="Collections | DigitalChiselCo" scrollPastBanner={true}>
+  {seasonal.length > 0 && (
+    <section class="mb-8">
+      <h2 class="text-xl mb-3">✨ Seasonal right now</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {seasonal.map((s) => (
+          <a href={`/seasonal/${s.slug}`} class="block rounded-lg overflow-hidden border border-[#FAC775]/40 bg-gradient-to-br from-[#FAEEDA] to-[#FAC775]/30 hover:shadow-md transition p-5">
+            <div class="font-serif text-xl text-bronze-800">{s.title}</div>
+            {s.subtitle && <p class="text-sm text-ink-700/70 mt-1">{s.subtitle}</p>}
+            <span class="inline-block mt-2 text-sm text-bronze-700 font-medium">Explore →</span>
+          </a>
+        ))}
+      </div>
+    </section>
+  )}
   <h1 class="text-3xl mb-6">Shop by collection</h1>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
     {categories.map((c) => (

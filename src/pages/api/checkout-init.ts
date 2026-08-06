@@ -63,6 +63,14 @@ export const POST: APIRoute = async ({ request }) => {
         email ?? null,
       );
       if (!validation.ok) return json({ error: validation.error }, 400);
+      // Referral codes (REF-XXXX) are real 15% coupons, but you can't redeem
+      // your OWN share code — the friend must be someone else.
+      if (validation.code.startsWith('REF-') && email) {
+        const { data: rc } = await db.from('referral_codes').select('email').eq('code', validation.code).maybeSingle();
+        if (rc && String(rc.email).toLowerCase() === email) {
+          return json({ error: "That's your own referral code — share it with a friend instead. They get 15% off, and you earn a reward when they order." }, 400);
+        }
+      }
       const { data: row } = await db.from('coupons').select('id').eq('code', validation.code).maybeSingle();
       if (row) {
         couponMeta = { id: row.id, code: validation.code, amount: validation.discount_amount, percent: validation.percent_off };

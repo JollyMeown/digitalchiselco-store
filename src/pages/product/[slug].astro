@@ -2,6 +2,7 @@
 import Shell from '../../layouts/Shell.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
+import RecentlyViewed from '../../components/RecentlyViewed.astro';
 import { getProductBySlug, getRelatedProducts, getSettings } from '../../lib/queries';
 import { pricing, money } from '../../lib/pricing';
 import { jsonLd } from '../../lib/jsonld';
@@ -50,6 +51,18 @@ try {
     reviews = revs.length > 1 ? [revs[i], revs[j]] : [revs[i]];
   }
 } catch { /* reviews + sale are optional */ }
+
+// Real customer reviews for THIS design (approved on-site submissions, photos first).
+let productReviews: { name: string; title: string | null; text: string; rating: number; photo_url: string | null; created_at: string }[] = [];
+try {
+  const { supabaseAdmin } = await import('../../lib/supabase');
+  const { data: pr } = await supabaseAdmin().from('reviews')
+    .select('name, title, text, rating, photo_url, created_at')
+    .eq('product_id', p.id).eq('status', 'approved').eq('active', true)
+    .order('photo_url', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(12);
+  productReviews = (pr || []) as any;
+} catch { /* optional */ }
+const prAvg = productReviews.length ? (productReviews.reduce((s, r) => s + Number(r.rating || 5), 0) / productReviews.length) : 0;
 // "Verified Buyer" is the imported-name placeholder — don't print it twice.
 const reviewerLabel = (name: string) =>
   /^\s*verified\s*buyer\s*$/i.test(name || '') ? 'Verified buyer' : `${name}, verified buyer`;
@@ -174,8 +187,112 @@ const jsonld = {
     </section>
   )}
 
+  <!-- ── Customer reviews & carve photos (on-site submissions) ─────────── -->
+  <section class="mt-14 border-t border-black/10 pt-8" id="reviews" data-product-id={p.id}>
+    <div class="flex items-baseline gap-3 mb-4">
+      <h2 class="text-xl">Customer reviews & carves</h2>
+      {productReviews.length > 0 && (
+        <span class="text-sm text-ink-700/70"><span class="text-yellow-500">★</span> {prAvg.toFixed(1)} · {productReviews.length} review{productReviews.length === 1 ? '' : 's'}</span>
+      )}
+    </div>
+
+    {productReviews.length > 0 ? (
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        {productReviews.map((r) => (
+          <div class="border border-black/10 rounded-lg overflow-hidden bg-white flex flex-col">
+            {r.photo_url && <img src={r.photo_url} alt={`Carve by ${r.name}`} loading="lazy" class="w-full aspect-[4/3] object-cover" />}
+            <div class="p-3">
+              <div class="text-yellow-500 text-sm" aria-hidden="true">{'★'.repeat(Math.max(1, Math.min(5, Number(r.rating) || 5)))}</div>
+              {r.title && <div class="font-medium text-sm text-ink-800 mt-1">{r.title}</div>}
+              <p class="text-sm text-ink-700/90 mt-1">{r.text}</p>
+              <div class="text-xs text-ink-700/50 mt-2">— {r.name}, verified carver</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p class="text-sm text-ink-700/60 mb-6">No carves shared yet for this design — be the first! Bought it? Show us how it turned out. 🪵</p>
+    )}
+
+    <details class="bg-cream/40 border border-bronze-600/20 rounded-lg p-4">
+      <summary class="cursor-pointer text-sm font-medium text-bronze-800 select-none">✍️ Write a review / share your carve photo</summary>
+      <form id="review-form" class="mt-4 space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label class="block"><span class="text-xs text-ink-700/70 block mb-1">Your name</span>
+            <input name="name" required maxlength="60" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600" /></label>
+          <label class="block"><span class="text-xs text-ink-700/70 block mb-1">Email (for verification, never shown)</span>
+            <input name="email" type="email" required class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600" /></label>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label class="block"><span class="text-xs text-ink-700/70 block mb-1">Rating</span>
+            <select name="rating" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600">
+              <option value="5">★★★★★ Love it</option><option value="4">★★★★ Great</option><option value="3">★★★ Good</option><option value="2">★★ Okay</option><option value="1">★ Poor</option>
+            </select></label>
+          <label class="block"><span class="text-xs text-ink-700/70 block mb-1">Headline (optional)</span>
+            <input name="title" maxlength="80" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600" /></label>
+        </div>
+        <label class="block"><span class="text-xs text-ink-700/70 block mb-1">Your review</span>
+          <textarea name="text" required rows={3} maxlength="800" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600"></textarea></label>
+        <label class="block"><span class="text-xs text-ink-700/70 block mb-1">Photo of your carve (optional, JPG/PNG, max 5MB)</span>
+          <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="w-full text-sm text-ink-700" /></label>
+        <div class="flex items-center gap-3">
+          <button type="submit" class="bg-bronze-600 text-cream px-5 py-2.5 rounded-md text-sm hover:bg-bronze-700 transition">Submit review</button>
+          <span id="review-msg" class="text-xs"></span>
+        </div>
+        <p class="text-[11px] text-ink-700/50">Reviews are checked before they appear, to keep this section genuine.</p>
+      </form>
+    </details>
+  </section>
+
+  <RecentlyViewed currentSlug={p.slug} title="Recently viewed" />
+
   <script type="application/ld+json" set:html={jsonLd(jsonld)} />
+  <script is:inline define:vars={{ slug: p.slug }}>
+    // Record this product in the "recently viewed" list (most-recent-first, max 12).
+    try {
+      var rv = JSON.parse(localStorage.getItem('dcc_recent') || '[]');
+      rv = [slug].concat(rv.filter(function (s) { return s !== slug; })).slice(0, 12);
+      localStorage.setItem('dcc_recent', JSON.stringify(rv));
+    } catch (_) {}
+  </script>
   <script is:inline>
+    // ── Review submission ───────────────────────────────────────────
+    (function () {
+      var form = document.getElementById('review-form');
+      if (!form) return;
+      var msg = document.getElementById('review-msg');
+      var pid = document.getElementById('reviews').dataset.productId;
+      function readFile(file) {
+        return new Promise(function (resolve, reject) {
+          if (!file) return resolve(null);
+          if (file.size > 5 * 1024 * 1024) return reject(new Error('Photo is over 5MB — please choose a smaller one.'));
+          var fr = new FileReader();
+          fr.onload = function () { resolve(fr.result); };
+          fr.onerror = function () { reject(new Error('Could not read the photo.')); };
+          fr.readAsDataURL(file);
+        });
+      }
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var btn = form.querySelector('button[type="submit"]');
+        msg.textContent = 'Sending…'; msg.className = 'text-xs text-ink-700/60'; btn.disabled = true;
+        try {
+          var fd = new FormData(form);
+          var photo = await readFile(fd.get('photo'));
+          var res = await fetch('/api/reviews/submit', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ product_id: pid, name: fd.get('name'), email: fd.get('email'), rating: Number(fd.get('rating')), title: fd.get('title'), text: fd.get('text'), photo: photo }),
+          });
+          var data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error || 'Could not submit.');
+          form.reset();
+          msg.textContent = '✓ Thank you! Your review will appear after a quick check.'; msg.className = 'text-xs text-green-700';
+        } catch (err) {
+          msg.textContent = '✕ ' + (err.message || 'Something went wrong.'); msg.className = 'text-xs text-red-600';
+        } finally { btn.disabled = false; }
+      });
+    })();
+
     document.querySelectorAll('.thumb').forEach((t) => {
       t.addEventListener('click', () => {
         const main = document.getElementById('main-img');

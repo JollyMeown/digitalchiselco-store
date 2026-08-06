@@ -55,6 +55,15 @@ export const POST: APIRoute = async ({ request }) => {
       const vh = crypto.createHash('sha256').update(`${ip}|${ua}|${day0}|${secret0}`).digest('hex').slice(0, 32);
       const pid = typeof body.pid === 'string' && /^[0-9a-f-]{36}$/i.test(body.pid) ? body.pid : null;
       await supabaseAdmin().from('site_events').insert({ day: day0, type, path, product_id: pid, visitor_hash: vh });
+      // Abandoned-browse: if the visitor has already given us their email
+      // (cart/subscribe), log the viewed product against it so the cron can
+      // remind browsers who never carted. No email → nothing stored.
+      if (type === 'view_product' && pid) {
+        const em = typeof body.em === 'string' ? body.em.toLowerCase().trim() : '';
+        if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
+          try { await supabaseAdmin().from('browse_events').insert({ email: em, product_id: pid }); } catch { /* best-effort */ }
+        }
+      }
       return new Response(null, { status: 204 });
     }
 

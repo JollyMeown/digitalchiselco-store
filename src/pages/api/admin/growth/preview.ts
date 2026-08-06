@@ -6,7 +6,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { send as sendEmail } from '../../../../lib/resend';
-import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, weeklyDigestEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
+import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, weeklyDigestEmail, abandonedBrowseEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
 
 export const prerender = false;
 
@@ -27,7 +27,7 @@ async function isCallerAdmin(request: Request): Promise<boolean> {
   return !!prof?.is_admin;
 }
 
-const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'review7', 'arrivals30', 'loyalty', 'weekly'] as const;
+const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'browse', 'review7', 'arrivals30', 'loyalty', 'weekly'] as const;
 
 async function render(kind: string, email: string): Promise<{ subject: string; html: string; text: string }> {
   const db = supabaseAdmin();
@@ -47,7 +47,8 @@ async function render(kind: string, email: string): Promise<{ subject: string; h
   } else if (kind === 'cart') {
     const items = bestsellers.slice(0, 2).map((b) => ({ title: b.title, price: Number(b.price_usd) || 7.99 }));
     out = cartReminderEmail({ email, items: items.length ? items : [{ title: 'Sample Bas-Relief STL', price: 7.99 }], subtotal: items.reduce((s, i) => s + i.price, 0) });
-  } else if (kind === 'review7') out = reviewRequestEmail({ email, name: 'Sample Customer', itemTitles: [bestsellers[0]?.title || 'Sample Bas-Relief STL'] });
+  } else if (kind === 'browse') out = abandonedBrowseEmail({ email, products: (bestsellers.length ? bestsellers : newest || []) as MiniProduct[] });
+  else if (kind === 'review7') out = reviewRequestEmail({ email, name: 'Sample Customer', itemTitles: [bestsellers[0]?.title || 'Sample Bas-Relief STL'] });
   else if (kind === 'arrivals30') out = newArrivalsEmail({ email, name: 'Sample Customer', products: (newest || []) as MiniProduct[] });
   else if (kind === 'loyalty') out = loyaltyEmail({ email, name: 'Sample Customer', code: 'LOYAL-DEMO' });
   else if (kind === 'weekly') {
