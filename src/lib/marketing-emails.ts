@@ -208,3 +208,23 @@ export function loyaltyEmail(d: { email: string; name?: string | null; code: str
     ${btn(SITE + '/catalog', 'Browse new designs')}`;
   return { subject, html: shell(subject, 'A permanent thank-you', body, d.email), text: `Your permanent 10% code: ${d.code}\nUnsubscribe: ${unsubUrl(d.email)}` };
 }
+
+// ── Gift card delivery ───────────────────────────────────────────────
+export function giftCardEmail(d: { email: string; buyerName?: string | null; cards: { code: string; amount: number }[] }): Out {
+  const total = d.cards.reduce((s, c) => s + c.amount, 0);
+  const subject = `Your DigitalChiselCo gift card${d.cards.length > 1 ? 's are' : ' is'} here 🎁`;
+  const cardBlocks = d.cards.map((c) => `
+    <div style="background:${CREAM};border:2px dashed ${BRONZE};border-radius:12px;padding:20px 24px;text-align:center;margin:0 0 12px;">
+      <div style="font-size:13px;color:${BRONZE_DARK};letter-spacing:1px;text-transform:uppercase;">Gift card value</div>
+      <div style="font-family:Georgia,serif;font-size:34px;color:${BRONZE_DARK};margin:2px 0 10px;">$${c.amount.toFixed(2)}</div>
+      <div style="display:inline-block;background:#fff;border:1px solid ${BRONZE};border-radius:8px;padding:10px 24px;font-family:monospace;font-size:20px;letter-spacing:3px;color:${BRONZE_DARK};font-weight:bold;">${esc(c.code)}</div>
+      <div style="font-size:11px;color:#8a7a68;margin-top:8px;">One-time code · works on every design, bundle & membership · never expires</div>
+    </div>`).join('');
+  const body = `
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">${d.buyerName ? `Hi ${esc(d.buyerName)},` : 'Hi,'}</p>
+    <p style="margin:10px 0 16px;font-size:15px;line-height:1.6;color:#555;">Thank you for your purchase! Here ${d.cards.length > 1 ? 'are your gift cards' : 'is your gift card'} — <strong>forward this email to the lucky carver</strong> (or print it and tuck it in a card). They redeem it in the promo box at checkout.</p>
+    ${cardBlocks}
+    ${btn(SITE + '/catalog', 'Browse the catalog')}
+    <p style="margin:12px 0 0;font-size:12px;color:#999;">Redeeming: add designs to the cart at digitalchiselco.com, open "Have a promo code?", paste the code.</p>`;
+  return { subject, html: shell(subject, `A $${total.toFixed(0)} gift of carving`, body, d.email), text: `Your DigitalChiselCo gift card code(s): ${d.cards.map((c) => c.code + ' ($' + c.amount + ')').join(', ')}\nRedeem in the cart promo box at ${SITE}` };
+}

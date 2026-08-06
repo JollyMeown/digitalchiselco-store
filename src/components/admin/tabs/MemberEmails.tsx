@@ -50,6 +50,20 @@ export default function MemberEmails() {
             {segment === 'single' && (
               <div><label className={labelCls}>Recipient email</label><input value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="customer@email.com" /></div>
             )}
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="text-xs px-2.5 py-1.5 rounded border border-bronze-600/30 bg-cream/50 text-bronze-800 hover:bg-cream"
+                onClick={() => {
+                  setSegment('expired');
+                  setSubject('We miss you at the workshop — here is 15% to come back');
+                  setHtml('<p>Hi {{first_name}},</p>'
+                    + '<p>Your membership wrapped up a while back — and the workshop has not slowed down since: <strong>8 brand-new bas-relief designs land every month</strong>, and the recent packs have been some of our best.</p>'
+                    + '<p>If you would like to pick the monthly drops back up (or just grab a few singles), here is <strong>15% off anything</strong> as a welcome-back:</p>'
+                    + '<p style="text-align:center;"><span style="display:inline-block;background:#F5EFE3;border:1px dashed #854F0B;border-radius:8px;padding:12px 28px;font-family:monospace;font-size:20px;letter-spacing:2px;color:#5E380A;font-weight:bold;">COMEBACK15</span></p>'
+                    + '<p style="text-align:center;"><a href="https://digitalchiselco.com/#membership" style="display:inline-block;background:#5E380A;color:#F5EFE3;text-decoration:none;padding:12px 26px;border-radius:8px;">Restart my membership</a></p>'
+                    + '<p>Everything you received before is still in <a href="https://digitalchiselco.com/account">your account</a> — nothing expires.</p>'
+                    + '<p>— Jolly, DigitalChiselCo</p>');
+                }}>↩ Load win-back template (expired members · COMEBACK15)</button>
+            </div>
             <div><label className={labelCls}>Subject</label><input value={subject} onChange={(e) => setSubject(e.target.value)} className={inputCls} placeholder="A little something new from DigitalChiselCo" /></div>
             <div>
               <label className={labelCls}>Message (HTML) — use <code>{'{{first_name}}'}</code> to personalise</label>

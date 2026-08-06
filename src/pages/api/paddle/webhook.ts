@@ -11,11 +11,13 @@
 // (Resend / Brevo / Klaviyo / MailerLite).
 
 import type { APIRoute } from 'astro';
+import crypto from 'node:crypto';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { verifyWebhookSignature, paddleApi } from '../../../lib/paddle';
 import { send as sendEmail } from '../../../lib/resend';
 import { orderConfirmation, membershipPurchaseNotification } from '../../../lib/email-templates';
 import { createSubscriptionForPurchase } from '../../../lib/subscriptions';
+import { giftCardEmail } from '../../../lib/marketing-emails';
 
 const OPS_INBOX = 'jolly@digitalchiselco.com';
 
@@ -363,6 +365,38 @@ async function handleTransactionCompleted(db: any, txn: any) {
         console.error(`[membership] subscription creation failed for order ${order.id} (${mp.slug}):`, e);
       }
     }
+  }
+
+  // ── Gift cards: mint one single-use coupon per card + email the buyer ──
+  // Idempotent on webhook retries: skip if a coupon for this order already exists.
+  if (email && email !== 'unknown@digitalchiselco.com') {
+    try {
+      const shortId = String(order.id).slice(0, 8);
+      const { data: already } = await db.from('coupons').select('id').ilike('description', `%order ${shortId}%`).limit(1);
+      if (!already?.length) {
+        const { data: giftProds } = await db.from('products').select('id, price_usd').like('slug', 'gift-card-%');
+        const giftById = new Map((giftProds || []).map((g: any) => [g.id, Number(g.price_usd)]));
+        const { data: oi } = await db.from('order_items').select('product_id, qty').eq('order_id', order.id);
+        const minted: { code: string; amount: number }[] = [];
+        for (const it of oi || []) {
+          const amount = it.product_id ? giftById.get(it.product_id) : undefined;
+          if (amount === undefined) continue;
+          for (let k = 0; k < Math.max(1, Number(it.qty) || 1); k++) {
+            const code = 'GIFT-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+            const { error: ce } = await db.from('coupons').insert({
+              code, fixed_amount_off: amount, active: true, max_redemptions: 1,
+              description: `gift card · order ${shortId}`,
+            });
+            if (!ce) minted.push({ code, amount });
+          }
+        }
+        if (minted.length) {
+          const { subject, html, text } = giftCardEmail({ email, buyerName: earlyOpsCustomerName, cards: minted });
+          await sendEmail({ to: email, subject, html, text, idempotencyKey: `gift:${order.id}` });
+          console.log(`[gift] minted ${minted.length} card(s) for order ${shortId}`);
+        }
+      }
+    } catch (e) { console.error('[gift] minting failed for order', order.id, e); }
   }
 
   // ── Send branded confirmation email with download links ──────────────

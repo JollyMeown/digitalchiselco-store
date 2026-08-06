@@ -128,8 +128,11 @@ export const POST: APIRoute = async ({ request }) => {
         const p = (products || []).find((x: any) => x.id === c.id);
         if (!p) continue;
         let unit = Number(p.price_usd);
-        if (discountPercent) unit = applyDiscount(unit, discountPercent);
-        if (fixedDiscount && productSubtotal > 0) {
+        // Gift cards are never discounted: a discounted card would still mint a
+        // coupon for its full face value (guaranteed loss).
+        const isGiftCard = String(p.slug || '').startsWith('gift-card-');
+        if (discountPercent && !isGiftCard) unit = applyDiscount(unit, discountPercent);
+        if (fixedDiscount && productSubtotal > 0 && !isGiftCard) {
           // Pro-rate the fixed discount across product lines
           const share = (unit * qty / productSubtotal) * fixedDiscount;
           unit = Math.max(0, +(unit - share / qty).toFixed(2));
