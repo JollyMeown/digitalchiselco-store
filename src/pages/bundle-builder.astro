@@ -1,0 +1,159 @@
+---
+// "Pick any 5 for $25" bundle builder. The buyer picks exactly 5 single designs;
+// the whole selection goes into the cart as ONE special item whose id is
+// 'bundle5:<id1>,<id2>,...'. Pricing is enforced server-side in
+// /api/checkout-init (flat $25, never combined with other discounts) and the
+// webhook expands the line back into 5 order_items + entitlements.
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { supabaseAdmin } from '../lib/supabase';
+
+export const prerender = false;
+
+const BUNDLE_PRICE = 25;
+// Eligible = active single designs. Bundles/catalogues/gift cards are excluded —
+// the deal is for singles only (same filter is re-checked in checkout-init).
+const { data: prods } = await supabaseAdmin()
+  .from('products')
+  .select('id, slug, title, price_usd, image_url')
+  .eq('active', true)
+  .gt('price_usd', 0)
+  .not('slug', 'like', 'gift-card-%')
+  .not('slug', 'like', 'catalogue-%')
+  .not('title', 'ilike', '%bundle%')
+  .order('created_at', { ascending: false })
+  .limit(600);
+const products = (prods || []).map((p) => ({
+  id: p.id,
+  slug: p.slug,
+  title: String(p.title || '').split('|')[0].trim(),
+  price: Number(p.price_usd),
+  img: p.image_url || '',
+}));
+const avgFive = products.length
+  ? (products.slice(0, 200).reduce((s, p) => s + p.price, 0) / Math.min(200, products.length)) * 5
+  : 0;
+---
+<Base
+  title="Pick Any 5 for $25 — STL Bundle Builder | DigitalChiselCo"
+  description={`Build your own bas-relief STL bundle: pick any 5 designs from our catalog for a flat $${BUNDLE_PRICE}. Instant download, commercial use included.`}
+>
+  <Header />
+  <Breadcrumbs crumbs={[{ label: 'Bundle builder' }]} />
+  <main class="px-4 sm:px-6 pb-28 max-w-6xl mx-auto">
+    <div class="text-center max-w-2xl mx-auto mb-6">
+      <h1 class="text-3xl sm:text-4xl">Pick any 5 — pay just ${BUNDLE_PRICE}</h1>
+      <p class="mt-2 text-sm text-ink-700/70">
+        Build your own bundle from {products.length} single designs.
+        {avgFive > BUNDLE_PRICE * 1.4 && (
+          <span> Five designs normally average <s>${avgFive.toFixed(0)}</s> — you pay a flat <strong class="text-bronze-700">${BUNDLE_PRICE}</strong>.</span>
+        )}
+        Instant downloads, commercial use included.
+      </p>
+    </div>
+
+    <div class="sticky top-0 z-30 -mx-4 sm:mx-0 mb-4 bg-[#FAEEDA]/95 backdrop-blur border-y sm:border sm:rounded-lg border-bronze-600/30 px-4 py-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <div id="bb-slots" class="flex items-center gap-1.5" aria-live="polite"></div>
+        <span id="bb-status" class="text-sm text-bronze-800 font-medium">Pick 5 designs to unlock the deal</span>
+        <button id="bb-add" disabled
+          class="ml-auto bg-bronze-600 text-cream text-sm px-5 py-2.5 rounded-md disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bronze-700 transition">
+          Add my 5-pack — ${BUNDLE_PRICE}
+        </button>
+      </div>
+    </div>
+
+    <input id="bb-search" type="search" placeholder={`Search ${products.length} designs…`}
+      class="w-full sm:max-w-sm px-4 py-2.5 text-sm border border-black/15 rounded-md mb-4 focus:outline-none focus:border-bronze-600" />
+
+    <div id="bb-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"></div>
+    <p id="bb-more" class="text-center text-xs text-ink-700/50 mt-4 hidden">Showing first 100 — search to find a specific design.</p>
+  </main>
+  <Footer />
+
+  <script is:inline define:vars={{ PRODUCTS: products, BUNDLE_PRICE }}>
+    const grid = document.getElementById('bb-grid');
+    const slotsEl = document.getElementById('bb-slots');
+    const statusEl = document.getElementById('bb-status');
+    const addBtn = document.getElementById('bb-add');
+    const moreEl = document.getElementById('bb-more');
+    const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const picked = new Map(); // id -> product
+
+    function card(p) {
+      const sel = picked.has(p.id);
+      return `
+        <button type="button" data-id="${esc(p.id)}" aria-pressed="${sel}"
+          class="bb-card text-left border rounded-md overflow-hidden transition relative ${sel ? 'border-bronze-600 ring-2 ring-bronze-600/50' : 'border-black/10 hover:shadow'}">
+          <span class="absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full text-xs flex items-center justify-center ${sel ? 'bg-bronze-600 text-cream' : 'bg-white/85 border border-black/15 text-ink-700/40'}">${sel ? '✓' : '+'}</span>
+          <span class="block aspect-square bg-cream overflow-hidden">${p.img ? `<img src="${esc(p.img)}" alt="${esc(p.title)}" loading="lazy" class="w-full h-full object-cover">` : ''}</span>
+          <span class="block p-2">
+            <span class="block text-xs leading-snug text-ink-800 line-clamp-2 min-h-[2.4em]">${esc(p.title)}</span>
+            <span class="block text-xs mt-1"><s class="text-ink-700/40">$${p.price.toFixed(2)}</s> <span class="text-bronze-700 font-medium">$${(BUNDLE_PRICE / 5).toFixed(2)} in the 5-pack</span></span>
+          </span>
+        </button>`;
+    }
+
+    function render() {
+      const q = (document.getElementById('bb-search').value || '').trim().toLowerCase();
+      const pool = q ? PRODUCTS.filter((p) => p.title.toLowerCase().includes(q)) : PRODUCTS;
+      const show = pool.slice(0, 100);
+      grid.innerHTML = show.map(card).join('') || '<p class="col-span-full text-sm text-ink-700/60 py-8 text-center">No designs match that search.</p>';
+      moreEl.classList.toggle('hidden', pool.length <= 100);
+      grid.querySelectorAll('.bb-card').forEach((b) => b.addEventListener('click', () => toggle(b.dataset.id)));
+    }
+
+    function toggle(id) {
+      if (picked.has(id)) picked.delete(id);
+      else {
+        if (picked.size >= 5) { statusEl.textContent = 'You already have 5 — remove one to swap it.'; return; }
+        const p = PRODUCTS.find((x) => x.id === id);
+        if (p) picked.set(id, p);
+      }
+      render(); renderBar();
+    }
+
+    function renderBar() {
+      const arr = [...picked.values()];
+      slotsEl.innerHTML = Array.from({ length: 5 }, (_, i) => {
+        const p = arr[i];
+        return p
+          ? `<span class="relative w-9 h-9 rounded overflow-hidden border border-bronze-600/50 bg-white" title="${esc(p.title)}">${p.img ? `<img src="${esc(p.img)}" class="w-full h-full object-cover">` : ''}</span>`
+          : '<span class="w-9 h-9 rounded border border-dashed border-bronze-600/40 bg-white/50"></span>';
+      }).join('');
+      const value = arr.reduce((s, p) => s + p.price, 0);
+      if (arr.length === 5) {
+        statusEl.innerHTML = '✓ Ready — <s>$' + value.toFixed(2) + '</s> <strong>$' + BUNDLE_PRICE.toFixed(2) + '</strong> (you save $' + Math.max(0, value - BUNDLE_PRICE).toFixed(2) + ')';
+        addBtn.disabled = false;
+      } else {
+        statusEl.textContent = arr.length ? `${arr.length} of 5 picked — add ${5 - arr.length} more` : 'Pick 5 designs to unlock the deal';
+        addBtn.disabled = true;
+      }
+    }
+
+    addBtn.addEventListener('click', () => {
+      const arr = [...picked.values()];
+      if (arr.length !== 5) return;
+      const ids = arr.map((p) => p.id);
+      const item = {
+        id: 'bundle5:' + ids.join(','),
+        slug: 'bundle-builder',
+        title: 'Pick-5 Bundle: ' + arr.map((p) => p.title).join(' · ').slice(0, 160),
+        price: BUNDLE_PRICE,
+        qty: 1,
+        img: arr[0].img || '',
+      };
+      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      // one bundle per cart line; a second visit replaces nothing — it adds another
+      cart.push(item);
+      localStorage.setItem('cart', JSON.stringify(cart));
+      window.dispatchEvent(new Event('cart-changed'));
+      window.location.href = '/cart';
+    });
+
+    document.getElementById('bb-search').addEventListener('input', render);
+    render(); renderBar();
+  </script>
+</Base>

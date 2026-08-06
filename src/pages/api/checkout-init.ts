@@ -57,7 +57,9 @@ export const POST: APIRoute = async ({ request }) => {
     if (couponCode) {
       const validation = await validateCoupon(
         couponCode,
-        cart.filter((c) => !String(c.id).startsWith('membership:')).map((c) => ({ id: c.id, price: Number(c.price) || 0, qty: Number(c.qty) || 1 })),
+        // Membership + Pick-5 bundle lines never count toward a promo code —
+        // the bundle is already a deep flat-price deal.
+        cart.filter((c) => !String(c.id).startsWith('membership:') && !String(c.id).startsWith('bundle5:')).map((c) => ({ id: c.id, price: Number(c.price) || 0, qty: Number(c.qty) || 1 })),
         email ?? null,
       );
       if (!validation.ok) return json({ error: validation.error }, 400);
@@ -82,8 +84,10 @@ export const POST: APIRoute = async ({ request }) => {
       }
     }
 
-    // Split cart into product ids vs membership slugs
-    const productIds = cart.filter((c) => !String(c.id).startsWith('membership:')).map((c) => c.id);
+    // Split cart into product ids vs membership slugs vs Pick-5 bundle markers
+    const productIds = cart
+      .filter((c) => !String(c.id).startsWith('membership:') && !String(c.id).startsWith('bundle5:'))
+      .map((c) => c.id);
     const membershipSlugs = cart
       .filter((c) => String(c.id).startsWith('membership:'))
       .map((c) => String(c.id).slice('membership:'.length));
@@ -115,6 +119,28 @@ export const POST: APIRoute = async ({ request }) => {
     const items: any[] = [];
     for (const c of cart) {
       const qty = Math.max(1, Number(c.qty) || 1);
+      if (String(c.id).startsWith('bundle5:')) {
+        // "Pick any 5 for $25" — the flat price is enforced HERE, never taken
+        // from the browser. Validate: exactly 5 distinct eligible product ids.
+        const ids = String(c.id).slice('bundle5:'.length).split(',').map((s) => s.trim()).filter(Boolean);
+        const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (new Set(ids).size !== 5 || ids.length !== 5 || !ids.every((id) => uuidRe.test(id))) {
+          return json({ error: 'The Pick-5 bundle must contain exactly 5 different designs.' }, 400);
+        }
+        const { data: bps } = await db.from('products')
+          .select('id, slug, title, active, price_usd').in('id', ids);
+        const eligible = (bps || []).filter((p: any) =>
+          p.active && Number(p.price_usd) > 0 &&
+          !String(p.slug || '').startsWith('gift-card-') &&
+          !String(p.slug || '').startsWith('catalogue-') &&
+          !/bundle/i.test(String(p.title || '')));
+        if (eligible.length !== 5) {
+          return json({ error: 'One of the designs in your Pick-5 bundle is no longer available — please rebuild it.' }, 400);
+        }
+        // Flat $25 — no sale/coupon/member discount ever stacks on top.
+        items.push(adhocItem('Pick-5 Bundle — 5 Premium STL Designs', 25, 1));
+        continue;
+      }
       if (String(c.id).startsWith('membership:')) {
         const slug = String(c.id).slice('membership:'.length);
         const plan = (plans || []).find((p: any) => p.slug === slug);

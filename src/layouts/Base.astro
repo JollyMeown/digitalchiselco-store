@@ -167,8 +167,11 @@ const faviconType = settings.favicon_image_url
     </div>
     <script is:inline>
       (function () {
-        var KEY = 'dcc_exit_seen';
-        try { if (Date.now() - Number(localStorage.getItem(KEY) || 0) < 14 * 86400000) return; } catch (_) { return; }
+        var KEY = 'dcc_exit_seen', SUB = 'dcc_exit_sub';
+        try {
+          if (localStorage.getItem(SUB)) return; // already subscribed via popup — never show again
+          if (Date.now() - Number(localStorage.getItem(KEY) || 0) < 14 * 86400000) return;
+        } catch (_) { return; }
         if (location.pathname.startsWith('/cart') || location.pathname.startsWith('/account') || location.pathname.startsWith('/free') || location.pathname.startsWith('/admin')) return;
         var box = document.getElementById('dcc-exit');
         var shown = false;
@@ -192,6 +195,7 @@ const faviconType = settings.favicon_image_url
             var data = await res.json();
             msg.style.color = res.ok ? '#188038' : '#c00';
             msg.textContent = res.ok ? '✓ Check your inbox to confirm and get the files!' : (data.error || 'Something went wrong.');
+            if (res.ok) { try { localStorage.setItem(SUB, '1'); } catch (_) {} }
           } catch (_) { msg.style.color = '#c00'; msg.textContent = 'Network error — please try again.'; }
         });
       })();

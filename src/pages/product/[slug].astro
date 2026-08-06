@@ -26,7 +26,7 @@ try {
   const { supabaseAdmin } = await import('../../lib/supabase');
   const { data: revs, count } = await supabaseAdmin()
     .from('reviews').select('name, text, rating', { count: 'exact' })
-    .eq('active', true).order('sort_order').limit(60);
+    .eq('active', true).eq('rating', 5).order('sort_order').limit(60);
   reviewCount = count || 0;
   if (revs?.length) {
     let h = 0; for (const ch of p.slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;

@@ -203,6 +203,34 @@ async function handleTransactionCompleted(db: any, txn: any) {
     let productId: string | null = null;
     let title: string = String(it.price?.description || it.price?.name || '').slice(0, 240);
 
+    // "Pick any 5 for $25" bundle: one Paddle line expands into 5 order_items
+    // (line total split evenly) + an entitlement per design, so downloads and
+    // the confirmation email flow exactly like 5 normal purchases.
+    if (cartIds[i]?.startsWith('bundle5:')) {
+      const bIds = cartIds[i].slice('bundle5:'.length).split(',').map((s: string) => s.trim()).filter(Boolean);
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const valid = bIds.filter((id: string) => uuidRe.test(id));
+      const { data: bProds } = valid.length
+        ? await db.from('products').select('id, title').in('id', valid)
+        : { data: [] as any[] };
+      const per = valid.length ? +(lineTotal / valid.length).toFixed(2) : 0;
+      for (const bp of bProds || []) {
+        await db.from('order_items').insert({
+          order_id: order.id,
+          product_id: bp.id,
+          title: `${bp.title} (Pick-5 Bundle)`.slice(0, 240),
+          price_usd: per,
+          qty: 1,
+        });
+        await db.from('entitlements').insert({
+          order_id: order.id,
+          email: email || 'unknown@digitalchiselco.com',
+          product_id: bp.id,
+        });
+      }
+      continue;
+    }
+
     // Detect membership-plan items: match by paddle_price_id OR by membership:<slug> cart marker.
     let membershipPlan: { name: string; slug: string; price_usd: number; months: number; files_per_month: number } | null = null;
     if (priceId) {

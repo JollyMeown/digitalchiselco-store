@@ -39,6 +39,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
     {showCartPromos && (
       <div class="mb-6 rounded-lg border border-bronze-600/30 bg-[#FAEEDA] px-4 py-3">
         <p class="text-sm font-medium text-bronze-800">Save more when you buy more on my 3D models 🎉</p>
+        <p class="mt-1 text-xs text-bronze-800">⭐ Or build your own <a href="/bundle-builder" class="underline font-medium">Pick-any-5 bundle for a flat $25 →</a></p>
         <ul class="mt-2 space-y-1.5 text-sm text-ink-800">
           {promoTiers.map((t) => (
             <li class="flex items-center gap-2 flex-wrap">
@@ -189,7 +190,8 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         { items: 10, percent: 20, code: '2026OFF20' },
         { items: 25, percent: 35, code: '2026OFF35' },
       ];
-      const itemCount = c.length;
+      // bundle + membership lines never count toward the bulk-promo tiers
+      const itemCount = c.filter((x) => !String(x.id).startsWith('bundle5:') && !String(x.id).startsWith('membership:')).length;
       const hintBox = document.getElementById('tier-hint');
       const hintText = document.getElementById('tier-hint-text');
       const next = tiers.find((t) => t.items > itemCount);
@@ -236,7 +238,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
 
     async function loadUpsell() {
       const c = JSON.parse(localStorage.getItem('cart') || '[]');
-      const ids = c.map((x) => x.id);
+      const ids = c.map((x) => x.id).filter((id) => !String(id).startsWith('membership:') && !String(id).startsWith('bundle5:'));
       try {
         const res = await fetch('/api/related', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids }) });
         const data = await res.json();
@@ -269,7 +271,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       revalInFlight = true;
       try {
         const cart = JSON.parse(localStorage.getItem('cart') || '[]')
-          .filter((c) => !String(c.id).startsWith('membership:'))
+          .filter((c) => !String(c.id).startsWith('membership:') && !String(c.id).startsWith('bundle5:'))
           .map((c) => ({ id: c.id, price: Number(c.price), qty: 1, title: c.title }));
         if (cart.length === 0) {
           localStorage.removeItem('promo');
@@ -311,7 +313,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
     // Public-read RLS allows direct Supabase REST query for the field definitions.
     async function loadCustomFields() {
       const c = JSON.parse(localStorage.getItem('cart') || '[]');
-      const ids = [...new Set(c.map((x) => x.id).filter((id) => id && !String(id).startsWith('membership:')))];
+      const ids = [...new Set(c.map((x) => x.id).filter((id) => id && !String(id).startsWith('membership:') && !String(id).startsWith('bundle5:')))];
       if (!ids.length) { customFieldsByProduct = {}; return; }
       try {
         const url = SUPABASE_URL + '/rest/v1/product_custom_fields?select=*&product_id=in.(' + ids.join(',') + ')&order=sort_order';
@@ -410,7 +412,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       const code = (promoCodeInput.value || '').trim().toUpperCase();
       if (!code) { promoMsg.textContent = 'Enter a code.'; promoMsg.className = 'mt-2 text-xs text-red-600'; return; }
       const cart = JSON.parse(localStorage.getItem('cart') || '[]')
-        .filter((c) => !String(c.id).startsWith('membership:'))
+        .filter((c) => !String(c.id).startsWith('membership:') && !String(c.id).startsWith('bundle5:'))
         .map((c) => ({ id: c.id, price: Number(c.price), qty: 1, title: c.title }));
       promoMsg.textContent = 'Checking…'; promoMsg.className = 'mt-2 text-xs text-ink-700/60';
       try {

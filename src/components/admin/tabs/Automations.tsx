@@ -14,6 +14,47 @@ const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'loyalty', label: 'Loyalty 10% (3rd order)', group: 'Post-purchase' },
 ];
 
+// ── Block-based template builder ─────────────────────────────────────
+// Blocks are stored in email_template_overrides.blocks (jsonb) for re-editing;
+// the rendered HTML goes into body_html — the ONLY field the send path reads,
+// so the growth engine needs no changes.
+type Block =
+  | { type: 'text'; html: string }
+  | { type: 'image'; url: string; alt?: string; link?: string; width?: number }
+  | { type: 'button'; label: string; link: string }
+  | { type: 'products'; products: { slug: string; title: string; price_usd: number; image_url: string | null }[] }
+  | { type: 'divider' };
+
+const escH = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function renderBlocksHtml(blocks: Block[]): string {
+  return blocks.map((b) => {
+    if (b.type === 'text') return `<div style="font-size:14px;line-height:1.65;color:#2b2013;">${(b as any).html || ''}</div>`;
+    if (b.type === 'divider') return '<hr style="border:none;border-top:1px solid #ead9bd;margin:18px 0;" />';
+    if (b.type === 'image') {
+      if (!b.url) return '';
+      const img = `<img src="${escH(b.url)}" alt="${escH(b.alt || '')}" style="max-width:100%;${b.width ? `width:${Number(b.width)}px;` : ''}border-radius:10px;display:inline-block;" />`;
+      return `<div style="text-align:center;margin:14px 0;">${b.link ? `<a href="${escH(b.link)}">${img}</a>` : img}</div>`;
+    }
+    if (b.type === 'button') {
+      if (!b.link) return '';
+      return `<div style="text-align:center;margin:18px 0;"><a href="${escH(b.link)}" style="display:inline-block;background:#854F0B;color:#F5EFE3;text-decoration:none;padding:12px 26px;border-radius:8px;font-size:14px;">${escH(b.label || 'Open')}</a></div>`;
+    }
+    if (b.type === 'products') {
+      const ps = (b.products || []).slice(0, 3);
+      if (!ps.length) return '';
+      const w = Math.floor(100 / ps.length);
+      const cells = ps.map((p) =>
+        `<td width="${w}%" style="padding:6px;vertical-align:top;"><a href="https://digitalchiselco.com/product/${escH(p.slug)}" style="text-decoration:none;color:#2b2013;">` +
+        (p.image_url ? `<img src="${escH(p.image_url)}" alt="${escH(p.title)}" style="width:100%;border-radius:8px;display:block;" />` : '') +
+        `<div style="font-size:12px;margin-top:6px;line-height:1.4;">${escH(p.title.split('|')[0].trim())}</div>` +
+        `<div style="font-size:12px;color:#854F0B;font-weight:bold;">$${Number(p.price_usd).toFixed(2)}</div></a></td>`).join('');
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0;"><tr>${cells}</tr></table>`;
+    }
+    return '';
+  }).filter(Boolean).join('\n');
+}
+
 export default function Automations() {
   const [settings, setSettings] = useState<any>(null);
   const [drip, setDrip] = useState<{ active: number; done: number; converted: number; stopped: number }>({ active: 0, done: 0, converted: 0, stopped: 0 });
@@ -27,8 +68,12 @@ export default function Automations() {
   const [editOpen, setEditOpen] = useState(false);
   const [ovrSubject, setOvrSubject] = useState('');
   const [ovrHeading, setOvrHeading] = useState('');
-  const [ovrBody, setOvrBody] = useState('');
+  const [blocks, setBlocks] = useState<Block[]>([]);
   const [ovrSaved, setOvrSaved] = useState(false);
+  // product picker (for the "products" block)
+  const [prodQ, setProdQ] = useState('');
+  const [prodResults, setProdResults] = useState<any[]>([]);
+  const [pickerFor, setPickerFor] = useState<number | null>(null);
 
   useEffect(() => { load(); }, []);
   useEffect(() => { loadPreview(kind); }, [kind]);
@@ -64,16 +109,29 @@ export default function Automations() {
     else setMsg({ kind: 'error', text: data.error || 'preview failed' });
     // load any saved override for the edit panel
     const { data: ov } = await supabase.from('email_template_overrides').select('*').eq('kind', k).maybeSingle();
-    setOvrSubject(ov?.subject || ''); setOvrHeading(ov?.heading || ''); setOvrBody(ov?.body_html || '');
+    setOvrSubject(ov?.subject || ''); setOvrHeading(ov?.heading || '');
+    // blocks (composer state) win; a legacy body_html-only override becomes one raw-HTML text block
+    if (Array.isArray(ov?.blocks) && ov.blocks.length) setBlocks(ov.blocks);
+    else if (ov?.body_html) setBlocks([{ type: 'text', html: ov.body_html }]);
+    else setBlocks([]);
     setOvrSaved(!!ov);
+    setPickerFor(null); setProdQ(''); setProdResults([]);
   }
 
   async function saveOverride() {
+    // drop empty blocks so a lone blank text block doesn't override the default
+    const clean = blocks.filter((b) =>
+      b.type === 'divider' ||
+      (b.type === 'text' && (b as any).html?.trim()) ||
+      (b.type === 'image' && (b as any).url?.trim()) ||
+      (b.type === 'button' && (b as any).link?.trim()) ||
+      (b.type === 'products' && (b as any).products?.length));
     const payload = {
       kind,
       subject: ovrSubject.trim() || null,
       heading: ovrHeading.trim() || null,
-      body_html: ovrBody.trim() || null,
+      body_html: clean.length ? renderBlocksHtml(clean) : null,
+      blocks: clean.length ? clean : null,
       updated_at: new Date().toISOString(),
     };
     if (!payload.subject && !payload.heading && !payload.body_html) return resetOverride();
@@ -86,9 +144,44 @@ export default function Automations() {
 
   async function resetOverride() {
     await supabase.from('email_template_overrides').delete().eq('kind', kind);
-    setOvrSubject(''); setOvrHeading(''); setOvrBody(''); setOvrSaved(false);
+    setOvrSubject(''); setOvrHeading(''); setBlocks([]); setOvrSaved(false);
     setMsg({ kind: 'success', text: '✓ Reset to the default template' });
     loadPreview(kind);
+  }
+
+  // ── block helpers ────────────────────────────────────────────────
+  function patchBlock(i: number, patch: any) {
+    setBlocks((bs) => bs.map((b, j) => (j === i ? { ...b, ...patch } : b)));
+  }
+  function moveBlock(i: number, dir: -1 | 1) {
+    setBlocks((bs) => {
+      const j = i + dir;
+      if (j < 0 || j >= bs.length) return bs;
+      const next = bs.slice();
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+  function removeBlock(i: number) {
+    setBlocks((bs) => bs.filter((_, j) => j !== i));
+    setPickerFor(null);
+  }
+  function addBlock(type: Block['type']) {
+    const fresh: Block =
+      type === 'text' ? { type: 'text', html: '<p>Hi {{first_name}},</p>\n<p></p>' } :
+      type === 'image' ? { type: 'image', url: '', alt: '', link: '' } :
+      type === 'button' ? { type: 'button', label: 'Browse the catalog', link: 'https://digitalchiselco.com/catalog' } :
+      type === 'products' ? { type: 'products', products: [] } :
+      { type: 'divider' };
+    setBlocks((bs) => [...bs, fresh]);
+  }
+  async function searchProducts(q: string) {
+    setProdQ(q);
+    if (q.trim().length < 2) { setProdResults([]); return; }
+    const { data } = await supabase.from('products')
+      .select('slug, title, price_usd, image_url')
+      .eq('active', true).ilike('title', `%${q.trim()}%`).limit(8);
+    setProdResults(data || []);
   }
 
   async function sendTest() {
@@ -161,12 +254,83 @@ export default function Automations() {
         </div>
 
         {editOpen && (
-          <div className="mb-4 border border-bronze-600/20 bg-cream/30 rounded-lg p-3 space-y-2">
-            <p className="text-xs text-ink-700/60">Leave a field <b>blank</b> to keep the default. The logo, brand shell and unsubscribe footer always stay. Body accepts simple HTML (&lt;p&gt;, &lt;strong&gt;, &lt;a href&gt;, &lt;ul&gt;…).</p>
+          <div className="mb-4 border border-bronze-600/20 bg-cream/30 rounded-lg p-3 space-y-3">
+            <p className="text-xs text-ink-700/60">
+              Build the email body from <b>blocks</b> — text, pictures, buttons, product grids. Leave everything empty to keep the default template.
+              The logo, brand shell and unsubscribe footer always stay. Use <code>{'{{first_name}}'}</code> in text to personalise.
+            </p>
             <input value={ovrSubject} onChange={(e) => setOvrSubject(e.target.value)} placeholder="Custom subject (blank = default)" className={inputCls} />
             <input value={ovrHeading} onChange={(e) => setOvrHeading(e.target.value)} placeholder="Custom header title (blank = default)" className={inputCls} />
-            <textarea value={ovrBody} onChange={(e) => setOvrBody(e.target.value)} rows={8} placeholder="Custom body HTML (blank = default template body)" className={inputCls + ' font-mono text-xs'} />
-            <div className="flex gap-2">
+
+            {blocks.map((b, i) => (
+              <div key={i} className="border border-black/10 bg-white rounded-md p-2.5">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-[11px] uppercase tracking-wider text-bronze-700 font-medium mr-auto">
+                    {b.type === 'text' ? '📝 Text' : b.type === 'image' ? '🖼 Image' : b.type === 'button' ? '🔘 Button' : b.type === 'products' ? '🛍 Product grid' : '— Divider'}
+                  </span>
+                  <button className="text-xs px-1.5 py-0.5 border border-black/10 rounded hover:bg-cream disabled:opacity-30" disabled={i === 0} onClick={() => moveBlock(i, -1)} title="Move up">↑</button>
+                  <button className="text-xs px-1.5 py-0.5 border border-black/10 rounded hover:bg-cream disabled:opacity-30" disabled={i === blocks.length - 1} onClick={() => moveBlock(i, 1)} title="Move down">↓</button>
+                  <button className="text-xs px-1.5 py-0.5 border border-black/10 rounded text-red-600 hover:bg-red-50" onClick={() => removeBlock(i)} title="Remove">✕</button>
+                </div>
+                {b.type === 'text' && (
+                  <textarea value={(b as any).html} onChange={(e) => patchBlock(i, { html: e.target.value })} rows={4}
+                    placeholder="<p>Your text — simple HTML allowed (<strong>, <a href>, <ul>…)</p>" className={inputCls + ' font-mono text-xs'} />
+                )}
+                {b.type === 'image' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input value={(b as any).url} onChange={(e) => patchBlock(i, { url: e.target.value })} placeholder="Image URL (https://…)" className={inputCls} />
+                    <input value={(b as any).link || ''} onChange={(e) => patchBlock(i, { link: e.target.value })} placeholder="Click-through link (optional)" className={inputCls} />
+                    <input value={(b as any).alt || ''} onChange={(e) => patchBlock(i, { alt: e.target.value })} placeholder="Alt text (optional)" className={inputCls} />
+                    <input type="number" value={(b as any).width || ''} onChange={(e) => patchBlock(i, { width: e.target.value ? Number(e.target.value) : undefined })} placeholder="Width px (blank = full)" className={inputCls} />
+                    {(b as any).url && <img src={(b as any).url} alt="" className="sm:col-span-2 max-h-28 rounded border border-black/10 object-contain" />}
+                  </div>
+                )}
+                {b.type === 'button' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input value={(b as any).label} onChange={(e) => patchBlock(i, { label: e.target.value })} placeholder="Button label" className={inputCls} />
+                    <input value={(b as any).link} onChange={(e) => patchBlock(i, { link: e.target.value })} placeholder="Button link (https://…)" className={inputCls} />
+                  </div>
+                )}
+                {b.type === 'products' && (
+                  <div>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {((b as any).products || []).map((p: any, pi: number) => (
+                        <span key={p.slug} className="flex items-center gap-1.5 text-xs bg-cream border border-bronze-600/20 rounded pl-1 pr-1.5 py-1">
+                          {p.image_url && <img src={p.image_url} alt="" className="w-6 h-6 rounded object-cover" />}
+                          <span className="max-w-[140px] truncate">{p.title.split('|')[0].trim()}</span>
+                          <button className="text-red-600" onClick={() => patchBlock(i, { products: (b as any).products.filter((_: any, j: number) => j !== pi) })}>✕</button>
+                        </span>
+                      ))}
+                      {!((b as any).products || []).length && <span className="text-xs text-ink-700/50">No products yet — search below (max 3).</span>}
+                    </div>
+                    <input value={pickerFor === i ? prodQ : ''} onFocus={() => { setPickerFor(i); setProdQ(''); setProdResults([]); }}
+                      onChange={(e) => searchProducts(e.target.value)} placeholder="Search products by title…" className={inputCls} />
+                    {pickerFor === i && prodResults.length > 0 && (
+                      <div className="mt-1 border border-black/10 rounded bg-white divide-y divide-black/5 max-h-52 overflow-y-auto">
+                        {prodResults.map((p) => (
+                          <button key={p.slug} className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-cream disabled:opacity-40"
+                            disabled={((b as any).products || []).length >= 3 || ((b as any).products || []).some((x: any) => x.slug === p.slug)}
+                            onClick={() => { patchBlock(i, { products: [...((b as any).products || []), p] }); setProdQ(''); setProdResults([]); }}>
+                            {p.image_url && <img src={p.image_url} alt="" className="w-8 h-8 rounded object-cover" />}
+                            <span className="flex-1 truncate">{p.title.split('|')[0].trim()}</span>
+                            <span className="text-bronze-700">${Number(p.price_usd).toFixed(2)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            <div className="flex flex-wrap gap-2">
+              {(['text', 'image', 'button', 'products', 'divider'] as const).map((t) => (
+                <button key={t} className="text-xs px-2.5 py-1.5 rounded border border-bronze-600/30 bg-white text-bronze-800 hover:bg-cream" onClick={() => addBlock(t)}>
+                  + {t === 'text' ? 'Text' : t === 'image' ? 'Image' : t === 'button' ? 'Button' : t === 'products' ? 'Product grid' : 'Divider'}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 border-t border-black/10 pt-2">
               <button className={btnPrimary} onClick={saveOverride}>Save changes</button>
               {ovrSaved && <button className={btnGhost} onClick={resetOverride}>Reset to default</button>}
             </div>
