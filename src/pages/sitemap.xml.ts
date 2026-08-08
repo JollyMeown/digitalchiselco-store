@@ -12,6 +12,9 @@ const STATIC_PATHS: Array<{ path: string; priority: number; changefreq: string }
   { path: '/',            priority: 1.0, changefreq: 'daily' },
   { path: '/catalog',     priority: 0.9, changefreq: 'daily' },
   { path: '/collections', priority: 0.8, changefreq: 'weekly' },
+  { path: '/bundle-builder', priority: 0.8, changefreq: 'weekly' },
+  { path: '/gift-cards',  priority: 0.6, changefreq: 'monthly' },
+  { path: '/requests',    priority: 0.5, changefreq: 'weekly' },
   { path: '/pricing',     priority: 0.7, changefreq: 'weekly' },
   { path: '/membership',  priority: 0.7, changefreq: 'weekly' },
   { path: '/laser-studio', priority: 0.8, changefreq: 'weekly' },
@@ -51,6 +54,17 @@ export async function GET() {
       urls.push(entry(`${SITE}/collections/${c.slug}`, c.created_at, 'weekly', 0.7));
     }
   } catch (e) { console.error('sitemap categories failed:', e); }
+
+  // Live seasonal collections (active + inside their date window)
+  try {
+    const nowIso = new Date().toISOString();
+    const { data: seasonal } = await supabase.from('seasonal_collections')
+      .select('slug, created_at, starts_at, ends_at').eq('active', true).limit(200);
+    for (const s of seasonal || []) {
+      if ((s.starts_at && s.starts_at > nowIso) || (s.ends_at && s.ends_at < nowIso)) continue;
+      urls.push(entry(`${SITE}/seasonal/${s.slug}`, s.created_at, 'weekly', 0.7));
+    }
+  } catch (e) { console.error('sitemap seasonal failed:', e); }
 
   try {
     // Paginate products in chunks so we don't trip Supabase's 1000-row cap.
