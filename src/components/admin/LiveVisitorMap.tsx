@@ -23,6 +23,19 @@ const CENTROID: Record<string, [number, number]> = {
   NP: [28.4, 84.1], IR: [32.4, 53.7], IQ: [33.2, 43.7], AU: [-25.3, 133.8], NZ: [-40.9, 172.9],
 };
 
+// Simplified continent silhouettes in equirectangular space (x = lng+180,
+// y = 90-lat). Rough but recognizable — enough to read as a world map behind
+// the visitor dots.
+const LAND: string[] = [
+  '12,25 90,18 128,43 112,48 100,66 82,74 64,60 56,50 40,32 20,30',                    // North America
+  '100,80 122,80 146,92 140,112 124,128 112,143 106,132 102,110 98,92',                // South America
+  '120,12 137,12 141,25 124,28',                                                       // Greenland
+  '168,54 172,44 182,38 196,36 210,30 222,26 223,38 214,46 200,52 184,55',             // Europe
+  '164,70 166,56 186,52 210,54 224,60 232,74 226,92 212,112 198,126 190,120 186,92 178,80 168,76', // Africa
+  '210,50 222,26 248,16 280,12 310,16 342,20 360,26 360,42 336,44 316,50 300,54 300,70 288,84 272,84 256,78 240,64 224,58', // Asia
+  '292,110 312,101 326,104 334,116 328,128 312,124 298,126',                           // Australia
+];
+
 type Row = { code: string; count: number };
 const WINDOWS: [string, string, number][] = [['30 min', 'live', 30 * 60000], ['24 h', 'today', 24 * 3600000], ['7 days', 'week', 7 * 86400000]];
 
@@ -92,12 +105,12 @@ export default function LiveVisitorMap() {
       </div>
       <div className="grid lg:grid-cols-[1fr_180px] gap-4">
         <div className="relative">
-          <svg viewBox="0 0 360 180" className="w-full rounded-lg" style={{ background: '#eef4f7', aspectRatio: '2 / 1' }}>
+          <svg viewBox="0 0 360 180" className="w-full rounded-lg" style={{ background: '#eaf1f5', aspectRatio: '2 / 1' }}>
+            {/* continents */}
+            {LAND.map((pts, i) => <polygon key={'land' + i} points={pts} fill="#e6dcc6" stroke="#d6c7a8" strokeWidth={0.4} />)}
             {/* graticule */}
-            {[30, 60, 90, 120, 150, 210, 240, 270, 300, 330].map((x) => <line key={'v' + x} x1={x} y1={0} x2={x} y2={180} stroke="#d3e0e6" strokeWidth={0.4} />)}
-            {[30, 60, 90, 120, 150].map((y) => <line key={'h' + y} x1={0} y1={y} x2={360} y2={y} stroke="#d3e0e6" strokeWidth={0.4} />)}
-            <line x1={180} y1={0} x2={180} y2={180} stroke="#c2d3da" strokeWidth={0.6} />
-            <line x1={0} y1={90} x2={360} y2={90} stroke="#c2d3da" strokeWidth={0.6} />
+            {[30, 60, 90, 120, 150, 210, 240, 270, 300, 330].map((x) => <line key={'v' + x} x1={x} y1={0} x2={x} y2={180} stroke="#c9d8de" strokeWidth={0.3} opacity={0.6} />)}
+            {[30, 60, 90, 120, 150].map((y) => <line key={'h' + y} x1={0} y1={y} x2={360} y2={y} stroke="#c9d8de" strokeWidth={0.3} opacity={0.6} />)}
             {dots.map((d) => (
               <g key={d.code} onMouseEnter={() => setHover({ code: d.code, count: d.count })} onMouseLeave={() => setHover(null)} style={{ cursor: 'pointer' }}>
                 <circle cx={d.x} cy={d.y} r={d.rad + 2} fill="#854F0B" opacity={0.12} />
