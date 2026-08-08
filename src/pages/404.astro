@@ -1,0 +1,32 @@
+---
+// Branded 404. Served for unmatched routes automatically, AND rendered (via
+// Astro.rewrite) by dynamic pages when a product/collection/blog/seasonal slug
+// no longer exists — returning a proper 404 status so Google cleanly drops the
+// dead URL (instead of a soft-404 redirect to /catalog).
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+Astro.response.status = 404;
+---
+<Base title="Design not found · DigitalChiselCo" noindex>
+  <Header />
+  <main class="max-w-2xl mx-auto px-4 sm:px-6 py-20 text-center min-h-[50vh]">
+    <div class="text-5xl mb-3">🪵</div>
+    <h1 class="font-serif text-3xl text-bronze-800">That design isn't here</h1>
+    <p class="mt-3 text-ink-700/70">
+      The page or design you were looking for has moved or is no longer available — but there are
+      hundreds more waiting for your machine.
+    </p>
+    <form action="/search" method="get" role="search" class="mt-6 flex max-w-md mx-auto">
+      <input type="search" name="q" placeholder="Search STL designs…" aria-label="Search"
+        class="flex-1 px-4 py-2.5 text-sm rounded-l-md border border-r-0 border-black/15 focus:outline-none focus:border-bronze-600" />
+      <button class="bg-bronze-600 text-cream px-5 rounded-r-md text-sm">Search</button>
+    </form>
+    <div class="mt-6 flex flex-wrap gap-3 justify-center text-sm">
+      <a href="/catalog" class="bg-bronze-600 text-cream px-5 py-2.5 rounded-md hover:bg-bronze-700 transition">Browse the catalog</a>
+      <a href="/collections" class="border border-bronze-600/30 text-bronze-700 px-5 py-2.5 rounded-md hover:bg-cream transition">Shop by collection</a>
+      <a href="/free" class="border border-bronze-600/30 text-bronze-700 px-5 py-2.5 rounded-md hover:bg-cream transition">Free STL pack</a>
+    </div>
+  </main>
+  <Footer />
+</Base>

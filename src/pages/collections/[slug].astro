@@ -6,7 +6,7 @@ import { getCategoryBySlug, getProductsByCategory, getSettings } from '../../lib
 
 const { slug } = Astro.params;
 const category = await getCategoryBySlug(slug!);
-if (!category) return Astro.redirect('/collections');
+if (!category) return Astro.rewrite('/404');
 
 const page = Math.max(1, Number(Astro.url.searchParams.get('page') || '1'));
 const { products, total, perPage } = await getProductsByCategory(category.id, page);

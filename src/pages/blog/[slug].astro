@@ -16,7 +16,7 @@ try {
   post = data;
 } catch {}
 
-if (!post) return Astro.redirect('/blog');
+if (!post) return Astro.rewrite('/404');
 ---
 <Shell
   title={`${post.title} · DigitalChiselCo Blog`}

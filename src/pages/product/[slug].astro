@@ -9,7 +9,7 @@ import { jsonLd } from '../../lib/jsonld';
 
 const { slug } = Astro.params;
 const p = await getProductBySlug(slug!);
-if (!p) return Astro.redirect('/catalog');
+if (!p) return Astro.rewrite('/404');
 
 const settings = await getSettings();
 const { price, original, percent } = pricing(p.price_usd, settings.discount_percent);

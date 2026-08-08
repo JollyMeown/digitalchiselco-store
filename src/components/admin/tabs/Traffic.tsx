@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card } from '../ui';
+import LiveVisitorMap from '../LiveVisitorMap';
 
 type Visit = { day: string; path: string; referrer_host: string | null; device: string | null; country: string | null; visitor_hash: string | null };
 
@@ -150,6 +151,8 @@ export default function Traffic() {
             <Card><div className="text-[11px] uppercase tracking-wide text-ink-700/50">Today · visitors</div><div className="text-2xl font-medium text-bronze-800 mt-1">{stats.today.uniq.toLocaleString()}</div></Card>
             <Card><div className="text-[11px] uppercase tracking-wide text-ink-700/50">Today · pageviews</div><div className="text-2xl font-medium text-bronze-800 mt-1">{stats.today.pv.toLocaleString()}</div></Card>
           </div>
+
+          <LiveVisitorMap />
 
           <Card>
             <div className="flex items-center gap-4 mb-2">

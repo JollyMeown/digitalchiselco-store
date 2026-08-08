@@ -16,7 +16,7 @@ const nowIso = new Date().toISOString();
 const { data: col } = await db.from('seasonal_collections').select('*').eq('slug', slug!).eq('active', true).maybeSingle();
 // respect the date window (null edges = open-ended)
 const inWindow = col && (!col.starts_at || col.starts_at <= nowIso) && (!col.ends_at || col.ends_at >= nowIso);
-if (!col || !inWindow) return Astro.redirect('/collections');
+if (!col || !inWindow) return Astro.rewrite('/404');
 
 const settings = await getSettings();
 const keywords: string[] = Array.isArray(col.keywords) ? col.keywords.filter(Boolean) : [];
