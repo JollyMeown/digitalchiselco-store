@@ -2,8 +2,21 @@
 ---
 <footer class="px-6 py-10 text-center text-xs text-ink-700/60 border-t border-black/10">
   <div class="flex gap-4 justify-center mb-3 flex-wrap">
-    <a href="/catalog">Catalog</a><a href="/collections">Collections</a><a href="/pricing">Pricing</a><a href="/free">Free files</a>
+    <a href="/catalog">Catalog</a><a href="/collections">Collections</a><a href="/designs">Themes</a><a href="/quiz">Design finder</a><a href="/favorites">Favorites</a><a href="/pricing">Pricing</a><a href="/free">Free files</a>
     <a href="/membership">Membership</a><a href="/contact">Contact</a>
+  </div>
+  <div class="mb-3 flex items-center justify-center gap-2">
+    <label for="dcc-ccy" class="text-ink-700/50">Show prices in</label>
+    <select id="dcc-ccy" class="border border-black/15 rounded px-2 py-1 text-xs bg-white">
+      <option value="AUTO">Auto</option>
+      <option value="USD">USD $</option>
+      <option value="EUR">EUR €</option>
+      <option value="GBP">GBP £</option>
+      <option value="CAD">CAD $</option>
+      <option value="AUD">AUD $</option>
+      <option value="INR">INR ₹</option>
+    </select>
+    <span class="text-ink-700/40">· charged in USD</span>
   </div>
   <div class="flex gap-4 justify-center mb-3 flex-wrap text-ink-700/40">
     <a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refunds">Refund Policy</a>
@@ -11,3 +24,35 @@
   <p>© {new Date().getFullYear()} DigitalChiselCo · Premium STL files for CNC, laser &amp; 3D printing</p>
   <p class="mt-1">Questions? <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a></p>
 </footer>
+<script is:inline>
+  (function () {
+    // Display-only currency conversion. Checkout always charges USD (Paddle);
+    // this just shows an approximate local price next to USD-marked prices.
+    var RATES = { USD: 1, EUR: 0.92, GBP: 0.79, CAD: 1.36, AUD: 1.52, INR: 83 };
+    var SYM = { USD: '$', EUR: '€', GBP: '£', CAD: 'CA$', AUD: 'A$', INR: '₹' };
+    var REGION = { GB: 'GBP', IE: 'EUR', FR: 'EUR', DE: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', BE: 'EUR', AT: 'EUR', PT: 'EUR', FI: 'EUR', CA: 'CAD', AU: 'AUD', NZ: 'AUD', IN: 'INR' };
+    function autoCcy() {
+      try { var loc = navigator.language || 'en-US'; var reg = (loc.split('-')[1] || 'US').toUpperCase(); return REGION[reg] || 'USD'; } catch (e) { return 'USD'; }
+    }
+    function chosen() { var c = localStorage.getItem('dcc_ccy') || 'AUTO'; return c === 'AUTO' ? autoCcy() : c; }
+    function convert() {
+      var ccy = chosen();
+      document.querySelectorAll('.dcc-ccy-approx').forEach(function (el) { el.remove(); });
+      if (ccy === 'USD' || !RATES[ccy]) return;
+      document.querySelectorAll('[data-usd]').forEach(function (el) {
+        var usd = parseFloat(el.getAttribute('data-usd')); if (!usd) return;
+        var v = usd * RATES[ccy];
+        var span = document.createElement('span');
+        span.className = 'dcc-ccy-approx';
+        span.style.cssText = 'font-size:0.8em;color:#8a7a68;margin-left:6px;white-space:nowrap;';
+        span.textContent = '≈ ' + SYM[ccy] + v.toFixed(2);
+        el.insertAdjacentElement('afterend', span);
+      });
+    }
+    window.dccConvertCcy = convert;
+    var sel = document.getElementById('dcc-ccy');
+    if (sel) { sel.value = localStorage.getItem('dcc_ccy') || 'AUTO'; sel.addEventListener('change', function () { localStorage.setItem('dcc_ccy', sel.value); convert(); }); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', convert, { once: true }); else convert();
+    window.addEventListener('pageshow', convert);
+  })();
+</script>
