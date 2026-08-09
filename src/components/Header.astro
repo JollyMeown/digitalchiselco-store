@@ -9,8 +9,8 @@ const links = [
   { href: '/', label: 'Home', desk: 'none' },
   { href: '/collections', label: 'Collections' },
   { href: '/catalog', label: 'Catalog' },
-  { href: '/designs', label: 'Themes', desk: 'xl' },
-  { href: '/quiz', label: 'Design finder', desk: 'xl' },
+  { href: '/designs', label: 'Themes', desk: 'none' },
+  { href: '/quiz', label: 'Design finder', desk: 'none' },
   { href: '/bundle-builder', label: '5 for $25' },
   { href: '/gift-cards', label: 'Gift Cards' },
   { href: '/free', label: 'Free files' },
@@ -46,7 +46,7 @@ const hs = await getSettings();
     <div class="hidden lg:flex items-center gap-3 text-sm text-ink-700 ml-auto whitespace-nowrap shrink-0">
       {links.filter((l) => l.desk !== 'none').map((l) => <a href={l.href} class={`hover:text-bronze-600 ${l.href === '/free' ? 'text-bronze-600' : ''} ${l.desk === 'xl' ? 'hidden xl:inline' : ''}`}>{l.label}</a>)}
       <a href="/membership" class="hidden xl:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
-      <a href="/favorites" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Favorites">❤ <span class="wish-count text-bronze-600 font-medium"></span></a>
+      <a href="/favorites" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Wishlist"><span class="text-red-500">❤</span><span class="wish-count text-bronze-600 font-medium"></span></a>
       <a href="/cart" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 Cart <span class="cart-count text-bronze-600 font-medium"></span></a>
     </div>
     <!-- Favorites + Cart for mobile/tablet (shown when the desktop nav is hidden). -->
@@ -73,7 +73,7 @@ const hs = await getSettings();
       <a href={l.href} class={`block px-4 py-2.5 hover:bg-cream ${l.href === '/free' ? 'text-bronze-600 font-medium' : 'text-ink-800'}`}>{l.label}</a>
     ))}
     <a href="/membership" class="block px-4 py-2.5 text-bronze-600 font-medium hover:bg-cream">Become a member</a>
-    <a href="/favorites" class="block px-4 py-2.5 text-ink-800 hover:bg-cream">❤ Favorites</a>
+    <a href="/favorites" class="block px-4 py-2.5 text-ink-800 hover:bg-cream"><span class="text-red-500">❤</span> Wishlist</a>
     <a href="/cart" class="block px-4 py-2.5 text-ink-800 hover:bg-cream">Cart</a>
   </nav>
   <div class="border-t border-black/10 px-4 py-3">
@@ -87,6 +87,16 @@ const hs = await getSettings();
   </div>
 </aside>
 <SocialProof />
+<style is:global>
+  /* Heartbeat for saved (red) hearts — gentle continuous pulse, plus a bigger
+     pop the moment one is added. Respects reduced-motion preferences. */
+  @keyframes dcc-heartbeat { 0%, 100% { transform: scale(1); } 20% { transform: scale(1.18); } 35% { transform: scale(0.94); } 50% { transform: scale(1.1); } 65% { transform: scale(1); } }
+  @keyframes dcc-pop { 0% { transform: scale(1); } 40% { transform: scale(1.55); } 70% { transform: scale(0.9); } 100% { transform: scale(1); } }
+  .wish-btn .wish-icon, .wish-remove { display: inline-block; transform-origin: center; }
+  .wish-btn.is-wished .wish-icon, .wish-remove { animation: dcc-heartbeat 1.6s ease-in-out infinite; }
+  .wish-btn.just-wished .wish-icon { animation: dcc-pop 0.6s ease-out; }
+  @media (prefers-reduced-motion: reduce) { .wish-btn .wish-icon, .wish-remove { animation: none !important; } }
+</style>
 <script is:inline>
   function cartCount() { try { return JSON.parse(localStorage.getItem('cart') || '[]').length; } catch { return 0; } }
   function renderCartCount() { const n = cartCount(); document.querySelectorAll('.cart-count').forEach((el) => { el.textContent = n > 0 ? `(${n})` : ''; }); }
@@ -117,6 +127,7 @@ const hs = await getSettings();
       const icon = btn.querySelector('.wish-icon');
       if (icon) icon.textContent = on ? '❤️' : '🤍';
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.classList.toggle('is-wished', on);   // drives the heartbeat animation
     });
   }
   window.dccSyncWishButtons = syncWishButtons;
@@ -129,7 +140,8 @@ const hs = await getSettings();
     const btn = e.target.closest('.wish-btn'); if (!btn) return;
     e.preventDefault(); e.stopPropagation();
     const d = btn.dataset;
-    wishToggle({ id: d.wishId, slug: d.wishSlug, title: d.wishTitle, price: Number(d.wishPrice) || 0, img: d.wishImg || '' });
+    const added = wishToggle({ id: d.wishId, slug: d.wishSlug, title: d.wishTitle, price: Number(d.wishPrice) || 0, img: d.wishImg || '' });
+    if (added) { btn.classList.add('just-wished'); setTimeout(() => btn.classList.remove('just-wished'), 700); }
   });
 
   // ── Instant search typeahead ──────────────────────────────────────

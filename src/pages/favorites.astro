@@ -8,11 +8,14 @@ import Footer from '../components/Footer.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import RecentlyViewed from '../components/RecentlyViewed.astro';
 ---
-<Base title="Your favorites · DigitalChiselCo" description="Designs you have saved for later.">
+<Base title="Your Wishlist · DigitalChiselCo" description="Designs you have saved to your wishlist.">
   <Header />
   <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-    <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Favorites' }]} />
-    <h1 class="text-2xl md:text-3xl mt-2 mb-1">Your favorites ❤</h1>
+    <Breadcrumbs crumbs={[{ label: 'Wishlist' }]} />
+    <div class="flex items-center justify-between gap-3 flex-wrap mt-2 mb-1">
+      <h1 class="text-2xl md:text-3xl">Your Wishlist <span class="text-red-500">❤</span> <span id="wish-num" class="text-ink-700/50 text-lg"></span></h1>
+      <button id="wish-addall" class="hidden text-sm bg-bronze-600 text-cream px-4 py-2 rounded-md hover:bg-bronze-700 transition">Add all to cart</button>
+    </div>
     <p class="text-sm text-ink-700/70 mb-6">Designs you saved for later. They live in this browser, add to cart whenever you are ready.</p>
 
     <div id="wish-empty" class="hidden text-center py-16">
@@ -34,7 +37,11 @@ import RecentlyViewed from '../components/RecentlyViewed.astro';
     try { list = JSON.parse(localStorage.getItem('dcc_wishlist') || '[]'); } catch {}
     const grid = document.getElementById('wish-grid');
     const empty = document.getElementById('wish-empty');
+    const num = document.getElementById('wish-num');
+    const addAll = document.getElementById('wish-addall');
     if (!grid || !empty) return;
+    if (num) num.textContent = list.length ? `(${list.length})` : '';
+    if (addAll) addAll.classList.toggle('hidden', list.length === 0);
     if (!list.length) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
     grid.innerHTML = list.map((p) => `
@@ -56,6 +63,17 @@ import RecentlyViewed from '../components/RecentlyViewed.astro';
     const btn = e.target.closest('.wish-remove'); if (!btn) return;
     e.preventDefault();
     if (window.DCCWish) { window.DCCWish.toggle({ id: btn.dataset.id }); render(); }
+  });
+  // Add every saved design to the cart at once
+  document.getElementById('wish-addall')?.addEventListener('click', () => {
+    let list = [], cart = [];
+    try { list = JSON.parse(localStorage.getItem('dcc_wishlist') || '[]'); } catch {}
+    try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch {}
+    const have = new Set(cart.map((x) => x.id));
+    for (const p of list) if (!have.has(p.id)) cart.push({ id: p.id, slug: p.slug, title: p.title, price: Number(p.price) || 0, img: p.img || '' });
+    localStorage.setItem('cart', JSON.stringify(cart));
+    window.dispatchEvent(new Event('cart-changed'));
+    window.location.href = '/cart';
   });
   window.addEventListener('wish-changed', render);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render, { once: true }); else render();
