@@ -87,6 +87,20 @@ const hs = await getSettings();
     </nav>
   </div>
 </aside>
+
+<!-- Slide-out mini-cart -->
+<div id="dcc-cart-overlay" class="hidden fixed inset-0 bg-black/40 z-40" aria-hidden="true"></div>
+<aside id="dcc-cart-drawer" class="fixed top-0 right-0 h-full w-[330px] max-w-[88vw] bg-white shadow-xl z-50 translate-x-full transition-transform duration-200 flex flex-col" role="dialog" aria-modal="true" aria-label="Cart">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-black/10">
+    <span class="font-serif text-bronze-700">Your cart <span class="cart-count text-bronze-600 text-sm"></span></span>
+    <button id="dcc-cart-close" class="text-bronze-700 text-2xl leading-none w-9 h-9 rounded hover:bg-cream" aria-label="Close cart">✕</button>
+  </div>
+  <div id="dcc-cart-items" class="flex-1 overflow-y-auto p-3"></div>
+  <div class="border-t border-black/10 p-4">
+    <div class="flex justify-between text-sm mb-3"><span>Subtotal</span><span id="dcc-cart-subtotal" class="font-medium text-ink-800">$0.00</span></div>
+    <a href="/cart" class="dcc-cart-go block text-center bg-bronze-600 text-cream py-2.5 rounded-md hover:bg-bronze-700 transition">View cart &amp; checkout</a>
+  </div>
+</aside>
 <SocialProof />
 <MobileBottomBar />
 <style is:global>
@@ -145,6 +159,44 @@ const hs = await getSettings();
     const added = wishToggle({ id: d.wishId, slug: d.wishSlug, title: d.wishTitle, price: Number(d.wishPrice) || 0, img: d.wishImg || '' });
     if (added) { btn.classList.add('just-wished'); setTimeout(() => btn.classList.remove('just-wished'), 700); }
   });
+
+  // ── Slide-out mini-cart ────────────────────────────────────────────
+  const cartDrawer = document.getElementById('dcc-cart-drawer');
+  const cartOverlay = document.getElementById('dcc-cart-overlay');
+  function esc(s) { return String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  function renderMiniCart() {
+    let items = []; try { items = JSON.parse(localStorage.getItem('cart') || '[]'); } catch {}
+    const box = document.getElementById('dcc-cart-items'); const sub = document.getElementById('dcc-cart-subtotal');
+    if (!box) return;
+    if (!items.length) { box.innerHTML = '<p class="text-sm text-ink-700/60 text-center py-12">Your cart is empty.</p>'; if (sub) sub.textContent = '$0.00'; return; }
+    let total = 0;
+    box.innerHTML = items.map((p) => { total += Number(p.price) || 0; return '<div class="flex items-center gap-2 py-2 border-b border-black/5">'
+      + (p.img ? '<img src="' + esc(p.img) + '" class="w-12 h-12 rounded object-cover shrink-0" alt="">' : '')
+      + '<a href="/product/' + esc(p.slug) + '" class="flex-1 min-w-0"><div class="text-sm text-ink-800 line-clamp-2">' + esc(p.title) + '</div><div class="text-xs text-bronze-600">$' + (Number(p.price) || 0).toFixed(2) + '</div></a>'
+      + '<button class="mini-cart-remove text-ink-700/40 hover:text-red-500 text-xl leading-none" data-id="' + esc(p.id) + '" aria-label="Remove">&times;</button></div>'; }).join('');
+    if (sub) { sub.textContent = '$' + total.toFixed(2); if (window.dccConvertCcy) window.dccConvertCcy(); }
+  }
+  function openCart() { renderMiniCart(); cartDrawer?.classList.remove('translate-x-full'); cartOverlay?.classList.remove('hidden'); document.documentElement.style.overflow = 'hidden'; }
+  function closeCart() { cartDrawer?.classList.add('translate-x-full'); cartOverlay?.classList.add('hidden'); document.documentElement.style.overflow = ''; }
+  window.dccOpenCart = openCart;
+  document.getElementById('dcc-cart-close')?.addEventListener('click', closeCart);
+  cartOverlay?.addEventListener('click', closeCart);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCart(); });
+  // clicking a cart icon opens the drawer (except on /cart, and the drawer's own link)
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href="/cart"]'); if (!a) return;
+    if (location.pathname === '/cart' || a.classList.contains('dcc-cart-go')) return;
+    e.preventDefault(); openCart();
+  });
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('.mini-cart-remove'); if (!b) return;
+    e.preventDefault();
+    let items = []; try { items = JSON.parse(localStorage.getItem('cart') || '[]'); } catch {}
+    items = items.filter((x) => x.id !== b.dataset.id);
+    localStorage.setItem('cart', JSON.stringify(items));
+    window.dispatchEvent(new Event('cart-changed')); renderMiniCart();
+  });
+  window.addEventListener('cart-changed', () => { if (cartDrawer && !cartDrawer.classList.contains('translate-x-full')) renderMiniCart(); });
 
   // ── Instant search typeahead ──────────────────────────────────────
   document.querySelectorAll('.dcc-search').forEach((form) => {
@@ -241,10 +293,12 @@ const hs = await getSettings();
     e.preventDefault();
     const d = btn.dataset;
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    if (cart.find((x) => x.id === d.id)) { window.location.href = '/cart'; return; } // already added → go to cart
+    const onCartPage = location.pathname === '/cart';
+    if (cart.find((x) => x.id === d.id)) { if (onCartPage) { window.location.href = '/cart'; } else if (window.dccOpenCart) { window.dccOpenCart(); } return; }
     cart.push({ id: d.id, slug: d.slug, title: d.title, price: Number(d.price), img: d.img });
     localStorage.setItem('cart', JSON.stringify(cart));
     window.dispatchEvent(new Event('cart-changed'));
     syncCartButtons();
+    if (!onCartPage && window.dccOpenCart) window.dccOpenCart();   // slide-out mini-cart
   });
 </script>
