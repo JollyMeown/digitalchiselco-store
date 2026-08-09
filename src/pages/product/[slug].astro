@@ -4,7 +4,7 @@ import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import RecentlyViewed from '../../components/RecentlyViewed.astro';
 import TrustBadges from '../../components/TrustBadges.astro';
-import { getProductBySlug, getRelatedProducts, getSettings } from '../../lib/queries';
+import { getProductBySlug, getRelatedProducts, getSettings, getSoldCount } from '../../lib/queries';
 import { pricing, money } from '../../lib/pricing';
 import { jsonLd } from '../../lib/jsonld';
 import { img } from '../../lib/img';
@@ -20,6 +20,7 @@ const cat = cats[0];
 const cleanTitle = p.title.split('|')[0].trim();
 const gallery: string[] = (Array.isArray(p.gallery) && p.gallery.length ? p.gallery : [p.image_url]).filter(Boolean);
 const related = await getRelatedProducts(p.id, 5);
+const soldCount = await getSoldCount(p.id);
 
 // Social proof: two CURATED reviews (generic=true — English, 5★, never naming a
 // specific design so they read true under any product), rotated per product via
@@ -175,6 +176,12 @@ const breadcrumbLd = {
         data-wish-id={p.id} data-wish-slug={p.slug} data-wish-title={cleanTitle} data-wish-price={price} data-wish-img={gallery[0] || ''}>
         <span class="wish-icon">🤍</span> Save to favorites
       </button>
+
+      {soldCount >= 5 && (
+        <p class="mt-3 text-sm text-green-700 flex items-center gap-1.5">
+          <span aria-hidden="true">🔥</span> <span><strong>{soldCount.toLocaleString()}</strong> makers already own this design</span>
+        </p>
+      )}
 
       <ul class="mt-6 text-sm text-ink-700 space-y-1.5">
         <li>📦 Instant digital download (STL file)</li>

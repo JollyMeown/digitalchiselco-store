@@ -1,5 +1,6 @@
 ---
 import Logo from './Logo.astro';
+import SocialProof from './SocialProof.astro';
 import { getCategories, getSettings } from '../lib/queries';
 // desk: 'none' → mobile drawer only (the logo already links Home);
 // desk: 'xl'   → desktop nav only from 1280px up (keeps the row from
@@ -81,6 +82,7 @@ const hs = await getSettings();
     </nav>
   </div>
 </aside>
+<SocialProof />
 <script is:inline>
   function cartCount() { try { return JSON.parse(localStorage.getItem('cart') || '[]').length; } catch { return 0; } }
   function renderCartCount() { const n = cartCount(); document.querySelectorAll('.cart-count').forEach((el) => { el.textContent = n > 0 ? `(${n})` : ''; }); }

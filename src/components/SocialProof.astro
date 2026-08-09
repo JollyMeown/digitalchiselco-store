@@ -1,0 +1,51 @@
+---
+// Real-time social-proof popups: cycles recent purchases in a small toast at
+// the bottom-left. Data from /api/social-proof (anonymized). Self-contained;
+// include once (it lives in Header so it appears site-wide).
+---
+<div id="dcc-proof" class="fixed bottom-4 left-4 z-40 max-w-[300px] hidden">
+  <div class="flex items-center gap-3 bg-white border border-black/10 shadow-lg rounded-xl p-2.5 pr-3">
+    <img id="dcc-proof-img" src="" alt="" width="44" height="44" class="w-11 h-11 rounded-lg object-cover bg-cream shrink-0" />
+    <div class="min-w-0">
+      <div class="text-[13px] text-ink-800 leading-tight"><span class="font-medium">Someone</span> just grabbed</div>
+      <a id="dcc-proof-link" href="#" class="text-[13px] text-bronze-700 font-medium leading-tight line-clamp-1 hover:underline">a design</a>
+      <div id="dcc-proof-time" class="text-[11px] text-ink-700/55 mt-0.5">just now</div>
+    </div>
+    <button id="dcc-proof-x" class="text-ink-700/40 hover:text-ink-700 text-lg leading-none self-start" aria-label="Dismiss">×</button>
+  </div>
+</div>
+<script is:inline>
+  (function () {
+    if (sessionStorage.getItem('dcc_proof_off')) return;
+    var box = document.getElementById('dcc-proof');
+    if (!box) return;
+    var img = document.getElementById('dcc-proof-img');
+    var link = document.getElementById('dcc-proof-link');
+    var time = document.getElementById('dcc-proof-time');
+    document.getElementById('dcc-proof-x').addEventListener('click', function () { box.classList.add('hidden'); sessionStorage.setItem('dcc_proof_off', '1'); });
+    function ago(iso) {
+      if (!iso) return 'recently';
+      var s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+      if (s < 90) return 'just now';
+      var m = Math.floor(s / 60); if (m < 60) return m + ' min ago';
+      var h = Math.floor(m / 60); if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
+      var d = Math.floor(h / 24); return d + (d === 1 ? ' day ago' : ' days ago');
+    }
+    var items = [], i = 0, timer;
+    function show() {
+      if (!items.length) return;
+      var it = items[i % items.length]; i++;
+      if (it.image_url) { img.src = it.image_url; img.style.display = ''; } else { img.style.display = 'none'; }
+      link.textContent = it.title || 'a design';
+      link.href = it.slug ? '/product/' + it.slug : '/catalog';
+      time.textContent = ago(it.at);
+      box.classList.remove('hidden');
+      clearTimeout(timer);
+      timer = setTimeout(function () { box.classList.add('hidden'); timer = setTimeout(show, 8000); }, 6000);
+    }
+    fetch('/api/social-proof').then(function (r) { return r.json(); }).then(function (d) {
+      items = (d && d.items) || [];
+      if (items.length) setTimeout(show, 4000);
+    }).catch(function () {});
+  })();
+</script>

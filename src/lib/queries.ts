@@ -113,6 +113,14 @@ export async function getRelatedProducts(excludeId: string, limit = 5) {
   } catch (e) { console.error('getRelatedProducts failed:', e); return []; }
 }
 
+// Lifetime units sold for a product (social proof on the product page).
+export async function getSoldCount(productId: string): Promise<number> {
+  try {
+    const { count } = await supabase.from('order_items').select('id', { count: 'exact', head: true }).eq('product_id', productId);
+    return count || 0;
+  } catch { return 0; }
+}
+
 export async function getCategories() {
   try {
     const { data, error } = await supabase.from('categories').select('*').order('sort_order');
