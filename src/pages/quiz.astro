@@ -1,0 +1,125 @@
+---
+// "Find your next design" quiz funnel. Two quick picks (machine + themes) →
+// personalized design matches, with an optional email capture. Fully client-
+// rendered against /api/recommend, so it needs no server data.
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+
+const themes = [
+  { slug: 'skull-designs', label: '💀 Skulls' },
+  { slug: 'wildlife-animals', label: '🦌 Wildlife' },
+  { slug: 'religious-christian', label: '✝️ Religious' },
+  { slug: 'western-cowboy', label: '🤠 Western' },
+  { slug: 'fishing-nautical', label: '🎣 Fishing & Nautical' },
+  { slug: 'floral-botanical', label: '🌹 Floral' },
+  { slug: 'memorial-pet', label: '🐾 Pet Memorial' },
+  { slug: 'patriotic-military', label: '🇺🇸 Patriotic' },
+  { slug: 'gothic-dark', label: '🦇 Gothic' },
+];
+---
+<Base title="Find Your Next Design — Design Finder | DigitalChiselCo" description="Answer two quick questions and get bas-relief STL designs matched to your machine and style.">
+  <Header />
+  <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+    <Breadcrumbs crumbs={[{ label: 'Design finder' }]} />
+    <h1 class="text-2xl md:text-3xl mt-2 mb-1">Find your next design 🎯</h1>
+    <p class="text-sm text-ink-700/70 mb-6">Two quick picks and we will match designs to your machine and taste.</p>
+
+    <!-- Step 1: machine -->
+    <div id="q-step1" class="quiz-step">
+      <h2 class="text-lg mb-3">1. What do you carve with?</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {['CNC router', 'Laser engraver', '3D printer', 'A bit of everything'].map((m) => (
+          <button class="q-machine border border-black/15 rounded-lg py-4 hover:border-bronze-600 hover:bg-cream/40 transition text-sm font-medium" data-machine={m}>{m}</button>
+        ))}
+      </div>
+    </div>
+
+    <!-- Step 2: themes -->
+    <div id="q-step2" class="quiz-step hidden">
+      <h2 class="text-lg mb-3">2. Which themes do you love? <span class="text-sm text-ink-700/60 font-normal">(pick a few)</span></h2>
+      <div class="flex flex-wrap gap-2 mb-5">
+        {themes.map((t) => (
+          <button class="q-theme border border-black/15 rounded-full px-4 py-2 text-sm hover:border-bronze-600 transition" data-theme={t.slug} aria-pressed="false">{t.label}</button>
+        ))}
+      </div>
+      <button id="q-go" class="bg-bronze-600 text-cream px-6 py-2.5 rounded-md hover:bg-bronze-700 transition disabled:opacity-40" disabled>Show my matches →</button>
+    </div>
+
+    <!-- Results -->
+    <div id="q-results" class="hidden">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg">Your matches</h2>
+        <button id="q-restart" class="text-sm text-bronze-700 hover:underline">↺ Start over</button>
+      </div>
+      <div class="mb-5 rounded-lg bg-cream/50 border border-bronze-600/20 p-4">
+        <p class="text-sm text-ink-800">Save your favorites (❤ on any design) and use code <strong class="font-mono">THANKYOU10</strong> for 10% off your first order.</p>
+        <form id="q-sub" class="mt-3 flex gap-2 max-w-sm">
+          <input type="email" id="q-email" placeholder="Email me new designs like these" class="flex-1 px-3 py-2 text-sm rounded-md border border-black/15 focus:outline-none focus:border-bronze-600" />
+          <button class="bg-bronze-600 text-cream px-4 rounded-md text-sm">Notify me</button>
+        </form>
+        <p id="q-sub-msg" class="text-xs text-green-700 mt-1"></p>
+      </div>
+      <div id="q-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+    </div>
+  </main>
+  <Footer />
+</Base>
+
+<script is:inline>
+  (function () {
+    const picked = new Set();
+    const step1 = document.getElementById('q-step1');
+    const step2 = document.getElementById('q-step2');
+    const results = document.getElementById('q-results');
+    const goBtn = document.getElementById('q-go');
+
+    document.querySelectorAll('.q-machine').forEach((b) => b.addEventListener('click', () => {
+      step1.classList.add('hidden'); step2.classList.remove('hidden'); window.scrollTo({ top: 0, behavior: 'smooth' });
+    }));
+    document.querySelectorAll('.q-theme').forEach((b) => b.addEventListener('click', () => {
+      const t = b.dataset.theme; const on = picked.has(t);
+      if (on) { picked.delete(t); b.classList.remove('bg-bronze-600', 'text-cream', 'border-bronze-600'); b.setAttribute('aria-pressed', 'false'); }
+      else { picked.add(t); b.classList.add('bg-bronze-600', 'text-cream', 'border-bronze-600'); b.setAttribute('aria-pressed', 'true'); }
+      goBtn.disabled = picked.size === 0;
+    }));
+
+    function card(p) {
+      const title = (p.title || '').split('|')[0].trim();
+      return `<div class="group border border-black/10 rounded-md overflow-hidden bg-white flex flex-col">
+        <a href="/product/${p.slug}" class="relative block aspect-square bg-cream overflow-hidden">
+          ${p.image_url ? `<img src="${p.image_url}" alt="${title.replace(/"/g,'&quot;')}" loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.03] transition" />` : ''}
+          <button type="button" class="wish-btn absolute top-2 right-2 w-8 h-8 rounded-full bg-white/85 flex items-center justify-center text-base shadow-sm" data-wish-id="${p.id}" data-wish-slug="${p.slug}" data-wish-title="${title.replace(/"/g,'&quot;')}" data-wish-price="${p.price_usd||0}" data-wish-img="${p.image_url||''}"><span class="wish-icon">🤍</span></button>
+        </a>
+        <div class="p-3 flex flex-col flex-1">
+          <a href="/product/${p.slug}"><h3 class="text-sm leading-snug line-clamp-2 text-ink-800 min-h-[2.5em]">${title}</h3></a>
+          <span class="text-bronze-600 text-sm font-medium mt-1">$${Number(p.price_usd||0).toFixed(2)}</span>
+          <button class="add-to-cart mt-2 w-full text-xs border border-bronze-600 text-bronze-700 py-1.5 rounded hover:bg-bronze-600 hover:text-cream transition" data-id="${p.id}" data-slug="${p.slug}" data-title="${title.replace(/"/g,'&quot;')}" data-price="${p.price_usd||0}" data-img="${p.image_url||''}">Add to cart</button>
+        </div>
+      </div>`;
+    }
+    goBtn.addEventListener('click', async () => {
+      goBtn.disabled = true; goBtn.textContent = 'Finding…';
+      const r = await fetch('/api/recommend?themes=' + [...picked].join(',')).then((r) => r.json()).catch(() => ({ items: [] }));
+      document.getElementById('q-grid').innerHTML = (r.items || []).map(card).join('') || '<p class="text-ink-700/60">No exact matches — <a href="/catalog" class="text-bronze-700">browse the full catalog →</a></p>';
+      step2.classList.add('hidden'); results.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (window.dccSyncCartButtons) window.dccSyncCartButtons();
+      if (window.dccSyncWishButtons) window.dccSyncWishButtons();
+    });
+    document.getElementById('q-restart').addEventListener('click', () => {
+      results.classList.add('hidden'); step1.classList.remove('hidden'); picked.clear();
+      document.querySelectorAll('.q-theme').forEach((b) => { b.classList.remove('bg-bronze-600', 'text-cream', 'border-bronze-600'); b.setAttribute('aria-pressed', 'false'); });
+      goBtn.disabled = true; goBtn.textContent = 'Show my matches →';
+    });
+    document.getElementById('q-sub').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('q-email').value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return;
+      try { localStorage.setItem('dcc_email', email); } catch {}
+      try { await fetch('/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, source: 'quiz' }) }); } catch {}
+      document.getElementById('q-sub-msg').textContent = '✓ You are on the list — check your inbox to confirm.';
+    });
+  })();
+</script>
