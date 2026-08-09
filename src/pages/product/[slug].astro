@@ -128,6 +128,13 @@ const breadcrumbLd = {
           ))}
         </div>
       )}
+      {p.video_url && (
+        <div class="mt-3">
+          <div class="text-xs font-medium text-ink-700/60 mb-1">🎬 Watch it in motion</div>
+          <video src={p.video_url} poster={p.video_thumb} controls muted loop autoplay playsinline preload="none"
+            class="w-full rounded-lg bg-black aspect-square object-cover"></video>
+        </div>
+      )}
     </div>
 
     <!-- details -->
