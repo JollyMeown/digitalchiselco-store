@@ -52,12 +52,13 @@ import RecentlyViewed from '../components/RecentlyViewed.astro';
         </a>
         <div class="p-3 flex flex-col flex-1">
           <a href="/product/${p.slug}" class="block"><h3 class="text-sm leading-snug line-clamp-2 text-ink-800 min-h-[2.5em]">${p.title || ''}</h3></a>
-          <span class="text-bronze-600 text-sm font-medium mt-1">$${Number(p.price || 0).toFixed(2)}</span>
+          <span class="text-bronze-600 text-sm font-medium mt-1" data-usd="${Number(p.price || 0)}">$${Number(p.price || 0).toFixed(2)}</span>
           <button class="add-to-cart mt-2 w-full text-xs border border-bronze-600 text-bronze-700 py-1.5 rounded hover:bg-bronze-600 hover:text-cream transition"
             data-id="${p.id}" data-slug="${p.slug}" data-title="${(p.title || '').replace(/"/g, '&quot;')}" data-price="${p.price || 0}" data-img="${p.img || ''}">Add to cart</button>
         </div>
       </div>`).join('');
     if (window.dccSyncCartButtons) window.dccSyncCartButtons();
+    if (window.dccConvertCcy) window.dccConvertCcy();
   }
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('.wish-remove'); if (!btn) return;

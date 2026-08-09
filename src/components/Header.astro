@@ -1,6 +1,7 @@
 ---
 import Logo from './Logo.astro';
 import SocialProof from './SocialProof.astro';
+import MobileBottomBar from './MobileBottomBar.astro';
 import { getCategories, getSettings } from '../lib/queries';
 // desk: 'none' → mobile drawer only (the logo already links Home);
 // desk: 'xl'   → desktop nav only from 1280px up (keeps the row from
@@ -17,8 +18,8 @@ const links = [
   { href: '/laser-studio', label: 'Laser Studio', desk: 'xl' },
   { href: '/about', label: 'Our story', desk: 'xl' },
   { href: '/blog', label: 'Blog', desk: 'xl' },
-  { href: '/requests', label: 'Request a design', desk: 'xl' },
-  { href: '/account', label: 'User Portal' },
+  { href: '/requests', label: 'Request a design', desk: 'none' },
+  { href: '/account', label: 'Account' },
 ];
 const q = Astro.url.searchParams.get('q') ?? '';
 const categories = await getCategories();
@@ -29,7 +30,7 @@ const hs = await getSettings();
   Instant digital download · Commercial use included · {Number(hs.rating) || 4.9}★ from {Number(hs.reviews_count).toLocaleString()} reviews
 </div>
 <header class="sticky top-0 bg-white z-30 border-b border-black/10">
-  <nav class="flex items-center gap-3 px-4 sm:px-6 py-3 max-w-7xl mx-auto">
+  <nav class="flex items-center gap-3 px-4 sm:px-6 py-3 max-w-[1600px] mx-auto">
     <!-- Hamburger: visible on mobile/tablet only -->
     <button id="dcc-menu-open" class="lg:hidden shrink-0 text-bronze-700 text-2xl leading-none w-9 h-9 -ml-1 rounded hover:bg-cream" aria-label="Open menu" aria-controls="dcc-drawer" aria-expanded="false">☰</button>
     <div class="shrink-0"><Logo /></div>
@@ -87,6 +88,7 @@ const hs = await getSettings();
   </div>
 </aside>
 <SocialProof />
+<MobileBottomBar />
 <style is:global>
   /* Heartbeat for saved (red) hearts — gentle continuous pulse, plus a bigger
      pop the moment one is added. Respects reduced-motion preferences. */

@@ -94,7 +94,7 @@ const themes = [
         </a>
         <div class="p-3 flex flex-col flex-1">
           <a href="/product/${p.slug}"><h3 class="text-sm leading-snug line-clamp-2 text-ink-800 min-h-[2.5em]">${title}</h3></a>
-          <span class="text-bronze-600 text-sm font-medium mt-1">$${Number(p.price_usd||0).toFixed(2)}</span>
+          <span class="text-bronze-600 text-sm font-medium mt-1" data-usd="${Number(p.price_usd||0)}">$${Number(p.price_usd||0).toFixed(2)}</span>
           <button class="add-to-cart mt-2 w-full text-xs border border-bronze-600 text-bronze-700 py-1.5 rounded hover:bg-bronze-600 hover:text-cream transition" data-id="${p.id}" data-slug="${p.slug}" data-title="${title.replace(/"/g,'&quot;')}" data-price="${p.price_usd||0}" data-img="${p.image_url||''}">Add to cart</button>
         </div>
       </div>`;
@@ -107,6 +107,7 @@ const themes = [
       window.scrollTo({ top: 0, behavior: 'smooth' });
       if (window.dccSyncCartButtons) window.dccSyncCartButtons();
       if (window.dccSyncWishButtons) window.dccSyncWishButtons();
+      if (window.dccConvertCcy) window.dccConvertCcy();
     });
     document.getElementById('q-restart').addEventListener('click', () => {
       results.classList.add('hidden'); step1.classList.remove('hidden'); picked.clear();

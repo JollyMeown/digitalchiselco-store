@@ -1,0 +1,30 @@
+---
+// Thumb-reachable bottom navigation for phones/tablets (hidden on lg+). Reuses
+// the existing .wish-count / .cart-count spans, which the header script keeps
+// updated, so the badges here stay in sync automatically.
+---
+<nav class="dcc-bottombar lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-black/10 flex justify-around items-stretch text-[10px] text-ink-700"
+  aria-label="Quick navigation">
+  <a href="/" class="flex flex-col items-center justify-center gap-0.5 py-1.5 flex-1 hover:text-bronze-600">
+    <span class="text-[19px] leading-none" aria-hidden="true">🏠</span>Home
+  </a>
+  <a href="/catalog" class="flex flex-col items-center justify-center gap-0.5 py-1.5 flex-1 hover:text-bronze-600">
+    <span class="text-[19px] leading-none" aria-hidden="true">🔍</span>Browse
+  </a>
+  <a href="/favorites" class="flex flex-col items-center justify-center gap-0.5 py-1.5 flex-1 hover:text-bronze-600" aria-label="Wishlist">
+    <span class="text-[19px] leading-none text-red-500" aria-hidden="true">❤</span>
+    <span>Wishlist <span class="wish-count text-bronze-600 font-medium"></span></span>
+  </a>
+  <a href="/cart" class="flex flex-col items-center justify-center gap-0.5 py-1.5 flex-1 hover:text-bronze-600" aria-label="Cart">
+    <span class="text-[19px] leading-none" aria-hidden="true">🛒</span>
+    <span>Cart <span class="cart-count text-bronze-600 font-medium"></span></span>
+  </a>
+  <a href="/account" class="flex flex-col items-center justify-center gap-0.5 py-1.5 flex-1 hover:text-bronze-600">
+    <span class="text-[19px] leading-none" aria-hidden="true">👤</span>Account
+  </a>
+</nav>
+<style is:global>
+  /* leave room so the fixed bar never covers page content / footer on mobile */
+  @media (max-width: 1023px) { body { padding-bottom: calc(3.5rem + env(safe-area-inset-bottom)); } }
+  .dcc-bottombar { padding-bottom: env(safe-area-inset-bottom); }
+</style>
