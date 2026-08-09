@@ -34,6 +34,41 @@ export function isResendConfigured(): boolean {
   return !!env('RESEND_API_KEY');
 }
 
+// ── Global rate limiter ──────────────────────────────────────────────
+// Resend's API allows a fixed number of requests per second (default 2; raise
+// RESEND_MAX_RPS if your account limit is higher). EVERY call to the Resend API
+// funnels through resendFetch(), which (a) serializes calls, (b) spaces them so
+// we never exceed that rate, and (c) auto-retries on HTTP 429 honoring the
+// reset header. This holds whether the list is 100 or 100K: the batch loop just
+// takes proportionally longer, it never trips the limit or drops mail.
+const MAX_RPS = Math.max(1, Number(env('RESEND_MAX_RPS')) || 2);
+const MIN_GAP_MS = Math.ceil(1000 / MAX_RPS);
+const MAX_429_RETRIES = 6;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+let chain: Promise<unknown> = Promise.resolve();
+let lastCallAt = 0;
+
+async function resendFetch(url: string, headers: Record<string, string>, body: string): Promise<{ res: Response; data: any }> {
+  const task = chain.then(async () => {
+    for (let attempt = 0; ; attempt++) {
+      const gap = MIN_GAP_MS - (Date.now() - lastCallAt);
+      if (gap > 0) await sleep(gap);
+      lastCallAt = Date.now();
+      const res = await fetch(url, { method: 'POST', headers, body });
+      if (res.status !== 429 || attempt >= MAX_429_RETRIES) {
+        const data = await res.json().catch(() => ({}));
+        return { res, data };
+      }
+      // Rate limited: wait out the window (honor headers), then retry.
+      const resetS = Number(res.headers.get('retry-after')) || Number(res.headers.get('ratelimit-reset')) || 1;
+      await sleep(Math.min(30000, Math.max(1000, resetS * 1000)));
+    }
+  });
+  // Keep the shared chain alive even if one call rejects.
+  chain = task.then(() => undefined, () => undefined);
+  return task;
+}
+
 export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: string; skipped?: boolean; error?: string }> {
   const key = env('RESEND_API_KEY');
   if (!key) {
@@ -60,8 +95,7 @@ export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: strin
   if (opts.idempotencyKey) headers['idempotency-key'] = opts.idempotencyKey;
 
   try {
-    const res = await fetch('https://api.resend.com/emails', { method: 'POST', headers, body: JSON.stringify(body) });
-    const data: any = await res.json().catch(() => ({}));
+    const { res, data } = await resendFetch('https://api.resend.com/emails', headers, JSON.stringify(body));
     if (!res.ok) {
       console.error('[resend] send failed', res.status, data?.message || data);
       return { ok: false, error: data?.message || `HTTP ${res.status}` };
@@ -88,6 +122,9 @@ export async function sendBatch(
     return { ok: true, sent: 0, skipped: true };
   }
   if (!emails.length) return { ok: true, sent: 0 };
+  // Resend's batch endpoint caps at 100 per call. Callers already chunk, but
+  // warn loudly rather than silently dropping if someone passes more.
+  if (emails.length > 100) console.warn(`[resend] batch given ${emails.length} emails; only the first 100 are sent (chunk before calling)`);
   const from = env('RESEND_FROM') || 'DigitalChiselCo <onboarding@resend.dev>';
   const replyTo = env('RESEND_REPLY_TO');
   const payload = emails.slice(0, 100).map((e) => {
@@ -105,8 +142,7 @@ export async function sendBatch(
   const headers: Record<string, string> = { authorization: `Bearer ${key}`, 'content-type': 'application/json' };
   if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
   try {
-    const res = await fetch('https://api.resend.com/emails/batch', { method: 'POST', headers, body: JSON.stringify(payload) });
-    const data: any = await res.json().catch(() => ({}));
+    const { res, data } = await resendFetch('https://api.resend.com/emails/batch', headers, JSON.stringify(payload));
     if (!res.ok) {
       console.error('[resend] batch failed', res.status, data?.message || data);
       return { ok: false, sent: 0, error: data?.message || `HTTP ${res.status}` };

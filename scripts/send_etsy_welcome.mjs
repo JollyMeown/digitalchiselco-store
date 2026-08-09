@@ -12,6 +12,10 @@ import { etsyWelcomeEmail } from '../.digest_send/marketing-emails.mjs';
 import { sendBatch } from '../.digest_send/resend.mjs';
 
 const APPLY = process.argv.includes('--apply');
+// Optional wave cap: --limit 60 sends only the first 60 pending (dedup means a
+// second run picks up where this one stopped). Lets us send in waves.
+const limArg = process.argv.find((a) => a.startsWith('--limit='));
+const LIMIT = limArg ? Math.max(1, Number(limArg.split('=')[1]) || 0) : Infinity;
 const db = createClient(process.env.PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
 // audience = imported Etsy buyers, confirmed + not unsubscribed
@@ -24,10 +28,11 @@ const { data: done } = await db.from('etsy_welcome_log').select('email').limit(2
 const welcomed = new Set((done || []).map((r) => (r.email || '').toLowerCase().trim()));
 
 const TEST = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
-const audience = [...new Set((subs || []).map((r) => r.email.toLowerCase().trim()))]
+const pendingAll = [...new Set((subs || []).map((r) => r.email.toLowerCase().trim()))]
   .filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !TEST.test(e) && !welcomed.has(e));
+const audience = pendingAll.slice(0, LIMIT);
 
-console.log(`etsy-buyer subscribers: ${subs?.length || 0} · already welcomed: ${welcomed.size} · to send now: ${audience.length}`);
+console.log(`etsy-buyer subscribers: ${subs?.length || 0} · already welcomed: ${welcomed.size} · pending: ${pendingAll.length}${LIMIT !== Infinity ? ` · this wave: ${audience.length}` : ''} · to send now: ${audience.length}`);
 
 // this week's newest designs (up to 12 shown) + total count for the "see all" link
 const sinceIso = new Date(Date.now() - 7 * 86400000).toISOString();
