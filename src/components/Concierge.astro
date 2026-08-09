@@ -1,0 +1,76 @@
+---
+// Floating AI design concierge (bottom-right). Answers shop/compatibility
+// questions and recommends real designs via /api/concierge (Claude Haiku).
+// Self-contained; included once in the Header so it appears site-wide.
+---
+<button id="cc-fab" class="fixed bottom-20 lg:bottom-5 right-4 z-40 flex items-center gap-2 bg-bronze-600 text-cream rounded-full shadow-lg pl-3 pr-4 py-2.5 hover:bg-bronze-700 transition" aria-label="Open design help">
+  <span class="text-lg leading-none" aria-hidden="true">💬</span><span class="text-sm font-medium">Need help?</span>
+</button>
+
+<div id="cc-panel" class="hidden fixed bottom-20 lg:bottom-5 right-4 z-50 w-[92vw] max-w-[380px] h-[70vh] max-h-[560px] bg-white rounded-2xl shadow-2xl border border-black/10 flex flex-col overflow-hidden">
+  <div class="bg-bronze-800 text-cream px-4 py-3 flex items-center gap-2">
+    <span class="text-lg" aria-hidden="true">🪵</span>
+    <div class="leading-tight">
+      <div class="text-sm font-medium">Design concierge</div>
+      <div class="text-[11px] text-cream/70">Ask about designs, machines &amp; more</div>
+    </div>
+    <button id="cc-close" class="ml-auto text-cream/80 hover:text-cream text-xl leading-none" aria-label="Close">×</button>
+  </div>
+  <div id="cc-log" class="flex-1 overflow-y-auto p-3 space-y-2.5 text-sm bg-cream/30"></div>
+  <form id="cc-form" class="border-t border-black/10 p-2 flex gap-2">
+    <input id="cc-input" type="text" autocomplete="off" placeholder="e.g. skulls for my X-Carve?" class="flex-1 px-3 py-2 text-sm rounded-md border border-black/15 focus:outline-none focus:border-bronze-600" />
+    <button class="bg-bronze-600 text-cream px-3 rounded-md text-sm hover:bg-bronze-700 transition" aria-label="Send">Send</button>
+  </form>
+</div>
+
+<script is:inline>
+  (function () {
+    const fab = document.getElementById('cc-fab');
+    const panel = document.getElementById('cc-panel');
+    const log = document.getElementById('cc-log');
+    const form = document.getElementById('cc-form');
+    const input = document.getElementById('cc-input');
+    if (!fab || !panel) return;
+    const history = [];
+    let busy = false, greeted = false;
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function linkify(s) { return esc(s).replace(/(https?:\/\/[^\s)]+)/g, '<a href="$1" class="text-bronze-700 underline" target="_blank" rel="noreferrer">$1</a>'); }
+    function bubble(role, text) {
+      const wrap = document.createElement('div');
+      wrap.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
+      wrap.innerHTML = '<div class="' + (role === 'user' ? 'bg-bronze-600 text-cream' : 'bg-white border border-black/10 text-ink-800') + ' rounded-2xl px-3 py-2 max-w-[85%] whitespace-pre-wrap leading-snug">' + linkify(text) + '</div>';
+      log.appendChild(wrap); log.scrollTop = log.scrollHeight;
+      return wrap;
+    }
+    function open() {
+      panel.classList.remove('hidden'); fab.classList.add('hidden');
+      if (!greeted) { greeted = true; bubble('assistant', "Hi! I can help you find designs and answer questions about our STL files, machines and licensing. What are you working on? 🪵"); }
+      setTimeout(() => input.focus(), 50);
+    }
+    function close() { panel.classList.add('hidden'); fab.classList.remove('hidden'); }
+    fab.addEventListener('click', open);
+    document.getElementById('cc-close').addEventListener('click', close);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const q = input.value.trim();
+      if (!q || busy) return;
+      input.value = '';
+      bubble('user', q);
+      history.push({ role: 'user', content: q });
+      busy = true;
+      const typing = bubble('assistant', '…');
+      try {
+        const r = await fetch('/api/concierge', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: history }) });
+        const d = await r.json();
+        const reply = d.reply || d.error || 'Sorry, please try again.';
+        typing.querySelector('div').innerHTML = linkify(reply);
+        if (d.reply) history.push({ role: 'assistant', content: d.reply });
+      } catch {
+        typing.querySelector('div').textContent = 'Connection issue — please try again.';
+      }
+      log.scrollTop = log.scrollHeight; busy = false;
+    });
+  })();
+</script>

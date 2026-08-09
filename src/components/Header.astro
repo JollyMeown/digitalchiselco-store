@@ -2,6 +2,7 @@
 import Logo from './Logo.astro';
 import SocialProof from './SocialProof.astro';
 import MobileBottomBar from './MobileBottomBar.astro';
+import Concierge from './Concierge.astro';
 import { getCategories, getSettings } from '../lib/queries';
 // desk: 'none' → mobile drawer only (the logo already links Home);
 // desk: 'xl'   → desktop nav only from 1280px up (keeps the row from
@@ -103,6 +104,7 @@ const hs = await getSettings();
 </aside>
 <SocialProof />
 <MobileBottomBar />
+<Concierge />
 <style is:global>
   /* Heartbeat for saved (red) hearts — gentle continuous pulse, plus a bigger
      pop the moment one is added. Respects reduced-motion preferences. */
