@@ -1,0 +1,20 @@
+---
+// Hub page linking every SEO landing topic — gives Google a crawlable index and
+// gives shoppers a themed way in.
+import Shell from '../../layouts/Shell.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { LANDING_TOPICS } from '../../lib/landing';
+---
+<Shell title="Browse Designs by Theme & Machine | DigitalChiselCo" description="Explore bas-relief STL files by theme and machine — skulls, wildlife, religious, western, fishing and more, for CNC routers, laser engravers and 3D printers." scrollPastBanner={true}>
+  <Breadcrumbs crumbs={[{ label: 'Designs' }]} />
+  <h1 class="text-2xl md:text-3xl mb-2">Browse designs by theme &amp; machine</h1>
+  <p class="text-ink-700/80 text-sm mb-6 max-w-3xl">Jump straight to the designs you are after, grouped by subject and by the machine you carve with.</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    {LANDING_TOPICS.map((t) => (
+      <a href={`/designs/${t.slug}`} class="block border border-black/10 rounded-lg p-4 hover:border-bronze-600 hover:bg-cream/40 transition">
+        <div class="font-medium text-ink-800">{t.h1}</div>
+        <div class="text-sm text-ink-700/70 mt-1 line-clamp-2">{t.intro}</div>
+      </a>
+    ))}
+  </div>
+</Shell>

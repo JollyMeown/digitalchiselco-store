@@ -2,6 +2,7 @@
 // every category. Served at /sitemap.xml. Cached at the edge for 1 hour.
 
 import { supabase } from '../lib/supabase';
+import { LANDING_TOPICS } from '../lib/landing';
 
 export const prerender = false;
 
@@ -47,6 +48,10 @@ export async function GET() {
   for (const s of STATIC_PATHS) {
     urls.push(entry(`${SITE}${s.path}`, null, s.changefreq, s.priority));
   }
+
+  // SEO landing pages (themes + machines)
+  urls.push(entry(`${SITE}/designs`, null, 'weekly', 0.7));
+  for (const t of LANDING_TOPICS) urls.push(entry(`${SITE}/designs/${t.slug}`, null, 'weekly', 0.7));
 
   try {
     const { data: cats } = await supabase.from('categories').select('slug, created_at').limit(500);
