@@ -21,7 +21,7 @@ const title = product.title.split('|')[0].trim();
     )}
     <button type="button" class="wish-btn absolute top-2 right-2 w-8 h-8 rounded-full bg-white/85 backdrop-blur flex items-center justify-center text-base shadow-sm hover:scale-110 transition"
       aria-label="Save to favorites" data-wish-id={product.id} data-wish-slug={product.slug} data-wish-title={title}
-      data-wish-price={price} data-wish-img={product.image_url || ''} onclick="event.preventDefault();event.stopPropagation();">
+      data-wish-price={price} data-wish-img={product.image_url || ''}>
       <span class="wish-icon">🤍</span>
     </button>
   </a>
@@ -30,7 +30,7 @@ const title = product.title.split('|')[0].trim();
       <h3 class="text-sm leading-snug line-clamp-2 text-ink-800 min-h-[2.5em]">{title}</h3>
     </a>
     <div class="mt-1 flex items-center gap-2 flex-wrap">
-      <span class="text-bronze-600 text-sm font-medium">{money(price)}</span>
+      <span class="text-bronze-600 text-sm font-medium" data-usd={price}>{money(price)}</span>
       {percent > 0 && <>
         <span class="text-ink-700/40 text-xs line-through">{money(original)}</span>
         <span class="text-[10px] text-green-700 font-medium">{percent}% off</span>

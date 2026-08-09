@@ -7,7 +7,7 @@
   <div class="flex items-center gap-3 bg-white border border-black/10 shadow-lg rounded-xl p-2.5 pr-3">
     <img id="dcc-proof-img" src="" alt="" width="44" height="44" class="w-11 h-11 rounded-lg object-cover bg-cream shrink-0" />
     <div class="min-w-0">
-      <div class="text-[13px] text-ink-800 leading-tight"><span class="font-medium">Someone</span> just grabbed</div>
+      <div id="dcc-proof-lead" class="text-[13px] text-ink-800 leading-tight"><span class="font-medium">Someone</span> just grabbed</div>
       <a id="dcc-proof-link" href="#" class="text-[13px] text-bronze-700 font-medium leading-tight line-clamp-1 hover:underline">a design</a>
       <div id="dcc-proof-time" class="text-[11px] text-ink-700/55 mt-0.5">just now</div>
     </div>
@@ -22,20 +22,24 @@
     var img = document.getElementById('dcc-proof-img');
     var link = document.getElementById('dcc-proof-link');
     var time = document.getElementById('dcc-proof-time');
+    var lead = document.getElementById('dcc-proof-lead');
     document.getElementById('dcc-proof-x').addEventListener('click', function () { box.classList.add('hidden'); sessionStorage.setItem('dcc_proof_off', '1'); });
     function ago(iso) {
-      if (!iso) return 'recently';
+      if (!iso) return '';
       var s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
       if (s < 90) return 'just now';
-      var m = Math.floor(s / 60); if (m < 60) return m + ' min ago';
+      var m = Math.floor(s / 60); if (m < 60) return m + (m === 1 ? ' minute ago' : ' minutes ago');
       var h = Math.floor(m / 60); if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
-      var d = Math.floor(h / 24); return d + (d === 1 ? ' day ago' : ' days ago');
+      var d = Math.floor(h / 24); return d === 1 ? 'yesterday' : d + ' days ago';
     }
     var items = [], i = 0, timer;
     function show() {
       if (!items.length) return;
       var it = items[i % items.length]; i++;
       if (it.image_url) { img.src = it.image_url; img.style.display = ''; } else { img.style.display = 'none'; }
+      lead.innerHTML = it.type === 'view'
+        ? '<span class="font-medium">Someone</span> is viewing'
+        : '<span class="font-medium">Someone</span> just grabbed';
       link.textContent = it.title || 'a design';
       link.href = it.slug ? '/product/' + it.slug : '/catalog';
       time.textContent = ago(it.at);
