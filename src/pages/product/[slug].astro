@@ -116,14 +116,14 @@ const breadcrumbLd = {
     <div>
       <div class="aspect-square bg-cream rounded-lg overflow-hidden">
         {gallery[0]
-          ? <img id="main-img" src={img(gallery[0], { w: 900, q: 82 })} alt={mainAlt} width="800" height="800" fetchpriority="high" loading="eager" class="w-full h-full object-cover cursor-zoom-in" />
+          ? <img id="main-img" src={img(gallery[0], { w: 1000, q: 82, square: true })} alt={mainAlt} width="800" height="800" fetchpriority="high" loading="eager" class="w-full h-full object-cover cursor-zoom-in" />
           : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 p-6 text-center font-serif">{cleanTitle}</div>}
       </div>
       {gallery.length > 1 && (
         <div class="mt-3 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
           {gallery.slice(0, 10).map((g, i) => (
-            <button class="thumb aspect-square bg-cream rounded overflow-hidden border-2 border-transparent" data-src={img(g, { w: 900, q: 82 })} aria-label={`View image ${i + 1}`}>
-              <img src={img(g, { w: 160, q: 75 })} alt={`${cleanTitle} bas-relief STL — view ${i + 1}`} loading="lazy" width="160" height="160" class="w-full h-full object-cover" />
+            <button class="thumb aspect-square bg-cream rounded overflow-hidden border-2 border-transparent" data-src={img(g, { w: 1000, q: 82, square: true })} aria-label={`View image ${i + 1}`}>
+              <img src={img(g, { w: 200, q: 75, square: true })} alt={`${cleanTitle} bas-relief STL — view ${i + 1}`} loading="lazy" width="200" height="200" class="w-full h-full object-cover" />
             </button>
           ))}
         </div>
@@ -178,6 +178,16 @@ const breadcrumbLd = {
         data-id={p.id} data-slug={p.slug} data-title={cleanTitle} data-price={price} data-img={gallery[0] || ''}>
         Add to cart
       </button>
+      <button class="buy-now mt-2 w-full bg-ink-800 text-cream py-3 rounded-md hover:bg-black transition font-medium flex items-center justify-center gap-2"
+        data-id={p.id} data-slug={p.slug} data-title={cleanTitle} data-price={price} data-img={gallery[0] || ''}>
+        <span aria-hidden="true">⚡</span> Buy it now
+      </button>
+      <div class="mt-2 flex items-center justify-center gap-1.5 flex-wrap text-[11px] text-ink-700/60">
+        <span>Express checkout with</span>
+        <span class="px-1.5 py-0.5 rounded bg-black text-white font-medium leading-none"> Pay</span>
+        <span class="px-1.5 py-0.5 rounded border border-black/15 bg-white font-medium leading-none">G Pay</span>
+        <span class="px-1.5 py-0.5 rounded bg-[#003087] text-white font-medium leading-none">PayPal</span>
+      </div>
       <a href="/cart" class="mt-2 block text-center text-sm text-bronze-600">View cart →</a>
       <button type="button" class="wish-btn mt-2 w-full border border-black/15 text-ink-700 py-2 rounded-md text-sm hover:border-bronze-600 hover:text-bronze-700 transition flex items-center justify-center gap-1.5"
         data-wish-id={p.id} data-wish-slug={p.slug} data-wish-title={cleanTitle} data-wish-price={price} data-wish-img={gallery[0] || ''}>

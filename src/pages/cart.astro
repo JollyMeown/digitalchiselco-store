@@ -116,6 +116,12 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         </label>
       )}
       <button id="checkout" class="mt-4 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">Checkout</button>
+      <div class="mt-2 flex items-center justify-center gap-1.5 flex-wrap text-[11px] text-ink-700/60">
+        <span aria-hidden="true">⚡</span><span>One-tap express pay with</span>
+        <span class="px-1.5 py-0.5 rounded bg-black text-white font-medium leading-none"> Pay</span>
+        <span class="px-1.5 py-0.5 rounded border border-black/15 bg-white font-medium leading-none">G Pay</span>
+        <span class="px-1.5 py-0.5 rounded bg-[#003087] text-white font-medium leading-none">PayPal</span>
+      </div>
       <p class="text-xs text-ink-700/60 mt-2 text-center">Secure checkout · instant download links emailed after purchase</p>
       <div class="mt-4"><TrustBadges compact={true} /></div>
     </div>
@@ -609,5 +615,27 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
 
     // Back to cart from the inline checkout — reload to restore cart state + clear the frame.
     document.getElementById('dcc-checkout-back')?.addEventListener('click', () => window.location.reload());
+
+    // ── Express fast-track ─────────────────────────────────────────────
+    // A "Buy it now" click lands here with ?express=1. If we already know a
+    // valid email (returning buyer) and nothing needs personalizing, open the
+    // checkout in one step. Otherwise focus the one field we still need.
+    (function () {
+      if (new URLSearchParams(location.search).get('express') !== '1') return;
+      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      if (!cart.length) return;
+      setTimeout(() => {
+        const email = (emailInput?.value || '').trim().toLowerCase();
+        const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+        const hasRequired = !!document.querySelector('[data-cart-idx][required]');
+        if (emailOk && !hasRequired) {
+          whenPaddleReady(() => document.getElementById('checkout')?.click());
+        } else {
+          const target = emailOk ? document.getElementById('checkout') : emailInput;
+          target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (!emailOk) setTimeout(() => emailInput?.focus(), 300);
+        }
+      }, 450);
+    })();
   </script>
 </Base>

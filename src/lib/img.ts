@@ -9,12 +9,22 @@
 const SUPABASE_OBJECT_PREFIX = '/storage/v1/object/public/';
 const SUPABASE_RENDER_PREFIX = '/storage/v1/render/image/public/';
 
-export function img(url: string | null | undefined, opts: { w?: number; q?: number } = {}): string {
+export function img(url: string | null | undefined, opts: { w?: number; q?: number; h?: number; square?: boolean } = {}): string {
   if (!url) return '';
   if (!url.includes(SUPABASE_OBJECT_PREFIX)) return url; // non-Supabase host
   const transformed = url.replace(SUPABASE_OBJECT_PREFIX, SUPABASE_RENDER_PREFIX);
   const params: string[] = [];
-  if (opts.w) params.push(`width=${opts.w}`);
+  // `square` centre-crops to a 1:1 tile (resize=cover). Etsy heroes are often
+  // tall mockup composites (framing + faded side previews); cropping to the
+  // centre square gives the clean subject everywhere — card, main, AND lightbox
+  // so enlarging never reveals the raw tall/letterboxed file.
+  if (opts.square) {
+    const side = opts.w || opts.h || 900;
+    params.push(`width=${side}`, `height=${side}`, 'resize=cover');
+  } else {
+    if (opts.w) params.push(`width=${opts.w}`);
+    if (opts.h) params.push(`height=${opts.h}`);
+  }
   if (opts.q) params.push(`quality=${opts.q}`);
   return params.length ? `${transformed}?${params.join('&')}` : transformed;
 }

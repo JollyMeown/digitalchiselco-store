@@ -303,4 +303,20 @@ const hs = await getSettings();
     syncCartButtons();
     if (!onCartPage && window.dccOpenCart) window.dccOpenCart();   // slide-out mini-cart
   });
+
+  // Delegated "Buy it now" express path — add the item (if needed) then go
+  // straight to the cart in express mode, which fast-tracks to checkout.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.buy-now');
+    if (!btn) return;
+    e.preventDefault();
+    const d = btn.dataset;
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    if (!cart.find((x) => x.id === d.id)) {
+      cart.push({ id: d.id, slug: d.slug, title: d.title, price: Number(d.price), img: d.img });
+      localStorage.setItem('cart', JSON.stringify(cart));
+      window.dispatchEvent(new Event('cart-changed'));
+    }
+    window.location.href = '/cart?express=1';
+  });
 </script>
