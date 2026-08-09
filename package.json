@@ -25,7 +25,7 @@
     "etsy:reviews": "node scripts/etsy_reviews_sync.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.106.0",
+    "@anthropic-ai/sdk": "^0.116.0",
     "@astrojs/netlify": "^6.0.0",
     "@astrojs/react": "^4.1.0",
     "@astrojs/tailwind": "^6.0.0",

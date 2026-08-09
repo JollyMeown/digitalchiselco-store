@@ -1,8 +1,7 @@
 // Lightweight AI design concierge. Answers shop/compatibility questions and
 // recommends REAL designs from the catalog, grounded so it can't invent products
-// or prices. Uses Claude Haiku (fast + cheap) via the Anthropic SDK. Rate-limited.
+// or prices. Uses Google Gemini Flash (free tier). Rate-limited per IP.
 import type { APIRoute } from 'astro';
-import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../../lib/supabase';
 import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
 
@@ -11,6 +10,7 @@ const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: 
 const env = (n: string) => process.env[n] ?? (import.meta as any).env?.[n];
 
 const SITE = 'https://digitalchiselco.com';
+const MODEL = env('GEMINI_MODEL') || 'gemini-2.5-flash';
 const SYSTEM = `You are the friendly design concierge for DigitalChiselCo, a shop that sells premium bas-relief STL design files for CNC routers, laser engravers and 3D printers.
 
 Facts you can rely on:
@@ -40,14 +40,13 @@ async function relevantProducts(q: string) {
 }
 
 export const POST: APIRoute = async ({ request }) => {
-  const key = env('ANTHROPIC_API_KEY');
+  const key = env('GEMINI_API_KEY') || env('GOOGLE_API_KEY');
   if (!key) return json({ error: 'Concierge is not configured yet.' }, 503);
   const ip = clientIp(request);
   if (!(await rateLimit(`concierge:ip:${ip}`, 20, 3600))) return tooMany();
 
   const body = await request.json().catch(() => ({}));
   const history = Array.isArray(body.messages) ? body.messages : [];
-  // keep it lightweight: last 8 turns, text only, capped length
   const msgs = history.slice(-8)
     .filter((m: any) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 1500) }));
@@ -61,15 +60,24 @@ export const POST: APIRoute = async ({ request }) => {
     msgs[msgs.length - 1] = { role: 'user', content: `${lastUser}\n\nRelevant designs (recommend only from these, or suggest browsing):\n${list}` };
   }
 
+  // Gemini uses roles "user" and "model"
+  const contents = msgs.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+
   try {
-    const client = new Anthropic({ apiKey: key });
-    const resp = await client.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 400,
-      system: SYSTEM,
-      messages: msgs,
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM }] },
+        contents,
+        generationConfig: { maxOutputTokens: 500, temperature: 0.6 },
+      }),
     });
-    const text = resp.content.filter((b) => b.type === 'text').map((b: any) => b.text).join('').trim();
+    const d: any = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error('[concierge] gemini', res.status, d?.error?.message);
+      return json({ error: 'The concierge is busy right now. Please try again, or email jolly@digitalchiselco.com.' }, 502);
+    }
+    const text = (d?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text).join('').trim();
     return json({ ok: true, reply: text || "I'm here to help with our designs — what are you carving?" });
   } catch (e: any) {
     console.error('[concierge]', e?.message);
