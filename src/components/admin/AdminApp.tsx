@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import Overview from './tabs/Overview';
 import Products from './tabs/Products';
 import Categories from './tabs/Categories';
+import CategoryManager from './tabs/CategoryManager';
 import Orders from './tabs/Orders';
 import Subscribers from './tabs/Subscribers';
 import Media from './tabs/Media';
@@ -44,6 +45,7 @@ const TABS: Tab[] = [
   { key: 'pdfmaker',    label: 'PDF Maker',    icon: '⎙', Component: PdfMaker },
   { key: 'customized',  label: 'Customized',   icon: '✎', Component: Customized },
   { key: 'categories',  label: 'Categories',   icon: '☷', Component: Categories },
+  { key: 'categorymgr', label: 'Category Manager', icon: '🗂', Component: CategoryManager },
   { key: 'orders',      label: 'Orders',       icon: '⊞', Component: Orders },
   { key: 'cults',       label: 'Cults3D Sales', icon: '◈', Component: Cults },
   { key: 'discounts',   label: 'Discounts',    icon: '%', Component: Discounts },
