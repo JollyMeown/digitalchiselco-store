@@ -1,0 +1,63 @@
+---
+// Wishlist / Favorites page. Renders entirely from the visitor's localStorage
+// (the 'dcc_wishlist' store managed in Header.astro), so it needs no login and
+// no server data. Each saved design links out and can be added to cart.
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import RecentlyViewed from '../components/RecentlyViewed.astro';
+---
+<Base title="Your favorites · DigitalChiselCo" description="Designs you have saved for later.">
+  <Header />
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Favorites' }]} />
+    <h1 class="text-2xl md:text-3xl mt-2 mb-1">Your favorites ❤</h1>
+    <p class="text-sm text-ink-700/70 mb-6">Designs you saved for later. They live in this browser, add to cart whenever you are ready.</p>
+
+    <div id="wish-empty" class="hidden text-center py-16">
+      <div class="text-5xl mb-3">🤍</div>
+      <p class="text-ink-700/70 mb-4">You have not saved any designs yet.</p>
+      <a href="/catalog" class="inline-block bg-bronze-600 text-cream px-5 py-2.5 rounded-md hover:bg-bronze-700 transition">Browse the catalog</a>
+    </div>
+
+    <div id="wish-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+
+    <div class="mt-14"><RecentlyViewed /></div>
+  </main>
+  <Footer />
+</Base>
+
+<script is:inline>
+  function render() {
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem('dcc_wishlist') || '[]'); } catch {}
+    const grid = document.getElementById('wish-grid');
+    const empty = document.getElementById('wish-empty');
+    if (!grid || !empty) return;
+    if (!list.length) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    grid.innerHTML = list.map((p) => `
+      <div class="group border border-black/10 rounded-md overflow-hidden bg-white flex flex-col">
+        <a href="/product/${p.slug}" class="relative block aspect-square bg-cream overflow-hidden">
+          ${p.img ? `<img src="${p.img}" alt="${(p.title || '').replace(/"/g, '&quot;')}" loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.03] transition" />` : `<div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">${p.title || ''}</div>`}
+          <button type="button" class="wish-remove absolute top-2 right-2 w-8 h-8 rounded-full bg-white/85 flex items-center justify-center shadow-sm hover:scale-110 transition" data-id="${p.id}" aria-label="Remove from favorites">❤️</button>
+        </a>
+        <div class="p-3 flex flex-col flex-1">
+          <a href="/product/${p.slug}" class="block"><h3 class="text-sm leading-snug line-clamp-2 text-ink-800 min-h-[2.5em]">${p.title || ''}</h3></a>
+          <span class="text-bronze-600 text-sm font-medium mt-1">$${Number(p.price || 0).toFixed(2)}</span>
+          <button class="add-to-cart mt-2 w-full text-xs border border-bronze-600 text-bronze-700 py-1.5 rounded hover:bg-bronze-600 hover:text-cream transition"
+            data-id="${p.id}" data-slug="${p.slug}" data-title="${(p.title || '').replace(/"/g, '&quot;')}" data-price="${p.price || 0}" data-img="${p.img || ''}">Add to cart</button>
+        </div>
+      </div>`).join('');
+    if (window.dccSyncCartButtons) window.dccSyncCartButtons();
+  }
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.wish-remove'); if (!btn) return;
+    e.preventDefault();
+    if (window.DCCWish) { window.DCCWish.toggle({ id: btn.dataset.id }); render(); }
+  });
+  window.addEventListener('wish-changed', render);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render, { once: true }); else render();
+  window.addEventListener('pageshow', render);
+</script>

@@ -42,10 +42,12 @@ const hs = await getSettings();
     <div class="hidden lg:flex items-center gap-3 text-sm text-ink-700 ml-auto whitespace-nowrap shrink-0">
       {links.filter((l) => l.desk !== 'none').map((l) => <a href={l.href} class={`hover:text-bronze-600 ${l.href === '/free' ? 'text-bronze-600' : ''} ${l.desk === 'xl' ? 'hidden xl:inline' : ''}`}>{l.label}</a>)}
       <a href="/membership" class="hidden xl:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
+      <a href="/favorites" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Favorites">❤ <span class="wish-count text-bronze-600 font-medium"></span></a>
       <a href="/cart" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 Cart <span class="cart-count text-bronze-600 font-medium"></span></a>
     </div>
-    <!-- Cart for mobile/tablet (shown when the desktop nav is hidden). -->
-    <a href="/cart" class="lg:hidden ml-auto shrink-0 font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 <span class="cart-count text-bronze-600 font-medium"></span></a>
+    <!-- Favorites + Cart for mobile/tablet (shown when the desktop nav is hidden). -->
+    <a href="/favorites" class="lg:hidden ml-auto shrink-0 font-medium text-ink-800 hover:text-bronze-600" aria-label="Favorites">❤ <span class="wish-count text-bronze-600 font-medium"></span></a>
+    <a href="/cart" class="lg:hidden shrink-0 font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 <span class="cart-count text-bronze-600 font-medium"></span></a>
   </nav>
   <form action="/search" method="get" role="search" class="md:hidden px-4 pb-3 flex">
     <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files"
@@ -66,6 +68,7 @@ const hs = await getSettings();
       <a href={l.href} class={`block px-4 py-2.5 hover:bg-cream ${l.href === '/free' ? 'text-bronze-600 font-medium' : 'text-ink-800'}`}>{l.label}</a>
     ))}
     <a href="/membership" class="block px-4 py-2.5 text-bronze-600 font-medium hover:bg-cream">Become a member</a>
+    <a href="/favorites" class="block px-4 py-2.5 text-ink-800 hover:bg-cream">❤ Favorites</a>
     <a href="/cart" class="block px-4 py-2.5 text-ink-800 hover:bg-cream">Cart</a>
   </nav>
   <div class="border-t border-black/10 px-4 py-3">
@@ -84,6 +87,44 @@ const hs = await getSettings();
   renderCartCount();
   window.addEventListener('cart-changed', renderCartCount);
   window.addEventListener('storage', renderCartCount);
+
+  // ── Wishlist / Favorites (localStorage, no login required) ─────────
+  const WISH_KEY = 'dcc_wishlist';
+  function wishList() { try { return JSON.parse(localStorage.getItem(WISH_KEY) || '[]'); } catch { return []; } }
+  function wishHas(id) { return wishList().some((x) => x.id === id); }
+  function wishSave(list) { localStorage.setItem(WISH_KEY, JSON.stringify(list)); window.dispatchEvent(new Event('wish-changed')); }
+  function wishToggle(item) {
+    const list = wishList(); const i = list.findIndex((x) => x.id === item.id);
+    let added;
+    if (i >= 0) { list.splice(i, 1); added = false; } else { list.unshift(item); added = true; }
+    wishSave(list);
+    // record affinity if we know who this is (feeds price-drop / personalization)
+    if (added) { const email = localStorage.getItem('dcc_email') || ''; if (email) { try { navigator.sendBeacon('/api/favorite', new Blob([JSON.stringify({ email, product_id: item.id })], { type: 'application/json' })); } catch {} } }
+    return added;
+  }
+  window.DCCWish = { list: wishList, has: wishHas, toggle: wishToggle };
+  function renderWishCount() { const n = wishList().length; document.querySelectorAll('.wish-count').forEach((el) => { el.textContent = n > 0 ? `(${n})` : ''; }); }
+  function syncWishButtons() {
+    const list = wishList(); const ids = new Set(list.map((x) => x.id));
+    document.querySelectorAll('.wish-btn[data-wish-id]').forEach((btn) => {
+      const on = ids.has(btn.dataset.wishId);
+      const icon = btn.querySelector('.wish-icon');
+      if (icon) icon.textContent = on ? '❤️' : '🤍';
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  window.dccSyncWishButtons = syncWishButtons;
+  renderWishCount();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncWishButtons, { once: true }); else syncWishButtons();
+  window.addEventListener('pageshow', () => { renderWishCount(); syncWishButtons(); });
+  window.addEventListener('wish-changed', () => { renderWishCount(); syncWishButtons(); });
+  window.addEventListener('storage', () => { renderWishCount(); syncWishButtons(); });
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.wish-btn'); if (!btn) return;
+    e.preventDefault(); e.stopPropagation();
+    const d = btn.dataset;
+    wishToggle({ id: d.wishId, slug: d.wishSlug, title: d.wishTitle, price: Number(d.wishPrice) || 0, img: d.wishImg || '' });
+  });
 
   // ── Mobile drawer (nav + categories) ──────────────────────────────
   const _drawer = document.getElementById('dcc-drawer');

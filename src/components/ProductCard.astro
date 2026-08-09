@@ -19,6 +19,11 @@ const title = product.title.split('|')[0].trim();
         <span aria-hidden="true">🔥</span> Bundle
       </span>
     )}
+    <button type="button" class="wish-btn absolute top-2 right-2 w-8 h-8 rounded-full bg-white/85 backdrop-blur flex items-center justify-center text-base shadow-sm hover:scale-110 transition"
+      aria-label="Save to favorites" data-wish-id={product.id} data-wish-slug={product.slug} data-wish-title={title}
+      data-wish-price={price} data-wish-img={product.image_url || ''} onclick="event.preventDefault();event.stopPropagation();">
+      <span class="wish-icon">🤍</span>
+    </button>
   </a>
   <div class="p-3 flex flex-col flex-1">
     <a href={`/product/${product.slug}`} class="block">

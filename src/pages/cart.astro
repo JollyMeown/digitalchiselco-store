@@ -5,6 +5,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import RecentlyViewed from '../components/RecentlyViewed.astro';
+import TrustBadges from '../components/TrustBadges.astro';
 import { pricing } from '../lib/pricing';
 import { getSettings } from '../lib/queries';
 const settings = await getSettings();
@@ -116,6 +117,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       )}
       <button id="checkout" class="mt-4 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">Checkout</button>
       <p class="text-xs text-ink-700/60 mt-2 text-center">Secure checkout · instant download links emailed after purchase</p>
+      <div class="mt-4"><TrustBadges compact={true} /></div>
     </div>
   </main>
 

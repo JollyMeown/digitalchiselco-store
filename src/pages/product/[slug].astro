@@ -3,6 +3,7 @@ import Shell from '../../layouts/Shell.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import RecentlyViewed from '../../components/RecentlyViewed.astro';
+import TrustBadges from '../../components/TrustBadges.astro';
 import { getProductBySlug, getRelatedProducts, getSettings } from '../../lib/queries';
 import { pricing, money } from '../../lib/pricing';
 import { jsonLd } from '../../lib/jsonld';
@@ -170,6 +171,10 @@ const breadcrumbLd = {
         Add to cart
       </button>
       <a href="/cart" class="mt-2 block text-center text-sm text-bronze-600">View cart →</a>
+      <button type="button" class="wish-btn mt-2 w-full border border-black/15 text-ink-700 py-2 rounded-md text-sm hover:border-bronze-600 hover:text-bronze-700 transition flex items-center justify-center gap-1.5"
+        data-wish-id={p.id} data-wish-slug={p.slug} data-wish-title={cleanTitle} data-wish-price={price} data-wish-img={gallery[0] || ''}>
+        <span class="wish-icon">🤍</span> Save to favorites
+      </button>
 
       <ul class="mt-6 text-sm text-ink-700 space-y-1.5">
         <li>📦 Instant digital download (STL file)</li>
@@ -199,6 +204,10 @@ const breadcrumbLd = {
       </div>
     </div>
   </div>
+
+  <section class="mt-10">
+    <TrustBadges />
+  </section>
 
   {related.length > 0 && (
     <section class="mt-14">

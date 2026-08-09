@@ -1,0 +1,26 @@
+---
+// Trust / reassurance row shown near the buy button and in the cart. Pure
+// static markup, no dependencies. Reduces pre-purchase hesitation for digital
+// CNC/laser buyers (compatibility, instant delivery, satisfaction, secure pay).
+interface Props { compact?: boolean }
+const { compact = false } = Astro.props;
+const items = [
+  { icon: '⚡', title: 'Instant download', sub: 'Emailed the moment you pay' },
+  { icon: '🛠️', title: 'Works with your machine', sub: 'Aspire, VCarve, Carveco, Fusion 360' },
+  { icon: '🔁', title: 'Unlimited re-downloads', sub: 'Yours forever in your account' },
+  { icon: '🛡️', title: '100% satisfaction', sub: 'Not carving right? We make it right.' },
+  { icon: '🔒', title: 'Secure checkout', sub: 'Encrypted, card details never stored' },
+];
+const show = compact ? items.slice(0, 3) : items;
+---
+<div class={`grid gap-3 ${compact ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
+  {show.map((i) => (
+    <div class="flex items-start gap-2 rounded-lg border border-black/10 bg-cream/40 px-3 py-2.5">
+      <span class="text-lg leading-none" aria-hidden="true">{i.icon}</span>
+      <div>
+        <div class="text-xs font-medium text-ink-800 leading-tight">{i.title}</div>
+        {!compact && <div class="text-[11px] text-ink-700/60 leading-tight mt-0.5">{i.sub}</div>}
+      </div>
+    </div>
+  ))}
+</div>
