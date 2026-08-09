@@ -14,6 +14,7 @@ const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'arrivals30', label: 'New arrivals (+30 days)', group: 'Post-purchase' },
   { key: 'loyalty', label: 'Loyalty 10% (3rd order)', group: 'Post-purchase' },
   { key: 'weekly', label: 'Weekly fresh-designs digest (Mondays)', group: 'Broadcasts' },
+  { key: 'etsyWelcome', label: 'Etsy-buyer welcome (one-time)', group: 'Etsy buyers' },
 ];
 
 // ── Block-based template builder ─────────────────────────────────────
@@ -282,12 +283,14 @@ export default function Automations() {
           desc="One email to a confirmed subscriber who viewed 3+ designs but never added to cart or bought. Once per person, product-page links only." />
         <Toggle field="referral_rewards_enabled" label="Referral rewards"
           desc="When a friend orders with someone's REF- share link, email the referrer a 15% reward code. The 15%-off for friends works whether this is on or off." />
+        <Toggle field="etsy_welcome_enabled" label="Etsy-buyer welcome"
+          desc="One-time welcome to imported Etsy buyers (source 'etsy-buyer'): this week's newest designs + a 10% code. Sent once each, never twice. These buyers skip the drip and weekly digest." />
       </div>
 
       <Card>
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <select value={kind} onChange={(e) => setKind(e.target.value)} className={inputCls + ' max-w-xs'}>
-            {['Subscriber drip', 'Cart recovery', 'Post-purchase', 'Broadcasts'].map((grp) => (
+            {['Subscriber drip', 'Cart recovery', 'Post-purchase', 'Broadcasts', 'Etsy buyers'].map((grp) => (
               <optgroup key={grp} label={grp}>
                 {KINDS.filter((k) => k.group === grp).map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
               </optgroup>

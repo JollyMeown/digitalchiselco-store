@@ -6,7 +6,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { send as sendEmail } from '../../../../lib/resend';
-import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, weeklyDigestEmail, abandonedBrowseEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
+import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
 
 export const prerender = false;
 
@@ -27,7 +27,7 @@ async function isCallerAdmin(request: Request): Promise<boolean> {
   return !!prof?.is_admin;
 }
 
-const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'browse', 'review7', 'arrivals30', 'loyalty', 'weekly'] as const;
+const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'browse', 'review7', 'arrivals30', 'loyalty', 'weekly', 'etsyWelcome'] as const;
 
 async function render(kind: string, email: string): Promise<{ subject: string; html: string; text: string }> {
   const db = supabaseAdmin();
@@ -71,6 +71,21 @@ async function render(kind: string, email: string): Promise<{ subject: string; h
       range = sD === eD ? sD : `${sD} – ${eD}`;
     }
     out = weeklyDigestEmail({ email, products: pool as MiniProduct[], weekNumber: Math.floor(Date.now() / 604800000), range });
+  }
+  else if (kind === 'etsyWelcome') {
+    // preview with this week's newest 12 designs + the true count for the link
+    const sinceIso = new Date(Date.now() - 7 * 86400000).toISOString();
+    const [{ data: fresh }, { count }] = await Promise.all([
+      db.from('products').select('title, slug, image_url, price_usd')
+        .eq('active', true).gte('created_at', sinceIso)
+        .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
+        .order('created_at', { ascending: false }).limit(12),
+      db.from('products').select('id', { count: 'exact', head: true })
+        .eq('active', true).gte('created_at', sinceIso)
+        .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null),
+    ]);
+    const products = (fresh?.length ? fresh : newest || []) as MiniProduct[];
+    out = etsyWelcomeEmail({ email, products, totalNew: count || products.length, code: 'THANKYOU10' });
   }
   else throw new Error('unknown kind');
 

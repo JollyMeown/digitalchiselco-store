@@ -69,6 +69,7 @@ export const TEMPLATE_HEADINGS: Record<string, string> = {
   loyalty: 'A permanent thank-you',
   weekly: 'Fresh from the workshop 🪵',
   browse: 'Still thinking it over? 🪵',
+  etsyWelcome: 'Welcome to the workshop 🪵',
 };
 
 function shell(subject: string, heading: string, bodyHtml: string, email: string): string {
@@ -269,6 +270,44 @@ export function weeklyDigestEmail(d: {
     <p style="margin:14px 0 0;font-size:13px;color:#777;text-align:center;">Buying a few? <a href="${SITE}/bundle-builder" style="color:${BRONZE};">Pick any 5 for a flat $25 →</a></p>`;
   const text = `${n} new designs this week at DigitalChiselCo: ` + d.products.slice(0, 12).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join(' · ') + `\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'Fresh from the workshop 🪵', body, d.email), text };
+}
+
+// ── Etsy-buyer welcome (one-time, warm intro to the website) ──────────
+// Sent once to imported Etsy buyers: thank-you + this week's newest designs +
+// a 10% welcome code. No em dashes (owner preference).
+export function etsyWelcomeEmail(d: {
+  email: string; products: MiniProduct[]; totalNew?: number; code?: string;
+}): Out {
+  const code = d.code || 'THANKYOU10';
+  const total = d.totalNew ?? d.products.length;
+  const rows: string[] = [];
+  for (let i = 0; i < Math.min(12, d.products.length); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  const grid = d.products.length ? `
+    <div style="font-size:13px;letter-spacing:1px;text-transform:uppercase;color:${BRONZE};text-align:center;margin:22px 0 4px;">✨ Just added this week</div>
+    ${rows.join('')}
+    <p style="text-align:center;margin:6px 0 4px;"><a href="${SITE}/catalog?sort=newest" style="color:${BRONZE};font-size:13px;">See all ${total} new designs &rarr;</a></p>` : '';
+  const subject = 'Thanks for your purchase, here is a little welcome gift 🎁';
+  const body = `
+    <p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">Hi there,</p>
+    <p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">
+      Thank you so much for your purchase on Etsy. It genuinely means the world to a small workshop like ours. 🙏
+      I wanted to personally welcome you to our home on the web, <a href="${SITE}" style="color:${BRONZE};">digitalchiselco.com</a>.
+    </p>
+    <p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">
+      It's where <b>every one of our bas-relief designs lives in one place</b>, with instant downloads, brand-new designs added every week,
+      bundle deals, and a members' library, usually at friendlier prices than Etsy.
+    </p>
+    ${grid}
+    <div style="background:${CREAM};border:1px dashed ${BRONZE};border-radius:10px;padding:18px;text-align:center;margin:20px 0;">
+      <div style="font-size:12px;letter-spacing:1px;text-transform:uppercase;color:${BRONZE};margin-bottom:6px;">Your welcome gift</div>
+      <div style="font-size:15px;color:${INK};margin-bottom:8px;">10% off your first order on our site</div>
+      <div style="font-size:26px;font-weight:700;letter-spacing:2px;color:${BRONZE_DARK};font-family:Georgia,serif;">${esc(code)}</div>
+      <div style="font-size:12px;color:#8a7a68;margin-top:6px;">Just paste it in the promo box at checkout.</div>
+    </div>
+    ${btn(SITE + '/catalog', 'Browse the full collection')}
+    <p style="font-size:14px;line-height:1.6;margin:18px 0 4px;color:${INK};">Happy carving,<br><b>Jolly</b> · DigitalChiselCo</p>`;
+  const text = `Thank you for your Etsy purchase! Welcome to digitalchiselco.com, where every one of our bas-relief designs lives in one place, new ones weekly, instant downloads.\n\nYour welcome gift: 10% off your first order with code ${code} (paste it in the checkout promo box).\n\nBrowse the collection: ${SITE}/catalog\n\nHappy carving, Jolly, DigitalChiselCo\n\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'Welcome to the workshop 🪵', body, d.email), text };
 }
 
 // ── Referral reward (referrer earns their 15% after a friend orders) ──

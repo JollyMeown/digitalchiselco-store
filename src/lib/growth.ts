@@ -10,7 +10,7 @@ import { supabaseAdmin } from './supabase';
 import { send as sendEmail, sendBatch } from './resend';
 import {
   dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
-  weeklyDigestEmail, abandonedBrowseEmail, applyOverride, TEMPLATE_HEADINGS,
+  weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS,
   type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
 import { isoWeekKey } from './weekly-digest';
@@ -45,8 +45,9 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   // ── 1. nurture drip ─────────────────────────────────────────────────
   if (g.drip_enabled) {
     const s = { enrolled: 0, sent: 0, converted: 0, failed: 0 };
-    // enroll confirmed subscribers not yet in the drip
-    const { data: subs } = await db.from('subscribers').select('email').not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(3000);
+    // enroll confirmed subscribers not yet in the drip. Etsy buyers are excluded:
+    // they get their own one-time welcome, never the "free pack" drip.
+    const { data: subs } = await db.from('subscribers').select('email').not('confirmed_at', 'is', null).is('unsubscribed_at', null).neq('source', 'etsy-buyer').limit(3000);
     const { data: inDrip } = await db.from('subscriber_drip').select('email');
     const enrolled = new Set((inDrip || []).map((r) => r.email.toLowerCase()));
     const newbies = (subs || []).map((r) => r.email.toLowerCase()).filter((e) => !enrolled.has(e));
@@ -221,7 +222,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           const startD = fmtDay(fresh[fresh.length - 1].created_at), endD = fmtDay(fresh[0].created_at);
           const range = startD === endD ? startD : `${startD} – ${endD}`;
           const { data: subs } = await db.from('subscribers').select('email')
-            .not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(3000);
+            .not('confirmed_at', 'is', null).is('unsubscribed_at', null).neq('source', 'etsy-buyer').limit(3000);
           // Resend batch: 100 emails/call, one idempotency key per chunk.
           const list = (subs || []).map((r) => r.email.toLowerCase());
           const tags = [{ name: 'kind', value: 'weekly' }, { name: 'week', value: week }];
@@ -243,6 +244,54 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         stats.weekly = s;
       }
     }
+  }
+
+  // ── 4b. Etsy-buyer welcome (one-time) ───────────────────────────────
+  // Any imported Etsy buyer we have not welcomed yet gets ONE welcome email
+  // with this week's newest designs + a 10% code. Deduped by etsy_welcome_log
+  // (PK on email), so a retry or the manual script can never double-send.
+  stats.etsyWelcome = 'off';
+  if (g.etsy_welcome_enabled) {
+    const s = { candidates: 0, sent: 0, failed: 0 };
+    const { data: buyers } = await db.from('subscribers').select('email')
+      .eq('source', 'etsy-buyer').not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(3000);
+    const { data: done } = await db.from('etsy_welcome_log').select('email').limit(20000);
+    const welcomed = new Set((done || []).map((r) => r.email.toLowerCase()));
+    const TEST = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
+    const pending = [...new Set((buyers || []).map((r) => r.email.toLowerCase().trim()))]
+      .filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !TEST.test(e) && !welcomed.has(e));
+    s.candidates = pending.length;
+    if (pending.length) {
+      // this week's newest designs (up to 12 shown) + total count for the link
+      const sinceIso = daysAgo(7);
+      const [{ data: fresh }, { count: totalNew }] = await Promise.all([
+        db.from('products').select('title, slug, price_usd, image_url')
+          .eq('active', true).gte('created_at', sinceIso)
+          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
+          .order('created_at', { ascending: false }).limit(12),
+        db.from('products').select('id', { count: 'exact', head: true })
+          .eq('active', true).gte('created_at', sinceIso)
+          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null),
+      ]);
+      const products = (fresh || []) as MiniProduct[];
+      const total = totalNew || products.length;
+      const tags = [{ name: 'kind', value: 'etsy-welcome' }];
+      for (let c = 0; c < pending.length; c += 100) {
+        const batch = pending.slice(c, c + 100);
+        const chunk = batch.map((email) => {
+          const { subject, html, text } = withOvr('etsyWelcome',
+            etsyWelcomeEmail({ email, products, totalNew: total, code: 'THANKYOU10' }), email);
+          return { to: email, subject, html, text, tags };
+        });
+        const res = await sendBatch(chunk, `etsy-welcome:${sinceIso.slice(0, 10)}:${c / 100}`);
+        if (res.ok) {
+          s.sent += res.sent;
+          // mark them welcomed so we never send again
+          await db.from('etsy_welcome_log').upsert(batch.map((email) => ({ email })), { onConflict: 'email', ignoreDuplicates: true });
+        } else s.failed += batch.length;
+      }
+    }
+    stats.etsyWelcome = s;
   }
 
   // ── 5. abandoned-browse: viewed ≥3 designs, never carted, never bought ──

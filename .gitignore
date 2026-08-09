@@ -58,3 +58,7 @@ sandbox-test-data-backup.json
 paddle-sync-*.log
 
 .digest_send/
+
+# Local-only: contains real customer emails (PII) — never commit
+scripts/import_etsy_buyers.mjs
+scripts/.etsy-welcome-preview.html
