@@ -6,6 +6,7 @@
 //   3. Post-purchase followups (review +7d, new arrivals +30d, loyalty on 3rd order)
 // Every send is idempotent (Resend idempotency keys + ledger tables).
 
+import { createHash } from 'node:crypto';
 import { supabaseAdmin } from './supabase';
 import { send as sendEmail, sendBatch } from './resend';
 import {
@@ -285,7 +286,10 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
             etsyWelcomeEmail({ email, products, totalNew: total, code: 'THANKYOU10' }), email);
           return { to: email, subject, html, text, tags };
         });
-        const res = await sendBatch(chunk, `etsy-welcome:${sinceIso.slice(0, 10)}:${c / 100}`);
+        // Idempotency key = hash of this batch's recipients (stable across
+        // retries, unique per recipient set, never a positional-index collision).
+        const idem = 'etsy-welcome:' + createHash('sha256').update([...batch].sort().join(',')).digest('hex').slice(0, 32);
+        const res = await sendBatch(chunk, idem);
         if (res.ok) {
           s.sent += res.sent;
           // mark them welcomed so we never send again

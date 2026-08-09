@@ -7,6 +7,7 @@
 //   node scripts/send_etsy_welcome.mjs --apply   # actually send
 import 'dotenv/config';
 import { writeFileSync } from 'node:fs';
+import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { etsyWelcomeEmail } from '../.digest_send/marketing-emails.mjs';
 import { sendBatch } from '../.digest_send/resend.mjs';
@@ -66,7 +67,10 @@ for (let c = 0; c < audience.length; c += 100) {
     const { subject, html, text } = etsyWelcomeEmail({ email, products, totalNew, code: 'THANKYOU10' });
     return { to: email, subject, html, text, tags };
   });
-  const res = await sendBatch(chunk, `etsy-welcome:${sinceIso.slice(0, 10)}:${c / 100}`);
+  // Idempotency key = hash of THIS batch's recipients, so retries of the same
+  // people dedupe but different waves never collide on a positional index.
+  const idem = 'etsy-welcome:' + crypto.createHash('sha256').update([...batch].sort().join(',')).digest('hex').slice(0, 32);
+  const res = await sendBatch(chunk, idem);
   if (res.ok) {
     sent += res.sent;
     await db.from('etsy_welcome_log').upsert(batch.map((email) => ({ email })), { onConflict: 'email', ignoreDuplicates: true });

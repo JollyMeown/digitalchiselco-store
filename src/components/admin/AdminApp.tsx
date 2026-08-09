@@ -16,6 +16,7 @@ import MemberSubs from './tabs/MemberSubs';
 import MemberEmails from './tabs/MemberEmails';
 import Finance from './tabs/Finance';
 import Traffic from './tabs/Traffic';
+import Insights from './tabs/Insights';
 import Automations from './tabs/Automations';
 import Bundles from './tabs/Bundles';
 import Creations from './tabs/Creations';
@@ -35,6 +36,7 @@ const TABS: Tab[] = [
   { key: 'overview',    label: 'Overview',     icon: '◎', Component: Overview },
   { key: 'finance',     label: 'Finance',      icon: '💰', Component: Finance },
   { key: 'traffic',     label: 'Traffic',      icon: '📊', Component: Traffic },
+  { key: 'insights',    label: 'Subscriber Insights', icon: '📈', Component: Insights },
   { key: 'automations', label: 'Automations',  icon: '🤖', Component: Automations },
   { key: 'products',    label: 'Products',     icon: '▦', Component: Products },
   { key: 'seo',         label: 'SEO Review',   icon: '✦', Component: Seo },
