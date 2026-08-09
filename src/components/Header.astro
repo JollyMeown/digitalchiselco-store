@@ -33,10 +33,11 @@ const hs = await getSettings();
     <div class="shrink-0"><Logo /></div>
     <!-- Search flexes, but never below 190px — the guaranteed floor keeps the
          nav links (shrink-0 below) from ever overlapping it. -->
-    <form action="/search" method="get" role="search" class="hidden md:flex flex-1 min-w-[190px] max-w-sm xl:max-w-md mx-1">
-      <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files"
+    <form action="/search" method="get" role="search" class="dcc-search relative hidden md:flex flex-1 min-w-[190px] max-w-sm xl:max-w-md mx-1">
+      <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files" autocomplete="off"
         class="min-w-0 flex-1 px-4 py-2 text-sm rounded-l-md border border-r-0 border-black/15 focus:outline-none focus:border-bronze-600" />
       <button class="shrink-0 bg-bronze-600 text-cream px-4 rounded-r-md text-sm" aria-label="Search">Search</button>
+      <div class="dcc-suggest hidden absolute top-full left-0 right-0 mt-1 bg-white border border-black/10 rounded-lg shadow-xl z-50 overflow-hidden"></div>
     </form>
     <!-- Desktop nav links + cart: pinned right, never shrinks. Secondary links
          (Laser Studio / Our story / Blog) appear from xl so the row always fits. -->
@@ -50,10 +51,11 @@ const hs = await getSettings();
     <a href="/favorites" class="lg:hidden ml-auto shrink-0 font-medium text-ink-800 hover:text-bronze-600" aria-label="Favorites">❤ <span class="wish-count text-bronze-600 font-medium"></span></a>
     <a href="/cart" class="lg:hidden shrink-0 font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 <span class="cart-count text-bronze-600 font-medium"></span></a>
   </nav>
-  <form action="/search" method="get" role="search" class="md:hidden px-4 pb-3 flex">
-    <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files"
+  <form action="/search" method="get" role="search" class="dcc-search relative md:hidden px-4 pb-3 flex">
+    <input type="search" name="q" value={q} placeholder="Search STL files…" aria-label="Search STL files" autocomplete="off"
       class="flex-1 px-4 py-2 text-sm rounded-l-md border border-r-0 border-black/15 focus:outline-none focus:border-bronze-600" />
     <button class="bg-bronze-600 text-cream px-4 rounded-r-md text-sm">Go</button>
+    <div class="dcc-suggest hidden absolute top-full left-4 right-4 mt-1 bg-white border border-black/10 rounded-lg shadow-xl z-50 overflow-hidden"></div>
   </form>
 </header>
 
@@ -126,6 +128,37 @@ const hs = await getSettings();
     e.preventDefault(); e.stopPropagation();
     const d = btn.dataset;
     wishToggle({ id: d.wishId, slug: d.wishSlug, title: d.wishTitle, price: Number(d.wishPrice) || 0, img: d.wishImg || '' });
+  });
+
+  // ── Instant search typeahead ──────────────────────────────────────
+  document.querySelectorAll('.dcc-search').forEach((form) => {
+    const input = form.querySelector('input[name="q"]');
+    const box = form.querySelector('.dcc-suggest');
+    if (!input || !box) return;
+    let t, lastQ = '';
+    const hide = () => box.classList.add('hidden');
+    const render = (items, q) => {
+      if (!items.length) { box.innerHTML = `<div class="px-3 py-2 text-sm text-ink-700/60">No matches. Press Enter to search.</div>`; box.classList.remove('hidden'); return; }
+      box.innerHTML = items.map((p) => `
+        <a href="/product/${p.slug}" class="flex items-center gap-2 px-2.5 py-2 hover:bg-cream border-b border-black/5 last:border-0">
+          ${p.image_url ? `<img src="${p.image_url}" width="36" height="36" class="w-9 h-9 rounded object-cover bg-cream shrink-0" alt="" />` : ''}
+          <span class="text-sm text-ink-800 line-clamp-1 flex-1">${(p.title || '').replace(/</g, '&lt;')}</span>
+          <span class="text-xs text-bronze-600 font-medium">$${Number(p.price || 0).toFixed(2)}</span>
+        </a>`).join('') + `<a href="/search?q=${encodeURIComponent(q)}" class="block px-3 py-2 text-sm text-bronze-700 font-medium hover:bg-cream">See all results for “${q.replace(/</g, '&lt;')}” →</a>`;
+      box.classList.remove('hidden');
+    };
+    input.addEventListener('input', () => {
+      const q = input.value.trim();
+      clearTimeout(t);
+      if (q.length < 2) { hide(); return; }
+      if (q === lastQ) return; lastQ = q;
+      t = setTimeout(() => {
+        fetch('/api/search-suggest?q=' + encodeURIComponent(q)).then((r) => r.json()).then((d) => render(d.items || [], q)).catch(hide);
+      }, 180);
+    });
+    input.addEventListener('focus', () => { if (input.value.trim().length >= 2 && box.innerHTML) box.classList.remove('hidden'); });
+    document.addEventListener('click', (e) => { if (!form.contains(e.target)) hide(); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
   });
 
   // ── Mobile drawer (nav + categories) ──────────────────────────────
