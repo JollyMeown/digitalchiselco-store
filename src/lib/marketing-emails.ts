@@ -310,6 +310,28 @@ export function etsyWelcomeEmail(d: {
   return { subject, html: shell(subject, 'Welcome to the workshop 🪵', body, d.email), text };
 }
 
+// ── Product spotlight (send one design to the people interested in it) ──
+export function productSpotlightEmail(d: { email: string; product: MiniProduct; reason?: string }): Out {
+  const p = d.product;
+  const t = (p.title || '').split('|')[0].trim();
+  const subject = `You might love this design: ${t.slice(0, 55)}`;
+  const reason = d.reason || 'Based on the designs you have been looking at, we think this one belongs on your machine';
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 12px;">Hi fellow maker,</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">${esc(reason)}:</p>
+    <div style="text-align:center;">
+      <a href="${SITE}/product/${esc(p.slug)}" style="text-decoration:none;color:${INK};">
+        ${p.image_url ? `<img src="${esc(p.image_url)}" width="440" style="width:100%;max-width:440px;border-radius:10px;display:block;margin:0 auto;" alt="${esc(t)}">` : ''}
+        <div style="font-size:17px;font-weight:600;margin:12px 0 2px;color:${INK};">${esc(t)}</div>
+        ${p.price_usd != null ? `<div style="font-size:16px;color:${BRONZE};font-weight:600;">$${Number(p.price_usd).toFixed(2)}</div>` : ''}
+      </a>
+    </div>
+    ${btn(SITE + '/product/' + esc(p.slug), 'Get this design')}
+    <p style="text-align:center;font-size:13px;color:#777;margin:14px 0 0;">Not quite right? <a href="${SITE}/catalog" style="color:${BRONZE};">Browse the full collection</a></p>`;
+  const text = `We thought you'd love this design: ${t}. ${SITE}/product/${p.slug}\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'A design picked for you 🪵', body, d.email), text };
+}
+
 // ── Referral reward (referrer earns their 15% after a friend orders) ──
 export function referralRewardEmail(d: { email: string; code: string; friendEmail?: string }): Out {
   const subject = 'Your friend just carved — here is your 15% reward 🎉';

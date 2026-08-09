@@ -12,6 +12,14 @@ async function api(params: Record<string, string>) {
   const res = await fetch(`/api/admin/insights?${qs}`, { headers: { authorization: `Bearer ${await token()}` } });
   return res.json();
 }
+async function postApi(body: any) {
+  const res = await fetch('/api/admin/insights', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${await token()}` },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
 
 const DAY = 86400000;
 const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
@@ -248,27 +256,103 @@ function Products({ topFromOverview }: { topFromOverview?: any[] }) {
 function AudienceModal({ product, onClose }: { product: any; onClose: () => void }) {
   const [d, setD] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [seg, setSeg] = useState({ clicked: true, browsed: true, bought: false });
+  const [myEmail, setMyEmail] = useState('');
+  const [preview, setPreview] = useState<{ sendable: number; sample: string[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [msg, setMsg] = useState('');
+
   useEffect(() => { api({ view: 'product', product_id: product.product_id }).then((r) => r.ok && setD(r)); }, [product.product_id]);
+  useEffect(() => { supabase.auth.getUser().then(({ data }) => setMyEmail(data?.user?.email || '')); }, []);
+  // recompute the real sendable count whenever the targeting changes
+  useEffect(() => {
+    setPreview(null); setConfirming(false); setMsg('');
+    if (!(seg.clicked || seg.browsed || seg.bought)) return;
+    let alive = true;
+    postApi({ product_id: product.product_id, segments: seg }).then((r) => { if (alive && r.ok) setPreview({ sendable: r.sendable, sample: r.sample || [] }); });
+    return () => { alive = false; };
+  }, [seg, product.product_id]);
+
   const emails = useMemo(() => (d?.audience || []).map((a: any) => a.email), [d]);
   const copy = () => { navigator.clipboard.writeText(emails.join(', ')); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  const Seg = ({ k, label }: { k: 'clicked' | 'browsed' | 'bought'; label: string }) => (
+    <label className="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+      <input type="checkbox" checked={seg[k]} onChange={(e) => setSeg({ ...seg, [k]: e.target.checked })} /> {label}
+    </label>
+  );
+
+  const sendTest = async () => {
+    if (!myEmail) return; setBusy(true); setMsg('Sending test…');
+    const r = await postApi({ product_id: product.product_id, test: myEmail });
+    setMsg(r.ok ? `✓ Test sent to ${r.tested}` : `✗ ${r.error || 'failed'}`); setBusy(false);
+  };
+  const sendAll = async () => {
+    setBusy(true); setMsg('Sending…');
+    const r = await postApi({ product_id: product.product_id, segments: seg, confirm: true });
+    setBusy(false); setConfirming(false);
+    setMsg(r.ok ? `✓ Sent to ${r.sent}${r.failed ? `, ${r.failed} failed` : ''}${r.note ? ` (${r.note})` : ''}` : `✗ ${r.error || 'failed'}`);
+    if (r.ok) setPreview((p) => (p ? { ...p, sendable: 0 } : p));  // they're now deduped out
+  };
+
+  const n = preview?.sendable ?? null;
   return (
     <Modal open onClose={onClose} title={`Interested in: ${title1(product.title) || product.slug}`} wide>
       {!d ? <div className="text-sm text-ink-700/60 p-4">Loading…</div> : (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm text-ink-700/70">{emails.length} people showed interest</span>
-            {emails.length > 0 && <button onClick={copy} className="text-xs px-2 py-1 rounded border border-black/10 hover:bg-cream ml-auto">{copied ? '✓ Copied' : 'Copy all emails'}</button>}
+        <div className="space-y-4">
+          {/* ── Send-to-audience panel ── */}
+          <div className="bg-cream/50 border border-bronze-600/20 rounded-lg p-3">
+            <div className="text-sm font-medium text-ink-800 mb-2">📣 Send this design to its interested audience</div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-2">
+              <span className="text-xs text-ink-700/60">Target:</span>
+              <Seg k="clicked" label="🖱 Clicked in an email" />
+              <Seg k="browsed" label="👁 Browsed on site" />
+              <Seg k="bought" label="🛒 Already bought" />
+            </div>
+            <p className="text-[11px] text-ink-700/55 mb-2">
+              Only confirmed subscribers are emailed. Anyone unsubscribed, who reported spam, or who already got this design is skipped automatically. "Already bought" is off by default since they own it.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-ink-800">
+                {n === null ? 'Calculating…' : <><b>{n}</b> eligible {n === 1 ? 'person' : 'people'}</>}
+              </span>
+              <button onClick={sendTest} disabled={busy || !myEmail}
+                className="text-xs px-2.5 py-1.5 rounded border border-black/10 hover:bg-white disabled:opacity-40 ml-auto">
+                Send test to me
+              </button>
+              {!confirming ? (
+                <button onClick={() => setConfirming(true)} disabled={busy || !n}
+                  className="text-xs px-3 py-1.5 rounded bg-bronze-600 text-cream hover:bg-bronze-700 disabled:opacity-40">
+                  Send to {n ?? 0} →
+                </button>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <span className="text-xs text-ink-700/70">Sure?</span>
+                  <button onClick={sendAll} disabled={busy} className="text-xs px-3 py-1.5 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-40">Yes, send {n}</button>
+                  <button onClick={() => setConfirming(false)} disabled={busy} className="text-xs px-2 py-1.5 rounded border border-black/10">Cancel</button>
+                </span>
+              )}
+            </div>
+            {msg && <div className="text-xs mt-2 text-ink-800">{msg}</div>}
           </div>
-          <div className="max-h-[360px] overflow-y-auto">
-            {(d.audience || []).map((a: any) => (
-              <div key={a.email} className="flex items-center gap-2 py-1.5 text-sm border-b border-black/5">
-                <span className="flex-1 truncate text-ink-800">{a.email}</span>
-                {a.bought && <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-100 text-green-800">bought</span>}
-                {a.clicked && <span className="text-[11px] px-1.5 py-0.5 rounded bg-bronze-600/15 text-bronze-700">clicked</span>}
-                {a.browsed && <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-800">browsed</span>}
-              </div>
-            ))}
-            {!d.audience?.length && <div className="text-sm text-ink-700/50">No interest signals yet.</div>}
+
+          {/* ── Interested list ── */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm text-ink-700/70">{emails.length} people showed interest</span>
+              {emails.length > 0 && <button onClick={copy} className="text-xs px-2 py-1 rounded border border-black/10 hover:bg-cream ml-auto">{copied ? '✓ Copied' : 'Copy all emails'}</button>}
+            </div>
+            <div className="max-h-[300px] overflow-y-auto">
+              {(d.audience || []).map((a: any) => (
+                <div key={a.email} className="flex items-center gap-2 py-1.5 text-sm border-b border-black/5">
+                  <span className="flex-1 truncate text-ink-800">{a.email}</span>
+                  {a.bought && <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-100 text-green-800">bought</span>}
+                  {a.clicked && <span className="text-[11px] px-1.5 py-0.5 rounded bg-bronze-600/15 text-bronze-700">clicked</span>}
+                  {a.browsed && <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-800">browsed</span>}
+                </div>
+              ))}
+              {!d.audience?.length && <div className="text-sm text-ink-700/50">No interest signals yet.</div>}
+            </div>
           </div>
         </div>
       )}
