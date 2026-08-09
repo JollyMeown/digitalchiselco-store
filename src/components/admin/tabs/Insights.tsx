@@ -45,6 +45,7 @@ function tierOf(r: any): { label: string; cls: string } {
 export default function Insights() {
   const [sub, setSub] = useState<'people' | 'products'>('people');
   const [ov, setOv] = useState<any>(null);
+  const [hot, setHot] = useState<any>(null);   // product opened from the hot-list
 
   useEffect(() => { api({ view: 'overview' }).then((d) => d.ok && setOv(d)); }, []);
 
@@ -53,6 +54,29 @@ export default function Insights() {
       <div className="text-xs text-ink-700/70 bg-cream/40 border border-bronze-600/15 rounded-lg px-3 py-2">
         📈 <b>Subscriber Insights.</b> Every email's opens, clicks and bounces are logged per person (via Resend). Clicks on a product link reveal what each customer actually likes, so you can send more of the right thing. All figures are live.
       </div>
+
+      {ov?.mostClickedWeek?.length > 0 && (
+        <Card>
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="font-medium text-ink-900 text-sm">🔥 Most-clicked designs this week</h3>
+            <span className="text-xs text-ink-700/55">unique clickers in the last 7 days · click a design to send it to them</span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {ov.mostClickedWeek.map((p: any) => (
+              <button key={p.slug} onClick={() => setHot({ product_id: p.id, slug: p.slug, title: p.title })}
+                className="shrink-0 w-[130px] text-left group">
+                <div className="relative">
+                  {p.image_url && <img src={p.image_url} className="w-full h-[130px] object-cover rounded-lg border border-black/10 group-hover:ring-2 ring-bronze-500 transition" alt="" />}
+                  <span className="absolute top-1 right-1 bg-bronze-700 text-cream text-[11px] font-medium px-1.5 py-0.5 rounded-full">🖱 {p.clicks}</span>
+                </div>
+                <div className="text-[11px] leading-tight mt-1 text-ink-800 line-clamp-2">{title1(p.title) || p.slug}</div>
+                <div className="text-[11px] text-bronze-700 mt-0.5 opacity-0 group-hover:opacity-100 transition">Send to clickers →</div>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+      {hot && <AudienceModal product={hot} onClose={() => setHot(null)} />}
 
       {ov && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">

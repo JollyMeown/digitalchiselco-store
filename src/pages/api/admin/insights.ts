@@ -62,10 +62,28 @@ async function overview() {
   const { data: prod } = await db.from('v_product_interest')
     .select('slug, title, image_url, email_clickers, browsers, buyers, interest_score')
     .order('interest_score', { ascending: false }).limit(10);
+
+  // most-clicked designs in the last 7 days (from email link clicks)
+  const weekAgo = new Date(now - 7 * DAY).toISOString();
+  const { data: recentClicks } = await db.from('email_events')
+    .select('url, email').eq('event', 'clicked').gte('created_at', weekAgo).limit(20000);
+  const clickAgg = new Map<string, Set<string>>();  // slug → unique emails
+  for (const c of recentClicks || []) {
+    const s = slugFromUrl(c.url); if (!s) continue;
+    (clickAgg.get(s) || clickAgg.set(s, new Set()).get(s)!).add((c.email || '').toLowerCase());
+  }
+  const ranked = [...clickAgg.entries()].map(([slug, set]) => ({ slug, clicks: set.size })).sort((a, b) => b.clicks - a.clicks).slice(0, 8);
+  let mostClickedWeek: any[] = [];
+  if (ranked.length) {
+    const { data: pm } = await db.from('products').select('id, slug, title, image_url, price_usd').in('slug', ranked.map((r) => r.slug));
+    const bySlug = new Map((pm || []).map((p) => [p.slug, p]));
+    mostClickedWeek = ranked.map((r) => ({ ...r, ...(bySlug.get(r.slug) || {}) })).filter((r) => r.id);
+  }
+
   return {
     total: rows.length, engaged30, clickers, dormant, neverOpened, bounced, complained, unsub,
     bySource: Object.entries(bySource).map(([source, n]) => ({ source, n })).sort((a, b) => b.n - a.n),
-    topProducts: prod || [],
+    topProducts: prod || [], mostClickedWeek,
   };
 }
 
