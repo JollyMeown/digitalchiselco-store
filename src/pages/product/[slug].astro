@@ -116,7 +116,7 @@ const breadcrumbLd = {
     <div>
       <div class="aspect-square bg-cream rounded-lg overflow-hidden">
         {gallery[0]
-          ? <img id="main-img" src={img(gallery[0], { w: 900, q: 82 })} alt={mainAlt} width="800" height="800" fetchpriority="high" loading="eager" class="w-full h-full object-cover" />
+          ? <img id="main-img" src={img(gallery[0], { w: 900, q: 82 })} alt={mainAlt} width="800" height="800" fetchpriority="high" loading="eager" class="w-full h-full object-cover cursor-zoom-in" />
           : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 p-6 text-center font-serif">{cleanTitle}</div>}
       </div>
       {gallery.length > 1 && (
@@ -286,6 +286,47 @@ const breadcrumbLd = {
   </section>
 
   <RecentlyViewed currentSlug={p.slug} title="Recently viewed" />
+
+  <!-- Sticky buy bar (mobile): appears when the main Add-to-cart scrolls away -->
+  <div id="sticky-buy" class="lg:hidden fixed left-0 right-0 bottom-14 z-30 bg-white/95 backdrop-blur border-t border-black/10 px-4 py-2 flex items-center gap-3 translate-y-[150%] transition-transform duration-200">
+    <span class="text-bronze-600 font-medium whitespace-nowrap" data-usd={price}>{money(price)}</span>
+    <button class="add-to-cart flex-1 bg-bronze-600 text-cream py-2.5 rounded-md text-sm font-medium"
+      data-id={p.id} data-slug={p.slug} data-title={cleanTitle} data-price={price} data-img={gallery[0] || ''}>Add to cart</button>
+  </div>
+
+  <!-- Image lightbox -->
+  <div id="lightbox" class="fixed inset-0 z-50 bg-black/90 hidden items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Enlarged image">
+    <button id="lb-close" class="absolute top-3 right-4 text-white/90 text-4xl leading-none" aria-label="Close">×</button>
+    <img id="lb-img" src="" alt={mainAlt} class="max-w-full max-h-full object-contain cursor-zoom-in transition-transform duration-150" />
+  </div>
+
+  <script is:inline>
+    // ── Image lightbox (click main image to enlarge; click to toggle zoom) ──
+    (function () {
+      var main = document.getElementById('main-img');
+      var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lb-img');
+      if (!main || !lb || !lbImg) return;
+      function open() { lbImg.src = main.src; lbImg.classList.remove('scale-[1.8]'); lb.classList.remove('hidden'); lb.classList.add('flex'); document.documentElement.style.overflow = 'hidden'; }
+      function close() { lb.classList.add('hidden'); lb.classList.remove('flex'); document.documentElement.style.overflow = ''; }
+      main.addEventListener('click', open);
+      document.getElementById('lb-close').addEventListener('click', close);
+      lb.addEventListener('click', function (e) { if (e.target === lb) close(); });
+      lbImg.addEventListener('click', function () { lbImg.classList.toggle('scale-[1.8]'); lbImg.classList.toggle('cursor-zoom-out'); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    })();
+
+    // ── Sticky mobile buy bar ──────────────────────────────────────────
+    (function () {
+      var bar = document.getElementById('sticky-buy');
+      var mainBtn = document.querySelector('.grid .add-to-cart[data-id]');
+      if (!bar || !mainBtn || !('IntersectionObserver' in window)) return;
+      var io = new IntersectionObserver(function (entries) {
+        var visible = entries[0].isIntersecting;
+        bar.classList.toggle('translate-y-[150%]', visible);
+      }, { rootMargin: '0px 0px -40px 0px' });
+      io.observe(mainBtn);
+    })();
+  </script>
 
   <script type="application/ld+json" set:html={jsonLd(jsonld)} />
   <script type="application/ld+json" set:html={jsonLd(breadcrumbLd)} />
