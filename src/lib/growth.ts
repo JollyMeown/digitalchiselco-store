@@ -221,8 +221,10 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           const startD = fmtDay(fresh[fresh.length - 1].created_at), endD = fmtDay(fresh[0].created_at);
           const range = startD === endD ? startD : `${startD} – ${endD}`;
+          // Everyone confirmed gets the weekly digest, INCLUDING Etsy buyers
+          // (they get their one-time welcome first, then join the weekly).
           const { data: subs } = await db.from('subscribers').select('email')
-            .not('confirmed_at', 'is', null).is('unsubscribed_at', null).neq('source', 'etsy-buyer').limit(3000);
+            .not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(5000);
           // Resend batch: 100 emails/call, one idempotency key per chunk.
           const list = (subs || []).map((r) => r.email.toLowerCase());
           const tags = [{ name: 'kind', value: 'weekly' }, { name: 'week', value: week }];

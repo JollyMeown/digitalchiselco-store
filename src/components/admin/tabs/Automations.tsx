@@ -284,7 +284,7 @@ export default function Automations() {
         <Toggle field="referral_rewards_enabled" label="Referral rewards"
           desc="When a friend orders with someone's REF- share link, email the referrer a 15% reward code. The 15%-off for friends works whether this is on or off." />
         <Toggle field="etsy_welcome_enabled" label="Etsy-buyer welcome"
-          desc="One-time welcome to imported Etsy buyers (source 'etsy-buyer'): this week's newest designs + a 10% code. Sent once each, never twice. These buyers skip the drip and weekly digest." />
+          desc="One-time welcome to imported Etsy buyers (source 'etsy-buyer'): this week's newest designs + a 10% code. Sent once each, never twice. They skip the free-pack drip, then join the weekly digest like everyone else." />
       </div>
 
       <Card>
