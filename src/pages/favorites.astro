@@ -13,10 +13,14 @@ import RecentlyViewed from '../components/RecentlyViewed.astro';
   <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
     <Breadcrumbs crumbs={[{ label: 'Wishlist' }]} />
     <div class="flex items-center justify-between gap-3 flex-wrap mt-2 mb-1">
-      <h1 class="text-2xl md:text-3xl">Your Wishlist <span class="text-red-500">❤</span> <span id="wish-num" class="text-ink-700/50 text-lg"></span></h1>
-      <button id="wish-addall" class="hidden text-sm bg-bronze-600 text-cream px-4 py-2 rounded-md hover:bg-bronze-700 transition">Add all to cart</button>
+      <h1 id="wish-title" class="text-2xl md:text-3xl">Your Wishlist <span class="text-red-500">❤</span> <span id="wish-num" class="text-ink-700/50 text-lg"></span></h1>
+      <div class="flex gap-2">
+        <button id="wish-share" class="hidden text-sm border border-black/15 px-4 py-2 rounded-md hover:bg-cream transition">🔗 Share</button>
+        <button id="wish-saveall" class="hidden text-sm border border-bronze-600 text-bronze-700 px-4 py-2 rounded-md hover:bg-cream transition">Save to my wishlist</button>
+        <button id="wish-addall" class="hidden text-sm bg-bronze-600 text-cream px-4 py-2 rounded-md hover:bg-bronze-700 transition">Add all to cart</button>
+      </div>
     </div>
-    <p class="text-sm text-ink-700/70 mb-6">Designs you saved for later. They live in this browser, add to cart whenever you are ready.</p>
+    <p id="wish-sub" class="text-sm text-ink-700/70 mb-6">Designs you saved for later. They live in this browser, add to cart whenever you are ready.</p>
 
     <div id="wish-empty" class="hidden text-center py-16">
       <div class="text-5xl mb-3">🤍</div>
@@ -32,51 +36,94 @@ import RecentlyViewed from '../components/RecentlyViewed.astro';
 </Base>
 
 <script is:inline>
+  // Shared wishlist support: /favorites?s=<base64 of the item array> shows a
+  // read-only view of someone else's list, which the viewer can add to cart or
+  // save into their own. Without ?s it's the personal wishlist from localStorage.
+  function sharedItems() {
+    try { const s = new URLSearchParams(location.search).get('s'); if (!s) return null; return JSON.parse(decodeURIComponent(escape(atob(s)))); } catch { return null; }
+  }
+  const SHARED = sharedItems();
+
+  function cardHtml(p, shared) {
+    const t = (p.title || '').replace(/"/g, '&quot;');
+    const heart = shared ? '' : `<button type="button" class="wish-remove absolute top-2 right-2 w-8 h-8 rounded-full bg-white/85 flex items-center justify-center shadow-sm hover:scale-110 transition" data-id="${p.id}" aria-label="Remove from favorites">❤️</button>`;
+    return `<div class="group border border-black/10 rounded-md overflow-hidden bg-white flex flex-col">
+      <a href="/product/${p.slug}" class="relative block aspect-square bg-cream overflow-hidden">
+        ${p.img ? `<img src="${p.img}" alt="${t}" loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.03] transition" />` : `<div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">${p.title || ''}</div>`}
+        ${heart}
+      </a>
+      <div class="p-3 flex flex-col flex-1">
+        <a href="/product/${p.slug}" class="block"><h3 class="text-sm leading-snug line-clamp-2 text-ink-800 min-h-[2.5em]">${p.title || ''}</h3></a>
+        <span class="text-bronze-600 text-sm font-medium mt-1" data-usd="${Number(p.price || 0)}">$${Number(p.price || 0).toFixed(2)}</span>
+        <button class="add-to-cart mt-2 w-full text-xs border border-bronze-600 text-bronze-700 py-1.5 rounded hover:bg-bronze-600 hover:text-cream transition"
+          data-id="${p.id}" data-slug="${p.slug}" data-title="${t}" data-price="${p.price || 0}" data-img="${p.img || ''}">Add to cart</button>
+      </div>
+    </div>`;
+  }
+
   function render() {
-    let list = [];
-    try { list = JSON.parse(localStorage.getItem('dcc_wishlist') || '[]'); } catch {}
-    const grid = document.getElementById('wish-grid');
-    const empty = document.getElementById('wish-empty');
-    const num = document.getElementById('wish-num');
-    const addAll = document.getElementById('wish-addall');
+    const grid = document.getElementById('wish-grid'), empty = document.getElementById('wish-empty');
     if (!grid || !empty) return;
-    if (num) num.textContent = list.length ? `(${list.length})` : '';
-    if (addAll) addAll.classList.toggle('hidden', list.length === 0);
+    const shared = !!SHARED;
+    let list = SHARED;
+    if (!shared) { try { list = JSON.parse(localStorage.getItem('dcc_wishlist') || '[]'); } catch { list = []; } }
+    list = list || [];
+
+    // header controls
+    document.getElementById('wish-num').textContent = list.length ? `(${list.length})` : '';
+    document.getElementById('wish-addall').classList.toggle('hidden', list.length === 0);
+    document.getElementById('wish-share').classList.toggle('hidden', shared || list.length === 0);
+    document.getElementById('wish-saveall').classList.toggle('hidden', !shared || list.length === 0);
+    if (shared) {
+      document.getElementById('wish-title').innerHTML = 'A shared Wishlist <span class="text-red-500">❤</span>';
+      document.getElementById('wish-sub').textContent = 'Someone shared these designs with you. Add them to your cart, or save them to your own wishlist.';
+    }
+
     if (!list.length) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
-    grid.innerHTML = list.map((p) => `
-      <div class="group border border-black/10 rounded-md overflow-hidden bg-white flex flex-col">
-        <a href="/product/${p.slug}" class="relative block aspect-square bg-cream overflow-hidden">
-          ${p.img ? `<img src="${p.img}" alt="${(p.title || '').replace(/"/g, '&quot;')}" loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.03] transition" />` : `<div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">${p.title || ''}</div>`}
-          <button type="button" class="wish-remove absolute top-2 right-2 w-8 h-8 rounded-full bg-white/85 flex items-center justify-center shadow-sm hover:scale-110 transition" data-id="${p.id}" aria-label="Remove from favorites">❤️</button>
-        </a>
-        <div class="p-3 flex flex-col flex-1">
-          <a href="/product/${p.slug}" class="block"><h3 class="text-sm leading-snug line-clamp-2 text-ink-800 min-h-[2.5em]">${p.title || ''}</h3></a>
-          <span class="text-bronze-600 text-sm font-medium mt-1" data-usd="${Number(p.price || 0)}">$${Number(p.price || 0).toFixed(2)}</span>
-          <button class="add-to-cart mt-2 w-full text-xs border border-bronze-600 text-bronze-700 py-1.5 rounded hover:bg-bronze-600 hover:text-cream transition"
-            data-id="${p.id}" data-slug="${p.slug}" data-title="${(p.title || '').replace(/"/g, '&quot;')}" data-price="${p.price || 0}" data-img="${p.img || ''}">Add to cart</button>
-        </div>
-      </div>`).join('');
+    grid.innerHTML = list.map((p) => cardHtml(p, shared)).join('');
     if (window.dccSyncCartButtons) window.dccSyncCartButtons();
     if (window.dccConvertCcy) window.dccConvertCcy();
   }
+
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('.wish-remove'); if (!btn) return;
     e.preventDefault();
     if (window.DCCWish) { window.DCCWish.toggle({ id: btn.dataset.id }); render(); }
   });
-  // Add every saved design to the cart at once
+
+  function currentList() {
+    if (SHARED) return SHARED;
+    try { return JSON.parse(localStorage.getItem('dcc_wishlist') || '[]'); } catch { return []; }
+  }
+  // Add every design to the cart at once
   document.getElementById('wish-addall')?.addEventListener('click', () => {
-    let list = [], cart = [];
-    try { list = JSON.parse(localStorage.getItem('dcc_wishlist') || '[]'); } catch {}
-    try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch {}
+    let cart = []; try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch {}
     const have = new Set(cart.map((x) => x.id));
-    for (const p of list) if (!have.has(p.id)) cart.push({ id: p.id, slug: p.slug, title: p.title, price: Number(p.price) || 0, img: p.img || '' });
+    for (const p of currentList()) if (!have.has(p.id)) cart.push({ id: p.id, slug: p.slug, title: p.title, price: Number(p.price) || 0, img: p.img || '' });
     localStorage.setItem('cart', JSON.stringify(cart));
     window.dispatchEvent(new Event('cart-changed'));
     window.location.href = '/cart';
   });
-  window.addEventListener('wish-changed', render);
+  // Share: copy a link that encodes the current wishlist
+  document.getElementById('wish-share')?.addEventListener('click', async () => {
+    const items = currentList().map((p) => ({ id: p.id, slug: p.slug, title: p.title, price: p.price, img: p.img }));
+    const code = btoa(unescape(encodeURIComponent(JSON.stringify(items))));
+    const url = location.origin + '/favorites?s=' + code;
+    try { await navigator.clipboard.writeText(url); } catch {}
+    const btn = document.getElementById('wish-share'); const old = btn.textContent;
+    if (navigator.share) { try { await navigator.share({ title: 'My DigitalChiselCo wishlist', url }); } catch {} }
+    btn.textContent = '✓ Link copied'; setTimeout(() => { btn.textContent = old; }, 1800);
+  });
+  // Save a shared list into my own wishlist
+  document.getElementById('wish-saveall')?.addEventListener('click', () => {
+    if (!SHARED || !window.DCCWish) return;
+    const mine = window.DCCWish.list(); const have = new Set(mine.map((x) => x.id));
+    for (const p of SHARED) if (!have.has(p.id)) window.DCCWish.toggle({ id: p.id, slug: p.slug, title: p.title, price: p.price, img: p.img });
+    window.location.href = '/favorites';
+  });
+
+  window.addEventListener('wish-changed', () => { if (!SHARED) render(); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render, { once: true }); else render();
   window.addEventListener('pageshow', render);
 </script>
