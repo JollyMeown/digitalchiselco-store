@@ -29,6 +29,14 @@ const title = product.title.split('|')[0].trim();
     <a href={`/product/${product.slug}`} class="block">
       <h3 class="text-sm leading-snug line-clamp-2 text-ink-800 min-h-[2.5em]">{title}</h3>
     </a>
+    {(product.rating_count ?? 0) > 0 && (
+      <div class="flex items-center gap-1 mt-0.5" aria-label={`Rated ${product.rating_avg} out of 5`}>
+        <span class="text-yellow-500 text-xs leading-none" aria-hidden="true">
+          {'★'.repeat(Math.round(Number(product.rating_avg) || 0))}<span class="text-ink-700/25">{'★'.repeat(5 - Math.round(Number(product.rating_avg) || 0))}</span>
+        </span>
+        <span class="text-[11px] text-ink-700/50">({product.rating_count})</span>
+      </div>
+    )}
     <div class="mt-1 flex items-center gap-2 flex-wrap">
       <span class="text-bronze-600 text-sm font-medium" data-usd={price}>{money(price)}</span>
       {percent > 0 && <>

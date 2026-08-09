@@ -3,9 +3,10 @@ import { supabase } from './supabase';
 export type ProductCard = {
   id: string; title: string; slug: string; price_usd: number;
   image_url: string | null; is_bundle: boolean; link_status: string;
+  rating_avg?: number | null; rating_count?: number | null;
 };
 
-const CARD = 'id,title,slug,price_usd,image_url,is_bundle,link_status';
+const CARD = 'id,title,slug,price_usd,image_url,is_bundle,link_status,rating_avg,rating_count';
 
 export type SiteSettings = {
   donation_total: number; rating: number; reviews_count: number;

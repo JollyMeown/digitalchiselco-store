@@ -15,7 +15,7 @@ const settings = await getSettings();
 const SITE = 'https://digitalchiselco.com';
 
 let q = supabase.from('products')
-  .select('id, slug, title, price_usd, image_url, is_bundle')
+  .select('id, slug, title, price_usd, image_url, is_bundle, rating_avg, rating_count')
   .eq('active', true).not('image_url', 'is', null);
 if (topic.keywords.length) {
   q = q.or(topic.keywords.map((k) => `title.ilike.%${k}%`).join(','));

@@ -10,6 +10,8 @@ echo --- etsy shop stats --- >> finance-refresh.log
 "C:\Program Files\nodejs\node.exe" scripts\etsy_stats_sync.mjs >> finance-refresh.log 2>&1
 echo --- link etsy reviews to products (powers star snippets) --- >> finance-refresh.log
 "C:\Program Files\nodejs\node.exe" scripts\link_etsy_reviews.mjs --apply >> finance-refresh.log 2>&1
+echo --- recompute per-product rating badges --- >> finance-refresh.log
+"C:\Program Files\nodejs\node.exe" scripts\recompute_ratings.mjs >> finance-refresh.log 2>&1
 echo --- finance ledger refresh --- >> finance-refresh.log
 "C:\Program Files\nodejs\node.exe" scripts\finance_refresh.mjs --months 13 >> finance-refresh.log 2>&1
 echo --- done %time% --- >> finance-refresh.log
