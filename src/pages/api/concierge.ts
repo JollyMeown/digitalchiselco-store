@@ -1,7 +1,9 @@
 // Lightweight AI design concierge. Answers shop/compatibility questions and
 // recommends REAL designs from the catalog, grounded so it can't invent products
-// or prices. Uses Google Gemini Flash (free tier). Rate-limited per IP.
+// or prices. Primary model: Claude Haiku (fast, cheap, high quality). Falls back
+// to free Gemini Flash if ANTHROPIC_API_KEY is not set. Rate-limited per IP.
 import type { APIRoute } from 'astro';
+import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../../lib/supabase';
 import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
 
@@ -10,7 +12,8 @@ const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: 
 const env = (n: string) => process.env[n] ?? (import.meta as any).env?.[n];
 
 const SITE = 'https://digitalchiselco.com';
-const MODEL = env('GEMINI_MODEL') || 'gemini-2.5-flash';
+const CLAUDE_MODEL = env('CONCIERGE_MODEL') || 'claude-haiku-4-5';
+const GEMINI_MODEL = env('GEMINI_MODEL') || 'gemini-2.5-flash';
 const SYSTEM = `You are the friendly design concierge for DigitalChiselCo, a shop that sells premium bas-relief STL design files for CNC routers, laser engravers and 3D printers.
 
 Facts you can rely on:
@@ -25,7 +28,8 @@ Rules:
 - Be warm, brief and helpful (2-4 sentences). Never invent products, prices, links, or policies.
 - Recommend ONLY designs from the "Relevant designs" list provided in the user turn; link them as ${SITE}/product/<slug>. If none fit, suggest browsing ${SITE}/catalog or ${SITE}/designs.
 - You cannot process orders, payments, refunds, or accounts. For those, direct to the cart, the account page, or jolly@digitalchiselco.com.
-- If asked something unrelated to the shop, gently steer back to designs and carving.`;
+- If asked something unrelated to the shop, gently steer back to designs and carving.
+- Never use em dashes. Use commas or periods.`;
 
 async function relevantProducts(q: string) {
   const words = (q.toLowerCase().match(/[a-z]{3,}/g) || [])
@@ -39,9 +43,40 @@ async function relevantProducts(q: string) {
   return data || [];
 }
 
+// --- Claude Haiku (primary) ---
+async function askClaude(key: string, msgs: { role: string; content: string }[]): Promise<string> {
+  const anthropic = new Anthropic({ apiKey: key, maxRetries: 2 });
+  const res = await anthropic.messages.create({
+    model: CLAUDE_MODEL,
+    max_tokens: 500,
+    temperature: 0.6,
+    system: SYSTEM,
+    messages: msgs.map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })) as any,
+  });
+  const block = res.content.find((b: any) => b.type === 'text') as any;
+  return (block?.text || '').trim();
+}
+
+// --- Gemini Flash (free fallback) ---
+async function askGemini(key: string, msgs: { role: string; content: string }[]): Promise<string> {
+  const contents = msgs.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM }] },
+      contents,
+      generationConfig: { maxOutputTokens: 500, temperature: 0.6 },
+    }),
+  });
+  const d: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`gemini ${res.status} ${d?.error?.message || ''}`);
+  return (d?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text).join('').trim();
+}
+
 export const POST: APIRoute = async ({ request }) => {
-  const key = env('GEMINI_API_KEY') || env('GOOGLE_API_KEY');
-  if (!key) return json({ error: 'Concierge is not configured yet.' }, 503);
+  const claudeKey = env('ANTHROPIC_API_KEY');
+  const geminiKey = env('GEMINI_API_KEY') || env('GOOGLE_API_KEY');
+  if (!claudeKey && !geminiKey) return json({ error: 'Concierge is not configured yet.' }, 503);
   const ip = clientIp(request);
   if (!(await rateLimit(`concierge:ip:${ip}`, 20, 3600))) return tooMany();
 
@@ -60,25 +95,21 @@ export const POST: APIRoute = async ({ request }) => {
     msgs[msgs.length - 1] = { role: 'user', content: `${lastUser}\n\nRelevant designs (recommend only from these, or suggest browsing):\n${list}` };
   }
 
-  // Gemini uses roles "user" and "model"
-  const contents = msgs.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
-
+  // Primary: Claude Haiku. Fallback: Gemini Flash if Claude errors or has no key.
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM }] },
-        contents,
-        generationConfig: { maxOutputTokens: 500, temperature: 0.6 },
-      }),
-    });
-    const d: any = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error('[concierge] gemini', res.status, d?.error?.message);
-      return json({ error: 'The concierge is busy right now. Please try again, or email jolly@digitalchiselco.com.' }, 502);
+    let text = '';
+    if (claudeKey) {
+      try {
+        text = await askClaude(claudeKey, msgs);
+      } catch (e: any) {
+        console.error('[concierge] claude', e?.status, e?.message);
+        if (geminiKey) text = await askGemini(geminiKey, msgs);
+        else throw e;
+      }
+    } else if (geminiKey) {
+      text = await askGemini(geminiKey, msgs);
     }
-    const text = (d?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text).join('').trim();
-    return json({ ok: true, reply: text || "I'm here to help with our designs — what are you carving?" });
+    return json({ ok: true, reply: text || "I'm here to help with our designs. What are you carving?" });
   } catch (e: any) {
     console.error('[concierge]', e?.message);
     return json({ error: 'The concierge is busy right now. Please try again, or email jolly@digitalchiselco.com.' }, 502);
