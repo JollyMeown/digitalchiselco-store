@@ -42,8 +42,10 @@ function tierOf(r: any): { label: string; cls: string } {
   return { label: 'New', cls: 'bg-ink-700/10 text-ink-700/60' };
 }
 
+type Sub = 'people' | 'products' | 'leads' | 'referrals';
+
 export default function Insights() {
-  const [sub, setSub] = useState<'people' | 'products'>('people');
+  const [sub, setSub] = useState<Sub>('people');
   const [ov, setOv] = useState<any>(null);
   const [hot, setHot] = useState<any>(null);   // product opened from the hot-list
 
@@ -90,17 +92,122 @@ export default function Insights() {
         </div>
       )}
 
-      <div className="flex gap-2">
-        {(['people', 'products'] as const).map((k) => (
+      {ov?.health && <HealthCard health={ov.health} onChange={() => api({ view: 'overview' }).then((d) => d.ok && setOv(d))} />}
+
+      <div className="flex gap-2 flex-wrap">
+        {([['people', '👤 People'], ['products', '🎯 Product interest'], ['leads', '🔥 Hot leads'], ['referrals', '🎁 Referrals']] as [Sub, string][]).map(([k, label]) => (
           <button key={k} onClick={() => setSub(k)}
             className={`text-sm px-3 py-1.5 rounded-lg border ${sub === k ? 'bg-bronze-600 text-cream border-bronze-600' : 'border-black/10 text-ink-700 hover:bg-cream'}`}>
-            {k === 'people' ? '👤 People' : '🎯 Product interest'}
+            {label}
           </button>
         ))}
       </div>
 
-      {sub === 'people' ? <People /> : <Products topFromOverview={ov?.topProducts} />}
+      {sub === 'people' && <People />}
+      {sub === 'products' && <Products topFromOverview={ov?.topProducts} />}
+      {sub === 'leads' && <Leads />}
+      {sub === 'referrals' && <Referrals />}
     </div>
+  );
+}
+
+// ── List health: deliverability rates + prune ────────────────────────
+function HealthCard({ health: h, onChange }: { health: any; onChange: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const prune = async () => {
+    setBusy(true); setMsg('Suppressing…');
+    const r = await postApi({ action: 'suppress_bounced' });
+    setMsg(r.ok ? `✓ ${r.suppressed} suppressed` : `✗ ${r.error || 'failed'}`); setBusy(false); onChange();
+  };
+  const Metric = ({ label, val, good }: { label: string; val: string; good?: boolean }) => (
+    <div><div className="text-[11px] uppercase tracking-wide text-ink-700/55">{label}</div><div className={`text-lg font-medium ${good === false ? 'text-orange-600' : 'text-ink-800'}`}>{val}</div></div>
+  );
+  return (
+    <Card>
+      <div className="flex items-center gap-2 mb-3">
+        <h3 className="font-medium text-ink-900 text-sm">🩺 List health</h3>
+        <span className="text-xs text-ink-700/55">lifetime delivery quality</span>
+        <button onClick={prune} disabled={busy} className="ml-auto text-xs px-2.5 py-1.5 rounded border border-black/10 hover:bg-cream disabled:opacity-40">Suppress bounced &amp; complainers</button>
+        {msg && <span className="text-xs text-ink-800">{msg}</span>}
+      </div>
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+        <Metric label="Emails sent" val={h.sent.toLocaleString()} />
+        <Metric label="Delivered" val={`${h.deliveryRate}%`} />
+        <Metric label="Open rate" val={`${h.openRate}%`} />
+        <Metric label="Click rate" val={`${h.clickRate}%`} />
+        <Metric label="Bounce rate" val={`${h.bounceRate}%`} good={h.bounceRate < 2} />
+        <Metric label="Suppressed" val={h.suppressed.toLocaleString()} />
+      </div>
+      {h.complaintRate > 0.1 && <div className="text-xs text-orange-600 mt-2">⚠ Complaint rate {h.complaintRate}% — keep an eye on this; above 0.3% risks deliverability.</div>}
+    </Card>
+  );
+}
+
+// ── Hot leads (RFM) ──────────────────────────────────────────────────
+function Leads() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [open, setOpen] = useState<string | null>(null);
+  useEffect(() => { api({ view: 'leads' }).then((d) => d.ok && setRows(d.rows)); }, []);
+  const tier = (s: number) => s >= 400 ? { t: '🔥 Champion', c: 'bg-green-100 text-green-800' } : s >= 300 ? { t: 'Loyal', c: 'bg-amber-100 text-amber-800' } : s >= 200 ? { t: 'Promising', c: 'bg-sky-100 text-sky-800' } : { t: 'At risk', c: 'bg-ink-700/10 text-ink-700/70' };
+  return (
+    <Card>
+      <div className="text-xs text-ink-700/60 mb-3">Subscribers ranked by likelihood to buy (recency + order count + spend). Click to see their profile.</div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-ink-700/60 border-b border-black/10"><tr>
+            <th className="text-left font-medium px-2 py-2">Email</th><th className="text-left font-medium px-2 py-2">Tier</th>
+            <th className="text-left font-medium px-2 py-2">Orders</th><th className="text-left font-medium px-2 py-2">Revenue</th>
+            <th className="text-left font-medium px-2 py-2">Last activity</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r) => { const t = tier(r.score); return (
+              <tr key={r.email} className="border-b border-black/5 hover:bg-cream/40 cursor-pointer" onClick={() => setOpen(r.email)}>
+                <td className="px-2 py-2 text-bronze-700 max-w-[220px] truncate">{r.email}</td>
+                <td className="px-2 py-2"><span className={`text-[11px] px-1.5 py-0.5 rounded ${t.c}`}>{t.t}</span></td>
+                <td className="px-2 py-2">{r.orders}</td>
+                <td className="px-2 py-2">${Number(r.revenue).toFixed(2)}</td>
+                <td className="px-2 py-2 text-ink-700/70">{r.recencyDays}d ago</td>
+              </tr>
+            ); })}
+            {!rows.length && <tr><td colSpan={5} className="px-2 py-6 text-center text-ink-700/50">No orders yet to score.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {open && <PersonModal email={open} onClose={() => setOpen(null)} />}
+    </Card>
+  );
+}
+
+// ── Referral leaderboard ─────────────────────────────────────────────
+function Referrals() {
+  const [rows, setRows] = useState<any[]>([]);
+  useEffect(() => { api({ view: 'referrals' }).then((d) => d.ok && setRows(d.rows)); }, []);
+  return (
+    <Card>
+      <div className="text-xs text-ink-700/60 mb-3">Your top referrers. The referral-nudge automation invites customers to join this list.</div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-ink-700/60 border-b border-black/10"><tr>
+            <th className="text-left font-medium px-2 py-2">#</th><th className="text-left font-medium px-2 py-2">Referrer</th>
+            <th className="text-left font-medium px-2 py-2">Friends referred</th><th className="text-left font-medium px-2 py-2">Rewarded</th>
+            <th className="text-left font-medium px-2 py-2">Revenue driven</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.referrer_email} className="border-b border-black/5">
+                <td className="px-2 py-2 text-ink-700/60">{i + 1}</td>
+                <td className="px-2 py-2 text-bronze-700 max-w-[240px] truncate">{r.referrer_email}</td>
+                <td className="px-2 py-2 font-medium">{r.referred}</td>
+                <td className="px-2 py-2">{r.rewarded}</td>
+                <td className="px-2 py-2">${Number(r.revenue).toFixed(2)}</td>
+              </tr>
+            ))}
+            {!rows.length && <tr><td colSpan={5} className="px-2 py-6 text-center text-ink-700/50">No referrals yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }
 
@@ -279,6 +386,7 @@ function Products({ topFromOverview }: { topFromOverview?: any[] }) {
 
 function AudienceModal({ product, onClose }: { product: any; onClose: () => void }) {
   const [d, setD] = useState<any>(null);
+  const [rel, setRel] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
   const [seg, setSeg] = useState({ clicked: true, browsed: true, bought: false });
   const [myEmail, setMyEmail] = useState('');
@@ -288,6 +396,7 @@ function AudienceModal({ product, onClose }: { product: any; onClose: () => void
   const [msg, setMsg] = useState('');
 
   useEffect(() => { api({ view: 'product', product_id: product.product_id }).then((r) => r.ok && setD(r)); }, [product.product_id]);
+  useEffect(() => { api({ view: 'related', product_id: product.product_id }).then((r) => r.ok && setRel(r.related || [])); }, [product.product_id]);
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setMyEmail(data?.user?.email || '')); }, []);
   // recompute the real sendable count whenever the targeting changes
   useEffect(() => {
@@ -378,6 +487,21 @@ function AudienceModal({ product, onClose }: { product: any; onClose: () => void
               {!d.audience?.length && <div className="text-sm text-ink-700/50">No interest signals yet.</div>}
             </div>
           </div>
+
+          {rel.length > 0 && (
+            <div>
+              <div className="text-xs uppercase tracking-wide text-ink-700/60 mb-2">Customers who liked this also liked</div>
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {rel.map((p) => (
+                  <a key={p.slug} href={`/product/${p.slug}`} target="_blank" rel="noreferrer" className="shrink-0 w-[110px] group">
+                    {p.image_url && <img src={p.image_url} className="w-full h-[110px] object-cover rounded-lg border border-black/10 group-hover:ring-2 ring-bronze-500 transition" alt="" />}
+                    <div className="text-[11px] leading-tight mt-1 text-ink-800 line-clamp-2">{title1(p.title) || p.slug}</div>
+                    <div className="text-[11px] text-ink-700/55">{p.shared} shared {p.shared === 1 ? 'fan' : 'fans'}</div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Modal>

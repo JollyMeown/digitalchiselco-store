@@ -42,10 +42,11 @@ const slugFromUrl = (u: string | null): string | null => {
 async function overview() {
   const db = supabaseAdmin();
   const { data: eng } = await db.from('v_subscriber_engagement')
-    .select('email, source, opened, clicked, bounced, complained, last_opened_at, unsubscribed_at').limit(200000);
+    .select('email, source, sent, delivered, opened, clicked, bounced, complained, last_opened_at, unsubscribed_at').limit(200000);
   const rows = eng || [];
   const now = Date.now();
   let engaged30 = 0, clickers = 0, dormant = 0, neverOpened = 0, bounced = 0, complained = 0, unsub = 0;
+  let tSent = 0, tDelivered = 0, tOpened = 0, tClicked = 0, tBounced = 0, tComplained = 0;
   const bySource: Record<string, number> = {};
   for (const r of rows) {
     bySource[r.source || 'unknown'] = (bySource[r.source || 'unknown'] || 0) + 1;
@@ -53,11 +54,20 @@ async function overview() {
     if (r.bounced) bounced++;
     if (r.complained) complained++;
     if (r.clicked) clickers++;
+    tSent += r.sent || 0; tDelivered += r.delivered || 0; tOpened += r.opened || 0;
+    tClicked += r.clicked || 0; tBounced += r.bounced || 0; tComplained += r.complained || 0;
     const lo = r.last_opened_at ? new Date(r.last_opened_at).getTime() : 0;
     if (lo && now - lo <= 30 * DAY) engaged30++;
     else if (!lo) neverOpened++;
     else dormant++;
   }
+  const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : 0);
+  const { count: suppressed } = await db.from('subscribers').select('email', { count: 'exact', head: true }).not('suppressed_at', 'is', null);
+  const health = {
+    sent: tSent, deliveryRate: pct(tDelivered, tSent), openRate: pct(tOpened, tDelivered),
+    clickRate: pct(tClicked, tDelivered), bounceRate: pct(tBounced, tSent), complaintRate: pct(tComplained, tDelivered),
+    suppressed: suppressed || 0,
+  };
   // product affinity headline
   const { data: prod } = await db.from('v_product_interest')
     .select('slug, title, image_url, email_clickers, browsers, buyers, interest_score')
@@ -81,10 +91,91 @@ async function overview() {
   }
 
   return {
-    total: rows.length, engaged30, clickers, dormant, neverOpened, bounced, complained, unsub,
+    total: rows.length, engaged30, clickers, dormant, neverOpened, bounced, complained, unsub, health,
     bySource: Object.entries(bySource).map(([source, n]) => ({ source, n })).sort((a, b) => b.n - a.n),
     topProducts: prod || [], mostClickedWeek,
   };
+}
+
+// ── Hot leads: RFM-scored subscribers most likely to buy ─────────────
+async function leads(url: URL) {
+  const db = supabaseAdmin();
+  const { data } = await db.from('v_subscriber_rfm').select('email, source, orders, revenue, last_order_at, last_open_at, joined_at').limit(50000);
+  const now = Date.now();
+  const scored = (data || []).map((r) => {
+    const recencyDays = Math.floor((now - new Date(r.last_order_at || r.last_open_at || r.joined_at).getTime()) / DAY);
+    const R = recencyDays <= 14 ? 5 : recencyDays <= 45 ? 4 : recencyDays <= 90 ? 3 : recencyDays <= 180 ? 2 : 1;
+    const F = r.orders >= 5 ? 5 : r.orders >= 3 ? 4 : r.orders >= 2 ? 3 : r.orders >= 1 ? 2 : 1;
+    const rev = Number(r.revenue) || 0;
+    const M = rev >= 100 ? 5 : rev >= 50 ? 4 : rev >= 20 ? 3 : rev > 0 ? 2 : 1;
+    return { ...r, recencyDays, score: R * 100 + F * 10 + M, R, F, M };
+  }).sort((a, b) => b.score - a.score).slice(0, 100);
+  return { rows: scored };
+}
+
+// ── Referral leaderboard ─────────────────────────────────────────────
+async function referrals() {
+  const db = supabaseAdmin();
+  const { data } = await db.from('v_referral_leaderboard').select('referrer_email, referred, rewarded, revenue').order('referred', { ascending: false }).limit(100);
+  return { rows: data || [] };
+}
+
+// ── Related designs: customers who liked X also liked Y ──────────────
+async function related(url: URL) {
+  const db = supabaseAdmin();
+  const productId = url.searchParams.get('product_id') || '';
+  const { data: prod } = await db.from('products').select('id, slug').eq('id', productId).maybeSingle();
+  if (!prod) return { error: 'product not found' };
+  // audience interested in THIS product (browsed/bought/clicked)
+  const A = new Set<string>();
+  const [{ data: br }, { data: cl }, { data: oi }] = await Promise.all([
+    db.from('browse_events').select('email').eq('product_id', productId).limit(5000),
+    db.from('email_events').select('email').eq('event', 'clicked').ilike('url', `%/product/${prod.slug}%`).limit(5000),
+    db.from('order_items').select('order_id').eq('product_id', productId).limit(5000),
+  ]);
+  for (const r of br || []) A.add((r.email || '').toLowerCase());
+  for (const r of cl || []) A.add((r.email || '').toLowerCase());
+  for (const c of chunk((oi || []).map((x) => x.order_id), 300)) { const { data } = await db.from('orders').select('email').in('id', c).is('deleted_at', null); (data || []).forEach((o) => A.add((o.email || '').toLowerCase())); }
+  const audience = [...A].filter(Boolean).slice(0, 800);
+  if (!audience.length) return { related: [] };
+  // other products that same audience engaged with (browse + buy), by distinct people
+  const tally = new Map<string, Set<string>>();  // productId → emails
+  for (const c of chunk(audience, 300)) {
+    const { data: b2 } = await db.from('browse_events').select('email, product_id').in('email', c).limit(20000);
+    for (const r of b2 || []) if (r.product_id && r.product_id !== productId) (tally.get(r.product_id) || tally.set(r.product_id, new Set()).get(r.product_id)!).add((r.email || '').toLowerCase());
+  }
+  // buys by the audience
+  for (const c of chunk(audience, 300)) {
+    const { data: os } = await db.from('orders').select('id, email').in('email', c).is('deleted_at', null).limit(20000);
+    const idToEmail = new Map((os || []).map((o) => [o.id, (o.email || '').toLowerCase()]));
+    const oids = [...idToEmail.keys()];
+    for (const c2 of chunk(oids, 300)) {
+      const { data: its } = await db.from('order_items').select('order_id, product_id').in('order_id', c2).limit(20000);
+      for (const it of its || []) if (it.product_id && it.product_id !== productId) (tally.get(it.product_id) || tally.set(it.product_id, new Set()).get(it.product_id)!).add(idToEmail.get(it.order_id) || '');
+    }
+  }
+  const ranked = [...tally.entries()].map(([pid, set]) => ({ product_id: pid, shared: set.size })).sort((a, b) => b.shared - a.shared).slice(0, 8);
+  if (!ranked.length) return { related: [] };
+  const { data: pm } = await db.from('products').select('id, slug, title, image_url, price_usd').in('id', ranked.map((r) => r.product_id));
+  const meta = new Map((pm || []).map((p) => [p.id, p]));
+  return { related: ranked.map((r) => ({ ...r, ...(meta.get(r.product_id) || {}) })).filter((r) => r.slug) };
+}
+
+async function suppressBounced() {
+  const db = supabaseAdmin();
+  // everyone with a hard bounce or spam complaint, not already suppressed
+  const bad = new Set<string>();
+  for (const ev of ['bounced', 'complained']) {
+    const { data } = await db.from('email_events').select('email').eq('event', ev).limit(50000);
+    for (const r of data || []) if (r.email) bad.add(r.email.toLowerCase());
+  }
+  const emails = [...bad];
+  let suppressed = 0;
+  for (const c of chunk(emails, 200)) {
+    const { data } = await db.from('subscribers').update({ suppressed_at: new Date().toISOString() }).in('email', c).is('suppressed_at', null).select('email');
+    suppressed += (data || []).length;
+  }
+  return { suppressed };
 }
 
 async function people(url: URL) {
@@ -271,10 +362,14 @@ async function blast(request: Request, url: URL) {
 export const POST: APIRoute = async ({ request, url }) => {
   if (!(await isCallerAdmin(request))) return json({ error: 'Admin authentication required.' }, 401);
   try {
-    const out = await blast(request, url);
+    // peek at the action without consuming the body twice
+    const raw = await request.text();
+    const body = raw ? JSON.parse(raw) : {};
+    if (body.action === 'suppress_bounced') { const out = await suppressBounced(); return json({ ok: true, ...out }); }
+    const out = await blast(new Request(request.url, { method: 'POST', headers: request.headers, body: raw }), url);
     return json({ ok: !out.error, ...out }, out.error ? 400 : 200);
   } catch (e: any) {
-    return json({ error: e?.message || 'blast failed' }, 500);
+    return json({ error: e?.message || 'action failed' }, 500);
   }
 };
 
@@ -288,6 +383,9 @@ export const GET: APIRoute = async ({ request, url }) => {
     else if (view === 'subscriber') out = await subscriber(url);
     else if (view === 'products') out = await products(url);
     else if (view === 'product') out = await productAudience(url);
+    else if (view === 'leads') out = await leads(url);
+    else if (view === 'referrals') out = await referrals();
+    else if (view === 'related') out = await related(url);
     else return json({ error: 'unknown view' }, 400);
     return json({ ok: true, ...out });
   } catch (e: any) {
