@@ -28,6 +28,9 @@ type SendOptions = {
   idempotencyKey?: string;
   /** Optional Resend tags (surfaced back on webhook events → email stats). */
   tags?: { name: string; value: string }[];
+  /** Optional ISO time to schedule delivery (Resend scheduled_at) — used by
+   *  send-time optimization to deliver at each subscriber's best hour. */
+  scheduledAt?: string;
 };
 
 export function isResendConfigured(): boolean {
@@ -87,6 +90,7 @@ export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: strin
   if (opts.text) body.text = opts.text;
   if (replyTo) body.reply_to = replyTo;
   if (opts.tags?.length) body.tags = opts.tags;
+  if (opts.scheduledAt) body.scheduled_at = opts.scheduledAt;
 
   const headers: Record<string, string> = {
     authorization: `Bearer ${key}`,
@@ -137,6 +141,7 @@ export async function sendBatch(
     if (e.text) item.text = e.text;
     if (e.replyTo || replyTo) item.reply_to = e.replyTo || replyTo;
     if (e.tags?.length) item.tags = e.tags;
+    if (e.scheduledAt) item.scheduled_at = e.scheduledAt;
     return item;
   });
   const headers: Record<string, string> = { authorization: `Bearer ${key}`, 'content-type': 'application/json' };

@@ -14,6 +14,9 @@ const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'arrivals30', label: 'New arrivals (+30 days)', group: 'Post-purchase' },
   { key: 'loyalty', label: 'Loyalty 10% (3rd order)', group: 'Post-purchase' },
   { key: 'weekly', label: 'Weekly fresh-designs digest (Mondays)', group: 'Broadcasts' },
+  { key: 'winback', label: 'Win-back (dormant subscribers)', group: 'Broadcasts' },
+  { key: 'priceDrop', label: 'Price-drop alert', group: 'Broadcasts' },
+  { key: 'referralNudge', label: 'Referral nudge (happy customers)', group: 'Broadcasts' },
   { key: 'etsyWelcome', label: 'Etsy-buyer welcome (one-time)', group: 'Etsy buyers' },
 ];
 
@@ -285,6 +288,16 @@ export default function Automations() {
           desc="When a friend orders with someone's REF- share link, email the referrer a 15% reward code. The 15%-off for friends works whether this is on or off." />
         <Toggle field="etsy_welcome_enabled" label="Etsy-buyer welcome"
           desc="One-time welcome to imported Etsy buyers (source 'etsy-buyer'): this week's newest designs + a 10% code. Sent once each, never twice. They skip the free-pack drip, then join the weekly digest like everyone else." />
+        <Toggle field="weekly_personalized" label="Personalized weekly digest"
+          desc="Orders each subscriber's weekly designs by their own category affinity (from their clicks, browses and buys), so the designs most like what they engage with appear first." />
+        <Toggle field="winback_enabled" label="Win-back dormant subscribers"
+          desc="A 'we miss you' email + 15% code (WINBACK15) to people who have not opened in 60+ days. Also auto-suppresses chronic never-openers (6+ sends, 0 opens) to protect deliverability. Once per person." />
+        <Toggle field="price_drop_enabled" label="Price-drop alerts"
+          desc="When a design's price drops, emails the people who clicked or browsed it but never bought. Skips buyers and anyone already alerted for that design." />
+        <Toggle field="referral_nudge_enabled" label="Referral nudge"
+          desc="Asks customers with at least one order to share their personal referral link (give 15%, get 15%). Once per person, at least 14 days after their last order." />
+        <Toggle field="sendtime_enabled" label="Send-time optimization"
+          desc="Learns each subscriber's most common open hour and schedules their broadcasts to arrive then (via Resend). Improves opens over time as data builds." />
       </div>
 
       <Card>

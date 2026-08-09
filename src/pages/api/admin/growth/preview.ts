@@ -6,7 +6,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { send as sendEmail } from '../../../../lib/resend';
-import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
+import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, winbackEmail, priceDropEmail, referralNudgeEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
 
 export const prerender = false;
 
@@ -27,7 +27,7 @@ async function isCallerAdmin(request: Request): Promise<boolean> {
   return !!prof?.is_admin;
 }
 
-const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'browse', 'review7', 'arrivals30', 'loyalty', 'weekly', 'etsyWelcome'] as const;
+const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'browse', 'review7', 'arrivals30', 'loyalty', 'weekly', 'etsyWelcome', 'winback', 'priceDrop', 'referralNudge'] as const;
 
 async function render(kind: string, email: string): Promise<{ subject: string; html: string; text: string }> {
   const db = supabaseAdmin();
@@ -87,6 +87,13 @@ async function render(kind: string, email: string): Promise<{ subject: string; h
     const products = (fresh?.length ? fresh : newest || []) as MiniProduct[];
     out = etsyWelcomeEmail({ email, products, totalNew: count || products.length, code: 'THANKYOU10' });
   }
+  else if (kind === 'winback') out = winbackEmail({ email, products: (bestsellers.length ? bestsellers : newest || []) as MiniProduct[], code: 'WINBACK15' });
+  else if (kind === 'priceDrop') {
+    const p = (bestsellers[0] || (newest || [])[0]) as any;
+    const cur = Number(p?.price_usd) || 6.39;
+    out = priceDropEmail({ email, product: p as MiniProduct, oldPrice: cur + 3, newPrice: cur });
+  }
+  else if (kind === 'referralNudge') out = referralNudgeEmail({ email, code: 'REF-DEMO12', link: 'https://digitalchiselco.com/?ref=REF-DEMO12' });
   else throw new Error('unknown kind');
 
   // owner-saved edits (subject / heading / body) apply to preview + test-sends

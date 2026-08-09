@@ -70,6 +70,9 @@ export const TEMPLATE_HEADINGS: Record<string, string> = {
   weekly: 'Fresh from the workshop 🪵',
   browse: 'Still thinking it over? 🪵',
   etsyWelcome: 'Welcome to the workshop 🪵',
+  winback: 'Come back and carve 🪵',
+  priceDrop: 'A design you liked just got cheaper',
+  referralNudge: 'Give 15%, get 15% 🎁',
 };
 
 function shell(subject: string, heading: string, bodyHtml: string, email: string): string {
@@ -330,6 +333,62 @@ export function productSpotlightEmail(d: { email: string; product: MiniProduct; 
     <p style="text-align:center;font-size:13px;color:#777;margin:14px 0 0;">Not quite right? <a href="${SITE}/catalog" style="color:${BRONZE};">Browse the full collection</a></p>`;
   const text = `We thought you'd love this design: ${t}. ${SITE}/product/${p.slug}\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'A design picked for you 🪵', body, d.email), text };
+}
+
+// ── Win-back (dormant subscriber, gentle nudge + code) ───────────────
+export function winbackEmail(d: { email: string; products: MiniProduct[]; code: string }): Out {
+  const subject = 'We saved your spot at the workshop 🪵';
+  const rows: string[] = [];
+  for (let i = 0; i < Math.min(3, d.products.length); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Hi fellow maker,</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">It has been a while, and we have added a lot of new designs since you last stopped by. To welcome you back, here is <strong>15% off</strong> anything in the shop:</p>
+    <div style="text-align:center;margin:6px 0 16px;">
+      <div style="display:inline-block;background:#fff;border:1px dashed ${BRONZE};border-radius:8px;padding:12px 28px;font-family:monospace;font-size:22px;letter-spacing:3px;color:${BRONZE_DARK};font-weight:bold;">${esc(d.code)}</div>
+    </div>
+    ${rows.join('')}
+    ${btn(SITE + '/catalog', 'See what is new')}
+    <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">Not carving these days? No hard feelings, you can unsubscribe below.</p>`;
+  const text = `We miss you at DigitalChiselCo. Here is 15% off with code ${d.code}: ${SITE}/catalog\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'Come back and carve 🪵', body, d.email), text };
+}
+
+// ── Price-drop alert (a design they liked just got cheaper) ──────────
+export function priceDropEmail(d: { email: string; product: MiniProduct; oldPrice: number; newPrice: number }): Out {
+  const p = d.product;
+  const t = (p.title || '').split('|')[0].trim();
+  const subject = `Price drop on a design you liked: ${t.slice(0, 45)}`;
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Good news,</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">A design you were looking at just dropped in price:</p>
+    <div style="text-align:center;">
+      <a href="${SITE}/product/${esc(p.slug)}" style="text-decoration:none;color:${INK};">
+        ${p.image_url ? `<img src="${esc(p.image_url)}" width="420" style="width:100%;max-width:420px;border-radius:10px;display:block;margin:0 auto;" alt="${esc(t)}">` : ''}
+        <div style="font-size:17px;font-weight:600;margin:12px 0 4px;color:${INK};">${esc(t)}</div>
+        <div style="font-size:16px;">
+          <span style="color:#999;text-decoration:line-through;margin-right:8px;">$${d.oldPrice.toFixed(2)}</span>
+          <span style="color:${BRONZE};font-weight:700;">$${d.newPrice.toFixed(2)}</span>
+        </div>
+      </a>
+    </div>
+    ${btn(SITE + '/product/' + esc(p.slug), 'Grab it now')}`;
+  const text = `Price drop: ${t} is now $${d.newPrice.toFixed(2)} (was $${d.oldPrice.toFixed(2)}). ${SITE}/product/${p.slug}\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'A design you liked just got cheaper', body, d.email), text };
+}
+
+// ── Referral nudge (ask a happy customer to share their link) ─────────
+export function referralNudgeEmail(d: { email: string; code: string; link: string }): Out {
+  const subject = 'Share your favourite designs, earn 15% 🎁';
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Hi fellow maker,</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">Thanks for being part of the workshop. Know someone with a CNC or laser who would love our designs? Share your personal link: <strong>they get 15% off their first order, and you get 15% off your next one</strong>.</p>
+    <div style="text-align:center;margin:6px 0 14px;">
+      <div style="display:inline-block;background:#fff;border:1px dashed ${BRONZE};border-radius:8px;padding:10px 20px;font-family:monospace;font-size:14px;color:${BRONZE_DARK};word-break:break-all;">${esc(d.link)}</div>
+    </div>
+    ${btn(d.link, 'Share my link')}
+    <p style="text-align:center;font-size:13px;color:#777;margin:14px 0 0;">Your code: <strong>${esc(d.code)}</strong> · track your rewards in <a href="${SITE}/account" style="color:${BRONZE};">your account</a></p>`;
+  const text = `Share DigitalChiselCo and earn 15%. Your link: ${d.link}\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'Give 15%, get 15% 🎁', body, d.email), text };
 }
 
 // ── Referral reward (referrer earns their 15% after a friend orders) ──

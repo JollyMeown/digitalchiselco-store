@@ -12,6 +12,7 @@ import { send as sendEmail, sendBatch } from './resend';
 import {
   dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
   weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS,
+  winbackEmail, priceDropEmail, referralNudgeEmail,
   type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
 import { isoWeekKey } from './weekly-digest';
@@ -30,6 +31,33 @@ async function hasPaidOrder(db: DB, email: string): Promise<boolean> {
 async function isUnsubscribed(db: DB, email: string): Promise<boolean> {
   const { data } = await db.from('subscribers').select('unsubscribed_at').ilike('email', email).maybeSingle();
   return !!data?.unsubscribed_at;
+}
+
+const chunk = <T,>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; };
+const hashKey = (prefix: string, emails: string[]) =>
+  prefix + ':' + createHash('sha256').update([...emails].sort().join(',')).digest('hex').slice(0, 28);
+
+/** The next future occurrence (UTC) of `hour`:00, as an ISO string, for
+ *  send-time-optimized delivery via Resend scheduled_at. */
+function nextHourIso(hour: number | null | undefined): string | undefined {
+  if (hour == null || hour < 0 || hour > 23) return undefined;
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hour, 0, 0));
+  if (d.getTime() <= now.getTime() + 60000) d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString();
+}
+
+/** Deterministic REF- code per email (mirrors /account); ensures the
+ *  referral_codes row + matching 15% coupon exist. */
+async function ensureReferralCode(db: DB, email: string): Promise<string> {
+  const e = email.toLowerCase();
+  const { data: rc } = await db.from('referral_codes').select('code').eq('email', e).maybeSingle();
+  if (rc?.code) return rc.code;
+  const secret = process.env.ACCOUNT_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'ref';
+  const code = 'REF-' + createHash('sha256').update('ref:' + e).digest('hex').slice(0, 6).toUpperCase();
+  await db.from('referral_codes').upsert({ email: e, code }, { onConflict: 'email' });
+  await db.from('coupons').upsert({ code, percent_off: 15, active: true, description: `referral share code for ${e}` }, { onConflict: 'code' });
+  return code;
 }
 
 export async function runGrowthAutomation(): Promise<Record<string, any>> {
@@ -209,7 +237,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         const { data: mk } = await db.from('site_settings').select('weekly_last_sent_at').eq('id', 1).maybeSingle();
         const sinceIso = (mk?.weekly_last_sent_at as string) || daysAgo(7);
         const { data: fresh } = await db.from('products')
-          .select('title, slug, price_usd, image_url, created_at')
+          .select('id, title, slug, price_usd, image_url, created_at')
           .eq('active', true).gt('created_at', sinceIso)
           .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
           .order('created_at', { ascending: false }).limit(80);
@@ -224,19 +252,44 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           const range = startD === endD ? startD : `${startD} – ${endD}`;
           // Everyone confirmed gets the weekly digest, INCLUDING Etsy buyers
           // (they get their one-time welcome first, then join the weekly).
-          const { data: subs } = await db.from('subscribers').select('email')
-            .not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(5000);
-          // Resend batch: 100 emails/call, one idempotency key per chunk.
-          const list = (subs || []).map((r) => r.email.toLowerCase());
+          const { data: subs } = await db.from('subscribers').select('email, best_send_hour')
+            .not('confirmed_at', 'is', null).is('unsubscribed_at', null).is('suppressed_at', null).limit(20000);
+          const list = (subs || []).map((r) => ({ email: r.email.toLowerCase(), hour: r.best_send_hour as number | null }));
+
+          // ── Personalization: order each person's designs by their category
+          // affinity so the ones most like what they engage with come first.
+          const freshProducts = fresh as (MiniProduct & { id?: string })[];
+          const catByProduct = new Map<string, string[]>();     // productId → categoryIds
+          const affByEmail = new Map<string, Set<string>>();     // email → top categoryIds
+          if (g.weekly_personalized) {
+            const ids = (freshProducts as any[]).map((p) => p.id).filter(Boolean);
+            if (ids.length) {
+              const { data: pcs } = await db.from('product_categories').select('product_id, category_id').in('product_id', ids);
+              for (const r of pcs || []) (catByProduct.get(r.product_id) || catByProduct.set(r.product_id, []).get(r.product_id)!).push(r.category_id);
+            }
+            for (const batch of chunk(list.map((l) => l.email), 300)) {
+              const { data: aff } = await db.from('v_subscriber_category_affinity').select('email, category_id, score').in('email', batch);
+              const perEmail = new Map<string, { c: string; s: number }[]>();
+              for (const a of aff || []) (perEmail.get(a.email) || perEmail.set(a.email, []).get(a.email)!).push({ c: a.category_id, s: a.score });
+              for (const [em, arr] of perEmail) affByEmail.set(em, new Set(arr.sort((x, y) => y.s - x.s).slice(0, 5).map((x) => x.c)));
+            }
+          }
+          const personalize = (email: string): MiniProduct[] => {
+            if (!g.weekly_personalized) return freshProducts;
+            const liked = affByEmail.get(email); if (!liked?.size) return freshProducts;
+            const sc = (p: any) => ((catByProduct.get(p.id) || []).some((c) => liked.has(c)) ? 1 : 0);
+            return [...freshProducts].sort((a, b) => sc(b) - sc(a));
+          };
+
           const tags = [{ name: 'kind', value: 'weekly' }, { name: 'week', value: week }];
-          for (let c = 0; c < list.length; c += 100) {
-            const chunk = list.slice(c, c + 100).map((email) => {
+          for (const part of chunk(list, 100)) {
+            const emails = part.map((r) => {
               const { subject, html, text } = withOvr('weekly',
-                weeklyDigestEmail({ email, products: fresh as MiniProduct[], weekNumber, range }), email);
-              return { to: email, subject, html, text, tags };
+                weeklyDigestEmail({ email: r.email, products: personalize(r.email), weekNumber, range }), r.email);
+              return { to: r.email, subject, html, text, tags, scheduledAt: g.sendtime_enabled ? nextHourIso(r.hour) : undefined };
             });
-            const res = await sendBatch(chunk, `digest:${week}:chunk${c / 100}`);
-            if (res.ok) s.sent += res.sent; else s.failed += chunk.length;
+            const res = await sendBatch(emails, hashKey(`digest:${week}`, part.map((r) => r.email)));
+            if (res.ok) s.sent += res.sent; else s.failed += emails.length;
           }
           await db.from('weekly_digest_log').update({ sent_count: s.sent, product_count: s.products }).eq('week_key', week);
         } else {
@@ -342,6 +395,138 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     s.candidates = byEmail.size;
     stats.browse = s;
   }
+
+  const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
+  const BAD = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
+  const okEmail = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !BAD.test(e);
+
+  // ── 6. Win-back + deliverability suppression ─────────────────────────
+  stats.winback = 'off';
+  if (g.winback_enabled) {
+    const s = { candidates: 0, sent: 0, suppressed: 0, failed: 0 };
+    const { data: eng } = await db.from('v_subscriber_engagement')
+      .select('email, joined_at, sent, opened, bounced, complained, last_opened_at, unsubscribed_at').limit(50000);
+    const { data: supRows } = await db.from('subscribers').select('email').not('suppressed_at', 'is', null).limit(50000);
+    const suppressed = new Set((supRows || []).map((r) => r.email.toLowerCase()));
+    const { data: wl } = await db.from('winback_log').select('email').limit(50000);
+    const welcomedBack = new Set((wl || []).map((r) => r.email.toLowerCase()));
+    const now = Date.now();
+    const D = (d: any) => (d ? new Date(d).getTime() : 0);
+
+    // suppress chronic never-openers (6+ sends, 0 opens, older than 90d)
+    const toSuppress = (eng || []).filter((r) => !r.unsubscribed_at && !suppressed.has(r.email.toLowerCase())
+      && r.sent >= 6 && r.opened === 0 && D(r.joined_at) < now - 90 * 86400000).map((r) => r.email.toLowerCase());
+    for (const b of chunk(toSuppress, 200)) {
+      await db.from('subscribers').update({ suppressed_at: new Date().toISOString() }).in('email', b);
+      b.forEach((e) => suppressed.add(e));
+    }
+    s.suppressed = toSuppress.length;
+
+    // win-back audience: dormant but not dead
+    const cand = (eng || []).filter((r) => {
+      const e = r.email.toLowerCase(); const lo = D(r.last_opened_at);
+      return !r.unsubscribed_at && !r.bounced && !r.complained && !suppressed.has(e) && !welcomedBack.has(e)
+        && r.sent >= 2 && okEmail(e) && D(r.joined_at) < now - 30 * 86400000
+        && (lo === 0 || lo < now - 60 * 86400000);
+    }).map((r) => r.email.toLowerCase()).slice(0, 60);
+    s.candidates = cand.length;
+    if (cand.length) {
+      await db.from('coupons').upsert({ code: 'WINBACK15', percent_off: 15, active: true, description: 'win-back 15%' }, { onConflict: 'code' });
+      const { data: best } = await db.from('products').select('title, slug, image_url, price_usd')
+        .eq('active', true).eq('is_bestseller', true).not('image_url', 'is', null).limit(3);
+      let show = (best || []) as MiniProduct[];
+      if (!show.length) { const { data: nw } = await db.from('products').select('title, slug, image_url, price_usd').eq('active', true).not('image_url', 'is', null).order('created_at', { ascending: false }).limit(3); show = (nw || []) as MiniProduct[]; }
+      for (const part of chunk(cand, 100)) {
+        const emails = part.map((email) => { const { subject, html, text } = withOvr('winback', winbackEmail({ email, products: show, code: 'WINBACK15' }), email); return { to: email, subject, html, text, tags: [{ name: 'kind', value: 'winback' }] }; });
+        const res = await sendBatch(emails, hashKey('winback', part));
+        if (res.ok) { s.sent += res.sent; await db.from('winback_log').upsert(part.map((email) => ({ email })), { onConflict: 'email', ignoreDuplicates: true }); } else s.failed += part.length;
+      }
+    }
+    stats.winback = s;
+  }
+
+  // ── 7. Price-drop alerts (a design they liked got cheaper) ───────────
+  stats.priceDrop = 'off';
+  if (g.price_drop_enabled) {
+    const s = { drops: 0, sent: 0, failed: 0 };
+    const { data: snaps } = await db.from('product_price_snapshot').select('product_id, price_usd').limit(50000);
+    const snapMap = new Map((snaps || []).map((r) => [r.product_id, Number(r.price_usd)]));
+    const { data: prods } = await db.from('products').select('id, slug, title, image_url, price_usd').eq('active', true).not('price_usd', 'is', null).limit(50000);
+    const drops = (prods || []).filter((p) => snapMap.has(p.id) && Number(p.price_usd) < (snapMap.get(p.id) as number) - 0.001).slice(0, 20);
+    s.drops = drops.length;
+    const suppressed = new Set(((await db.from('subscribers').select('email').not('suppressed_at', 'is', null).limit(50000)).data || []).map((r) => r.email.toLowerCase()));
+    for (const p of drops) {
+      const oldPrice = snapMap.get(p.id) as number, newPrice = Number(p.price_usd);
+      // interested non-buyers: clickers + browsers
+      const interested = new Set<string>();
+      const [{ data: cl }, { data: br }, { data: buys }] = await Promise.all([
+        db.from('email_events').select('email').eq('event', 'clicked').ilike('url', `%/product/${p.slug}%`).limit(5000),
+        db.from('browse_events').select('email').eq('product_id', p.id).limit(5000),
+        db.from('order_items').select('order_id').eq('product_id', p.id).limit(5000),
+      ]);
+      for (const r of cl || []) interested.add((r.email || '').toLowerCase());
+      for (const r of br || []) interested.add((r.email || '').toLowerCase());
+      const buyers = new Set<string>();
+      for (const b of chunk((buys || []).map((x) => x.order_id), 300)) { const { data } = await db.from('orders').select('email').in('id', b).is('deleted_at', null); (data || []).forEach((o) => buyers.add((o.email || '').toLowerCase())); }
+      let cands = [...interested].filter((e) => okEmail(e) && !buyers.has(e) && !suppressed.has(e));
+      // confirmed, non-unsubscribed subscribers only
+      const sendable = new Set<string>();
+      for (const b of chunk(cands, 300)) { const { data } = await db.from('subscribers').select('email, confirmed_at, unsubscribed_at').in('email', b); for (const su of data || []) if (su.confirmed_at && !su.unsubscribed_at) sendable.add(su.email.toLowerCase()); }
+      // drop already-notified for this product
+      for (const b of chunk([...sendable], 300)) { const { data } = await db.from('price_drop_log').select('email').eq('product_id', p.id).in('email', b); for (const r of data || []) sendable.delete((r.email || '').toLowerCase()); }
+      const recips = [...sendable].slice(0, 300);
+      for (const part of chunk(recips, 100)) {
+        const emails = part.map((email) => { const { subject, html, text } = withOvr('priceDrop', priceDropEmail({ email, product: p as MiniProduct, oldPrice, newPrice }), email); return { to: email, subject, html, text, tags: [{ name: 'kind', value: 'price-drop' }] }; });
+        const res = await sendBatch(emails, hashKey(`pricedrop:${p.id}`, part));
+        if (res.ok) { s.sent += res.sent; await db.from('price_drop_log').upsert(part.map((email) => ({ product_id: p.id, email, price_usd: newPrice })), { onConflict: 'product_id,email', ignoreDuplicates: true }); } else s.failed += part.length;
+      }
+    }
+    // refresh ALL snapshots to current price (so increases re-baseline and drops do not re-fire)
+    for (const b of chunk(prods || [], 500)) await db.from('product_price_snapshot').upsert(b.map((p) => ({ product_id: p.id, price_usd: Number(p.price_usd), updated_at: new Date().toISOString() })), { onConflict: 'product_id' });
+    stats.priceDrop = s;
+  }
+
+  // ── 8. Referral nudge (ask happy customers to share their link) ──────
+  stats.referralNudge = 'off';
+  if (g.referral_nudge_enabled) {
+    const s = { candidates: 0, sent: 0, failed: 0 };
+    const { data: rfm } = await db.from('v_subscriber_rfm').select('email, orders, last_order_at').gte('orders', 1).limit(50000);
+    const { data: nl } = await db.from('referral_nudge_log').select('email').limit(50000);
+    const nudged = new Set((nl || []).map((r) => r.email.toLowerCase()));
+    const now = Date.now();
+    const cand = (rfm || []).filter((r) => {
+      const e = r.email.toLowerCase();
+      return okEmail(e) && !nudged.has(e) && (!r.last_order_at || new Date(r.last_order_at).getTime() < now - 14 * 86400000);
+    }).map((r) => r.email.toLowerCase()).slice(0, 40);
+    s.candidates = cand.length;
+    for (const email of cand) {
+      try {
+        // must be a confirmed, non-unsubscribed, non-suppressed subscriber
+        const { data: su } = await db.from('subscribers').select('confirmed_at, unsubscribed_at, suppressed_at').ilike('email', email).maybeSingle();
+        if (!su?.confirmed_at || su.unsubscribed_at || su.suppressed_at) continue;
+        const code = await ensureReferralCode(db, email);
+        const { subject, html, text } = withOvr('referralNudge', referralNudgeEmail({ email, code, link: `${SITE}/?ref=${code}` }), email);
+        const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `refnudge:${email}`, tags: [{ name: 'kind', value: 'referral-nudge' }] });
+        if (res.ok) { s.sent++; await db.from('referral_nudge_log').upsert({ email }, { onConflict: 'email', ignoreDuplicates: true }); } else s.failed++;
+      } catch { s.failed++; }
+    }
+    stats.referralNudge = s;
+  }
+
+  // ── 9. Send-time learning: each subscriber's most common open hour ───
+  if (g.sendtime_enabled) {
+    const { data: opens } = await db.from('email_events').select('email, created_at').eq('event', 'opened').gte('created_at', daysAgo(90)).limit(50000);
+    const hours = new Map<string, number[]>();   // email → 24-bucket histogram
+    for (const o of opens || []) {
+      const em = (o.email || '').toLowerCase(); if (!em) continue;
+      const h = new Date(o.created_at).getUTCHours();
+      const arr = hours.get(em) || new Array(24).fill(0); arr[h]++; hours.set(em, arr);
+    }
+    const updates: { email: string; best_send_hour: number }[] = [];
+    for (const [email, hist] of hours) { let bi = 0; for (let i = 1; i < 24; i++) if (hist[i] > hist[bi]) bi = i; updates.push({ email, best_send_hour: bi }); }
+    for (const b of chunk(updates, 200)) for (const u of b) await db.from('subscribers').update({ best_send_hour: u.best_send_hour }).ilike('email', u.email);
+    stats.sendtime = { learned: updates.length };
+  } else stats.sendtime = 'off';
 
   return stats;
 }
