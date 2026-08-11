@@ -36,16 +36,28 @@ const cutoff = new Date(); cutoff.setUTCMonth(cutoff.getUTCMonth() - MONTHS);
 const cutoffMs = cutoff.getTime();
 const status = { channels: {}, generated_note: 'Etsy revenue = receipt grandtotal; Etsy ad spend = Promoted Listings (prolist); Cults converted at EUR_USD=' + EUR_USD };
 
-// ── 1) WEBSITE (Paddle orders, USD) ──────────────────────────────────
+// ── 1) WEBSITE (Paddle orders — mostly USD; multi-currency checkout can
+// store EUR/GBP/CAD/AUD totals, converted here with the stored fx rates) ──
 {
   let from = 0, count = 0, rev30 = 0;
   const now = Date.now(), d30 = now - 30 * 86400000;
+  // fx_rates = USD→foreign, refreshed daily by the growth cron. foreign→USD = /rate.
+  let fx = {};
+  try {
+    const { data: st } = await db.from('site_settings').select('fx_rates').eq('id', 1).maybeSingle();
+    fx = st?.fx_rates || {};
+  } catch { /* fall back: non-USD orders counted at face value */ }
+  const toUsd = (amount, ccy) => {
+    if (!ccy || ccy === 'USD') return amount;
+    const r = Number(fx[ccy]);
+    return r > 0 ? amount / r : amount;
+  };
   for (;;) {
     const { data } = await db.from('orders').select('total, currency, status, created_at').eq('status', 'paid').gte('created_at', cutoff.toISOString()).order('created_at').range(from, from + 999);
     if (!data || !data.length) break;
     for (const o of data) {
       const day = o.created_at.slice(0, 10);
-      const usd = Number(o.total) || 0; // website is USD
+      const usd = round2(toUsd(Number(o.total) || 0, o.currency));
       bump(day, 'website', { revenue_usd: usd, revenue_native: usd, currency: 'USD' });
       count++;
       if (new Date(o.created_at).getTime() >= d30) rev30 += usd;
