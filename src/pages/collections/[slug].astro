@@ -46,6 +46,16 @@ const settings = await getSettings();
       {category.description && <p class="text-ink-700/80 text-sm mb-6 max-w-3xl">{category.description}</p>}
     </>
   )}
+  <!-- "Complete the collection" progress — renders only for returning buyers
+       (email known from a past cart/subscribe) who own 1+ designs here. -->
+  <div id="coll-progress" class="hidden mb-5 bg-[#FAEEDA] border border-bronze-600/30 rounded-lg px-4 py-3" data-slug={category.slug}>
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <p class="text-sm text-bronze-800"><span aria-hidden="true">🏆</span> You own <strong id="coll-owned">0</strong> of <strong id="coll-total">0</strong> designs in this collection</p>
+      <a id="coll-cta" href="/bundle-builder" class="text-xs font-medium text-bronze-700 underline whitespace-nowrap">Complete it — pick 5 more for $25 →</a>
+    </div>
+    <div class="mt-2 h-2 rounded-full bg-white/70 overflow-hidden"><div id="coll-fill" class="h-full bg-bronze-600 transition-all" style="width:0%"></div></div>
+  </div>
+
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
     {products.map((p) => <ProductCard product={p} discount={settings.discount_percent} />)}
   </div>
@@ -56,4 +66,29 @@ const settings = await getSettings();
       {page < pages && <a href={`/collections/${slug}?page=${page + 1}`} class="px-3 py-1.5 border border-black/10 rounded">Next →</a>}
     </nav>
   )}
+
+  <script is:inline>
+    // Collection-completion progress: only for buyers whose email we already
+    // know client-side. Server returns counts only.
+    (function () {
+      var box = document.getElementById('coll-progress');
+      if (!box) return;
+      var email = '';
+      try { email = localStorage.getItem('dcc_email') || localStorage.getItem('buyer_email') || ''; } catch (_) {}
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return;
+      fetch('/api/collection-progress', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: email, slug: box.dataset.slug }),
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (!d.ok || !d.owned || d.owned < 1 || d.owned >= d.total) return; // show only mid-collection
+        document.getElementById('coll-owned').textContent = d.owned;
+        document.getElementById('coll-total').textContent = d.total;
+        document.getElementById('coll-fill').style.width = Math.max(4, Math.round((d.owned / d.total) * 100)) + '%';
+        var remaining = d.total - d.owned;
+        var cta = document.getElementById('coll-cta');
+        if (remaining < 5 && cta) { cta.textContent = 'Only ' + remaining + ' to go →'; cta.href = '#'; cta.addEventListener('click', function (e) { e.preventDefault(); window.scrollTo({ top: box.offsetTop + 200, behavior: 'smooth' }); }); }
+        box.classList.remove('hidden');
+      }).catch(function () {});
+    })();
+  </script>
 </Shell>

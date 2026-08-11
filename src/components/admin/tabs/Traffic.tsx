@@ -51,12 +51,13 @@ function TopList({ title, rows, total }: { title: string; rows: [string, number]
   );
 }
 
-type Ev = { day: string; type: string; product_id: string | null; q: string | null; n: number | null; visitor_hash: string | null };
+type Ev = { day: string; type: string; product_id: string | null; q: string | null; n: number | null; visitor_hash: string | null; ts?: string };
 
 export default function Traffic() {
   const [days, setDays] = useState<number>(30);
   const [rows, setRows] = useState<Visit[]>([]);
   const [events, setEvents] = useState<Ev[]>([]);
+  const [eventsExt, setEventsExt] = useState<Ev[]>([]);   // ≥30d window for the Shopper-actions panel
   const [paidCount, setPaidCount] = useState(0);
   const [prodNames, setProdNames] = useState<Record<string, string>>({});
   const [salesByProduct, setSalesByProduct] = useState<Record<string, number>>({});
@@ -79,26 +80,34 @@ export default function Traffic() {
     }
     setRows(out);
 
-    // funnel events + paid orders + product-heat context
-    const [{ data: evs }, { count: paid }, { data: oi }] = await Promise.all([
-      supabase.from('site_events').select('day, type, product_id, q, n, visitor_hash').gte('day', since).limit(20000),
+    // funnel events + paid orders + product-heat context. Events are fetched
+    // for at least 30 days so the Shopper-actions panel can offer its own
+    // Today / week / month ranges regardless of the global range buttons;
+    // the other cards keep seeing only the global range (filtered below).
+    const evDays = Math.max(days, 30);
+    const evSince = new Date(Date.now() - evDays * 86400000).toISOString().slice(0, 10);
+    const [{ data: evsAll }, { count: paid }, { data: oi }] = await Promise.all([
+      supabase.from('site_events').select('day, type, product_id, q, n, visitor_hash, ts').gte('day', evSince).order('ts', { ascending: false }).limit(20000),
       supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'paid').gte('created_at', sinceTs),
       supabase.from('order_items').select('product_id, orders!inner(status, created_at)').eq('orders.status', 'paid').gte('orders.created_at', sinceTs).limit(5000),
     ]);
+    const evs = (evsAll || []).filter((e: any) => e.day >= since);
+    setEventsExt((evsAll || []) as Ev[]);
     setEvents((evs || []) as Ev[]);
     setPaidCount(paid || 0);
     const sales: Record<string, number> = {};
     for (const r of (oi || []) as any[]) if (r.product_id) sales[r.product_id] = (sales[r.product_id] || 0) + 1;
     setSalesByProduct(sales);
 
-    // resolve product titles for the heat + shopper-action lists
+    // resolve product titles for the heat + shopper-action lists (extended set
+    // so panel drill-downs across 30d always resolve)
     const viewCounts: Record<string, number> = {};
-    for (const e of (evs || []) as Ev[]) {
+    for (const e of (evsAll || []) as Ev[]) {
       if (e.product_id && ['view_product', 'add_to_cart', 'buy_now', 'wishlist_add'].includes(e.type)) {
         viewCounts[e.product_id] = (viewCounts[e.product_id] || 0) + 1;
       }
     }
-    const ids = [...new Set([...Object.keys(viewCounts), ...Object.keys(sales)])].slice(0, 300);
+    const ids = [...new Set([...Object.keys(viewCounts), ...Object.keys(sales)])].slice(0, 400);
     if (ids.length) {
       const { data: ps } = await supabase.from('products').select('id, title').in('id', ids);
       setProdNames(Object.fromEntries((ps || []).map((p: any) => [p.id, p.title.split('|')[0].trim()])));
@@ -156,7 +165,7 @@ export default function Traffic() {
             <Card><div className="text-[11px] uppercase tracking-wide text-ink-700/50">Today · pageviews</div><div className="text-2xl font-medium text-bronze-800 mt-1">{stats.today.pv.toLocaleString()}</div></Card>
           </div>
 
-          <ShopperActions events={events} names={prodNames} paid={paidCount} days={days} />
+          <ShopperActions events={eventsExt} names={prodNames} paid={paidCount} days={days} />
 
           <LiveVisitorMap />
 
@@ -186,12 +195,67 @@ export default function Traffic() {
   );
 }
 
-// ── Shopper actions — the owner wants these numbers IMPOSSIBLE to miss. ──
-// Big bold counts of every buying signal (cart adds, buy-now taps, wishlist
-// saves…) for today + the selected range, plus most-carted / most-wishlisted.
+// ── Shopper actions v2 — bold, clickable, ranged, LIVE. ─────────────────
+// • Its own Today / This week / This month range (independent of the global
+//   range buttons; events are always loaded ≥30d for this panel).
+// • Click any metric card → drill-down: which designs + which emails we know
+//   (wishlists come from favorite signals, carts/checkouts from cart-email
+//   capture, orders from the orders table) + the latest raw events with times.
+// • LIVE strip: visitors on site in the last 5 min (pulsing) and a BLINKING
+//   heart/cart when someone is on the cart or in checkout right now. 15s poll.
+const PANEL_RANGES = [
+  { key: 'today', label: 'Today', days: 1 },
+  { key: 'week', label: 'This week', days: 7 },
+  { key: 'month', label: 'This month', days: 30 },
+] as const;
+
+function LiveNow() {
+  const [live, setLive] = useState<{ onSite: number; onCart: number } | null>(null);
+  useEffect(() => {
+    let stop = false;
+    async function poll() {
+      try {
+        const since = new Date(Date.now() - 5 * 60000).toISOString();
+        const { data } = await supabase.from('site_visits').select('visitor_hash, path').gte('ts', since).limit(2000);
+        const rows = data || [];
+        const onSite = new Set(rows.map((r: any) => r.visitor_hash || Math.random())).size;
+        const onCart = new Set(rows.filter((r: any) => r.path === '/cart' || r.path.startsWith('/checkout')).map((r: any) => r.visitor_hash || Math.random())).size;
+        if (!stop) setLive({ onSite, onCart });
+      } catch { /* keep last value */ }
+    }
+    poll();
+    const t = setInterval(poll, 15000);
+    return () => { stop = true; clearInterval(t); };
+  }, []);
+  if (!live) return null;
+  return (
+    <div className="flex items-center gap-4 flex-wrap ml-auto">
+      <style>{`@keyframes dccblink{0%,49%{opacity:1}50%,100%{opacity:.15}} .dcc-blink{animation:dccblink 1s step-start infinite}`}</style>
+      <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${live.onSite > 0 ? 'text-green-700' : 'text-ink-700/40'}`}>
+        <span className={`inline-block w-2.5 h-2.5 rounded-full ${live.onSite > 0 ? 'bg-green-500 animate-pulse' : 'bg-ink-700/20'}`} />
+        LIVE · <span className="text-lg leading-none">{live.onSite}</span> on site now
+      </span>
+      {live.onCart > 0 && (
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-full px-2.5 py-1">
+          <span className="dcc-blink text-sm leading-none" aria-hidden="true">❤️🛒</span>
+          {live.onCart} at cart / checkout RIGHT NOW
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Record<string, string>; paid: number; days: number }) {
+  const [range, setRange] = useState<'today' | 'week' | 'month'>('month');
+  const [open, setOpen] = useState<string | null>(null);      // drill-down metric type
+  const [people, setPeople] = useState<{ label: string; rows: { who: string; what: string; when: string }[] } | null>(null);
+  const [peopleBusy, setPeopleBusy] = useState(false);
+
+  const rangeDef = PANEL_RANGES.find((r) => r.key === range)!;
+  const sinceDay = new Date(Date.now() - (rangeDef.days - 1) * 86400000).toISOString().slice(0, 10);
+  const inRange = events.filter((e) => e.day >= sinceDay);
   const todayKey = new Date().toISOString().slice(0, 10);
-  const count = (t: string) => events.filter((e) => e.type === t).length;
+  const count = (t: string) => inRange.filter((e) => e.type === t).length;
   const todayCount = (t: string) => events.filter((e) => e.type === t && e.day === todayKey).length;
   const metrics = [
     { icon: '🛒', label: 'Added to cart', type: 'add_to_cart' },
@@ -200,50 +264,147 @@ function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Re
     { icon: '🚪', label: 'Checkout started', type: 'checkout_start' },
     { icon: '💳', label: 'Reached payment', type: 'txn_created' },
   ];
-  const topBy = (t: string) => {
+  // only show designs that resolve to a real product (hides deleted/test ids)
+  const topBy = (t: string, n = 8) => {
     const c: Record<string, number> = {};
-    for (const e of events) if (e.type === t && e.product_id) c[e.product_id] = (c[e.product_id] || 0) + 1;
-    return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    for (const e of inRange) if (e.type === t && e.product_id && names[e.product_id]) c[e.product_id] = (c[e.product_id] || 0) + 1;
+    return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, n);
   };
-  const topCarted = topBy('add_to_cart');
-  const topWished = topBy('wishlist_add');
+
+  // Drill-down "who": best-effort identity per metric. Wishlists → favorite
+  // signals; cart/checkout/payment → the email captured in the cart field;
+  // most shoppers stay anonymous until they type an email — that's expected.
+  async function loadPeople(type: string) {
+    setPeopleBusy(true); setPeople(null);
+    const sinceTs = new Date(Date.now() - rangeDef.days * 86400000).toISOString();
+    const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    try {
+      if (type === 'wishlist_add') {
+        const { data } = await supabase.from('browse_events')
+          .select('email, product_id, created_at').eq('source', 'favorite')
+          .gte('created_at', sinceTs).order('created_at', { ascending: false }).limit(30);
+        setPeople({
+          label: 'Wishlist saves where we know the email (subscribed / typed at cart)',
+          rows: (data || []).map((r: any) => ({ who: r.email, what: names[r.product_id] || 'a design', when: fmt(r.created_at) })),
+        });
+      } else if (type === 'txn_created' || type === 'checkout_start' || type === 'add_to_cart' || type === 'buy_now') {
+        const { data } = await supabase.from('abandoned_carts')
+          .select('email, cart, subtotal, updated_at, recovered_at')
+          .gte('updated_at', sinceTs).order('updated_at', { ascending: false }).limit(30);
+        setPeople({
+          label: 'Emails captured at the cart (♻ = later completed checkout)',
+          rows: (data || []).map((r: any) => ({
+            who: (r.recovered_at ? '♻ ' : '') + r.email,
+            what: `${(Array.isArray(r.cart) ? r.cart : []).length} item(s) · $${Number(r.subtotal || 0).toFixed(2)}`,
+            when: fmt(r.updated_at),
+          })),
+        });
+      } else setPeople({ label: '', rows: [] });
+    } catch { setPeople({ label: 'Could not load details.', rows: [] }); }
+    setPeopleBusy(false);
+  }
+
+  function toggle(type: string) {
+    const next = open === type ? null : type;
+    setOpen(next);
+    if (next) loadPeople(next);
+  }
+
   const wishRemoved = count('wishlist_remove');
+  const openMetric = metrics.find((m) => m.type === open);
+  const recentOf = (t: string) => inRange.filter((e) => e.type === t && (!e.product_id || names[e.product_id])).slice(0, 10);
+
   return (
     <Card>
-      <div className="flex items-baseline gap-2 mb-3">
-        <div className="text-sm font-bold text-ink-900">🔥 Shopper actions ({days}d)</div>
-        <span className="text-[11px] text-ink-700/50">every buying signal, live from the storefront</span>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <div className="text-sm font-bold text-ink-900">🔥 Shopper actions</div>
+        <div className="flex gap-1">
+          {PANEL_RANGES.map((r) => (
+            <button key={r.key} onClick={() => setRange(r.key)}
+              className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${range === r.key ? 'bg-bronze-600 text-cream' : 'bg-cream text-ink-700 hover:bg-bronze-600/10'}`}>{r.label}</button>
+          ))}
+        </div>
+        <span className="text-[11px] text-ink-700/50">tap a card for details</span>
+        <LiveNow />
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {metrics.map((m) => (
-          <div key={m.type} className="bg-cream/50 border border-bronze-600/15 rounded-lg p-3 text-center">
+          <button key={m.type} onClick={() => toggle(m.type)}
+            className={`rounded-lg p-3 text-center border transition cursor-pointer ${open === m.type ? 'bg-bronze-600/10 border-bronze-600 ring-2 ring-bronze-600/30' : 'bg-cream/50 border-bronze-600/15 hover:border-bronze-600/40'}`}>
             <div className="text-lg" aria-hidden="true">{m.icon}</div>
             <div className="text-3xl font-extrabold text-bronze-800 leading-tight">{count(m.type).toLocaleString()}</div>
             <div className="text-[11px] font-bold text-ink-800 mt-0.5">{m.label}</div>
             <div className="text-[11px] text-ink-700/60">today: <span className="font-bold text-ink-900">{todayCount(m.type)}</span></div>
-          </div>
+          </button>
         ))}
         <div className="bg-[#5E380A] rounded-lg p-3 text-center">
           <div className="text-lg" aria-hidden="true">✅</div>
           <div className="text-3xl font-extrabold text-[#FAC775] leading-tight">{paid.toLocaleString()}</div>
-          <div className="text-[11px] font-bold text-[#F5EFE3] mt-0.5">Paid orders</div>
+          <div className="text-[11px] font-bold text-[#F5EFE3] mt-0.5">Paid orders ({days}d)</div>
         </div>
       </div>
+
+      {open && openMetric && (
+        <div className="mt-4 bg-cream/40 border border-bronze-600/20 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-base" aria-hidden="true">{openMetric.icon}</span>
+            <span className="text-sm font-bold text-ink-900">{openMetric.label} — {rangeDef.label.toLowerCase()} in detail</span>
+            <button onClick={() => setOpen(null)} className="ml-auto text-ink-700/40 hover:text-ink-800 text-lg leading-none">×</button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs font-bold text-ink-900 mb-1.5">Designs</div>
+              {topBy(open).length === 0 ? <p className="text-xs text-ink-700/50">None in this range.</p> : topBy(open).map(([pid, n]) => (
+                <div key={pid} className="flex justify-between gap-2 text-xs py-0.5">
+                  <span className="truncate text-ink-800">{names[pid]}</span>
+                  <span className="font-bold text-bronze-800 whitespace-nowrap">{n}×</span>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className="text-xs font-bold text-ink-900 mb-1.5">Latest activity</div>
+              {recentOf(open).length === 0 ? <p className="text-xs text-ink-700/50">None in this range.</p> : recentOf(open).map((e, i) => (
+                <div key={i} className="flex justify-between gap-2 text-xs py-0.5">
+                  <span className="truncate text-ink-800">{e.product_id ? names[e.product_id] : (e.type === 'checkout_start' || e.type === 'txn_created' ? 'cart' : '—')}</span>
+                  <span className="text-ink-700/50 whitespace-nowrap">{e.ts ? new Date(e.ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : e.day}</span>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className="text-xs font-bold text-ink-900 mb-1.5">Who (when we know)</div>
+              {peopleBusy ? <p className="text-xs text-ink-700/50">Loading…</p> : !people || people.rows.length === 0 ? (
+                <p className="text-xs text-ink-700/50">No identified people in this range — most shoppers are anonymous until they type their email at the cart or subscribe.</p>
+              ) : (
+                <>
+                  <p className="text-[10px] text-ink-700/50 mb-1">{people.label}</p>
+                  {people.rows.slice(0, 10).map((r, i) => (
+                    <div key={i} className="text-xs py-0.5">
+                      <span className="text-bronze-800 font-medium">{r.who}</span>
+                      <span className="text-ink-700/60"> · {r.what} · {r.when}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <div>
-          <div className="text-xs font-bold text-ink-900 mb-1.5">🛒 Most added to cart</div>
-          {topCarted.length === 0 ? <p className="text-xs text-ink-700/50">Collecting from the latest deploy onward.</p> : topCarted.map(([pid, n]) => (
+          <div className="text-xs font-bold text-ink-900 mb-1.5">🛒 Most added to cart ({rangeDef.label.toLowerCase()})</div>
+          {topBy('add_to_cart', 6).length === 0 ? <p className="text-xs text-ink-700/50">Nothing yet in this range.</p> : topBy('add_to_cart', 6).map(([pid, n]) => (
             <div key={pid} className="flex justify-between gap-2 text-xs py-0.5">
-              <span className="truncate text-ink-800">{names[pid] || pid.slice(0, 8)}</span>
+              <span className="truncate text-ink-800">{names[pid]}</span>
               <span className="font-bold text-bronze-800 whitespace-nowrap">{n}×</span>
             </div>
           ))}
         </div>
         <div>
-          <div className="text-xs font-bold text-ink-900 mb-1.5">❤️ Most wishlisted {wishRemoved > 0 && <span className="font-normal text-ink-700/50">({wishRemoved} removed)</span>}</div>
-          {topWished.length === 0 ? <p className="text-xs text-ink-700/50">Collecting from the latest deploy onward.</p> : topWished.map(([pid, n]) => (
+          <div className="text-xs font-bold text-ink-900 mb-1.5">❤️ Most wishlisted ({rangeDef.label.toLowerCase()}) {wishRemoved > 0 && <span className="font-normal text-ink-700/50">({wishRemoved} removed)</span>}</div>
+          {topBy('wishlist_add', 6).length === 0 ? <p className="text-xs text-ink-700/50">Nothing yet in this range.</p> : topBy('wishlist_add', 6).map(([pid, n]) => (
             <div key={pid} className="flex justify-between gap-2 text-xs py-0.5">
-              <span className="truncate text-ink-800">{names[pid] || pid.slice(0, 8)}</span>
+              <span className="truncate text-ink-800">{names[pid]}</span>
               <span className="font-bold text-bronze-800 whitespace-nowrap">{n}×</span>
             </div>
           ))}
