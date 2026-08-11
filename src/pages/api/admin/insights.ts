@@ -298,10 +298,14 @@ async function sendableFor(db: ReturnType<typeof supabaseAdmin>, productId: stri
     for (const c of chunk(ids, 300)) { const { data } = await db.from('orders').select('email').in('id', c).is('deleted_at', null); (data || []).forEach((o: any) => add(o.email)); }
   }));
   await Promise.all(jobs);
-  let cands = [...want.keys()];
-  if (!cands.length) return [] as string[];
+  return hygieneFilter(db, productId, [...want.keys()]);
+}
 
-  // keep only confirmed, non-unsubscribed subscribers
+// Shared hygiene pipeline: confirmed non-unsubscribed subscribers only, no
+// spam complainers, nobody already sent this product, no obvious test inboxes.
+async function hygieneFilter(db: ReturnType<typeof supabaseAdmin>, productId: string, candsIn: string[]) {
+  let cands = [...new Set(candsIn.map((e) => (e || '').toLowerCase().trim()).filter(Boolean))];
+  if (!cands.length) return [] as string[];
   const sendable = new Set<string>();
   for (const c of chunk(cands, 300)) {
     const { data } = await db.from('subscribers').select('email, confirmed_at, unsubscribed_at').in('email', c);
@@ -309,19 +313,54 @@ async function sendableFor(db: ReturnType<typeof supabaseAdmin>, productId: stri
   }
   cands = [...sendable];
   if (!cands.length) return [];
-
-  // drop anyone who ever filed a spam complaint
   for (const c of chunk(cands, 300)) {
     const { data } = await db.from('email_events').select('email').eq('event', 'complained').in('email', c);
     for (const r of data || []) sendable.delete((r.email || '').toLowerCase());
   }
-  // drop anyone already sent this product
   for (const c of chunk([...sendable], 300)) {
     const { data } = await db.from('product_blast_log').select('email').eq('product_id', productId).in('email', c);
     for (const r of data || []) sendable.delete((r.email || '').toLowerCase());
   }
   const TEST = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
   return [...sendable].filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !TEST.test(e));
+}
+
+// ── Quick segments — one-click audiences relative to the chosen product ──
+//   carted_no_buy    people who built a cart but never completed any order
+//   category_fans    people who browsed/hearted designs in this product's categories
+//   category_buyers  people who own designs from this product's categories
+async function segmentCandidates(db: ReturnType<typeof supabaseAdmin>, productId: string, kind: string): Promise<string[]> {
+  const emails = new Set<string>();
+  const add = (e?: string | null) => { const em = (e || '').toLowerCase().trim(); if (em) emails.add(em); };
+  if (kind === 'carted_no_buy') {
+    const { data: carts } = await db.from('abandoned_carts').select('email').limit(10000);
+    (carts || []).forEach((r: any) => add(r.email));
+    // remove anyone who has EVER completed an order
+    for (const c of chunk([...emails], 300)) {
+      const { data } = await db.from('orders').select('email').eq('status', 'paid').in('email', c);
+      for (const r of data || []) emails.delete((r.email || '').toLowerCase());
+    }
+    return [...emails];
+  }
+  // category-scoped kinds: collect the product's categories → their products
+  const { data: pcs } = await db.from('product_categories').select('category_id').eq('product_id', productId);
+  const catIds = [...new Set((pcs || []).map((r: any) => r.category_id))];
+  if (!catIds.length) return [];
+  const { data: catProds } = await db.from('product_categories').select('product_id').in('category_id', catIds).limit(3000);
+  const prodIds = [...new Set((catProds || []).map((r: any) => r.product_id))];
+  if (!prodIds.length) return [];
+  if (kind === 'category_fans') {
+    for (const c of chunk(prodIds, 200)) {
+      const { data } = await db.from('browse_events').select('email').in('product_id', c).limit(10000);
+      (data || []).forEach((r: any) => add(r.email));
+    }
+  } else if (kind === 'category_buyers') {
+    for (const c of chunk(prodIds, 200)) {
+      const { data } = await db.from('entitlements').select('email').in('product_id', c).limit(10000);
+      (data || []).forEach((r: any) => add(r.email));
+    }
+  }
+  return [...emails];
 }
 
 async function blast(request: Request, url: URL) {
@@ -343,7 +382,12 @@ async function blast(request: Request, url: URL) {
     return res.ok ? { tested: to } : { error: res.error || 'test failed' };
   }
 
-  const recipients = await sendableFor(db, productId, p.slug, seg);
+  // Quick-segment override: body.segment picks a one-click audience instead of
+  // the product's own interest signals; same hygiene + per-product dedupe.
+  const segmentKind = String(body.segment || '');
+  const recipients = ['carted_no_buy', 'category_fans', 'category_buyers'].includes(segmentKind)
+    ? await hygieneFilter(db, productId, await segmentCandidates(db, productId, segmentKind))
+    : await sendableFor(db, productId, p.slug, seg);
   if (!body.confirm) return { sendable: recipients.length, sample: recipients.slice(0, 8) };  // preview
   if (!recipients.length) return { sent: 0, note: 'nobody eligible (already sent, or not a confirmed subscriber)' };
 

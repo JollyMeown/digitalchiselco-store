@@ -3,10 +3,14 @@
 // (and only one) reminder — gated by the admin "cart reminders" toggle.
 
 import type { APIRoute } from 'astro';
+import crypto from 'node:crypto';
 import { supabaseAdmin } from '../../lib/supabase';
+import { send as sendEmail } from '../../lib/resend';
 import { rateLimit, clientIp } from '../../lib/rate-limit';
 
 export const prerender = false;
+const OPS_INBOX = 'jolly@digitalchiselco.com';
+const BIG_CART_USD = 40;
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -33,6 +37,38 @@ export const POST: APIRoute = async ({ request }) => {
     const { data: existing } = await db.from('abandoned_carts').select('id').ilike('email', email).is('recovered_at', null).limit(1);
     if (!existing?.length) await db.from('abandoned_carts').insert({ email, cart: items, subtotal });
     void error;
+
+    // ── Anonymous→known identity bridge ────────────────────────────────
+    // The visitor just identified themselves. Stamp today's visitor hash →
+    // email so admin analytics can attach a name to today's on-site events.
+    // Hash formula matches /api/track exactly (rotates daily by design).
+    try {
+      const ua = request.headers.get('user-agent') || '';
+      const day = new Date().toISOString().slice(0, 10);
+      const secret = process.env.ACCOUNT_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'trk';
+      const vh = crypto.createHash('sha256').update(`${clientIp(request)}|${ua}|${day}|${secret}`).digest('hex').slice(0, 32);
+      await db.from('visitor_identities').upsert({ visitor_hash: vh, email }, { onConflict: 'visitor_hash' });
+    } catch { /* best-effort */ }
+
+    // ── Owner alert: a serious cart just appeared ──────────────────────
+    // One ping per email per day, only above the threshold, only when the
+    // Automations toggle is on. Best-effort — never blocks the response.
+    try {
+      if (subtotal >= BIG_CART_USD) {
+        const { data: g } = await db.from('growth_settings').select('owner_alerts_enabled').eq('id', 1).maybeSingle();
+        if (g?.owner_alerts_enabled) {
+          const list = items.slice(0, 8).map((x: any) => `• ${x.title} ($${x.price.toFixed(2)})`).join('<br/>');
+          await sendEmail({
+            to: OPS_INBOX,
+            subject: `🛒 Big cart right now: $${subtotal.toFixed(2)} (${items.length} items) — ${email}`,
+            html: `<p><strong>${email}</strong> just built a $${subtotal.toFixed(2)} cart:</p><p>${list}</p><p>They are on the site right now. If they do not finish, the abandoned-cart reminder handles it tomorrow.</p>`,
+            text: `${email} built a $${subtotal.toFixed(2)} cart (${items.length} items).`,
+            idempotencyKey: `bigcart:${email}:${new Date().toISOString().slice(0, 10)}`,
+          });
+        }
+      }
+    } catch { /* best-effort */ }
+
     return new Response(null, { status: 204 });
   } catch {
     return new Response(null, { status: 204 });

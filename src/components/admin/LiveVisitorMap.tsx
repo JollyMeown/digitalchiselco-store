@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { geoNaturalEarth1, geoPath, geoGraticule10 } from 'd3-geo';
+import { feature } from 'topojson-client';
+// Natural Earth 1:110m land + country borders (public domain, bundled — no
+// external tile servers, loads instantly, admin-only chunk).
+import land110 from 'world-atlas/land-110m.json';
+import countries110 from 'world-atlas/countries-110m.json';
 import { supabase } from '../../lib/supabase';
 import { Card } from './ui';
 
-// ISO2 → [lat, lng] centroid. Covers essentially all real traffic; a country
-// not listed still appears in the side list, just without a map dot.
+// ISO2 → [lat, lng] centroid for the visitor dots. Covers essentially all real
+// traffic; a country not listed still appears in the side list.
 const CENTROID: Record<string, [number, number]> = {
   US: [39.8, -98.6], CA: [56.1, -106.3], MX: [23.6, -102.5], BR: [-14.2, -51.9], AR: [-38.4, -63.6],
   CL: [-35.7, -71.5], CO: [4.6, -74.3], PE: [-9.2, -75.0], EC: [-1.8, -78.2], VE: [6.4, -66.6],
@@ -23,29 +29,28 @@ const CENTROID: Record<string, [number, number]> = {
   NP: [28.4, 84.1], IR: [32.4, 53.7], IQ: [33.2, 43.7], AU: [-25.3, 133.8], NZ: [-40.9, 172.9],
 };
 
-// Simplified continent silhouettes in equirectangular space (x = lng+180,
-// y = 90-lat). Rough but recognizable — enough to read as a world map behind
-// the visitor dots.
-const LAND: string[] = [
-  '12,25 90,18 128,43 112,48 100,66 82,74 64,60 56,50 40,32 20,30',                    // North America
-  '100,80 122,80 146,92 140,112 124,128 112,143 106,132 102,110 98,92',                // South America
-  '120,12 137,12 141,25 124,28',                                                       // Greenland
-  '168,54 172,44 182,38 196,36 210,30 222,26 223,38 214,46 200,52 184,55',             // Europe
-  '164,70 166,56 186,52 210,54 224,60 232,74 226,92 212,112 198,126 190,120 186,92 178,80 168,76', // Africa
-  '210,50 222,26 248,16 280,12 310,16 342,20 360,26 360,42 336,44 316,50 300,54 300,70 288,84 272,84 256,78 240,64 224,58', // Asia
-  '292,110 312,101 326,104 334,116 328,128 312,124 298,126',                           // Australia
-];
-
 type Row = { code: string; count: number };
 const WINDOWS: [string, string, number][] = [['30 min', 'live', 30 * 60000], ['24 h', 'today', 24 * 3600000], ['7 days', 'week', 7 * 86400000]];
 
 function flag(code: string): string {
-  if (!/^[A-Z]{2}$/.test(code)) return '🏳️';
+  if (!/^[A-Z]{2}$/.test(code)) return '🌐';
   return String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
 }
 let regionNames: Intl.DisplayNames | null = null;
 try { regionNames = new Intl.DisplayNames(['en'], { type: 'region' }); } catch {}
-const nameOf = (code: string) => { try { return regionNames?.of(code) || code; } catch { return code; } };
+const nameOf = (code: string) => {
+  if (code === '??') return 'Unknown location';
+  try { return regionNames?.of(code) || code; } catch { return code; }
+};
+
+// Projection + static geography, computed once at module load.
+const W = 960, H = 500;
+const projection = geoNaturalEarth1().fitExtent([[4, 4], [W - 4, H - 4]], { type: 'Sphere' } as any);
+const path = geoPath(projection);
+const SPHERE_D = path({ type: 'Sphere' } as any) || '';
+const GRATICULE_D = path(geoGraticule10()) || '';
+const LAND_D = path(feature(land110 as any, (land110 as any).objects.land) as any) || '';
+const BORDERS = (feature(countries110 as any, (countries110 as any).objects.countries) as any).features as any[];
 
 export default function LiveVisitorMap() {
   const [winMs, setWinMs] = useState(WINDOWS[0][2]);
@@ -59,16 +64,19 @@ export default function LiveVisitorMap() {
     const sinceIso = new Date(Date.now() - ms).toISOString();
     const { data } = await supabase.from('site_visits')
       .select('country, visitor_hash').gte('ts', sinceIso).neq('device', 'bot').limit(20000);
-    // unique visitors per country
+    // unique visitors per country — visitors WITHOUT a resolvable country are
+    // never dropped: they count toward the total and get a 🌐 Unknown row.
     const byCountry = new Map<string, Set<string>>();
+    const allUniq = new Set<string>();
     for (const r of data || []) {
-      const code = (r.country || '').toUpperCase();
-      if (!/^[A-Z]{2}$/.test(code)) continue;
-      (byCountry.get(code) || byCountry.set(code, new Set()).get(code)!).add(r.visitor_hash || Math.random().toString());
+      const vh = r.visitor_hash || Math.random().toString();
+      allUniq.add(vh);
+      const code = /^[A-Z]{2}$/i.test(r.country || '') ? (r.country as string).toUpperCase() : '??';
+      (byCountry.get(code) || byCountry.set(code, new Set()).get(code)!).add(vh);
     }
     const list = [...byCountry.entries()].map(([code, set]) => ({ code, count: set.size })).sort((a, b) => b.count - a.count);
     setRows(list);
-    setTotal(list.reduce((s, r) => s + r.count, 0));
+    setTotal(allUniq.size);
     setUpdated(new Date());
   }
 
@@ -79,19 +87,23 @@ export default function LiveVisitorMap() {
     return () => clearInterval(timer.current);
   }, [winMs]);
 
-  const maxCount = Math.max(1, ...rows.map((r) => r.count));
-  const dots = useMemo(() => rows.filter((r) => CENTROID[r.code]).map((r) => {
+  const known = rows.filter((r) => r.code !== '??');
+  const maxCount = Math.max(1, ...known.map((r) => r.count));
+  const dots = useMemo(() => known.filter((r) => CENTROID[r.code]).map((r) => {
     const [lat, lng] = CENTROID[r.code];
-    const x = lng + 180, y = 90 - lat;
-    const rad = 2.2 + Math.sqrt(r.count / maxCount) * 7;
-    return { ...r, x, y, rad };
-  }), [rows, maxCount]);
+    const pt = projection([lng, lat]);
+    if (!pt) return null;
+    const rad = 5 + Math.sqrt(r.count / maxCount) * 14;
+    return { ...r, x: pt[0], y: pt[1], rad };
+  }).filter(Boolean) as (Row & { x: number; y: number; rad: number })[], [rows, maxCount]);
+
+  const isLiveWindow = winMs === WINDOWS[0][2];
 
   return (
     <Card>
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <h3 className="font-medium text-ink-900 text-sm">🌍 Live visitors</h3>
-        <span className="text-xs text-ink-700/60">{total} unique · {rows.length} countries</span>
+        <span className="text-xs text-ink-700/60"><b className="text-bronze-800">{total}</b> unique · {known.length} countries</span>
         <span className="ml-auto flex items-center gap-1 text-xs">
           <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           {updated ? `updated ${updated.toLocaleTimeString()}` : 'loading…'}
@@ -105,27 +117,45 @@ export default function LiveVisitorMap() {
       </div>
       <div className="grid lg:grid-cols-[1fr_180px] gap-4">
         <div className="relative">
-          <svg viewBox="0 0 360 180" className="w-full rounded-lg" style={{ background: '#eaf1f5', aspectRatio: '2 / 1' }}>
-            {/* continents */}
-            {LAND.map((pts, i) => <polygon key={'land' + i} points={pts} fill="#e6dcc6" stroke="#d6c7a8" strokeWidth={0.4} />)}
-            {/* graticule */}
-            {[30, 60, 90, 120, 150, 210, 240, 270, 300, 330].map((x) => <line key={'v' + x} x1={x} y1={0} x2={x} y2={180} stroke="#c9d8de" strokeWidth={0.3} opacity={0.6} />)}
-            {[30, 60, 90, 120, 150].map((y) => <line key={'h' + y} x1={0} y1={y} x2={360} y2={y} stroke="#c9d8de" strokeWidth={0.3} opacity={0.6} />)}
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full rounded-xl" role="img" aria-label="visitor world map">
+            <defs>
+              <radialGradient id="dcc-ocean" cx="50%" cy="42%" r="75%">
+                <stop offset="0%" stopColor="#dcebf2" />
+                <stop offset="100%" stopColor="#bfd6e2" />
+              </radialGradient>
+            </defs>
+            {/* ocean sphere + graticule + Natural Earth land + country borders */}
+            <path d={SPHERE_D} fill="url(#dcc-ocean)" stroke="#a9c3d2" strokeWidth={1} />
+            <path d={GRATICULE_D} fill="none" stroke="#ffffff" strokeWidth={0.5} opacity={0.5} />
+            <path d={LAND_D} fill="#efe6d2" stroke="none" />
+            {BORDERS.map((f: any, i: number) => (
+              <path key={i} d={path(f) || undefined} fill="none" stroke="#d9c9a8" strokeWidth={0.6} />
+            ))}
+            {/* visitor dots — pulse in the 30-min (live) window */}
             {dots.map((d) => (
               <g key={d.code} onMouseEnter={() => setHover({ code: d.code, count: d.count })} onMouseLeave={() => setHover(null)} style={{ cursor: 'pointer' }}>
-                <circle cx={d.x} cy={d.y} r={d.rad + 2} fill="#854F0B" opacity={0.12} />
-                <circle cx={d.x} cy={d.y} r={d.rad} fill="#854F0B" opacity={0.75} />
+                {isLiveWindow && (
+                  <circle cx={d.x} cy={d.y} r={d.rad} fill="#854F0B" opacity={0.35}>
+                    <animate attributeName="r" values={`${d.rad};${d.rad * 2.2}`} dur="1.8s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.35;0" dur="1.8s" repeatCount="indefinite" />
+                  </circle>
+                )}
+                <circle cx={d.x} cy={d.y} r={d.rad + 3} fill="#854F0B" opacity={0.15} />
+                <circle cx={d.x} cy={d.y} r={d.rad} fill="#854F0B" opacity={0.85} stroke="#FFFBF4" strokeWidth={1.5} />
+                {d.count > 1 && d.rad >= 8 && (
+                  <text x={d.x} y={d.y + 3.5} textAnchor="middle" fontSize={Math.min(12, d.rad)} fontWeight={700} fill="#F5EFE3">{d.count}</text>
+                )}
               </g>
             ))}
           </svg>
           {hover && (
-            <div className="absolute top-2 left-2 bg-white/95 border border-black/10 rounded px-2 py-1 text-xs shadow-sm pointer-events-none">
-              {flag(hover.code)} {nameOf(hover.code)} · <b>{hover.count}</b> visitor{hover.count === 1 ? '' : 's'}
+            <div className="absolute top-2 left-2 bg-white/95 border border-black/10 rounded-md px-2.5 py-1.5 text-xs shadow pointer-events-none">
+              {flag(hover.code)} <b>{nameOf(hover.code)}</b> · {hover.count} visitor{hover.count === 1 ? '' : 's'}
             </div>
           )}
-          {rows.length === 0 && <p className="text-xs text-ink-700/50 mt-2">No visitors in this window yet — check back or widen the range.</p>}
+          {total === 0 && <p className="text-xs text-ink-700/50 mt-2">No visitors in this window yet — check back or widen the range.</p>}
         </div>
-        <div className="max-h-[220px] overflow-y-auto">
+        <div className="max-h-[260px] overflow-y-auto">
           <div className="text-[11px] uppercase tracking-wider text-ink-700/50 mb-1">Top countries</div>
           {rows.slice(0, 25).map((r) => (
             <div key={r.code} className="flex items-center gap-2 text-sm py-0.5">

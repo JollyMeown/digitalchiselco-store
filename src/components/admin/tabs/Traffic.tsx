@@ -181,6 +181,8 @@ export default function Traffic() {
 
           <FunnelCard visitors={stats.visitors} events={events} paid={paidCount} days={days} />
 
+          <OrdersCalendar />
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <HeatList events={events} names={prodNames} sales={salesByProduct} />
             <SearchTerms events={events} />
@@ -250,6 +252,7 @@ function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Re
   const [open, setOpen] = useState<string | null>(null);      // drill-down metric type
   const [people, setPeople] = useState<{ label: string; rows: { who: string; what: string; when: string }[] } | null>(null);
   const [peopleBusy, setPeopleBusy] = useState(false);
+  const [idMap, setIdMap] = useState<Record<string, string>>({});   // visitor_hash → email (identity bridge)
 
   const rangeDef = PANEL_RANGES.find((r) => r.key === range)!;
   const sinceDay = new Date(Date.now() - (rangeDef.days - 1) * 86400000).toISOString().slice(0, 10);
@@ -278,6 +281,15 @@ function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Re
     setPeopleBusy(true); setPeople(null);
     const sinceTs = new Date(Date.now() - rangeDef.days * 86400000).toISOString();
     const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    // Identity bridge: resolve visitor hashes on this metric's events to emails
+    // captured when those visitors identified themselves (cart / subscribe).
+    try {
+      const hashes = [...new Set(inRange.filter((e) => e.type === type && e.visitor_hash).map((e) => e.visitor_hash as string))].slice(0, 200);
+      if (hashes.length) {
+        const { data: ids } = await supabase.from('visitor_identities').select('visitor_hash, email').in('visitor_hash', hashes);
+        setIdMap(Object.fromEntries((ids || []).map((r: any) => [r.visitor_hash, r.email])));
+      } else setIdMap({});
+    } catch { setIdMap({}); }
     try {
       if (type === 'wishlist_add') {
         const { data } = await supabase.from('browse_events')
@@ -364,9 +376,14 @@ function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Re
             <div>
               <div className="text-xs font-bold text-ink-900 mb-1.5">Latest activity</div>
               {recentOf(open).length === 0 ? <p className="text-xs text-ink-700/50">None in this range.</p> : recentOf(open).map((e, i) => (
-                <div key={i} className="flex justify-between gap-2 text-xs py-0.5">
-                  <span className="truncate text-ink-800">{e.product_id ? names[e.product_id] : (e.type === 'checkout_start' || e.type === 'txn_created' ? 'cart' : '—')}</span>
-                  <span className="text-ink-700/50 whitespace-nowrap">{e.ts ? new Date(e.ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : e.day}</span>
+                <div key={i} className="text-xs py-0.5">
+                  <div className="flex justify-between gap-2">
+                    <span className="truncate text-ink-800">{e.product_id ? names[e.product_id] : (e.type === 'checkout_start' || e.type === 'txn_created' ? 'cart' : '—')}</span>
+                    <span className="text-ink-700/50 whitespace-nowrap">{e.ts ? new Date(e.ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : e.day}</span>
+                  </div>
+                  {e.visitor_hash && idMap[e.visitor_hash] && (
+                    <div className="text-[10px] text-green-700 font-medium truncate">👤 {idMap[e.visitor_hash]}</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -489,6 +506,86 @@ function SearchTerms({ events }: { events: Ev[] }) {
           {top.map(([q, t]) => (
             <span key={q} className={`text-xs px-2 py-0.5 rounded border ${t.zero ? 'border-red-300 text-red-700 bg-red-50' : 'border-black/10 text-ink-700 bg-cream/50'}`}>{q} · {t.n}</span>
           ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ── Orders heatmap calendar — GitHub-style, 16 weeks of buying days. ──
+// Square intensity = paid orders that day; tooltip shows orders + revenue.
+// The footer line names your strongest day of the week for launches/drops.
+function OrdersCalendar() {
+  const [byDay, setByDay] = useState<Record<string, { n: number; rev: number }>>({});
+  const [loaded, setLoaded] = useState(false);
+  const WEEKS = 16;
+
+  useEffect(() => {
+    (async () => {
+      const since = new Date(Date.now() - WEEKS * 7 * 86400000).toISOString();
+      const { data } = await supabase.from('orders')
+        .select('created_at, total').eq('status', 'paid').gte('created_at', since).limit(10000);
+      const m: Record<string, { n: number; rev: number }> = {};
+      for (const o of data || []) {
+        const d = String(o.created_at).slice(0, 10);
+        (m[d] ||= { n: 0, rev: 0 });
+        m[d].n++; m[d].rev += Number(o.total) || 0;
+      }
+      setByDay(m); setLoaded(true);
+    })();
+  }, []);
+
+  // Build the grid: columns = weeks (oldest → newest), rows = Mon..Sun.
+  const today = new Date();
+  const cols: { day: string; n: number; rev: number }[][] = [];
+  const start = new Date(today.getTime() - (WEEKS * 7 - 1) * 86400000);
+  // align the first column so rows are true weekdays (Mon = row 0)
+  const startDow = (start.getDay() + 6) % 7;
+  const first = new Date(start.getTime() - startDow * 86400000);
+  for (let w = 0; w < WEEKS + 1; w++) {
+    const col: { day: string; n: number; rev: number }[] = [];
+    for (let d = 0; d < 7; d++) {
+      const dt = new Date(first.getTime() + (w * 7 + d) * 86400000);
+      if (dt > today) break;
+      const key = dt.toISOString().slice(0, 10);
+      col.push({ day: key, ...(byDay[key] || { n: 0, rev: 0 }) });
+    }
+    if (col.length) cols.push(col);
+  }
+  const maxN = Math.max(1, ...Object.values(byDay).map((v) => v.n));
+  const shade = (n: number) => n === 0 ? '#f1ece1' : n <= maxN * 0.34 ? '#e0c391' : n <= maxN * 0.67 ? '#b8834a' : '#854F0B';
+
+  // strongest day of week by orders
+  const dowTotals = new Array(7).fill(0);
+  for (const [day, v] of Object.entries(byDay)) dowTotals[(new Date(day + 'T12:00:00Z').getUTCDay() + 6) % 7] += v.n;
+  const DOW = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const bestDow = dowTotals.some((n) => n > 0) ? DOW[dowTotals.indexOf(Math.max(...dowTotals))] : null;
+  const CELL = 15, GAP = 3;
+
+  return (
+    <Card>
+      <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+        <div className="text-sm font-bold text-ink-900">📅 Buying days — last {WEEKS} weeks</div>
+        {bestDow && <span className="text-xs text-ink-700/60">your strongest day is <b className="text-bronze-800">{bestDow}</b> — launch drops then</span>}
+      </div>
+      {!loaded ? <p className="text-xs text-ink-700/50">Loading…</p> : (
+        <div className="overflow-x-auto">
+          <svg width={(cols.length * (CELL + GAP)) + 30} height={7 * (CELL + GAP) + 6}>
+            {['Mon', 'Wed', 'Fri', 'Sun'].map((lbl, i) => (
+              <text key={lbl} x={0} y={[0, 2, 4, 6][i] * (CELL + GAP) + CELL - 3} fontSize={9} fill="#8a7a68">{lbl}</text>
+            ))}
+            {cols.map((col, w) => col.map((c, d) => (
+              <rect key={c.day} x={30 + w * (CELL + GAP)} y={d * (CELL + GAP)} width={CELL} height={CELL} rx={3}
+                fill={shade(c.n)} stroke={c.n > 0 ? '#5E380A22' : 'none'}>
+                <title>{c.day}: {c.n} order{c.n === 1 ? '' : 's'}{c.rev > 0 ? ` · $${c.rev.toFixed(2)}` : ''}</title>
+              </rect>
+            )))}
+          </svg>
+          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-ink-700/50">
+            less
+            {['#f1ece1', '#e0c391', '#b8834a', '#854F0B'].map((c) => <span key={c} className="inline-block w-3 h-3 rounded" style={{ background: c }} />)}
+            more · hover a square for the day's orders + revenue
+          </div>
         </div>
       )}
     </Card>

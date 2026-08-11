@@ -378,6 +378,23 @@ async function handleTransactionCompleted(db: any, txn: any) {
 
   console.log(`Order ${order.id} created for txn ${txn.id} (${email}, $${total}).`);
 
+  // ── Owner instant alert: a real order just landed 🎉 ─────────────────
+  // Gated by growth_settings.owner_alerts_enabled; idempotent per order.
+  try {
+    const { data: gset } = await db.from('growth_settings').select('owner_alerts_enabled').eq('id', 1).maybeSingle();
+    if (gset?.owner_alerts_enabled) {
+      const { data: oiAlert } = await db.from('order_items').select('title, price_usd').eq('order_id', order.id).limit(10);
+      const lines = (oiAlert || []).map((r: any) => `• ${String(r.title).split('|')[0].trim()} ($${Number(r.price_usd).toFixed(2)})`).join('<br/>');
+      await sendEmail({
+        to: OPS_INBOX,
+        subject: `🎉 New order: $${total.toFixed(2)} ${currency} from ${email}`,
+        html: `<p><strong>${email}</strong> just paid <strong>$${total.toFixed(2)} ${currency}</strong> (order #${String(order.id).slice(0, 8)}).</p><p>${lines}</p>`,
+        text: `New order $${total.toFixed(2)} ${currency} from ${email} (#${String(order.id).slice(0, 8)}).`,
+        idempotencyKey: `order-alert:${order.id}`,
+      });
+    }
+  } catch (e) { console.error('[owner-alert] failed (order fine):', e); }
+
   // ── Free-gift threshold: SMART auto-pick when the paid subtotal qualifies ──
   // Owner sets only a $ threshold. Enforced here off the real Paddle-paid amount
   // (browser can't fake it). The shop chooses the gift itself:

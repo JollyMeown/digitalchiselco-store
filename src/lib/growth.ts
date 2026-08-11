@@ -724,5 +724,55 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     stats.wishlistReminder = s;
   }
 
+  // ── 15. AI Design Scout (Mondays): demand signals → 5 design ideas ───
+  // Feeds real evidence (zero-result searches, top searches, most carted /
+  // wishlisted themes) to Claude Haiku and emails the owner a ranked list of
+  // designs to make next. Costs a fraction of a cent per week.
+  stats.designScout = 'off';
+  if (g.design_scout_enabled) {
+    if (new Date().getUTCDay() !== 1) stats.designScout = 'waiting for Monday';
+    else if (!process.env.ANTHROPIC_API_KEY) stats.designScout = 'ANTHROPIC_API_KEY not set';
+    else {
+      try {
+        const OPS = 'jolly@digitalchiselco.com';
+        const week = isoWeekKey(new Date());
+        const sinceDay = daysAgo(30).slice(0, 10);
+        const { data: evs } = await db.from('site_events').select('type, product_id, q, n').gte('day', sinceDay).limit(20000);
+        const zero = [...new Set((evs || []).filter((e: any) => e.type === 'search' && e.q && (e.n ?? 0) === 0).map((e: any) => String(e.q)))].slice(0, 25);
+        const searchCount: Record<string, number> = {};
+        for (const e of evs || []) if ((e as any).type === 'search' && (e as any).q) searchCount[(e as any).q] = (searchCount[(e as any).q] || 0) + 1;
+        const topSearches = Object.entries(searchCount).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([q, n]) => `${q} (${n}x)`);
+        const actIds = [...new Set((evs || []).filter((e: any) => ['add_to_cart', 'wishlist_add', 'buy_now'].includes(e.type) && e.product_id).map((e: any) => e.product_id))].slice(0, 100);
+        const { data: actProds } = actIds.length ? await db.from('products').select('title').in('id', actIds) : { data: [] as any[] };
+        const hotTitles = (actProds || []).map((p: any) => String(p.title).split('|')[0].trim()).slice(0, 40);
+
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 });
+        const res = await anthropic.messages.create({
+          model: 'claude-haiku-4-5',
+          max_tokens: 1200,
+          system: `You advise DigitalChiselCo, a shop selling bas-relief STL files for CNC carving. Given real shopper demand signals, propose exactly 5 NEW bas-relief design ideas the shop should produce next. Rules: never use em dashes; rank by demand evidence; each idea gets a bold one-line name, 1-2 sentences of what the relief shows, and one line citing the evidence (which searches or product interest support it). Do not propose designs that duplicate the "already hot" list. Output clean HTML using only <p>, <strong>, <ol>, <li>.`,
+          messages: [{ role: 'user', content: `Searches that found NOTHING (strongest signal, last 30 days):\n${zero.join(', ') || 'none'}\n\nTop searches:\n${topSearches.join(', ') || 'none'}\n\nAlready hot (carted/wishlisted, do not duplicate):\n${hotTitles.join('; ') || 'none'}` }],
+        });
+        const block: any = res.content.find((b: any) => b.type === 'text');
+        const ideasHtml = (block?.text || '').trim();
+        if (!ideasHtml) throw new Error('empty model response');
+        const r = await sendEmail({
+          to: OPS,
+          subject: `🧭 Design Scout ${week}: your next 5 designs, ranked by real demand`,
+          html: `<div style="max-width:600px;margin:0 auto;font-family:Helvetica,Arial,sans-serif;color:#2A1A0E;font-size:14px;line-height:1.6;">
+<h2 style="font-family:Georgia,serif;color:#5E380A;">🧭 Design Scout · ${week}</h2>
+<p>Ranked from 30 days of real shopper searches and product interest. Zero-result searches are gold: people wanted these and left empty-handed.</p>
+${ideasHtml}
+<p style="color:#999;font-size:12px;">Signals used: ${zero.length} zero-result searches, ${topSearches.length} top searches, ${hotTitles.length} hot designs excluded.</p></div>`,
+          text: ideasHtml.replace(/<[^>]+>/g, ''),
+          idempotencyKey: `designscout:${week}`,
+          tags: [{ name: 'kind', value: 'designScout' }],
+        });
+        stats.designScout = r.ok ? `sent (${week})` : `failed: ${r.error}`;
+      } catch (e: any) { stats.designScout = `failed: ${e?.message}`; }
+    }
+  }
+
   return stats;
 }

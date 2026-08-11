@@ -389,6 +389,7 @@ function AudienceModal({ product, onClose }: { product: any; onClose: () => void
   const [rel, setRel] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
   const [seg, setSeg] = useState({ clicked: true, browsed: true, bought: false });
+  const [segment, setSegment] = useState('');   // quick-segment override ('' = interest signals)
   const [myEmail, setMyEmail] = useState('');
   const [preview, setPreview] = useState<{ sendable: number; sample: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -401,11 +402,12 @@ function AudienceModal({ product, onClose }: { product: any; onClose: () => void
   // recompute the real sendable count whenever the targeting changes
   useEffect(() => {
     setPreview(null); setConfirming(false); setMsg('');
-    if (!(seg.clicked || seg.browsed || seg.bought)) return;
+    if (!segment && !(seg.clicked || seg.browsed || seg.bought)) return;
     let alive = true;
-    postApi({ product_id: product.product_id, segments: seg }).then((r) => { if (alive && r.ok) setPreview({ sendable: r.sendable, sample: r.sample || [] }); });
+    postApi({ product_id: product.product_id, segments: seg, ...(segment ? { segment } : {}) })
+      .then((r) => { if (alive && r.ok) setPreview({ sendable: r.sendable, sample: r.sample || [] }); });
     return () => { alive = false; };
-  }, [seg, product.product_id]);
+  }, [seg, segment, product.product_id]);
 
   const emails = useMemo(() => (d?.audience || []).map((a: any) => a.email), [d]);
   const copy = () => { navigator.clipboard.writeText(emails.join(', ')); setCopied(true); setTimeout(() => setCopied(false), 1500); };
@@ -422,7 +424,7 @@ function AudienceModal({ product, onClose }: { product: any; onClose: () => void
   };
   const sendAll = async () => {
     setBusy(true); setMsg('Sending…');
-    const r = await postApi({ product_id: product.product_id, segments: seg, confirm: true });
+    const r = await postApi({ product_id: product.product_id, segments: seg, ...(segment ? { segment } : {}), confirm: true });
     setBusy(false); setConfirming(false);
     setMsg(r.ok ? `✓ Sent to ${r.sent}${r.failed ? `, ${r.failed} failed` : ''}${r.note ? ` (${r.note})` : ''}` : `✗ ${r.error || 'failed'}`);
     if (r.ok) setPreview((p) => (p ? { ...p, sendable: 0 } : p));  // they're now deduped out
@@ -437,10 +439,18 @@ function AudienceModal({ product, onClose }: { product: any; onClose: () => void
           <div className="bg-cream/50 border border-bronze-600/20 rounded-lg p-3">
             <div className="text-sm font-medium text-ink-800 mb-2">📣 Send this design to its interested audience</div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-2">
-              <span className="text-xs text-ink-700/60">Target:</span>
-              <Seg k="clicked" label="🖱 Clicked in an email" />
-              <Seg k="browsed" label="👁 Browsed on site" />
-              <Seg k="bought" label="🛒 Already bought" />
+              <span className="text-xs text-ink-700/60">Audience:</span>
+              <select value={segment} onChange={(e) => setSegment(e.target.value)} className="text-xs border border-black/15 rounded px-2 py-1 bg-white">
+                <option value="">🎯 Interested in this design (pick signals)</option>
+                <option value="carted_no_buy">🛒 Built a cart, never bought (any design)</option>
+                <option value="category_fans">👁 Fans of this design's categories</option>
+                <option value="category_buyers">✅ Bought from this design's categories</option>
+              </select>
+              {!segment && <>
+                <Seg k="clicked" label="🖱 Clicked in an email" />
+                <Seg k="browsed" label="👁 Browsed on site" />
+                <Seg k="bought" label="🛒 Already bought" />
+              </>}
             </div>
             <p className="text-[11px] text-ink-700/55 mb-2">
               Only confirmed subscribers are emailed. Anyone unsubscribed, who reported spam, or who already got this design is skipped automatically. "Already bought" is off by default since they own it.

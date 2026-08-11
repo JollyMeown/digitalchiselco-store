@@ -306,6 +306,10 @@ export default function Automations() {
           desc="Every Monday YOU get one email: pageviews, cart adds, wishlist saves, checkout funnel, orders + revenue, best designs, and searches that found nothing. No admin login needed." />
         <Toggle field="wishlist_reminder_enabled" label="Wishlist reminder"
           desc="Subscribers who hearted a design 3-14 days ago but never bought it get one gentle 'saved, not forgotten' email with those designs. Once per person per design, ever." />
+        <Toggle field="owner_alerts_enabled" label="Instant alerts (to you)"
+          desc="Emails YOU the moment things happen: 🎉 every paid order (with items), and 🛒 any cart worth $40+ the second the shopper types their email. One big-cart ping per shopper per day." />
+        <Toggle field="design_scout_enabled" label="AI Design Scout (Mondays)"
+          desc="Every Monday, AI reads 30 days of real demand (searches that found nothing, top searches, hot designs) and emails you 5 ranked NEW design ideas with the evidence for each. Costs well under a cent per week." />
       </div>
 
       <PicksPanel />

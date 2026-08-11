@@ -37,6 +37,17 @@ export const POST: APIRoute = async ({ request }) => {
       .upsert({ email, name, source: 'free-pack' }, { onConflict: 'email' });
     if (error) throw error;
 
+    // Anonymous→known bridge: stamp today's visitor hash → email (same hash
+    // formula as /api/track) so admin analytics can name today's activity.
+    try {
+      const crypto = await import('node:crypto');
+      const ua = request.headers.get('user-agent') || '';
+      const day = new Date().toISOString().slice(0, 10);
+      const secret = process.env.ACCOUNT_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'trk';
+      const vh = crypto.createHash('sha256').update(`${ip}|${ua}|${day}|${secret}`).digest('hex').slice(0, 32);
+      await db.from('visitor_identities').upsert({ visitor_hash: vh, email }, { onConflict: 'visitor_hash' });
+    } catch { /* best-effort */ }
+
     // Send our own confirmation email via Resend. We deliberately DO NOT
     // call MailerLite here — that happens after the click, in
     // /free/confirm, so the welcome automation only fires for real humans.
