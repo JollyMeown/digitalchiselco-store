@@ -3,7 +3,7 @@
 <footer class="px-6 py-10 text-center text-xs text-ink-700/60 border-t border-black/10">
   <div class="flex gap-4 justify-center mb-3 flex-wrap">
     <a href="/catalog">Catalog</a><a href="/collections">Collections</a><a href="/designs">Themes</a><a href="/quiz">Design finder</a><a href="/favorites">Favorites</a><a href="/pricing">Pricing</a><a href="/free">Free files</a>
-    <a href="/membership">Membership</a><a href="/resend-downloads">Resend my downloads</a><a href="/contact">Contact</a>
+    <a href="/bundle-of-week">Bundle of the week</a><a href="/membership">Membership</a><a href="/resend-downloads">Resend my downloads</a><a href="/contact">Contact</a>
   </div>
   <div class="mb-3 flex items-center justify-center gap-2">
     <label for="dcc-ccy" class="text-ink-700/50">Show prices in</label>
@@ -45,7 +45,11 @@
         var span = document.createElement('span');
         span.className = 'dcc-ccy-approx';
         span.style.cssText = 'font-size:0.8em;color:#8a7a68;margin-left:6px;white-space:nowrap;';
-        span.textContent = '≈ ' + SYM[ccy] + v.toFixed(2);
+        // EU/UK consumer prices are quoted before VAT — Paddle adds it at
+        // checkout, so flag it here to avoid payment-frame surprise (a real
+        // cause of drop-off between "Reached payment" and "Paid").
+        var vat = (ccy === 'EUR' || ccy === 'GBP') ? ' + VAT' : '';
+        span.textContent = '≈ ' + SYM[ccy] + v.toFixed(2) + vat;
         el.insertAdjacentElement('afterend', span);
       });
     }

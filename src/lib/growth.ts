@@ -13,6 +13,7 @@ import {
   dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
   weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS,
   winbackEmail, priceDropEmail, referralNudgeEmail, refundWinbackEmail,
+  wishlistReminderEmail, ownerWeeklyReport,
   type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
 import { isoWeekKey } from './weekly-digest';
@@ -582,6 +583,146 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       stats.fx = { EUR: fx.EUR, GBP: fx.GBP, CAD: fx.CAD, AUD: fx.AUD };
     } else stats.fx = 'api error';
   } catch (e: any) { stats.fx = `failed: ${e?.message}`; }
+
+  // ── 12. Bundle of the Week: rotate a theme, pick 5, publish ──────────
+  // Regenerates whenever the stored week key is stale (so enabling mid-week
+  // works). The /bundle-of-week page reads site_settings.weekly_bundle and the
+  // existing bundle5: checkout path enforces the flat $25 server-side.
+  stats.bundleWeek = 'off';
+  if (g.bundle_week_enabled) {
+    try {
+      const week = isoWeekKey(new Date());
+      const { data: st } = await db.from('site_settings').select('weekly_bundle').eq('id', 1).maybeSingle();
+      const cur: any = st?.weekly_bundle;
+      if (cur?.week === week) {
+        stats.bundleWeek = `current (${cur.category_name})`;
+      } else {
+        const { data: cats } = await db.from('categories').select('id, name, slug').order('name');
+        const list = cats || [];
+        const weekNum = parseInt(week.replace(/\D/g, ''), 10) || 0;
+        let chosen: any = null; let ids: string[] = [];
+        for (let i = 0; i < list.length && !chosen; i++) {
+          const cat = list[(weekNum + i) % list.length];
+          const { data: pool } = await db.from('product_categories')
+            .select('products!inner(id, slug, title, price_usd, image_url, active, is_bundle, is_subscription, is_bestseller)')
+            .eq('category_id', cat.id).limit(80);
+          // mirror the bundle5 checkout eligibility exactly, or the add-to-cart would 400
+          const eligible = (pool || []).map((r: any) => r.products).filter((p: any) =>
+            p?.active && !p.is_bundle && !p.is_subscription && p.image_url && Number(p.price_usd) > 0
+            && !String(p.slug || '').startsWith('gift-card-') && !String(p.slug || '').startsWith('catalogue-')
+            && !/bundle/i.test(String(p.title || '')));
+          if (eligible.length >= 5) {
+            eligible.sort((a: any, b: any) => Number(b.is_bestseller) - Number(a.is_bestseller));
+            chosen = cat; ids = eligible.slice(0, 5).map((p: any) => p.id);
+          }
+        }
+        if (chosen) {
+          const now = new Date();
+          const daysToMon = ((8 - now.getUTCDay()) % 7) || 7;   // next Monday 00:00 UTC
+          const exp = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysToMon));
+          await db.from('site_settings').update({
+            weekly_bundle: { week, category_id: chosen.id, category_name: chosen.name, category_slug: chosen.slug, ids, expires_at: exp.toISOString(), generated_at: now.toISOString() },
+          }).eq('id', 1);
+          stats.bundleWeek = `generated: ${chosen.name}`;
+        } else stats.bundleWeek = 'no category with 5 eligible designs';
+      }
+    } catch (e: any) { stats.bundleWeek = `failed: ${e?.message}`; }
+  }
+
+  // ── 13. Owner weekly report (Mondays, to the ops inbox) ──────────────
+  stats.ownerReport = 'off';
+  if (g.owner_report_enabled) {
+    if (new Date().getUTCDay() !== 1) stats.ownerReport = 'waiting for Monday';
+    else {
+      try {
+        const OPS = 'jolly@digitalchiselco.com';
+        const week = isoWeekKey(new Date());
+        const since = daysAgo(7); const sinceDay = since.slice(0, 10);
+        const [{ count: pv }, { data: ords }, { data: evs }, { data: oi }] = await Promise.all([
+          db.from('site_visits').select('id', { count: 'exact', head: true }).gte('day', sinceDay),
+          db.from('orders').select('total, currency').eq('status', 'paid').gte('created_at', since),
+          db.from('site_events').select('type, product_id, q, n').gte('day', sinceDay).limit(20000),
+          db.from('order_items').select('title, orders!inner(status, created_at)').eq('orders.status', 'paid').gte('orders.created_at', since).limit(2000),
+        ]);
+        const cnt = (t: string) => (evs || []).filter((e: any) => e.type === t).length;
+        const topProd = async (t: string) => {
+          const c: Record<string, number> = {};
+          for (const e of evs || []) if ((e as any).type === t && (e as any).product_id) c[(e as any).product_id] = (c[(e as any).product_id] || 0) + 1;
+          const top = Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 5);
+          if (!top.length) return [];
+          const { data: ps } = await db.from('products').select('id, title').in('id', top.map(([id]) => id));
+          const nameOf = new Map((ps || []).map((p: any) => [p.id, String(p.title).split('|')[0].trim()]));
+          return top.map(([id, n]) => ({ title: nameOf.get(id) || 'Design', n }));
+        };
+        const soldCount: Record<string, number> = {};
+        for (const r of oi || []) { const t = String((r as any).title || '').split('|')[0].trim(); if (t) soldCount[t] = (soldCount[t] || 0) + 1; }
+        const revenue = (ords || []).reduce((s: number, o: any) => s + (Number(o.total) || 0), 0);
+        const { subject, html, text } = ownerWeeklyReport({
+          email: OPS, weekLabel: week,
+          pageviews: pv || 0,
+          actions: [
+            { label: '🛒 Cart adds', n: cnt('add_to_cart') },
+            { label: '⚡ Buy-now', n: cnt('buy_now') },
+            { label: '❤️ Wishlist', n: cnt('wishlist_add') },
+            { label: '🚪 Checkouts', n: cnt('checkout_start') },
+            { label: '💳 Reached pay', n: cnt('txn_created') },
+          ],
+          orders: (ords || []).length, revenue,
+          topCarted: await topProd('add_to_cart'),
+          topWished: await topProd('wishlist_add'),
+          topSold: Object.entries(soldCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([title, n]) => ({ title, n })),
+          zeroSearches: [...new Set((evs || []).filter((e: any) => e.type === 'search' && e.q && (e.n ?? 0) === 0).map((e: any) => String(e.q)))].slice(0, 12),
+        });
+        const r = await sendEmail({ to: OPS, subject, html, text, idempotencyKey: `ownerreport:${week}`, tags: [{ name: 'kind', value: 'ownerReport' }] });
+        stats.ownerReport = r.ok ? `sent (${week})` : `failed: ${r.error}`;
+      } catch (e: any) { stats.ownerReport = `failed: ${e?.message}`; }
+    }
+  }
+
+  // ── 14. Wishlist reminders: hearted 3-14 days ago, never bought ──────
+  stats.wishlistReminder = 'off';
+  if (g.wishlist_reminder_enabled) {
+    const s = { candidates: 0, sent: 0, failed: 0 };
+    const { data: favs } = await db.from('browse_events')
+      .select('email, product_id')
+      .eq('source', 'favorite')
+      .lte('created_at', daysAgo(3)).gte('created_at', daysAgo(14))
+      .limit(5000);
+    const byEmail = new Map<string, Set<string>>();
+    for (const f of favs || []) {
+      const em = (f.email || '').toLowerCase(); if (!em || !f.product_id) continue;
+      (byEmail.get(em) || byEmail.set(em, new Set()).get(em)!).add(f.product_id);
+    }
+    s.candidates = byEmail.size;
+    let sends = 0;
+    for (const [em, pidSet] of byEmail) {
+      if (sends >= 40) break;
+      try {
+        if (await isUnsubscribed(db, em)) continue;
+        let pids = [...pidSet].slice(0, 6);
+        const { data: logged } = await db.from('wishlist_reminder_log').select('product_id').eq('email', em).in('product_id', pids);
+        const done = new Set((logged || []).map((r: any) => r.product_id));
+        pids = pids.filter((id) => !done.has(id));
+        if (!pids.length) continue;
+        const { data: owned } = await db.from('entitlements').select('product_id').ilike('email', em).in('product_id', pids);
+        const own = new Set((owned || []).map((r: any) => r.product_id));
+        pids = pids.filter((id) => !own.has(id));
+        if (!pids.length) continue;
+        const { data: prods } = await db.from('products')
+          .select('id, title, slug, image_url, price_usd')
+          .in('id', pids).eq('active', true).not('image_url', 'is', null).limit(3);
+        if (!prods?.length) continue;
+        const { subject, html, text } = withOvr('wishlistReminder',
+          wishlistReminderEmail({ email: em, products: prods as MiniProduct[] }), em);
+        const res = await sendEmail({ to: em, subject, html, text, idempotencyKey: hashKey(`wishrem:${em}`, prods.map((p: any) => p.id)), tags: [{ name: 'kind', value: 'wishlistReminder' }] });
+        if (res.ok) {
+          s.sent++; sends++;
+          await db.from('wishlist_reminder_log').upsert(prods.map((p: any) => ({ email: em, product_id: p.id })), { onConflict: 'email,product_id', ignoreDuplicates: true });
+        } else s.failed++;
+      } catch { s.failed++; }
+    }
+    stats.wishlistReminder = s;
+  }
 
   return stats;
 }

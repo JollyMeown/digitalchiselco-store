@@ -75,6 +75,8 @@ export const TEMPLATE_HEADINGS: Record<string, string> = {
   referralNudge: 'Give 15%, get 15% 🎁',
   payRecovery: 'Almost there 🛒',
   refundWinback: 'Fancy another try? 🪵',
+  picks: 'Picked just for you 🪵',
+  wishlistReminder: 'Saved, not forgotten ❤️',
 };
 
 function shell(subject: string, heading: string, bodyHtml: string, email: string): string {
@@ -353,6 +355,84 @@ export function winbackEmail(d: { email: string; products: MiniProduct[]; code: 
     <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">Not carving these days? No hard feelings, you can unsubscribe below.</p>`;
   const text = `We miss you at DigitalChiselCo. Here is 15% off with code ${d.code}: ${SITE}/catalog\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'Come back and carve 🪵', body, d.email), text };
+}
+
+// ── Product Picks: hand-selected designs sent by the owner to one person ──
+// Used by the Automations "Send hand-picked designs" tool. The shop owner
+// searches the catalog, picks a few designs and adds a personal note; this
+// wraps them in the branded shell (logo included) like every other email.
+export function productPicksEmail(d: { email: string; products: MiniProduct[]; note?: string | null; name?: string | null }): Out {
+  const subject = 'A few designs I picked out for you 🪵';
+  const rows: string[] = [];
+  for (let i = 0; i < d.products.length; i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Hi${d.name ? ' ' + esc(d.name) : ' fellow maker'},</p>
+    ${d.note ? `<div style="background:#FFFBF4;border-left:3px solid ${BRONZE};border-radius:0 8px 8px 0;padding:12px 16px;margin:0 0 16px;">
+      <p style="font-size:15px;line-height:1.6;color:#4a3a28;margin:0;font-style:italic;">${esc(d.note)}</p>
+      <p style="font-size:12px;color:#999;margin:6px 0 0;">Jolly, DigitalChiselCo</p>
+    </div>` : `<p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">You asked, and I went digging through the workshop. Here is what I think you will like:</p>`}
+    ${rows.join('')}
+    ${btn(SITE + '/catalog', 'Browse the full catalog')}
+    <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">Questions about any of these? Just reply, it lands straight in my inbox.</p>`;
+  const text = `Hi${d.name ? ' ' + d.name : ''},\n\n${d.note ? d.note + '\n\n' : 'Here are a few designs I picked out for you:\n\n'}` +
+    d.products.map((p) => `${(p.title || '').split('|')[0].trim()} ($${Number(p.price_usd).toFixed(2)}): ${SITE}/product/${p.slug}`).join('\n') +
+    `\n\nBrowse everything: ${SITE}/catalog\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'Picked just for you 🪵', body, d.email), text };
+}
+
+// ── Wishlist reminder (they hearted it, never bought it) ──────────────
+export function wishlistReminderEmail(d: { email: string; products: MiniProduct[] }): Out {
+  const subject = d.products.length === 1
+    ? `Still thinking about ${String(d.products[0].title || '').split('|')[0].trim().slice(0, 40)}?`
+    : 'The designs on your wishlist are still waiting 🪵';
+  const rows: string[] = [];
+  for (let i = 0; i < Math.min(3, d.products.length); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Hi fellow maker,</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">A little while ago you saved ${d.products.length === 1 ? 'this design' : 'these designs'} to your wishlist. ${d.products.length === 1 ? 'It is' : 'They are'} still here, instant download, ready to carve whenever you are:</p>
+    ${rows.join('')}
+    ${btn(SITE + '/favorites', 'Open my wishlist')}
+    <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">Tip: two or more designs unlock a bulk discount in the cart.</p>`;
+  const text = `Still on your wishlist:\n` +
+    d.products.map((p) => `${(p.title || '').split('|')[0].trim()}: ${SITE}/product/${p.slug}`).join('\n') +
+    `\n\nYour wishlist: ${SITE}/favorites\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'Saved, not forgotten ❤️', body, d.email), text };
+}
+
+// ── Owner weekly report (to the ops inbox, not customers) ─────────────
+export function ownerWeeklyReport(d: {
+  email: string; weekLabel: string;
+  pageviews: number; actions: { label: string; n: number }[];
+  orders: number; revenue: number;
+  topCarted: { title: string; n: number }[];
+  topWished: { title: string; n: number }[];
+  topSold: { title: string; n: number }[];
+  zeroSearches: string[];
+}): Out {
+  const subject = `📊 Your week at DigitalChiselCo: ${d.orders} orders, $${d.revenue.toFixed(2)}`;
+  const stat = (label: string, n: string | number) =>
+    `<td style="padding:10px;text-align:center;background:#FFFBF4;border:1px solid #eee;border-radius:8px;">
+      <div style="font-size:24px;font-weight:bold;color:${BRONZE_DARK};">${n}</div>
+      <div style="font-size:11px;color:#8a7a68;font-weight:bold;">${esc(label)}</div></td>`;
+  const list = (title: string, rows: { title: string; n: number }[]) => rows.length ? `
+    <p style="font-size:13px;font-weight:bold;color:${BRONZE_DARK};margin:16px 0 4px;">${title}</p>
+    ${rows.map((r) => `<p style="font-size:13px;color:#555;margin:2px 0;">• ${esc(r.title)} <strong>×${r.n}</strong></p>`).join('')}` : '';
+  const body = `
+    <table role="presentation" width="100%" cellspacing="4"><tr>
+      ${stat('Pageviews', d.pageviews.toLocaleString())}${stat('Orders', d.orders)}${stat('Revenue', '$' + d.revenue.toFixed(2))}
+    </tr></table>
+    <table role="presentation" width="100%" cellspacing="4"><tr>
+      ${d.actions.map((a) => stat(a.label, a.n.toLocaleString())).join('')}
+    </tr></table>
+    ${list('🛒 Most added to cart', d.topCarted)}
+    ${list('❤️ Most wishlisted', d.topWished)}
+    ${list('✅ Best sellers', d.topSold)}
+    ${d.zeroSearches.length ? `<p style="font-size:13px;font-weight:bold;color:#b91c1c;margin:16px 0 4px;">🔍 Searched but NOT found (design ideas!)</p>
+      <p style="font-size:13px;color:#555;margin:2px 0;">${d.zeroSearches.map(esc).join(' · ')}</p>` : ''}
+    <p style="text-align:center;margin:18px 0 0;">${btn(SITE + '/admin#traffic', 'Open the full Traffic dashboard')}</p>`;
+  const text = `Week ${d.weekLabel}: ${d.pageviews} pageviews, ${d.orders} orders, $${d.revenue.toFixed(2)}.\n` +
+    d.actions.map((a) => `${a.label}: ${a.n}`).join(', ');
+  return { subject, html: shell(subject, `Week in review · ${d.weekLabel}`, body, d.email), text };
 }
 
 // ── Failed-payment recovery (the card was declined mid-checkout) ─────

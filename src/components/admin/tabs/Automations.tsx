@@ -300,7 +300,15 @@ export default function Automations() {
           desc="Learns each subscriber's most common open hour and schedules their broadcasts to arrive then (via Resend). Improves opens over time as data builds." />
         <Toggle field="refund_winback_enabled" label="Post-refund win-back"
           desc="30 days after a refund, one friendly 'no hard feelings' email with a 15% code (COMEBACK15). One per person ever; only refunds from the last week of the window, so enabling late never blasts old refunds." />
+        <Toggle field="bundle_week_enabled" label="Bundle of the Week"
+          desc="Every Monday the shop auto-picks 5 designs from a rotating theme and publishes them at /bundle-of-week as a one-tap $25 bundle with a countdown. No email, just the page." />
+        <Toggle field="owner_report_enabled" label="Your weekly report (to you)"
+          desc="Every Monday YOU get one email: pageviews, cart adds, wishlist saves, checkout funnel, orders + revenue, best designs, and searches that found nothing. No admin login needed." />
+        <Toggle field="wishlist_reminder_enabled" label="Wishlist reminder"
+          desc="Subscribers who hearted a design 3-14 days ago but never bought it get one gentle 'saved, not forgotten' email with those designs. Once per person per design, ever." />
       </div>
+
+      <PicksPanel />
 
       <Card>
         <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -466,5 +474,107 @@ export default function Automations() {
         )}
       </Card>
     </div>
+  );
+}
+
+// ── Send hand-picked designs ─────────────────────────────────────────
+// A customer asks "do you have X?" → search the catalog, pick a few designs,
+// add a personal note, hit send. One branded email (logo + house template)
+// straight to their inbox. Not a broadcast — one person at a time.
+function PicksPanel() {
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [note, setNote] = useState('');
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [picked, setPicked] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
+
+  async function tok(): Promise<string> {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || '';
+  }
+
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      const term = q.trim();
+      if (term.length < 2) { setResults([]); return; }
+      const { data } = await supabase.from('products')
+        .select('id, title, slug, price_usd, image_url')
+        .eq('active', true).ilike('title', `%${term}%`)
+        .order('is_bestseller', { ascending: false }).limit(8);
+      setPicked((cur) => { setResults((data || []).filter((p: any) => !cur.some((x) => x.id === p.id))); return cur; });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  function add(p: any) {
+    if (picked.length >= 12) { setMsg({ kind: 'error', text: 'Max 12 designs per email.' }); return; }
+    setPicked([...picked, p]); setResults(results.filter((r) => r.id !== p.id)); setQ('');
+  }
+
+  async function send() {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setMsg({ kind: 'error', text: 'Enter a valid recipient email.' }); return; }
+    if (!picked.length) { setMsg({ kind: 'error', text: 'Pick at least one design.' }); return; }
+    setBusy(true); setMsg({ kind: 'info', text: 'Sending…' });
+    try {
+      const res = await fetch('/api/admin/product-picks', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${await tok()}` },
+        body: JSON.stringify({ email, name, note, product_ids: picked.map((p) => p.id) }),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.ok) setMsg({ kind: 'error', text: d.error || 'Send failed.' });
+      else {
+        setMsg({ kind: 'success', text: `✓ Sent ${d.sent} design${d.sent === 1 ? '' : 's'} to ${email}` });
+        setPicked([]); setNote('');
+      }
+    } catch { setMsg({ kind: 'error', text: 'Network error.' }); }
+    setBusy(false);
+  }
+
+  return (
+    <Card>
+      <div className="text-sm font-medium text-ink-900">🎯 Send hand-picked designs</div>
+      <p className="text-xs text-ink-700/60 mt-0.5 mb-3">A customer asked for something specific? Search the catalog, pick the designs, add a personal note. They get one branded email with your logo and product cards.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Recipient email *" className={inputCls} />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Their first name (optional, used in the greeting)" className={inputCls} />
+      </div>
+      <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={1000}
+        placeholder='Personal note (optional) — e.g. "You asked about eagle designs, these carve beautifully at 12 inches."'
+        className={inputCls + ' mb-2'} />
+      <div className="relative">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 Search the catalog by title…" className={inputCls} />
+        {results.length > 0 && (
+          <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-black/10 rounded-md shadow-lg max-h-72 overflow-y-auto">
+            {results.map((p) => (
+              <button key={p.id} onClick={() => add(p)} className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-cream text-left">
+                {p.image_url && <img src={p.image_url} className="w-9 h-9 rounded object-cover flex-shrink-0" alt="" />}
+                <span className="flex-1 text-xs text-ink-800 line-clamp-2">{String(p.title).split('|')[0].trim()}</span>
+                <span className="text-xs text-bronze-700 whitespace-nowrap">${Number(p.price_usd).toFixed(2)}</span>
+                <span className="text-bronze-600 text-sm">＋</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {picked.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {picked.map((p) => (
+            <span key={p.id} className="inline-flex items-center gap-1.5 bg-cream border border-bronze-600/25 rounded-full pl-1 pr-2 py-0.5 text-xs text-ink-800">
+              {p.image_url && <img src={p.image_url} className="w-5 h-5 rounded-full object-cover" alt="" />}
+              <span className="max-w-[180px] truncate">{String(p.title).split('|')[0].trim()}</span>
+              <button onClick={() => setPicked(picked.filter((x) => x.id !== p.id))} className="text-ink-700/40 hover:text-red-600" aria-label="Remove">✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-3 mt-3">
+        <button disabled={busy} onClick={send} className={btnPrimary}>{busy ? 'Sending…' : `Send ${picked.length || ''} design${picked.length === 1 ? '' : 's'} ✈`}</button>
+        <Toast message={msg.text} kind={msg.kind} />
+      </div>
+    </Card>
   );
 }

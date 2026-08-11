@@ -17,7 +17,7 @@ export const POST: APIRoute = async ({ request }) => {
     const since = new Date(Date.now() - 86400000).toISOString();
     const { data: recent } = await supabaseAdmin().from('browse_events')
       .select('id').eq('email', email).eq('product_id', productId).gte('created_at', since).limit(1);
-    if (!recent?.length) await supabaseAdmin().from('browse_events').insert({ email, product_id: productId });
+    if (!recent?.length) await supabaseAdmin().from('browse_events').insert({ email, product_id: productId, source: 'favorite' });
     return json({ ok: true });
   } catch {
     return json({ ok: false }, 200);

@@ -1,0 +1,117 @@
+---
+// Bundle of the Week — 5 auto-picked designs from a rotating theme, one tap,
+// flat $25. The picks live in site_settings.weekly_bundle (regenerated every
+// Monday by the growth cron when the Automations toggle is ON). Checkout
+// reuses the proven bundle5: cart line, so the $25 is enforced server-side.
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { supabaseAdmin } from '../lib/supabase';
+import { pricing, money } from '../lib/pricing';
+import { getSettings } from '../lib/queries';
+
+const BUNDLE_PRICE = 25;
+const settings = await getSettings();
+
+let bundle: { category_name: string; ids: string[]; expires_at: string } | null = null;
+let products: any[] = [];
+try {
+  const db = supabaseAdmin();
+  const { data: st } = await db.from('site_settings').select('weekly_bundle').eq('id', 1).maybeSingle();
+  const wb: any = (st as any)?.weekly_bundle;
+  if (wb?.ids?.length === 5 && wb.expires_at && Date.parse(wb.expires_at) > Date.now()) {
+    const { data: ps } = await db.from('products')
+      .select('id, slug, title, price_usd, image_url, active').in('id', wb.ids);
+    const live = (ps || []).filter((p: any) => p.active);
+    if (live.length === 5) { bundle = wb; products = wb.ids.map((id: string) => live.find((p: any) => p.id === id)).filter(Boolean); }
+  }
+} catch { /* page falls back to the builder */ }
+
+const totalValue = products.reduce((s, p) => s + pricing(p.price_usd, settings.discount_percent).price, 0);
+const saved = Math.max(0, totalValue - BUNDLE_PRICE);
+---
+<Base title="Bundle of the Week — 5 Designs, $25 | DigitalChiselCo" description="This week's hand-bundled theme: five premium bas-relief STL designs for a flat $25. New bundle every Monday.">
+  <Header />
+  <Breadcrumbs crumbs={[{ label: 'Bundle of the Week' }]} />
+  <main class="px-6 pb-16 max-w-5xl mx-auto min-h-[50vh]">
+    {bundle ? (
+      <>
+        <div class="text-center mb-8 mt-2">
+          <p class="text-xs uppercase tracking-[3px] text-bronze-600 font-medium">Bundle of the week</p>
+          <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 mt-1">{bundle.category_name} — 5 designs, $25</h1>
+          <p class="text-ink-700/70 mt-2 text-sm">A fresh themed five-pack every Monday. When the clock runs out, this exact bundle is gone.</p>
+          <div class="mt-3 inline-flex items-center gap-2 bg-[#5E380A] text-[#F5EFE3] rounded-full px-4 py-1.5 text-sm">
+            <span aria-hidden="true">⏳</span> Ends in <span id="bow-cd" class="font-mono font-medium" data-ends={bundle.expires_at}>…</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {products.map((p) => (
+            <a href={`/product/${p.slug}`} class="border border-black/10 rounded-lg overflow-hidden bg-white hover:shadow transition">
+              <div class="aspect-square bg-cream overflow-hidden">
+                {p.image_url && <img src={p.image_url} alt={p.title.split('|')[0].trim()} loading="lazy" class="w-full h-full object-cover" />}
+              </div>
+              <div class="p-2.5">
+                <div class="text-xs leading-snug text-ink-800 line-clamp-2 min-h-[2.4em]">{p.title.split('|')[0].trim()}</div>
+                <div class="text-xs text-ink-700/40 line-through mt-1">{money(pricing(p.price_usd, settings.discount_percent).price)}</div>
+              </div>
+            </a>
+          ))}
+        </div>
+
+        <div class="mt-8 max-w-md mx-auto text-center bg-white border-2 border-bronze-600/40 rounded-xl p-6">
+          <div class="flex items-baseline justify-center gap-3">
+            <span class="text-4xl font-serif text-bronze-800">$25</span>
+            <span class="text-ink-700/40 line-through">{money(totalValue)}</span>
+            {saved > 0 && <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">save {money(saved)}</span>}
+          </div>
+          <p class="text-xs text-ink-700/60 mt-1">All five designs · instant download · commercial license</p>
+          <button id="bow-add" class="mt-4 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition font-medium"
+            data-ids={products.map((p) => p.id).join(',')}
+            data-title={`Bundle of the Week: ${bundle.category_name}`}
+            data-img={products[0]?.image_url || ''}>
+            Add the whole bundle — $25
+          </button>
+          <p class="text-[11px] text-ink-700/50 mt-2">Prefer to choose your own five? <a href="/bundle-builder" class="text-bronze-600 underline">Build a custom bundle</a></p>
+        </div>
+      </>
+    ) : (
+      <div class="text-center mt-12">
+        <div class="text-4xl mb-3" aria-hidden="true">🗓</div>
+        <h1 class="font-serif text-3xl text-bronze-800">The next bundle lands Monday</h1>
+        <p class="text-ink-700/70 mt-2 text-sm">Every week we bundle five themed designs at a flat $25. In the meantime, build your own:</p>
+        <a href="/bundle-builder" class="inline-block mt-5 bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Pick any 5 for $25 →</a>
+      </div>
+    )}
+  </main>
+  <Footer />
+  <script is:inline>
+    (function () {
+      var cd = document.getElementById('bow-cd');
+      if (cd) {
+        var end = new Date(cd.dataset.ends).getTime();
+        (function tick() {
+          var ms = end - Date.now();
+          if (ms <= 0) { cd.textContent = 'ended'; return; }
+          var d = Math.floor(ms / 86400000), h = Math.floor(ms / 3600000) % 24, m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
+          cd.textContent = (d > 0 ? d + 'd ' : '') + h + 'h ' + m + 'm ' + s + 's';
+          setTimeout(tick, 1000);
+        })();
+      }
+      var btn = document.getElementById('bow-add');
+      if (btn) btn.addEventListener('click', function () {
+        var ids = (btn.dataset.ids || '').split(',');
+        if (ids.length !== 5) return;
+        var cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        var lineId = 'bundle5:' + ids.join(',');
+        if (!cart.some(function (x) { return x.id === lineId; })) {
+          cart.push({ id: lineId, slug: 'bundle-of-week', title: btn.dataset.title, price: 25, qty: 1, img: btn.dataset.img });
+          localStorage.setItem('cart', JSON.stringify(cart));
+          window.dispatchEvent(new Event('cart-changed'));
+        }
+        window.location.href = '/cart';
+      });
+    })();
+  </script>
+</Base>
