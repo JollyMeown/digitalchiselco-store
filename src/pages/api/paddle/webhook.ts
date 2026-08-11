@@ -18,6 +18,7 @@ import { send as sendEmail } from '../../../lib/resend';
 import { orderConfirmation, membershipPurchaseNotification } from '../../../lib/email-templates';
 import { createSubscriptionForPurchase } from '../../../lib/subscriptions';
 import { giftCardEmail, paymentRecoveryEmail } from '../../../lib/marketing-emails';
+import { telegramOwner } from '../../../lib/notify';
 
 const OPS_INBOX = 'jolly@digitalchiselco.com';
 
@@ -392,6 +393,8 @@ async function handleTransactionCompleted(db: any, txn: any) {
         text: `New order $${total.toFixed(2)} ${currency} from ${email} (#${String(order.id).slice(0, 8)}).`,
         idempotencyKey: `order-alert:${order.id}`,
       });
+      // Free Telegram push (skipped silently unless TELEGRAM_* env is set)
+      await telegramOwner(`🎉 <b>New order: $${total.toFixed(2)} ${currency}</b>\n${email}\n${(oiAlert || []).slice(0, 5).map((r: any) => `• ${String(r.title).split('|')[0].trim()}`).join('\n')}`);
     }
   } catch (e) { console.error('[owner-alert] failed (order fine):', e); }
 

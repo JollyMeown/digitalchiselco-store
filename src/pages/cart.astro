@@ -153,6 +153,16 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
   <!-- Inline Paddle checkout — branded, embedded on-site (uses the dashboard Inline theme) -->
   <section id="dcc-checkout-section" class="hidden px-4 sm:px-6 pb-16 max-w-3xl mx-auto">
     <button id="dcc-checkout-back" type="button" class="text-sm text-bronze-700 hover:underline mb-4">&larr; Back to cart</button>
+    <!-- Exit-save: shown once when the buyer backs out of payment -->
+    <div id="dcc-exit-save" class="hidden mb-4 bg-[#FAEEDA] border border-bronze-600/40 rounded-lg px-4 py-3">
+      <p class="text-sm text-bronze-800 font-medium">Not ready right now? No problem.</p>
+      <p class="text-xs text-ink-700/70 mt-0.5">I can email you your cart so you can finish in one click later. Nothing is lost either way.</p>
+      <div class="mt-2 flex flex-wrap gap-2">
+        <button id="dcc-exit-save-yes" type="button" class="text-xs px-3 py-2 rounded-md bg-bronze-600 text-cream hover:bg-bronze-700 transition">📧 Email me my cart</button>
+        <button id="dcc-exit-save-no" type="button" class="text-xs px-3 py-2 rounded-md border border-black/15 hover:bg-white transition">Just take me back</button>
+      </div>
+      <p id="dcc-exit-save-msg" class="text-xs mt-2 hidden"></p>
+    </div>
     <h1 class="font-serif text-2xl sm:text-3xl text-bronze-800 mb-1">Complete your purchase</h1>
     <p class="text-sm text-ink-700/60 mb-5">Secure checkout — your STL files are emailed instantly after payment.</p>
     <div class="dcc-inline-frame rounded-xl border border-bronze-600/15 bg-white p-2 sm:p-4 min-h-[420px]"></div>
@@ -659,8 +669,40 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       if (e.target.checked) setTimeout(() => document.getElementById('gift-to')?.focus(), 50);
     });
 
-    // Back to cart from the inline checkout — reload to restore cart state + clear the frame.
-    document.getElementById('dcc-checkout-back')?.addEventListener('click', () => window.location.reload());
+    // Back to cart from the inline checkout. FIRST click offers to email the
+    // cart (we know exactly this is where sales die — the funnel's
+    // "Reached payment → Paid" gap); second click or "just take me back"
+    // reloads as before. Offer shows once per checkout open.
+    let exitOffered = false;
+    document.getElementById('dcc-checkout-back')?.addEventListener('click', () => {
+      const offer = document.getElementById('dcc-exit-save');
+      const em = (emailInput?.value || localStorage.getItem('buyer_email') || '').trim().toLowerCase();
+      const items = JSON.parse(localStorage.getItem('cart') || '[]');
+      if (!exitOffered && offer && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em) && items.length) {
+        exitOffered = true;
+        offer.classList.remove('hidden');
+        offer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      window.location.reload();
+    });
+    document.getElementById('dcc-exit-save-no')?.addEventListener('click', () => window.location.reload());
+    document.getElementById('dcc-exit-save-yes')?.addEventListener('click', async () => {
+      const msg = document.getElementById('dcc-exit-save-msg');
+      const em = (emailInput?.value || localStorage.getItem('buyer_email') || '').trim().toLowerCase();
+      const items = JSON.parse(localStorage.getItem('cart') || '[]').map((x) => ({ title: x.title, price: Number(x.price) || 0 }));
+      msg.textContent = 'Sending…'; msg.className = 'text-xs mt-2 text-ink-700/60';
+      try {
+        const r = await fetch('/api/save-cart-email', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: em, items }) });
+        const d = await r.json();
+        msg.textContent = d.message || d.error || 'Done.';
+        msg.className = 'text-xs mt-2 ' + (r.ok && d.ok ? 'text-green-700' : 'text-red-600');
+        if (r.ok && d.ok) setTimeout(() => window.location.reload(), 1800);
+      } catch {
+        msg.textContent = 'Network error, going back to your cart.'; msg.className = 'text-xs mt-2 text-red-600';
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    });
 
     // ── Express fast-track ─────────────────────────────────────────────
     // A "Buy it now" click lands here with ?express=1. If we already know a

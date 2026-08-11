@@ -286,6 +286,31 @@ function PersonModal({ email, onClose }: { email: string; onClose: () => void })
   return (
     <Modal open onClose={onClose} title={email} wide>
       {!d ? <div className="text-sm text-ink-700/60 p-4">Loading…</div> : (
+        <>
+        {d.ltv && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+            <div className="bg-cream/60 border border-bronze-600/15 rounded-lg p-2.5 text-center">
+              <div className="text-xl font-extrabold text-bronze-800">${d.ltv.spend.toFixed(2)}</div>
+              <div className="text-[10px] font-bold text-ink-700/70">LIFETIME VALUE</div>
+              <div className="text-[10px] text-ink-700/50">≈ ${d.ltv.perYear}/yr</div>
+            </div>
+            <div className="bg-cream/60 border border-bronze-600/15 rounded-lg p-2.5 text-center">
+              <div className="text-xl font-extrabold text-bronze-800">{d.ltv.orders}</div>
+              <div className="text-[10px] font-bold text-ink-700/70">ORDERS</div>
+              <div className="text-[10px] text-ink-700/50">avg ${d.ltv.avgOrder.toFixed(2)}</div>
+            </div>
+            <div className="bg-cream/60 border border-bronze-600/15 rounded-lg p-2.5 text-center">
+              <div className="text-xl font-extrabold text-bronze-800">{d.ltv.lastOrderAt}</div>
+              <div className="text-[10px] font-bold text-ink-700/70">LAST ORDER</div>
+              <div className="text-[10px] text-ink-700/50">customer {Math.round(d.ltv.tenureDays / 30)} mo</div>
+            </div>
+            <div className={`rounded-lg p-2.5 text-center border ${d.ltv.overdue ? 'bg-red-50 border-red-200' : 'bg-cream/60 border-bronze-600/15'}`}>
+              <div className={`text-xl font-extrabold ${d.ltv.overdue ? 'text-red-700' : 'text-bronze-800'}`}>{d.ltv.nextWindow || '—'}</div>
+              <div className="text-[10px] font-bold text-ink-700/70">NEXT BUY (predicted)</div>
+              <div className="text-[10px] text-ink-700/50">{d.ltv.avgGapDays ? `buys every ~${d.ltv.avgGapDays}d${d.ltv.overdue ? ' · OVERDUE, send picks!' : ''}` : 'needs 2+ orders'}</div>
+            </div>
+          </div>
+        )}
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <div className="text-xs uppercase tracking-wide text-ink-700/60 mb-2">Products they like</div>
@@ -315,6 +340,7 @@ function PersonModal({ email, onClose }: { email: string; onClose: () => void })
             </div>
           </div>
         </div>
+        </>
       )}
     </Modal>
   );

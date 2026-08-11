@@ -6,6 +6,7 @@ import type { APIRoute } from 'astro';
 import crypto from 'node:crypto';
 import { supabaseAdmin } from '../../lib/supabase';
 import { send as sendEmail } from '../../lib/resend';
+import { telegramOwner } from '../../lib/notify';
 import { rateLimit, clientIp } from '../../lib/rate-limit';
 
 export const prerender = false;
@@ -65,6 +66,7 @@ export const POST: APIRoute = async ({ request }) => {
             text: `${email} built a $${subtotal.toFixed(2)} cart (${items.length} items).`,
             idempotencyKey: `bigcart:${email}:${new Date().toISOString().slice(0, 10)}`,
           });
+          await telegramOwner(`🛒 <b>Big cart RIGHT NOW: $${subtotal.toFixed(2)}</b>\n${email} · ${items.length} items\nThey are on the site this second.`);
         }
       }
     } catch { /* best-effort */ }

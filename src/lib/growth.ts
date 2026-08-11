@@ -737,6 +737,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         const OPS = 'jolly@digitalchiselco.com';
         const week = isoWeekKey(new Date());
         const sinceDay = daysAgo(30).slice(0, 10);
+        // ── Website signals ──
         const { data: evs } = await db.from('site_events').select('type, product_id, q, n').gte('day', sinceDay).limit(20000);
         const zero = [...new Set((evs || []).filter((e: any) => e.type === 'search' && e.q && (e.n ?? 0) === 0).map((e: any) => String(e.q)))].slice(0, 25);
         const searchCount: Record<string, number> = {};
@@ -745,14 +746,29 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         const actIds = [...new Set((evs || []).filter((e: any) => ['add_to_cart', 'wishlist_add', 'buy_now'].includes(e.type) && e.product_id).map((e: any) => e.product_id))].slice(0, 100);
         const { data: actProds } = actIds.length ? await db.from('products').select('title').in('id', actIds) : { data: [] as any[] };
         const hotTitles = (actProds || []).map((p: any) => String(p.title).split('|')[0].trim()).slice(0, 40);
+        // ── Etsy signals (synced daily by the local finance-refresh run) ──
+        // Trending = biggest views gained since the previous sync; Loved =
+        // most favorers overall; plus recent-review titles = what actually SELLS.
+        const { data: els } = await db.from('etsy_listing_stats').select('title, views, favorers, views_prev').limit(3000);
+        const clean = (t: string) => String(t || '').split('|')[0].trim().slice(0, 70);
+        const trendingEtsy = (els || [])
+          .map((r: any) => ({ t: clean(r.title), d: Math.max(0, (r.views || 0) - (r.views_prev || 0)) }))
+          .filter((x) => x.d > 0).sort((a, b) => b.d - a.d).slice(0, 15).map((x) => `${x.t} (+${x.d} views)`);
+        const lovedEtsy = (els || [])
+          .sort((a: any, b: any) => (b.favorers || 0) - (a.favorers || 0)).slice(0, 12)
+          .map((r: any) => `${clean(r.title)} (${r.favorers} favorites)`);
+        const { data: recentRevs } = await db.from('reviews').select('product_id, etsy_created_at').not('etsy_review_id', 'is', null).gte('etsy_created_at', daysAgo(45)).limit(500);
+        const revIds = [...new Set((recentRevs || []).map((r: any) => r.product_id).filter(Boolean))].slice(0, 40);
+        const { data: revProds } = revIds.length ? await db.from('products').select('title').in('id', revIds) : { data: [] as any[] };
+        const recentlySold = (revProds || []).map((p: any) => clean(p.title)).slice(0, 20);
 
         const Anthropic = (await import('@anthropic-ai/sdk')).default;
         const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 });
         const res = await anthropic.messages.create({
           model: 'claude-haiku-4-5',
-          max_tokens: 1200,
-          system: `You advise DigitalChiselCo, a shop selling bas-relief STL files for CNC carving. Given real shopper demand signals, propose exactly 5 NEW bas-relief design ideas the shop should produce next. Rules: never use em dashes; rank by demand evidence; each idea gets a bold one-line name, 1-2 sentences of what the relief shows, and one line citing the evidence (which searches or product interest support it). Do not propose designs that duplicate the "already hot" list. Output clean HTML using only <p>, <strong>, <ol>, <li>.`,
-          messages: [{ role: 'user', content: `Searches that found NOTHING (strongest signal, last 30 days):\n${zero.join(', ') || 'none'}\n\nTop searches:\n${topSearches.join(', ') || 'none'}\n\nAlready hot (carted/wishlisted, do not duplicate):\n${hotTitles.join('; ') || 'none'}` }],
+          max_tokens: 1400,
+          system: `You advise DigitalChiselCo, a shop selling bas-relief STL files for CNC carving on both its own website and Etsy. Given real demand signals from BOTH channels, propose exactly 5 NEW bas-relief design ideas the shop should produce next. Rules: never use em dashes; rank by demand evidence; each idea gets a bold one-line name, 1-2 sentences of what the relief shows, and one line citing the evidence (name the specific searches, Etsy trends or favorites that support it, and which channel the signal came from). Do not duplicate anything in the "already hot" or Etsy lists, propose ADJACENT ideas those signals point toward. Output clean HTML using only <p>, <strong>, <ol>, <li>.`,
+          messages: [{ role: 'user', content: `WEBSITE, searches that found NOTHING (strongest signal, last 30 days):\n${zero.join(', ') || 'none'}\n\nWEBSITE, top searches:\n${topSearches.join(', ') || 'none'}\n\nWEBSITE, already hot (carted/wishlisted, do not duplicate):\n${hotTitles.join('; ') || 'none'}\n\nETSY, trending listings by views gained since yesterday:\n${trendingEtsy.join('; ') || 'no delta yet (first sync was today)'}\n\nETSY, most-favorited listings all-time:\n${lovedEtsy.join('; ') || 'none'}\n\nETSY, designs with reviews in the last 45 days (recently SOLD):\n${recentlySold.join('; ') || 'none'}` }],
         });
         const block: any = res.content.find((b: any) => b.type === 'text');
         const ideasHtml = (block?.text || '').trim();

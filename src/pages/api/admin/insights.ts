@@ -238,7 +238,29 @@ async function subscriber(url: URL) {
     score: it.buys * 5 + it.clicks * 2 + it.browses,
   })).sort((a, b) => b.score - a.score);
   const revenue = (orders || []).reduce((s, o) => s + (Number(o.total) || 0), 0);
-  return { email, events: events || [], likes, orders: orders || [], revenue };
+
+  // ── LTV + next-purchase prediction ─────────────────────────────────
+  // avg gap between paid orders → predicted next window (only meaningful with
+  // 2+ orders; single-order buyers get spend + tenure only).
+  const paidOrders = (orders || []).filter((o: any) => o.status === 'paid')
+    .map((o: any) => ({ t: Date.parse(o.created_at), total: Number(o.total) || 0 }))
+    .sort((a, b) => a.t - b.t);
+  let ltv: any = null;
+  if (paidOrders.length) {
+    const spend = paidOrders.reduce((s, o) => s + o.total, 0);
+    const first = paidOrders[0].t, last = paidOrders[paidOrders.length - 1].t;
+    const tenureDays = Math.max(1, Math.round((Date.now() - first) / 86400000));
+    const perYear = +(spend * 365 / tenureDays).toFixed(2);
+    let avgGapDays: number | null = null, nextWindow: string | null = null, overdue = false;
+    if (paidOrders.length >= 2) {
+      avgGapDays = Math.round((last - first) / 86400000 / (paidOrders.length - 1));
+      const due = last + avgGapDays * 86400000;
+      nextWindow = new Date(due).toISOString().slice(0, 10);
+      overdue = due < Date.now();
+    }
+    ltv = { spend: +spend.toFixed(2), orders: paidOrders.length, avgOrder: +(spend / paidOrders.length).toFixed(2), perYear, tenureDays, avgGapDays, nextWindow, overdue, lastOrderAt: new Date(last).toISOString().slice(0, 10) };
+  }
+  return { email, events: events || [], likes, orders: orders || [], revenue, ltv };
 }
 
 async function products(url: URL) {
