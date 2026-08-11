@@ -65,13 +65,22 @@ export const POST: APIRoute = async ({ request }) => {
     payload: event,
   });
   if (insertErr) {
-    // 23505 = unique_violation in Postgres → already processed, ack with 200 so Paddle stops retrying
     if ((insertErr as any).code === '23505' || /duplicate key/i.test(insertErr.message)) {
-      console.log(`Webhook ${eventId} (${eventType}) already processed — acking.`);
-      return json({ ok: true, deduped: true });
+      // Retry of an event we've seen. Only ack-and-skip if the FIRST attempt
+      // finished (processed_at set). If it died partway, fall through and
+      // reprocess — otherwise Paddle's retry gets swallowed here and a paid
+      // order can be left permanently half-created (no items/email).
+      const { data: prior } = await db.from('webhook_events')
+        .select('processed_at').eq('provider', 'paddle').eq('event_id', eventId).maybeSingle();
+      if (prior?.processed_at) {
+        console.log(`Webhook ${eventId} (${eventType}) already processed — acking.`);
+        return json({ ok: true, deduped: true });
+      }
+      console.warn(`Webhook ${eventId} (${eventType}) previously failed mid-processing — reprocessing.`);
+    } else {
+      console.error('Webhook insert failed:', insertErr);
+      return json({ error: 'DB error' }, 500);
     }
-    console.error('Webhook insert failed:', insertErr);
-    return json({ error: 'DB error' }, 500);
   }
 
   // 2) Route by event type
@@ -129,8 +138,17 @@ async function handleTransactionCompleted(db: any, txn: any) {
     .eq('paddle_transaction_id', txn.id)
     .maybeSingle();
   if (existing?.id) {
-    console.log(`Order already exists for transaction ${txn.id} → skipping create.`);
-    return;
+    // Resume support: a previous attempt may have crashed AFTER creating the
+    // order row but BEFORE creating its items/entitlements. If items exist the
+    // order is complete — skip. If none exist, fall through and finish the job
+    // reusing the existing order id (all downstream steps are idempotent).
+    const { count: itemCount } = await db.from('order_items')
+      .select('id', { count: 'exact', head: true }).eq('order_id', existing.id);
+    if ((itemCount || 0) > 0) {
+      console.log(`Order already exists for transaction ${txn.id} → skipping create.`);
+      return;
+    }
+    console.warn(`Order ${existing.id} exists for txn ${txn.id} but has 0 items — resuming fulfilment.`);
   }
 
   // Capture customer's name early — used both on the order row and for the
@@ -138,23 +156,29 @@ async function handleTransactionCompleted(db: any, txn: any) {
   const earlyOpsCustomerName =
     customerName || (txn.custom_data && txn.custom_data.customer_name) || null;
 
-  const { data: order, error: orderErr } = await db
-    .from('orders')
-    .insert({
-      email: email || 'unknown@digitalchiselco.com',
-      customer_name: earlyOpsCustomerName,
-      status: 'paid',
-      subtotal,
-      total,
-      currency,
-      provider: 'paddle',
-      provider_order_id: txn.id,
-      paddle_transaction_id: txn.id,
-      paddle_customer_id: txn.customer_id || null,
-    })
-    .select('id')
-    .single();
-  if (orderErr || !order) throw new Error(`Insert order failed: ${orderErr?.message}`);
+  let order: { id: string };
+  if (existing?.id) {
+    order = { id: existing.id };
+  } else {
+    const { data: created, error: orderErr } = await db
+      .from('orders')
+      .insert({
+        email: email || 'unknown@digitalchiselco.com',
+        customer_name: earlyOpsCustomerName,
+        status: 'paid',
+        subtotal,
+        total,
+        currency,
+        provider: 'paddle',
+        provider_order_id: txn.id,
+        paddle_transaction_id: txn.id,
+        paddle_customer_id: txn.customer_id || null,
+      })
+      .select('id')
+      .single();
+    if (orderErr || !created) throw new Error(`Insert order failed: ${orderErr?.message}`);
+    order = created;
+  }
 
   // Stamp the coupon redemption now that payment has actually completed. The
   // coupon_id rides along in custom_data from checkout-init. This is the ONLY
@@ -162,7 +186,10 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // unauthenticated caller can't burn a promo's max_redemptions without paying).
   // The whole webhook is idempotent (order insert is skipped on retry above),
   // so this runs at most once per paid order.
-  const couponId: string | null = txn.custom_data?.coupon_id || null;
+  // Skipped on the resume path: the stamp sits immediately after the order
+  // insert, so on any crash-late-then-resume it already ran once — running it
+  // again would double-count the redemption.
+  const couponId: string | null = existing?.id ? null : (txn.custom_data?.coupon_id || null);
   if (couponId) {
     try {
       await db.from('coupon_redemptions').insert({

@@ -49,6 +49,26 @@ export const POST: APIRoute = async ({ request }) => {
 
     const db = supabaseAdmin();
 
+    // Split cart into product ids vs membership slugs vs Pick-5 bundle markers
+    const productIds = cart
+      .filter((c) => !String(c.id).startsWith('membership:') && !String(c.id).startsWith('bundle5:'))
+      .map((c) => c.id);
+    const membershipSlugs = cart
+      .filter((c) => String(c.id).startsWith('membership:'))
+      .map((c) => String(c.id).slice('membership:'.length));
+
+    // Look up Paddle IDs + REAL prices from DB (before coupon validation, so
+    // min_subtotal / min_items gates run on DB prices, never browser-claimed ones).
+    const [{ data: products }, { data: plans }] = await Promise.all([
+      productIds.length
+        ? db.from('products').select('id, title, slug, price_usd, paddle_price_id').in('id', productIds)
+        : { data: [] as any[] },
+      membershipSlugs.length
+        ? db.from('membership_plans').select('slug, name, price_usd, paddle_price_id').in('slug', membershipSlugs)
+        : { data: [] as any[] },
+    ] as any);
+    const dbPriceById = new Map<string, number>((products || []).map((p: any) => [String(p.id), Number(p.price_usd)]));
+
     // Server-side discount resolution. Priority:
     //   1) Promo code (customer-entered)   — server-validated, may set fixed-$ or percent
     //   2) Auto shop sale (Etsy-style)     — applies when no code is used
@@ -58,8 +78,10 @@ export const POST: APIRoute = async ({ request }) => {
       const validation = await validateCoupon(
         couponCode,
         // Membership + Pick-5 bundle lines never count toward a promo code —
-        // the bundle is already a deep flat-price deal.
-        cart.filter((c) => !String(c.id).startsWith('membership:') && !String(c.id).startsWith('bundle5:')).map((c) => ({ id: c.id, price: Number(c.price) || 0, qty: Number(c.qty) || 1 })),
+        // the bundle is already a deep flat-price deal. Prices come from the DB
+        // (unknown ids price as 0), so browser-inflated prices can't pass a
+        // coupon's spend-minimum gate.
+        cart.filter((c) => !String(c.id).startsWith('membership:') && !String(c.id).startsWith('bundle5:')).map((c) => ({ id: c.id, price: dbPriceById.get(String(c.id)) ?? 0, qty: Number(c.qty) || 1 })),
         email ?? null,
       );
       if (!validation.ok) return json({ error: validation.error }, 400);
@@ -92,24 +114,6 @@ export const POST: APIRoute = async ({ request }) => {
       }
     }
 
-    // Split cart into product ids vs membership slugs vs Pick-5 bundle markers
-    const productIds = cart
-      .filter((c) => !String(c.id).startsWith('membership:') && !String(c.id).startsWith('bundle5:'))
-      .map((c) => c.id);
-    const membershipSlugs = cart
-      .filter((c) => String(c.id).startsWith('membership:'))
-      .map((c) => String(c.id).slice('membership:'.length));
-
-    // Look up Paddle IDs from DB
-    const [{ data: products }, { data: plans }] = await Promise.all([
-      productIds.length
-        ? db.from('products').select('id, title, slug, price_usd, paddle_price_id').in('id', productIds)
-        : { data: [] as any[] },
-      membershipSlugs.length
-        ? db.from('membership_plans').select('slug, name, price_usd, paddle_price_id').in('slug', membershipSlugs)
-        : { data: [] as any[] },
-    ] as any);
-
     // Build the items array Paddle expects.
     // When a discount applies (percent or fixed), we force ad-hoc lines so the
     // discounted prices reach Paddle directly (Paddle's catalog price would
@@ -125,7 +129,15 @@ export const POST: APIRoute = async ({ request }) => {
     }, 0);
 
     const items: any[] = [];
-    for (const c of cart) {
+    // These two arrays are built in LOCKSTEP with `items` (one entry per line
+    // actually sent to Paddle). The webhook correlates Paddle's items back to
+    // our products positionally via custom_data — building these from the raw
+    // cart instead would shift every index after a skipped line (unknown
+    // product/plan) and could fulfil the wrong design.
+    const sentIds: string[] = [];
+    const sentCustomizations: any[] = [];
+    for (let ci = 0; ci < cart.length; ci++) {
+      const c = cart[ci];
       const qty = Math.max(1, Number(c.qty) || 1);
       if (String(c.id).startsWith('bundle5:')) {
         // "Pick any 5 for $25" — the flat price is enforced HERE, never taken
@@ -147,6 +159,7 @@ export const POST: APIRoute = async ({ request }) => {
         }
         // Flat $25 — no sale/coupon/member discount ever stacks on top.
         items.push(adhocItem('Pick-5 Bundle — 5 Premium STL Designs', 25, 1));
+        sentIds.push(String(c.id)); sentCustomizations.push(customizations[ci] ?? null);
         continue;
       }
       if (String(c.id).startsWith('membership:')) {
@@ -158,6 +171,7 @@ export const POST: APIRoute = async ({ request }) => {
         } else {
           items.push(adhocItem(plan.name, Number(plan.price_usd), qty));
         }
+        sentIds.push(String(c.id)); sentCustomizations.push(customizations[ci] ?? null);
       } else {
         const p = (products || []).find((x: any) => x.id === c.id);
         if (!p) continue;
@@ -177,6 +191,7 @@ export const POST: APIRoute = async ({ request }) => {
         // current website price. Paddle still taxes + receipts ad-hoc items; the
         // webhook resolves the product via custom_data.cart_ids / title match.
         items.push(adhocItem(p.title, unit, qty));
+        sentIds.push(String(c.id)); sentCustomizations.push(customizations[ci] ?? null);
       }
     }
     if (!items.length) return json({ error: 'No valid items in cart.' }, 400);
@@ -190,12 +205,11 @@ export const POST: APIRoute = async ({ request }) => {
         // Embed our own identifiers so the webhook handler can correlate easily
         custom_data: {
           source: 'digitalchiselco-cart',
-          cart_ids: cart.map((c) => c.id),
+          cart_ids: sentIds,
           ...(couponMeta ? { coupon_id: couponMeta.id, coupon_code: couponMeta.code, coupon_discount: couponMeta.amount } : {}),
-          // Pass per-line customization snapshots so the webhook can persist
-          // them into order_item_customizations once the order is created.
-          // Indices align with cart_ids; null means "no fields configured".
-          ...(customizations.some((c) => Array.isArray(c) && c.length) ? { customizations } : {}),
+          // Per-line customization snapshots, aligned 1:1 with cart_ids (and
+          // therefore with the Paddle items array). null = no fields.
+          ...(sentCustomizations.some((c) => Array.isArray(c) && c.length) ? { customizations: sentCustomizations } : {}),
         },
       },
     });
