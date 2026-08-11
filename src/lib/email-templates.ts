@@ -47,6 +47,8 @@ export type OrderEmailData = {
   } | null;
   // "Carvers also bought" — 3 same-category products rendered under the order.
   crossSells?: { title: string; slug: string; image_url: string | null; price_usd: number }[];
+  // Gift orders: this email goes to the RECIPIENT; banner shows who sent it + note.
+  gift?: { fromName?: string | null; note?: string | null } | null;
 };
 
 /**
@@ -55,7 +57,9 @@ export type OrderEmailData = {
  */
 export function orderConfirmation(d: OrderEmailData): { subject: string; html: string; text: string } {
   const dateStr = new Date(d.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const subject = `Your DigitalChiselCo download${d.items.length > 1 ? 's are' : ' is'} ready — Order #${d.orderShortId}`;
+  const subject = d.gift
+    ? `🎁 ${d.gift.fromName ? `${d.gift.fromName} sent` : 'Someone sent'} you a gift, your downloads are inside`
+    : `Your DigitalChiselCo download${d.items.length > 1 ? 's are' : ' is'} ready — Order #${d.orderShortId}`;
 
   // --- HTML ---
   const itemRowsHtml = d.items.map((it) => {
@@ -136,6 +140,14 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
           <!-- Greeting -->
           <tr>
             <td style="padding:28px 28px 8px;">
+              ${d.gift ? `
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 16px;background:#FFFBF4;border:1px dashed ${BRAND_BRONZE};border-radius:10px;">
+                <tr><td style="padding:14px 16px;text-align:center;">
+                  <div style="font-size:22px;line-height:1;">🎁</div>
+                  <p style="margin:8px 0 0;font-size:15px;color:${BRAND_INK};"><strong>${d.gift.fromName ? esc(d.gift.fromName) : 'Someone who knows you love making things'}</strong> sent you these designs as a gift.</p>
+                  ${d.gift.note ? `<p style="margin:8px 0 0;font-size:14px;font-style:italic;color:#6b5a45;">"${esc(d.gift.note)}"</p>` : ''}
+                </td></tr>
+              </table>` : ''}
               <p style="margin:0;font-size:16px;line-height:1.5;color:${BRAND_INK};">
                 ${d.customerName ? `Hi ${esc(d.customerName)},` : 'Hi there,'}
               </p>
@@ -318,7 +330,8 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
     `Total paid: ${money(d.total)} ${d.currency}`,
   ].filter(Boolean).join('\n');
   const invoiceLink = d.paddleInvoiceUrl ? `\nPDF invoice: ${d.paddleInvoiceUrl}\n` : '';
-  const text = `${d.customerName ? `Hi ${d.customerName},` : 'Hi there,'}
+  const giftTxt = d.gift ? `🎁 ${d.gift.fromName || 'Someone'} sent you these designs as a gift.${d.gift.note ? `\n"${d.gift.note}"` : ''}\n\n` : '';
+  const text = `${giftTxt}${d.customerName ? `Hi ${d.customerName},` : 'Hi there,'}
 
 Thank you for your order from ${BRAND_NAME}!
 

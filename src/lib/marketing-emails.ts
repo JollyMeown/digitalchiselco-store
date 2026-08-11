@@ -73,6 +73,8 @@ export const TEMPLATE_HEADINGS: Record<string, string> = {
   winback: 'Come back and carve 🪵',
   priceDrop: 'A design you liked just got cheaper',
   referralNudge: 'Give 15%, get 15% 🎁',
+  payRecovery: 'Almost there 🛒',
+  refundWinback: 'Fancy another try? 🪵',
 };
 
 function shell(subject: string, heading: string, bodyHtml: string, email: string): string {
@@ -351,6 +353,40 @@ export function winbackEmail(d: { email: string; products: MiniProduct[]; code: 
     <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">Not carving these days? No hard feelings, you can unsubscribe below.</p>`;
   const text = `We miss you at DigitalChiselCo. Here is 15% off with code ${d.code}: ${SITE}/catalog\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'Come back and carve 🪵', body, d.email), text };
+}
+
+// ── Failed-payment recovery (the card was declined mid-checkout) ─────
+export function paymentRecoveryEmail(d: { email: string; items: { title: string; price: number }[] }): Out {
+  const subject = 'Your order did not go through, your cart is safe';
+  const list = d.items.slice(0, 6).map((it) =>
+    `<tr><td style="padding:6px 0;font-size:14px;color:#555;">${esc((it.title || '').split('|')[0].trim())}</td><td style="padding:6px 0;font-size:14px;color:${BRONZE_DARK};text-align:right;white-space:nowrap;">$${Number(it.price).toFixed(2)}</td></tr>`).join('');
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Hi fellow maker,</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">Your payment did not complete just now. It happens, cards get declined for all sorts of harmless reasons. Nothing was charged, and your cart is still saved on the device you shopped from.</p>
+    ${list ? `<table role="presentation" width="100%" style="border-top:1px solid #eee;border-bottom:1px solid #eee;margin:0 0 16px;">${list}</table>` : ''}
+    ${btn(SITE + '/cart', 'Finish my order')}
+    <p style="font-size:13px;line-height:1.6;color:#999;margin:14px 0 0;">Tip: a different card or PayPal usually sorts it out. If it keeps failing, just reply to this email and a real person will help.</p>
+    <p style="font-size:13px;line-height:1.6;color:#999;margin:8px 0 0;">Already finished your order? Then please ignore this note, you are all set.</p>`;
+  const text = `Your payment did not complete and nothing was charged. Your cart is still saved. Finish your order: ${SITE}/cart\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'Almost there 🛒', body, d.email), text };
+}
+
+// ── Post-refund win-back (30 days after a refund) ─────────────────────
+export function refundWinbackEmail(d: { email: string; products: MiniProduct[]; code: string }): Out {
+  const subject = 'No hard feelings, here is 15% off if you fancy another try';
+  const rows: string[] = [];
+  for (let i = 0; i < Math.min(3, d.products.length); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Hi fellow maker,</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">A little while back one of your orders was refunded. That is completely fine, it simply was not the right fit. We have added plenty of new designs since, and if you would like to give the workshop another try, this <strong>15% off</strong> code is yours:</p>
+    <div style="text-align:center;margin:6px 0 16px;">
+      <div style="display:inline-block;background:#fff;border:1px dashed ${BRONZE};border-radius:8px;padding:12px 28px;font-family:monospace;font-size:22px;letter-spacing:3px;color:${BRONZE_DARK};font-weight:bold;">${esc(d.code)}</div>
+    </div>
+    ${rows.join('')}
+    ${btn(SITE + '/catalog', 'Browse the new designs')}
+    <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">If a design ever gives you trouble on your machine, reply to this email, we fix files fast.</p>`;
+  const text = `Here is 15% off if you would like to give DigitalChiselCo another try. Code ${d.code}: ${SITE}/catalog\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'Fancy another try? 🪵', body, d.email), text };
 }
 
 // ── Price-drop alert (a design they liked just got cheaper) ──────────

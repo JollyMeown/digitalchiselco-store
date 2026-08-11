@@ -97,6 +97,29 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
 
       <!-- Email at cart — lets us pre-lock Paddle's email field so the receipt
            goes to exactly the address the buyer enters here. -->
+      <!-- Gift option: deliver the downloads to a friend's inbox instead -->
+      <div class="mt-4">
+        <label class="flex items-center gap-2 text-sm text-ink-800 cursor-pointer select-none">
+          <input id="gift-check" type="checkbox" class="accent-[#854F0B]" />
+          <span>🎁 This order is a <strong>gift</strong> — send the designs to someone else</span>
+        </label>
+        <div id="gift-fields" class="hidden mt-2 space-y-2 bg-[#FAEEDA] border border-bronze-600/30 rounded-md p-3">
+          <div>
+            <label for="gift-to" class="block text-[11px] text-ink-700/70 mb-0.5">Recipient's email <span class="text-red-600">*</span></label>
+            <input id="gift-to" type="email" inputmode="email" placeholder="friend@email.com" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white" />
+          </div>
+          <div>
+            <label for="gift-from" class="block text-[11px] text-ink-700/70 mb-0.5">Your name (shown on the gift)</label>
+            <input id="gift-from" type="text" maxlength="80" placeholder="e.g. Sarah" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white" />
+          </div>
+          <div>
+            <label for="gift-note" class="block text-[11px] text-ink-700/70 mb-0.5">Gift note (optional)</label>
+            <textarea id="gift-note" rows="2" maxlength="300" placeholder="Happy birthday! Carve something amazing." class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white"></textarea>
+          </div>
+          <p class="text-[11px] text-ink-700/60">They get the download links and your note. You get the receipt.</p>
+        </div>
+      </div>
+
       <div class="mt-4">
         <label for="buyer-email" class="block text-xs text-ink-700/70 mb-1">Email for download links and receipt</label>
         <input id="buyer-email" type="email" inputmode="email" autocomplete="email" required placeholder="you@email.com"
@@ -581,10 +604,27 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
           itemsForCheckout.push({ id: bumpEl.dataset.bumpId, title: 'Complete Catalogue', price: Number(bumpEl.dataset.bumpPrice) || 0, qty: 1 });
           customizationsPayload.push(null);
         }
+        // Gift order fields (validated lightly here, strictly server-side)
+        let gift = null;
+        if (document.getElementById('gift-check')?.checked) {
+          const gTo = (document.getElementById('gift-to')?.value || '').trim().toLowerCase();
+          if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(gTo)) {
+            alert("Please enter your friend's email for the gift, or untick the gift option.");
+            document.getElementById('gift-to')?.focus();
+            btn.disabled = false; btn.textContent = 'Checkout';
+            return;
+          }
+          gift = { to: gTo, from: (document.getElementById('gift-from')?.value || '').trim(), note: (document.getElementById('gift-note')?.value || '').trim() };
+        }
         const res = await fetch('/api/checkout-init', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ items: itemsForCheckout, email: buyerEmail, discount_percent: DISCOUNT, coupon_code: promo?.code || null, customizations: customizationsPayload }),
+          body: JSON.stringify({
+            items: itemsForCheckout, email: buyerEmail, discount_percent: DISCOUNT,
+            coupon_code: promo?.code || null, customizations: customizationsPayload,
+            currency: (window.dccChosenCcy ? window.dccChosenCcy() : 'USD'),
+            gift,
+          }),
         });
         const data = await res.json();
         if (!res.ok || !data.transaction_id) throw new Error(data.error || 'Could not start checkout.');
@@ -611,6 +651,12 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         alert(err.message || 'Checkout failed. Please try again.');
         btn.disabled = false; btn.textContent = 'Checkout';
       }
+    });
+
+    // Gift option: reveal the recipient fields when ticked.
+    document.getElementById('gift-check')?.addEventListener('change', (e) => {
+      document.getElementById('gift-fields')?.classList.toggle('hidden', !e.target.checked);
+      if (e.target.checked) setTimeout(() => document.getElementById('gift-to')?.focus(), 50);
     });
 
     // Back to cart from the inline checkout — reload to restore cart state + clear the frame.

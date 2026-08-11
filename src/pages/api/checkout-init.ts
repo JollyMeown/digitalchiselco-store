@@ -39,6 +39,24 @@ export const POST: APIRoute = async ({ request }) => {
     // customizations[i] = null OR [{key,label,type,value}, ...]
     const customizations: any[] = Array.isArray(body.customizations) ? body.customizations : [];
 
+    // Multi-currency: charge in the buyer's selected currency when we hold a
+    // fresh fx rate for it (rates refreshed daily by the growth cron into
+    // site_settings.fx_rates). Anything else falls back to USD. All discount
+    // math happens in USD; only the FINAL unit prices are converted.
+    const SUPPORTED_CCY = ['EUR', 'GBP', 'CAD', 'AUD'];
+    const reqCcy = String(body.currency || 'USD').toUpperCase();
+    let chargeCcy = 'USD';
+    let fxRate = 1;
+
+    // Gift order: recipient email + optional sender name/note ride through
+    // custom_data; the webhook delivers entitlements + downloads to them.
+    let giftData: { to: string; from: string; note: string } | null = null;
+    if (body.gift && typeof body.gift === 'object') {
+      const to = String(body.gift.to || '').toLowerCase().trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return json({ error: "Please enter a valid email for the gift recipient." }, 400);
+      giftData = { to, from: String(body.gift.from || '').trim().slice(0, 80), note: String(body.gift.note || '').trim().slice(0, 300) };
+    }
+
     if (!cart.length) return json({ error: 'Cart is empty.' }, 400);
 
     // Each call creates a Paddle transaction (a paid third-party write), so cap
@@ -68,6 +86,18 @@ export const POST: APIRoute = async ({ request }) => {
         : { data: [] as any[] },
     ] as any);
     const dbPriceById = new Map<string, number>((products || []).map((p: any) => [String(p.id), Number(p.price_usd)]));
+
+    // Resolve the fx rate for the requested currency — only trust a rate the
+    // cron refreshed within the last 7 days; otherwise charge USD as always.
+    if (SUPPORTED_CCY.includes(reqCcy)) {
+      try {
+        const { data: stFx } = await db.from('site_settings').select('fx_rates').eq('id', 1).maybeSingle();
+        const rates: any = stFx?.fx_rates || {};
+        const r = Number(rates[reqCcy]);
+        const updated = Date.parse(rates.updated_at || '') || 0;
+        if (r > 0 && Date.now() - updated < 7 * 86400000) { chargeCcy = reqCcy; fxRate = r; }
+      } catch { /* stay USD */ }
+    }
 
     // Server-side discount resolution. Priority:
     //   1) Promo code (customer-entered)   — server-validated, may set fixed-$ or percent
@@ -182,7 +212,9 @@ export const POST: APIRoute = async ({ request }) => {
         const slug = String(c.id).slice('membership:'.length);
         const plan = (plans || []).find((p: any) => p.slug === slug);
         if (!plan) continue;
-        if (plan.paddle_price_id) {
+        // Catalog price_ids are USD — a Paddle transaction is single-currency,
+        // so when charging in another currency memberships go ad-hoc too.
+        if (plan.paddle_price_id && chargeCcy === 'USD') {
           items.push({ price_id: plan.paddle_price_id, quantity: qty });
         } else {
           items.push(adhocItem(plan.name, Number(plan.price_usd), qty));
@@ -212,6 +244,21 @@ export const POST: APIRoute = async ({ request }) => {
     }
     if (!items.length) return json({ error: 'No valid items in cart.' }, 400);
 
+    // All discount math above ran in USD. Record the USD subtotal, then (for a
+    // non-USD charge) convert each ad-hoc unit price to the charge currency.
+    let usdSubtotal = 0;
+    for (const it of items) {
+      if (it.price?.unit_price) {
+        const usdCents = Number(it.price.unit_price.amount) || 0;
+        usdSubtotal += (usdCents / 100) * (Number(it.quantity) || 1);
+        if (chargeCcy !== 'USD') {
+          it.price.unit_price.amount = String(Math.round(usdCents * fxRate));
+          it.price.unit_price.currency_code = chargeCcy;
+        }
+      }
+    }
+    usdSubtotal = +usdSubtotal.toFixed(2);
+
     // Create the transaction in Paddle
     const txn = await paddleApi<any>('/transactions', {
       method: 'POST',
@@ -224,6 +271,8 @@ export const POST: APIRoute = async ({ request }) => {
           cart_ids: sentIds,
           ...(couponMeta ? { coupon_id: couponMeta.id, coupon_code: couponMeta.code, coupon_discount: couponMeta.amount } : {}),
           ...(remainderEligible ? { gift_remainder: giftRemainder } : {}),
+          ...(chargeCcy !== 'USD' ? { fx: { currency: chargeCcy, rate: fxRate, usd_subtotal: usdSubtotal } } : {}),
+          ...(giftData ? { gift: { to: giftData.to, from: giftData.from, note: giftData.note } } : {}),
           // Per-line customization snapshots, aligned 1:1 with cart_ids (and
           // therefore with the Paddle items array). null = no fields.
           ...(sentCustomizations.some((c) => Array.isArray(c) && c.length) ? { customizations: sentCustomizations } : {}),
@@ -237,7 +286,12 @@ export const POST: APIRoute = async ({ request }) => {
     // max_redemptions and disable the promo without ever paying. The coupon_id
     // is carried through in custom_data (above) so the webhook can stamp it.
 
-    return json({ transaction_id: txn.data?.id, status: txn.data?.status, discount_amount: couponMeta?.amount || 0 });
+    // Funnel truth-meter: a Paddle transaction now exists. Server-side (can't
+    // be ad-blocked), so checkout_start → txn_created → paid orders shows
+    // exactly where buyers drop inside the payment frame.
+    try { await db.from('site_events').insert({ type: 'txn_created', path: '/cart' }); } catch { /* analytics never blocks checkout */ }
+
+    return json({ transaction_id: txn.data?.id, status: txn.data?.status, discount_amount: couponMeta?.amount || 0, currency: chargeCcy });
   } catch (e: any) {
     console.error('checkout-init failed:', e);
     return json({ error: e.message || 'Checkout could not start.' }, 500);

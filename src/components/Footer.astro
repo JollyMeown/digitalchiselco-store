@@ -3,7 +3,7 @@
 <footer class="px-6 py-10 text-center text-xs text-ink-700/60 border-t border-black/10">
   <div class="flex gap-4 justify-center mb-3 flex-wrap">
     <a href="/catalog">Catalog</a><a href="/collections">Collections</a><a href="/designs">Themes</a><a href="/quiz">Design finder</a><a href="/favorites">Favorites</a><a href="/pricing">Pricing</a><a href="/free">Free files</a>
-    <a href="/membership">Membership</a><a href="/contact">Contact</a>
+    <a href="/membership">Membership</a><a href="/resend-downloads">Resend my downloads</a><a href="/contact">Contact</a>
   </div>
   <div class="mb-3 flex items-center justify-center gap-2">
     <label for="dcc-ccy" class="text-ink-700/50">Show prices in</label>
@@ -16,7 +16,7 @@
       <option value="AUD">AUD $</option>
       <option value="INR">INR ₹</option>
     </select>
-    <span class="text-ink-700/40">· charged in USD</span>
+    <span class="text-ink-700/40">· checkout charges EUR, GBP, CAD &amp; AUD natively, everything else in USD</span>
   </div>
   <div class="flex gap-4 justify-center mb-3 flex-wrap text-ink-700/40">
     <a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refunds">Refund Policy</a>
@@ -50,6 +50,7 @@
       });
     }
     window.dccConvertCcy = convert;
+    window.dccChosenCcy = chosen;   // cart uses this to request checkout in the buyer's currency
     var sel = document.getElementById('dcc-ccy');
     if (sel) { sel.value = localStorage.getItem('dcc_ccy') || 'AUTO'; sel.addEventListener('change', function () { localStorage.setItem('dcc_ccy', sel.value); convert(); }); }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', convert, { once: true }); else convert();

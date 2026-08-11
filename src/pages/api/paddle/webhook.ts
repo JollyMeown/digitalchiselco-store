@@ -17,7 +17,7 @@ import { verifyWebhookSignature, paddleApi } from '../../../lib/paddle';
 import { send as sendEmail } from '../../../lib/resend';
 import { orderConfirmation, membershipPurchaseNotification } from '../../../lib/email-templates';
 import { createSubscriptionForPurchase } from '../../../lib/subscriptions';
-import { giftCardEmail } from '../../../lib/marketing-emails';
+import { giftCardEmail, paymentRecoveryEmail } from '../../../lib/marketing-emails';
 
 const OPS_INBOX = 'jolly@digitalchiselco.com';
 
@@ -89,6 +89,8 @@ export const POST: APIRoute = async ({ request }) => {
       await handleTransactionCompleted(db, event.data);
     } else if (eventType === 'adjustment.created' || eventType === 'adjustment.updated') {
       await handleAdjustment(db, event.data);
+    } else if (eventType === 'transaction.payment_failed') {
+      await handlePaymentFailed(db, event.data);
     }
     // Other events (transaction.created, transaction.updated, subscription.*, etc.)
     // are stored above but not processed yet — easy to add as needed.
@@ -129,9 +131,28 @@ async function handleTransactionCompleted(db: any, txn: any) {
   }
   // Fallback chain in case the customer lookup fails or customer_id is missing.
   const email: string = customerEmail || (txn.customer?.email || '').toLowerCase().trim();
+
+  // Gift orders: checkout-init passes custom_data.gift = { to, from, note }.
+  // Entitlements + the download email go to the RECIPIENT; the buyer keeps the
+  // order row, the receipt, loyalty points and referral credit.
+  const giftRaw = txn.custom_data?.gift;
+  const giftTo = giftRaw && typeof giftRaw.to === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(giftRaw.to)
+    ? String(giftRaw.to).toLowerCase().trim() : null;
+  const gift = giftTo ? {
+    to: giftTo,
+    fromName: (String(giftRaw.from || '').trim().slice(0, 80)) || null,
+    note: (String(giftRaw.note || '').trim().slice(0, 300)) || null,
+  } : null;
+  const deliveryEmail: string = gift ? gift.to : email;
   const total = Number(txn.details?.totals?.total ?? txn.details?.totals?.subtotal ?? 0) / 100; // cents → dollars
   const subtotal = Number(txn.details?.totals?.subtotal ?? 0) / 100;
   const currency = String(txn.currency_code || 'USD');
+  // Multi-currency charging: checkout-init stamps the USD-equivalent subtotal
+  // into custom_data.fx so USD-denominated rules (free-gift threshold, loyalty
+  // points per dollar, referral stats) stay correct when the buyer paid in EUR
+  // etc. For USD transactions these are identical to subtotal/total.
+  const usdSubtotal = Number(txn.custom_data?.fx?.usd_subtotal) > 0 ? Number(txn.custom_data.fx.usd_subtotal) : subtotal;
+  const usdTotal = currency === 'USD' ? total : usdSubtotal;
 
   // Upsert order keyed on paddle_transaction_id (the unique index makes this safe).
   const { data: existing } = await db
@@ -253,7 +274,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
         });
         await db.from('entitlements').insert({
           order_id: order.id,
-          email: email || 'unknown@digitalchiselco.com',
+          email: deliveryEmail || 'unknown@digitalchiselco.com',
           product_id: bp.id,
         });
       }
@@ -325,7 +346,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
     if (productId) {
       await db.from('entitlements').insert({
         order_id: order.id,
-        email: email || 'unknown@digitalchiselco.com',
+        email: deliveryEmail || 'unknown@digitalchiselco.com',
         product_id: productId,
       });
     }
@@ -369,7 +390,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
     try {
       const { data: st } = await db.from('site_settings').select('free_gift_threshold').eq('id', 1).maybeSingle();
       const threshold = Number(st?.free_gift_threshold) || 0;
-      if (threshold > 0 && subtotal >= threshold) {
+      if (threshold > 0 && usdSubtotal >= threshold) {
         const shortId = String(order.id).slice(0, 8);
         const GIFT_PRICE_CAP = 15;   // only give away modestly-priced singles
 
@@ -423,10 +444,12 @@ async function handleTransactionCompleted(db: any, txn: any) {
         }
 
         if (candidates.length) {
-          const gift = candidates[Math.floor(Math.random() * candidates.length)];
-          await db.from('order_items').insert({ order_id: order.id, product_id: gift.id, title: `🎁 Free gift: ${String(gift.title).split('|')[0].trim()}`, price_usd: 0, qty: 1 });
-          await db.from('entitlements').insert({ order_id: order.id, email, product_id: gift.id });
-          console.log(`[free-gift] granted ${gift.slug} (smart pick) on order ${shortId} — subtotal $${subtotal} >= $${threshold}`);
+          // NOTE: named `pick`, not `gift` — the outer `gift` is the gift-ORDER
+          // routing object and must stay visible here (deliveryEmail target).
+          const pick = candidates[Math.floor(Math.random() * candidates.length)];
+          await db.from('order_items').insert({ order_id: order.id, product_id: pick.id, title: `🎁 Free gift: ${String(pick.title).split('|')[0].trim()}`, price_usd: 0, qty: 1 });
+          await db.from('entitlements').insert({ order_id: order.id, email: deliveryEmail, product_id: pick.id });
+          console.log(`[free-gift] granted ${pick.slug} (smart pick) on order ${shortId} — subtotal $${subtotal} >= $${threshold}`);
         } else {
           console.log(`[free-gift] order ${shortId} qualified but no eligible gift candidate found`);
         }
@@ -446,7 +469,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
         // idempotent on order (unique index referrals_order_uidx)
         const { data: refRow, error: refErr } = await db.from('referrals').insert({
           code: usedCode, referrer_email: referrer, referred_email: email,
-          order_id: order.id, amount_usd: total, status: 'pending',
+          order_id: order.id, amount_usd: usdTotal, status: 'pending',
         }).select('id').maybeSingle();
         if (!refErr && refRow) {
           const { data: g2 } = await db.from('growth_settings').select('referral_rewards_enabled').eq('id', 1).maybeSingle();
@@ -473,7 +496,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
     try {
       const { data: ls } = await db.from('site_settings').select('loyalty_enabled, loyalty_earn_per_dollar').eq('id', 1).maybeSingle();
       if (ls?.loyalty_enabled) {
-        const pts = Math.round(total * (Number(ls.loyalty_earn_per_dollar) || 10));
+        const pts = Math.round(usdTotal * (Number(ls.loyalty_earn_per_dollar) || 10));
         if (pts > 0) {
           const { error: le } = await db.from('loyalty_ledger').insert({ email, points: pts, reason: 'earned', order_id: order.id });
           if (!le) console.log(`[loyalty] +${pts} pts to ${email} for order ${String(order.id).slice(0, 8)}`);
@@ -706,8 +729,11 @@ async function handleTransactionCompleted(db: any, txn: any) {
       const paddleInvoiceUrl = invoiceNumber ? `${siteUrl}/api/invoice/${txn.id}` : null;
 
       const { subject, html, text } = orderConfirmation({
-        email,
-        customerName: finalCustomerName,
+        email: deliveryEmail,
+        // A gift recipient's name is unknown — the gift banner carries the
+        // sender's name instead, so suppress the buyer's name there.
+        customerName: gift ? null : finalCustomerName,
+        gift: gift ? { fromName: gift.fromName, note: gift.note } : null,
         crossSells,
         orderId: order.id,
         orderShortId: String(order.id).slice(0, 8),
@@ -725,13 +751,31 @@ async function handleTransactionCompleted(db: any, txn: any) {
       });
 
       const sendResult = await sendEmail({
-        to: email,
+        to: deliveryEmail,
         subject,
         html,
         text,
         idempotencyKey: `order:${order.id}`,   // Resend dedupes if we accidentally retry
         tags: [{ name: 'kind', value: 'order' }],
       });
+
+      // Gift orders: the buyer also gets a short "delivered" note (their money
+      // receipt still comes from Paddle as merchant of record).
+      if (gift && email && email !== deliveryEmail) {
+        try {
+          await sendEmail({
+            to: email,
+            subject: `🎁 Your gift is on its way to ${gift.to}`,
+            html: `<p>Hi${finalCustomerName ? ' ' + finalCustomerName : ''},</p>
+<p>Lovely gesture! We have delivered your gift to <strong>${gift.to}</strong> with the download links${gift.note ? ' and your note' : ''}.</p>
+<p>Order #${String(order.id).slice(0, 8)} · $${Number(total).toFixed(2)} ${currency}. Your payment receipt arrives separately.</p>
+<p>Happy making,<br/>Jolly · DigitalChiselCo</p>`,
+            text: `Your gift was delivered to ${gift.to} with the download links${gift.note ? ' and your note' : ''}. Order #${String(order.id).slice(0, 8)}.`,
+            idempotencyKey: `gift-sender:${order.id}`,
+            tags: [{ name: 'kind', value: 'gift' }],
+          });
+        } catch (e) { console.error('[gift-order] sender note failed:', e); }
+      }
 
       if (sendResult.ok && !sendResult.skipped) {
         console.log(`[email] Order ${order.id.slice(0, 8)} confirmation sent to ${email} (id=${sendResult.id})`);
@@ -785,12 +829,30 @@ async function handleAdjustment(db: any, adj: any) {
   const shortId = String(order.id).slice(0, 8);
 
   if (isFull) {
-    await db.from('orders').update({ status: 'refunded' }).eq('id', order.id);
+    await db.from('orders').update({ status: 'refunded', refunded_at: new Date().toISOString() }).eq('id', order.id);
     const { error: entErr } = await db.from('entitlements').delete().eq('order_id', order.id);
     if (entErr) throw new Error(`entitlement revoke failed for order ${order.id}: ${entErr.message}`);
     console.log(`[adjustment] FULL ${action} — order ${shortId} marked refunded, entitlements revoked ($${refunded}).`);
   } else {
+    // Stamp refunded_at (order stays 'paid') so the post-refund win-back can
+    // still reach partial refunders, then tell the BUYER what they keep.
+    await db.from('orders').update({ refunded_at: new Date().toISOString() }).eq('id', order.id);
     console.log(`[adjustment] PARTIAL ${action} on order ${shortId} ($${refunded} of $${order.total}) — order left paid, ops notified.`);
+    if (order.email && order.email !== 'unknown@digitalchiselco.com' && action === 'refund') {
+      try {
+        await sendEmail({
+          to: order.email,
+          subject: `Your refund of $${refunded.toFixed(2)} is on its way`,
+          html: `<p>Hi fellow maker,</p>
+<p>We have refunded <strong>$${refunded.toFixed(2)} ${order.currency}</strong> from your order <strong>#${shortId}</strong>. Depending on your bank it lands within 5 to 10 business days.</p>
+<p>The rest of your order is untouched, your other designs stay in your account with unlimited re-downloads.</p>
+<p>If anything else needs fixing, just reply to this email. A real person reads every message.</p>
+<p>Jolly · DigitalChiselCo</p>`,
+          text: `We have refunded $${refunded.toFixed(2)} ${order.currency} from your order #${shortId}. It lands within 5 to 10 business days. The rest of your order is untouched and stays in your account.`,
+          idempotencyKey: `adjustment-buyer:${adj.id || txnId}`,
+        });
+      } catch (e) { console.error('[adjustment] buyer email failed:', e); }
+    }
   }
 
   // Ops heads-up either way (best-effort).
@@ -806,4 +868,46 @@ async function handleAdjustment(db: any, adj: any) {
       idempotencyKey: `adjustment-ops:${adj.id || txnId}:${status}`,
     });
   } catch (e) { console.error('[adjustment] ops email failed:', e); }
+}
+
+// ── Failed payment recovery (transaction.payment_failed) ────────────────────
+// One gentle nudge, scheduled +2h so an immediate successful retry makes it
+// moot (the copy also says "ignore if you already finished"). Deduped to one
+// per email per day via the Resend idempotency key. Requires ticking
+// `transaction.payment_failed` on the webhook in the Paddle dashboard.
+async function handlePaymentFailed(db: any, txn: any) {
+  if (!txn?.id) return;
+
+  // If this transaction already produced a paid order (retry succeeded before
+  // the webhook reached us), never nudge.
+  const { data: paid } = await db.from('orders').select('id').eq('paddle_transaction_id', txn.id).maybeSingle();
+  if (paid) { console.log(`[payfail] txn ${txn.id} already paid — skipping.`); return; }
+
+  let email = '';
+  if (txn.customer_id) {
+    try {
+      const cust = await paddleApi<any>(`/customers/${txn.customer_id}`);
+      email = (cust?.data?.email || '').toLowerCase().trim();
+    } catch { /* fall through */ }
+  }
+  email = email || (txn.customer?.email || '').toLowerCase().trim();
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { console.log(`[payfail] txn ${txn.id}: no usable email.`); return; }
+
+  // Respect unsubscribes.
+  const { data: sub } = await db.from('subscribers').select('unsubscribed_at').ilike('email', email).maybeSingle();
+  if (sub?.unsubscribed_at) return;
+
+  const items = (Array.isArray(txn.items) ? txn.items : []).map((it: any) => ({
+    title: String(it.price?.name || it.price?.description || 'Design'),
+    price: Number(it.price?.unit_price?.amount ?? 0) / 100,
+  }));
+  const { subject, html, text } = paymentRecoveryEmail({ email, items });
+  const r = await sendEmail({
+    to: email, subject, html, text,
+    scheduledAt: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
+    idempotencyKey: `payfail:${email}:${new Date().toISOString().slice(0, 10)}`,
+    tags: [{ name: 'kind', value: 'payRecovery' }],
+  });
+  if (r.ok) console.log(`[payfail] recovery email scheduled (+2h) for ${email}, txn ${txn.id}`);
+  else console.error(`[payfail] recovery email failed for ${email}: ${r.error}`);
 }

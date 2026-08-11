@@ -12,7 +12,7 @@ import { send as sendEmail, sendBatch } from './resend';
 import {
   dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
   weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS,
-  winbackEmail, priceDropEmail, referralNudgeEmail,
+  winbackEmail, priceDropEmail, referralNudgeEmail, refundWinbackEmail,
   type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
 import { isoWeekKey } from './weekly-digest';
@@ -527,6 +527,61 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     for (const b of chunk(updates, 200)) for (const u of b) await db.from('subscribers').update({ best_send_hour: u.best_send_hour }).ilike('email', u.email);
     stats.sendtime = { learned: updates.length };
   } else stats.sendtime = 'off';
+
+  // ── 10. Post-refund win-back: 30 days after a refund, one olive branch ──
+  // Window is 30-37 days so enabling the toggle months later never blasts
+  // ancient refunds. One email per address ever (refund_winback_log).
+  stats.refundWinback = 'off';
+  if (g.refund_winback_enabled) {
+    const s = { candidates: 0, sent: 0, failed: 0 };
+    const { data: refunded } = await db.from('orders')
+      .select('email, refunded_at')
+      .not('refunded_at', 'is', null)
+      .lte('refunded_at', daysAgo(30)).gte('refunded_at', daysAgo(37))
+      .limit(500);
+    const { data: rl } = await db.from('refund_winback_log').select('email').limit(50000);
+    const alreadySent = new Set((rl || []).map((r) => r.email.toLowerCase()));
+    const cand = [...new Set((refunded || [])
+      .map((r) => (r.email || '').toLowerCase())
+      .filter((e) => e && e !== 'unknown@digitalchiselco.com' && !alreadySent.has(e)))].slice(0, 40);
+    s.candidates = cand.length;
+    if (cand.length) {
+      await db.from('coupons').upsert({ code: 'COMEBACK15', percent_off: 15, active: true, description: 'post-refund win-back 15%' }, { onConflict: 'code' });
+      const { data: best } = await db.from('products').select('title, slug, image_url, price_usd')
+        .eq('active', true).eq('is_bestseller', true).not('image_url', 'is', null).limit(3);
+      let show = (best || []) as MiniProduct[];
+      if (!show.length) { const { data: nw } = await db.from('products').select('title, slug, image_url, price_usd').eq('active', true).not('image_url', 'is', null).order('created_at', { ascending: false }).limit(3); show = (nw || []) as MiniProduct[]; }
+      for (const em of cand) {
+        try {
+          if (await isUnsubscribed(db, em)) continue;
+          const { subject, html, text } = withOvr('refundWinback', refundWinbackEmail({ email: em, products: show, code: 'COMEBACK15' }), em);
+          const res = await sendEmail({ to: em, subject, html, text, idempotencyKey: `refundwb:${em}`, tags: [{ name: 'kind', value: 'refundWinback' }] });
+          if (res.ok) { s.sent++; await db.from('refund_winback_log').upsert({ email: em }, { onConflict: 'email', ignoreDuplicates: true }); }
+          else s.failed++;
+        } catch { s.failed++; }
+      }
+    }
+    stats.refundWinback = s;
+  }
+
+  // ── 11. Daily fx refresh (multi-currency checkout) ───────────────────
+  // Free, keyless API. checkout-init only trusts rates < 7 days old, so a few
+  // failed days just means those buyers get charged in USD as before.
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/USD');
+    const d: any = await res.json();
+    if (d?.result === 'success' && d.rates) {
+      const fx = {
+        EUR: Number(d.rates.EUR) || null,
+        GBP: Number(d.rates.GBP) || null,
+        CAD: Number(d.rates.CAD) || null,
+        AUD: Number(d.rates.AUD) || null,
+        updated_at: new Date().toISOString(),
+      };
+      await db.from('site_settings').update({ fx_rates: fx }).eq('id', 1);
+      stats.fx = { EUR: fx.EUR, GBP: fx.GBP, CAD: fx.CAD, AUD: fx.AUD };
+    } else stats.fx = 'api error';
+  } catch (e: any) { stats.fx = `failed: ${e?.message}`; }
 
   return stats;
 }

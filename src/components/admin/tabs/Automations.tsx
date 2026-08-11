@@ -298,6 +298,8 @@ export default function Automations() {
           desc="Asks customers with at least one order to share their personal referral link (give 15%, get 15%). Once per person, at least 14 days after their last order." />
         <Toggle field="sendtime_enabled" label="Send-time optimization"
           desc="Learns each subscriber's most common open hour and schedules their broadcasts to arrive then (via Resend). Improves opens over time as data builds." />
+        <Toggle field="refund_winback_enabled" label="Post-refund win-back"
+          desc="30 days after a refund, one friendly 'no hard feelings' email with a 15% code (COMEBACK15). One per person ever; only refunds from the last week of the window, so enabling late never blasts old refunds." />
       </div>
 
       <Card>

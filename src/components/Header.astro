@@ -122,6 +122,15 @@ const hs = await getSettings();
   window.addEventListener('cart-changed', renderCartCount);
   window.addEventListener('storage', renderCartCount);
 
+  // ── Shopper-action beacon (feeds the admin Traffic → Shopper actions) ──
+  function dccAction(type, productId) {
+    try {
+      navigator.sendBeacon('/api/track', new Blob([JSON.stringify({
+        p: location.pathname, t: type, pid: productId || undefined,
+      })], { type: 'application/json' }));
+    } catch {}
+  }
+
   // ── Wishlist / Favorites (localStorage, no login required) ─────────
   const WISH_KEY = 'dcc_wishlist';
   function wishList() { try { return JSON.parse(localStorage.getItem(WISH_KEY) || '[]'); } catch { return []; } }
@@ -132,6 +141,7 @@ const hs = await getSettings();
     let added;
     if (i >= 0) { list.splice(i, 1); added = false; } else { list.unshift(item); added = true; }
     wishSave(list);
+    dccAction(added ? 'wishlist_add' : 'wishlist_remove', item.id);
     // record affinity if we know who this is (feeds price-drop / personalization)
     if (added) { const email = localStorage.getItem('dcc_email') || ''; if (email) { try { navigator.sendBeacon('/api/favorite', new Blob([JSON.stringify({ email, product_id: item.id })], { type: 'application/json' })); } catch {} } }
     return added;
@@ -300,6 +310,7 @@ const hs = await getSettings();
     cart.push({ id: d.id, slug: d.slug, title: d.title, price: Number(d.price), img: d.img });
     localStorage.setItem('cart', JSON.stringify(cart));
     window.dispatchEvent(new Event('cart-changed'));
+    dccAction('add_to_cart', d.id);
     syncCartButtons();
     if (!onCartPage && window.dccOpenCart) window.dccOpenCart();   // slide-out mini-cart
   });
@@ -317,6 +328,7 @@ const hs = await getSettings();
       localStorage.setItem('cart', JSON.stringify(cart));
       window.dispatchEvent(new Event('cart-changed'));
     }
+    dccAction('buy_now', d.id);
     window.location.href = '/cart?express=1';
   });
 </script>

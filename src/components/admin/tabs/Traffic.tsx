@@ -91,10 +91,14 @@ export default function Traffic() {
     for (const r of (oi || []) as any[]) if (r.product_id) sales[r.product_id] = (sales[r.product_id] || 0) + 1;
     setSalesByProduct(sales);
 
-    // resolve product titles for the heat list (top viewed + top sold)
+    // resolve product titles for the heat + shopper-action lists
     const viewCounts: Record<string, number> = {};
-    for (const e of (evs || []) as Ev[]) if (e.type === 'view_product' && e.product_id) viewCounts[e.product_id] = (viewCounts[e.product_id] || 0) + 1;
-    const ids = [...new Set([...Object.keys(viewCounts), ...Object.keys(sales)])].slice(0, 200);
+    for (const e of (evs || []) as Ev[]) {
+      if (e.product_id && ['view_product', 'add_to_cart', 'buy_now', 'wishlist_add'].includes(e.type)) {
+        viewCounts[e.product_id] = (viewCounts[e.product_id] || 0) + 1;
+      }
+    }
+    const ids = [...new Set([...Object.keys(viewCounts), ...Object.keys(sales)])].slice(0, 300);
     if (ids.length) {
       const { data: ps } = await supabase.from('products').select('id, title').in('id', ids);
       setProdNames(Object.fromEntries((ps || []).map((p: any) => [p.id, p.title.split('|')[0].trim()])));
@@ -152,6 +156,8 @@ export default function Traffic() {
             <Card><div className="text-[11px] uppercase tracking-wide text-ink-700/50">Today · pageviews</div><div className="text-2xl font-medium text-bronze-800 mt-1">{stats.today.pv.toLocaleString()}</div></Card>
           </div>
 
+          <ShopperActions events={events} names={prodNames} paid={paidCount} days={days} />
+
           <LiveVisitorMap />
 
           <Card>
@@ -180,6 +186,73 @@ export default function Traffic() {
   );
 }
 
+// ── Shopper actions — the owner wants these numbers IMPOSSIBLE to miss. ──
+// Big bold counts of every buying signal (cart adds, buy-now taps, wishlist
+// saves…) for today + the selected range, plus most-carted / most-wishlisted.
+function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Record<string, string>; paid: number; days: number }) {
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const count = (t: string) => events.filter((e) => e.type === t).length;
+  const todayCount = (t: string) => events.filter((e) => e.type === t && e.day === todayKey).length;
+  const metrics = [
+    { icon: '🛒', label: 'Added to cart', type: 'add_to_cart' },
+    { icon: '⚡', label: 'Buy-now taps', type: 'buy_now' },
+    { icon: '❤️', label: 'Wishlist saves', type: 'wishlist_add' },
+    { icon: '🚪', label: 'Checkout started', type: 'checkout_start' },
+    { icon: '💳', label: 'Reached payment', type: 'txn_created' },
+  ];
+  const topBy = (t: string) => {
+    const c: Record<string, number> = {};
+    for (const e of events) if (e.type === t && e.product_id) c[e.product_id] = (c[e.product_id] || 0) + 1;
+    return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  };
+  const topCarted = topBy('add_to_cart');
+  const topWished = topBy('wishlist_add');
+  const wishRemoved = count('wishlist_remove');
+  return (
+    <Card>
+      <div className="flex items-baseline gap-2 mb-3">
+        <div className="text-sm font-bold text-ink-900">🔥 Shopper actions ({days}d)</div>
+        <span className="text-[11px] text-ink-700/50">every buying signal, live from the storefront</span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {metrics.map((m) => (
+          <div key={m.type} className="bg-cream/50 border border-bronze-600/15 rounded-lg p-3 text-center">
+            <div className="text-lg" aria-hidden="true">{m.icon}</div>
+            <div className="text-3xl font-extrabold text-bronze-800 leading-tight">{count(m.type).toLocaleString()}</div>
+            <div className="text-[11px] font-bold text-ink-800 mt-0.5">{m.label}</div>
+            <div className="text-[11px] text-ink-700/60">today: <span className="font-bold text-ink-900">{todayCount(m.type)}</span></div>
+          </div>
+        ))}
+        <div className="bg-[#5E380A] rounded-lg p-3 text-center">
+          <div className="text-lg" aria-hidden="true">✅</div>
+          <div className="text-3xl font-extrabold text-[#FAC775] leading-tight">{paid.toLocaleString()}</div>
+          <div className="text-[11px] font-bold text-[#F5EFE3] mt-0.5">Paid orders</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div>
+          <div className="text-xs font-bold text-ink-900 mb-1.5">🛒 Most added to cart</div>
+          {topCarted.length === 0 ? <p className="text-xs text-ink-700/50">Collecting from the latest deploy onward.</p> : topCarted.map(([pid, n]) => (
+            <div key={pid} className="flex justify-between gap-2 text-xs py-0.5">
+              <span className="truncate text-ink-800">{names[pid] || pid.slice(0, 8)}</span>
+              <span className="font-bold text-bronze-800 whitespace-nowrap">{n}×</span>
+            </div>
+          ))}
+        </div>
+        <div>
+          <div className="text-xs font-bold text-ink-900 mb-1.5">❤️ Most wishlisted {wishRemoved > 0 && <span className="font-normal text-ink-700/50">({wishRemoved} removed)</span>}</div>
+          {topWished.length === 0 ? <p className="text-xs text-ink-700/50">Collecting from the latest deploy onward.</p> : topWished.map(([pid, n]) => (
+            <div key={pid} className="flex justify-between gap-2 text-xs py-0.5">
+              <span className="truncate text-ink-800">{names[pid] || pid.slice(0, 8)}</span>
+              <span className="font-bold text-bronze-800 whitespace-nowrap">{n}×</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function FunnelCard({ visitors, events, paid, days }: { visitors: number; events: Ev[]; paid: number; days: number }) {
   const uniq = (t: string) => new Set(events.filter((e) => e.type === t).map((e) => e.day + (e.visitor_hash || ''))).size;
   const steps = [
@@ -187,6 +260,10 @@ function FunnelCard({ visitors, events, paid, days }: { visitors: number; events
     { label: 'Viewed a product', n: uniq('view_product') },
     { label: 'Added to cart', n: uniq('add_to_cart') },
     { label: 'Started checkout', n: uniq('checkout_start') },
+    // txn_created is logged SERVER-side by checkout-init (ad-block proof): the
+    // buyer got as far as the Paddle payment frame. A big drop from here to
+    // "Paid orders" means people bail INSIDE payment (price shock, card issues).
+    { label: 'Reached payment', n: events.filter((e) => e.type === 'txn_created').length },
     { label: 'Paid orders', n: paid },
   ];
   const max = Math.max(1, ...steps.map((s) => s.n));

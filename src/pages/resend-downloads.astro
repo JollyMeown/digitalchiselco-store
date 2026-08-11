@@ -1,0 +1,47 @@
+---
+// Self-service "resend my downloads" — kills the #1 support-email category.
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+---
+<Base title="Resend my downloads | DigitalChiselCo" description="Lost your download email? Enter your email and we resend every STL file you own, instantly.">
+  <Header />
+  <Breadcrumbs crumbs={[{ label: 'Resend my downloads' }]} />
+  <main class="px-6 pb-16 max-w-lg mx-auto min-h-[50vh]">
+    <div class="text-center mb-8 mt-4">
+      <div class="text-4xl mb-3" aria-hidden="true">📥</div>
+      <h1 class="font-serif text-3xl text-bronze-800">Resend my downloads</h1>
+      <p class="text-ink-700/70 mt-2 text-sm leading-relaxed">Lost the email with your files? No problem. Enter the email you bought with and we will resend <strong>every design you own</strong> in one tidy email.</p>
+    </div>
+    <form id="rd-form" class="bg-white border border-black/10 rounded-xl p-5">
+      <label for="rd-email" class="block text-xs text-ink-700/70 mb-1">Your purchase email</label>
+      <input id="rd-email" type="email" inputmode="email" autocomplete="email" required placeholder="you@email.com"
+        class="w-full px-3 py-2.5 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600" />
+      <button id="rd-btn" class="mt-3 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition text-sm font-medium">Send me my downloads</button>
+      <p id="rd-msg" class="mt-3 text-sm hidden"></p>
+    </form>
+    <p class="text-xs text-ink-700/50 text-center mt-4">Prefer a dashboard? <a href="/account" class="text-bronze-600 underline">Sign into your account</a> to see every order.</p>
+  </main>
+  <Footer />
+  <script is:inline>
+    document.getElementById('rd-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('rd-btn');
+      const msg = document.getElementById('rd-msg');
+      const email = (document.getElementById('rd-email')?.value || '').trim();
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const r = await fetch('/api/resend-downloads', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
+        const d = await r.json();
+        msg.textContent = d.message || d.error || 'Done.';
+        msg.className = 'mt-3 text-sm ' + (r.ok ? 'text-green-700' : 'text-red-600');
+      } catch {
+        msg.textContent = 'Network error, please try again.';
+        msg.className = 'mt-3 text-sm text-red-600';
+      }
+      msg.classList.remove('hidden');
+      btn.disabled = false; btn.textContent = 'Send me my downloads';
+    });
+  </script>
+</Base>
