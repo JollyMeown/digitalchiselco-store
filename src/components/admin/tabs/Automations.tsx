@@ -314,6 +314,8 @@ export default function Automations() {
 
       <PicksPanel />
 
+      <TelegramTest />
+
       <Card>
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <select value={kind} onChange={(e) => setKind(e.target.value)} className={inputCls + ' max-w-xs'}>
@@ -577,6 +579,45 @@ function PicksPanel() {
       )}
       <div className="flex items-center gap-3 mt-3">
         <button disabled={busy} onClick={send} className={btnPrimary}>{busy ? 'Sending…' : `Send ${picked.length || ''} design${picked.length === 1 ? '' : 's'} ✈`}</button>
+        <Toast message={msg.text} kind={msg.kind} />
+      </div>
+    </Card>
+  );
+}
+
+// ── Telegram alerts: setup helper + one-tap test. ────────────────────
+// Pushes free instant alerts to the owner's phone. This card just verifies
+// the env vars are set; the actual sends live in the webhook + cart-note.
+function TelegramTest() {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
+
+  async function test() {
+    setBusy(true); setMsg({ kind: 'info', text: 'Sending…' });
+    try {
+      const { data } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/test-telegram', {
+        method: 'POST', headers: { authorization: `Bearer ${data.session?.access_token || ''}` },
+      });
+      const d = await res.json();
+      setMsg({ kind: d.ok ? 'success' : 'error', text: d.ok ? d.message : (d.error || 'Failed.') });
+    } catch { setMsg({ kind: 'error', text: 'Network error.' }); }
+    setBusy(false);
+  }
+
+  return (
+    <Card>
+      <div className="text-sm font-medium text-ink-900">📱 Telegram alerts on your phone (free)</div>
+      <p className="text-xs text-ink-700/60 mt-0.5 mb-2">Get a phone ping for every new order and big cart, in addition to email. One-time setup, then tap Test.</p>
+      <ol className="text-xs text-ink-700/80 space-y-1 list-decimal ml-4 mb-3">
+        <li>In Telegram, open <b>@BotFather</b> → send <code>/newbot</code> → pick a name → copy the <b>token</b> it gives you.</li>
+        <li>Open <b>@userinfobot</b> and send it anything → it replies with your numeric <b>Id</b> (that's your chat ID).</li>
+        <li>Open the bot <b>you just made</b> and send it any message (so it's allowed to message you back).</li>
+        <li>In Netlify → Site settings → Environment variables, add <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code>, then redeploy.</li>
+        <li>Come back here and tap <b>Send test</b> 👇</li>
+      </ol>
+      <div className="flex items-center gap-3">
+        <button disabled={busy} onClick={test} className={btnPrimary}>{busy ? 'Sending…' : 'Send test to my Telegram'}</button>
         <Toast message={msg.text} kind={msg.kind} />
       </div>
     </Card>
