@@ -128,6 +128,22 @@ export const POST: APIRoute = async ({ request }) => {
       return s + Number(p.price_usd) * Math.max(1, Number(c.qty) || 1);
     }, 0);
 
+    // Fixed-$ code worth MORE than the cart (typically a gift card): apply only
+    // up to (subtotal − $0.50) so the Paddle transaction always has a real,
+    // chargeable total — a $0 one-time transaction is unsupported territory.
+    // The unapplied remainder is NOT forfeited: for GIFT- codes it rides along
+    // in custom_data and the webhook mints a fresh GIFT- code for the balance
+    // and emails it to the buyer after payment.
+    let giftRemainder = 0;
+    if (fixedDiscount > 0 && productSubtotal > 0) {
+      const maxApplicable = Math.max(0, +(productSubtotal - 0.5).toFixed(2));
+      if (fixedDiscount > maxApplicable) {
+        giftRemainder = +(fixedDiscount - maxApplicable).toFixed(2);
+        fixedDiscount = maxApplicable;
+      }
+    }
+    const remainderEligible = giftRemainder >= 0.01 && !!couponMeta?.code?.startsWith('GIFT-');
+
     const items: any[] = [];
     // These two arrays are built in LOCKSTEP with `items` (one entry per line
     // actually sent to Paddle). The webhook correlates Paddle's items back to
@@ -207,6 +223,7 @@ export const POST: APIRoute = async ({ request }) => {
           source: 'digitalchiselco-cart',
           cart_ids: sentIds,
           ...(couponMeta ? { coupon_id: couponMeta.id, coupon_code: couponMeta.code, coupon_discount: couponMeta.amount } : {}),
+          ...(remainderEligible ? { gift_remainder: giftRemainder } : {}),
           // Per-line customization snapshots, aligned 1:1 with cart_ids (and
           // therefore with the Paddle items array). null = no fields.
           ...(sentCustomizations.some((c) => Array.isArray(c) && c.length) ? { customizations: sentCustomizations } : {}),

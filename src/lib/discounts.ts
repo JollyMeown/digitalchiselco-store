@@ -50,6 +50,19 @@ export async function validateCoupon(rawCode: string, cart: CartLine[], email: s
   if (coupon.expires_at && Date.parse(coupon.expires_at) < now) return { ok: false, error: 'This code has expired.' };
   if (coupon.max_redemptions && coupon.redemption_count >= coupon.max_redemptions) return { ok: false, error: 'This code has reached its redemption limit.' };
 
+  // ADDON is the post-purchase one-click offer on the success page. Its code is
+  // visible in that page's source, so gate it server-side: only honoured for an
+  // email that placed a real order in the last 48 hours. The cart promo box
+  // sends no email, so casual typing of "ADDON" is rejected outright.
+  if (code === 'ADDON') {
+    const gateErr = { ok: false as const, error: 'This code is only available right after a purchase.' };
+    if (!email) return gateErr;
+    const recentCutoff = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+    const { data: recent } = await db.from('orders').select('id')
+      .ilike('email', email.toLowerCase()).eq('status', 'paid').gte('created_at', recentCutoff).limit(1);
+    if (!recent?.length) return gateErr;
+  }
+
   // ── Scope filtering ────────────────────────────────────────────────────
   // If the coupon is scoped to specific categories/products, restrict the
   // cart lines to ones inside that scope BEFORE checking min_items / min_total.

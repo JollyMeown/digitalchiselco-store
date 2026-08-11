@@ -87,6 +87,8 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     if (eventType === 'transaction.completed') {
       await handleTransactionCompleted(db, event.data);
+    } else if (eventType === 'adjustment.created' || eventType === 'adjustment.updated') {
+      await handleAdjustment(db, event.data);
     }
     // Other events (transaction.created, transaction.updated, subscription.*, etc.)
     // are stored above but not processed yet — easy to add as needed.
@@ -552,7 +554,9 @@ async function handleTransactionCompleted(db: any, txn: any) {
   if (email && email !== 'unknown@digitalchiselco.com') {
     try {
       const shortId = String(order.id).slice(0, 8);
-      const { data: already } = await db.from('coupons').select('id').ilike('description', `%order ${shortId}%`).limit(1);
+      // Match the exact description we mint below — a looser '%order X%' would
+      // also match the gift-REMAINDER coupon and wrongly skip minting here.
+      const { data: already } = await db.from('coupons').select('id').ilike('description', `%gift card · order ${shortId}%`).limit(1);
       if (!already?.length) {
         const { data: giftProds } = await db.from('products').select('id, price_usd').like('slug', 'gift-card-%');
         const giftById = new Map((giftProds || []).map((g: any) => [g.id, Number(g.price_usd)]));
@@ -577,6 +581,39 @@ async function handleTransactionCompleted(db: any, txn: any) {
         }
       }
     } catch (e) { console.error('[gift] minting failed for order', order.id, e); }
+  }
+
+  // ── Gift-card remainder: card was worth more than the cart ─────────────
+  // checkout-init capped the applied amount and passed the balance through in
+  // custom_data.gift_remainder. Mint a fresh single-use GIFT- code for the
+  // balance and email it — the buyer never loses a cent of stored value.
+  // (The original card's coupon was max_redemptions=1 and its redemption was
+  // stamped above, so it can't be reused; this code IS its new balance.)
+  const giftRemainder = Number(txn.custom_data?.gift_remainder) || 0;
+  if (giftRemainder >= 0.01 && email && email !== 'unknown@digitalchiselco.com') {
+    try {
+      const shortId = String(order.id).slice(0, 8);
+      const { data: alreadyRem } = await db.from('coupons').select('id')
+        .ilike('description', `%gift remainder · order ${shortId}%`).limit(1);
+      if (!alreadyRem?.length) {
+        const code = 'GIFT-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+        const { error: ce } = await db.from('coupons').insert({
+          code, fixed_amount_off: giftRemainder, active: true, max_redemptions: 1,
+          description: `gift remainder · order ${shortId}`,
+        });
+        if (!ce) {
+          const { html, text } = giftCardEmail({ email, buyerName: earlyOpsCustomerName, cards: [{ code, amount: giftRemainder }] });
+          await sendEmail({
+            to: email,
+            subject: `Your remaining gift balance: $${giftRemainder.toFixed(2)} — new code inside`,
+            html, text,
+            idempotencyKey: `gift-remainder:${order.id}`,
+            tags: [{ name: 'kind', value: 'gift' }],
+          });
+          console.log(`[gift] remainder $${giftRemainder} re-minted as ${code} for order ${shortId}`);
+        }
+      }
+    } catch (e) { console.error('[gift] remainder minting failed for order', order.id, e); }
   }
 
   // ── Send branded confirmation email with download links ──────────────
@@ -708,4 +745,65 @@ async function handleTransactionCompleted(db: any, txn: any) {
       console.error(`[email] threw for order ${order.id}:`, e);
     }
   }
+}
+
+// ── Refunds & chargebacks (adjustment.created / adjustment.updated) ─────────
+// Paddle models refunds as "adjustments" against a transaction. When one is
+// APPROVED we revoke access:
+//   • FULL refund   → orders.status = 'refunded' + delete the order's
+//     entitlements. The account page only shows download links for status
+//     'paid', so access disappears immediately; entitlement deletion also
+//     stops the free-gift "already owns" logic counting refunded designs.
+//   • PARTIAL refund → order stays 'paid' (revoking everything would punish
+//     the items they kept); ops gets an email to adjust manually if needed.
+// Requires `adjustment.created` + `adjustment.updated` to be ticked on the
+// webhook's notification settings in the Paddle dashboard.
+async function handleAdjustment(db: any, adj: any) {
+  const action = String(adj?.action || '');
+  const status = String(adj?.status || '');
+  const txnId = adj?.transaction_id;
+  if (!txnId) return;
+  // Only money-back actions revoke access. Statuses: pending_approval →
+  // approved / rejected. Card-initiated chargebacks arrive already approved.
+  if (action !== 'refund' && action !== 'chargeback') {
+    console.log(`[adjustment] ignoring action=${action} for ${txnId}`);
+    return;
+  }
+  if (status !== 'approved') {
+    console.log(`[adjustment] ${action} for ${txnId} is ${status} — waiting for approval event.`);
+    return;
+  }
+
+  const { data: order } = await db.from('orders')
+    .select('id, email, total, currency, status')
+    .eq('paddle_transaction_id', txnId).maybeSingle();
+  if (!order) { console.warn(`[adjustment] no order found for txn ${txnId}`); return; }
+  if (order.status === 'refunded') { console.log(`[adjustment] order ${order.id} already refunded — skipping.`); return; }
+
+  const refunded = Number(adj.totals?.total ?? 0) / 100;
+  const isFull = refunded >= Number(order.total) - 0.01;
+  const shortId = String(order.id).slice(0, 8);
+
+  if (isFull) {
+    await db.from('orders').update({ status: 'refunded' }).eq('id', order.id);
+    const { error: entErr } = await db.from('entitlements').delete().eq('order_id', order.id);
+    if (entErr) throw new Error(`entitlement revoke failed for order ${order.id}: ${entErr.message}`);
+    console.log(`[adjustment] FULL ${action} — order ${shortId} marked refunded, entitlements revoked ($${refunded}).`);
+  } else {
+    console.log(`[adjustment] PARTIAL ${action} on order ${shortId} ($${refunded} of $${order.total}) — order left paid, ops notified.`);
+  }
+
+  // Ops heads-up either way (best-effort).
+  try {
+    const kind = isFull ? 'Full' : 'Partial';
+    await sendEmail({
+      to: OPS_INBOX,
+      subject: `${kind} ${action}: order ${shortId} ($${refunded.toFixed(2)} ${order.currency})`,
+      html: `<p>${kind} <strong>${action}</strong> approved on order <strong>#${shortId}</strong> (${order.email}).</p>
+<p>Amount: <strong>$${refunded.toFixed(2)} ${order.currency}</strong> of $${Number(order.total).toFixed(2)} paid · Paddle txn <code>${txnId}</code>.</p>
+<p>${isFull ? 'Download access has been revoked automatically.' : 'Order left active (they keep the other items) — review in admin if a specific design should be pulled.'}</p>`,
+      text: `${kind} ${action} on order ${shortId} (${order.email}): $${refunded.toFixed(2)} of $${Number(order.total).toFixed(2)}. ${isFull ? 'Access revoked.' : 'Order left active — review manually.'}`,
+      idempotencyKey: `adjustment-ops:${adj.id || txnId}:${status}`,
+    });
+  } catch (e) { console.error('[adjustment] ops email failed:', e); }
 }
