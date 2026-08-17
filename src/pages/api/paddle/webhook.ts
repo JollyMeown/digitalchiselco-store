@@ -91,6 +91,17 @@ export const POST: APIRoute = async ({ request }) => {
       return json({ error: 'DB error' }, 500);
     }
   }
+  // Atomic processing claim: two deliveries of the same event racing (first
+  // still running near the function timeout, retry arrives) could both run
+  // the fulfilment and, e.g., mint two gift codes. Only the claimant proceeds;
+  // a stale claim (>5 min, crashed attempt) can be re-claimed.
+  try {
+    const { data: claimed, error: claimErr } = await db.rpc('claim_webhook_event', { p_event_id: eventId });
+    if (!claimErr && claimed === false) {
+      console.log(`Webhook ${eventId} is being processed by another delivery — acking.`);
+      return json({ ok: true, deduped: true, reason: 'in-progress' });
+    }
+  } catch { /* if the RPC is unavailable, fall through (previous behaviour) */ }
 
   // 2) Route by event type
   try {

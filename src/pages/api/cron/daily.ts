@@ -22,10 +22,13 @@ const json = (data: unknown, status = 200) =>
 async function handle(request: Request): Promise<Response> {
   const secret = env('CRON_SECRET');
   if (!secret) return json({ error: 'CRON_SECRET not configured' }, 503);
+  // Bearer header ONLY (the old ?key= fallback put the secret in URL logs);
+  // constant-time compare so timing can't leak the secret.
   const auth = request.headers.get('authorization') || '';
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const key = bearer || new URL(request.url).searchParams.get('key') || '';
-  if (key !== secret) return json({ error: 'unauthorized' }, 401);
+  const crypto = await import('node:crypto');
+  const A = Buffer.from(bearer), B = Buffer.from(secret);
+  if (!bearer || A.length !== B.length || !crypto.timingSafeEqual(A, B)) return json({ error: 'unauthorized' }, 401);
 
   const t0 = Date.now();
   // Heartbeat: a row is written at START (ok=null) and finalized at the end.

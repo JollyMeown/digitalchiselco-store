@@ -79,7 +79,7 @@ export const POST: APIRoute = async ({ request }) => {
     // min_subtotal / min_items gates run on DB prices, never browser-claimed ones).
     const [{ data: products }, { data: plans }] = await Promise.all([
       productIds.length
-        ? db.from('products').select('id, title, slug, price_usd, paddle_price_id').in('id', productIds)
+        ? db.from('products').select('id, title, slug, price_usd, paddle_price_id').in('id', productIds).eq('active', true).gt('price_usd', 0)
         : { data: [] as any[] },
       membershipSlugs.length
         ? db.from('membership_plans').select('slug, name, price_usd, paddle_price_id').in('slug', membershipSlugs)
@@ -103,8 +103,12 @@ export const POST: APIRoute = async ({ request }) => {
     //   1) Promo code (customer-entered)   — server-validated, may set fixed-$ or percent
     //   2) Auto shop sale (Etsy-style)     — applies when no code is used
     let couponMeta: { id: string; code: string; amount: number; percent: number | null } | null = null;
+    let couponEligible: Set<string> | null = null;   // scoped coupon → only these cart ids get the discount
     let fixedDiscount = 0;
     if (couponCode) {
+      // Per-buyer coupon rules (single-use, own-referral-code) need to know WHO
+      // is buying; omitting email was a bypass. The cart always sends it.
+      if (!email) return json({ error: 'Please enter your email before applying a promo code.' }, 400);
       const validation = await validateCoupon(
         couponCode,
         // Membership + Pick-5 bundle lines never count toward a promo code —
@@ -126,6 +130,7 @@ export const POST: APIRoute = async ({ request }) => {
       const { data: row } = await db.from('coupons').select('id').eq('code', validation.code).maybeSingle();
       if (row) {
         couponMeta = { id: row.id, code: validation.code, amount: validation.discount_amount, percent: validation.percent_off };
+        couponEligible = validation.eligible_ids ? new Set(validation.eligible_ids) : null;
         if (validation.percent_off) discountPercent = validation.percent_off;
         else if (validation.fixed_amount_off) fixedDiscount = validation.fixed_amount_off;
       }
@@ -227,8 +232,10 @@ export const POST: APIRoute = async ({ request }) => {
         // Gift cards are never discounted: a discounted card would still mint a
         // coupon for its full face value (guaranteed loss).
         const isGiftCard = String(p.slug || '').startsWith('gift-card-');
-        if (discountPercent && !isGiftCard) unit = applyDiscount(unit, discountPercent);
-        if (fixedDiscount && productSubtotal > 0 && !isGiftCard) {
+        // Scoped coupon: lines outside the coupon's scope keep full price.
+        const inScope = !couponEligible || couponEligible.has(String(c.id));
+        if (discountPercent && !isGiftCard && (inScope || !couponMeta)) unit = applyDiscount(unit, discountPercent);
+        if (fixedDiscount && productSubtotal > 0 && !isGiftCard && inScope) {
           // Pro-rate the fixed discount across product lines
           const share = (unit * qty / productSubtotal) * fixedDiscount;
           unit = Math.max(0, +(unit - share / qty).toFixed(2));
@@ -284,6 +291,19 @@ export const POST: APIRoute = async ({ request }) => {
     // webhook (transaction.completed) AFTER payment succeeds — otherwise anyone
     // could loop this unauthenticated endpoint to exhaust a coupon's
     // max_redemptions and disable the promo without ever paying.
+
+    // Capped coupons (single-use gift/credit/reward codes): take an atomic
+    // 30-min HOLD for this transaction. Concurrent tabs each pass the naive
+    // redemption_count check; the hold makes the N-th one fail here instead of
+    // letting a $25 gift code be spent N times.
+    if (couponMeta && txn.data?.id) {
+      try {
+        const { data: ok, error } = await db.rpc('reserve_coupon', { p_coupon_id: couponMeta.id, p_txn_id: txn.data.id, p_email: email || null });
+        if (!error && ok === false) {
+          return json({ error: 'This code has already been used, or is being used in another checkout right now.' }, 400);
+        }
+      } catch (e) { console.error('[checkout-init] reserve_coupon failed (continuing):', e); }
+    }
 
     // SECURITY: server-side snapshot of exactly what this transaction sells.
     // The webhook fulfils from THIS row, never from txn.custom_data (which a

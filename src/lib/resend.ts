@@ -11,6 +11,8 @@
 // If RESEND_API_KEY is missing, send() is a no-op that logs + returns
 // { ok: true, skipped: true }. Lets storefront work without credentials.
 
+import { unsubHeaders } from './marketing-emails';
+
 function env(name: string): string | undefined {
   return process.env[name] ?? (import.meta as any).env?.[name];
 }
@@ -31,7 +33,20 @@ type SendOptions = {
   /** Optional ISO time to schedule delivery (Resend scheduled_at) — used by
    *  send-time optimization to deliver at each subscriber's best hour. */
   scheduledAt?: string;
+  /** Extra SMTP headers (e.g. List-Unsubscribe). Marketing sends get
+   *  unsubscribe headers attached automatically — see marketingHeadersFor(). */
+  headers?: Record<string, string>;
 };
+
+// Transactional kinds carry no unsubscribe header (order receipts, gift
+// delivery, alerts to the owner). Everything else tagged with a kind is
+// marketing and MUST advertise one-click unsubscribe (Gmail/Yahoo rules).
+const TRANSACTIONAL_KINDS = new Set(['order', 'gift', 'ownerReport', 'designScout', 'resendLibrary', 'cartSave', 'payRecovery', 'picks']);
+function marketingHeadersFor(to: string, tags?: { name: string; value: string }[]): Record<string, string> {
+  const kind = tags?.find((t) => t.name === 'kind')?.value;
+  if (!kind || TRANSACTIONAL_KINDS.has(kind)) return {};
+  try { return unsubHeaders(to); } catch { return {}; }
+}
 
 export function isResendConfigured(): boolean {
   return !!env('RESEND_API_KEY');
@@ -124,6 +139,9 @@ export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: strin
   if (replyTo) body.reply_to = replyTo;
   if (opts.tags?.length) body.tags = opts.tags;
   if (opts.scheduledAt) body.scheduled_at = opts.scheduledAt;
+  const firstTo = Array.isArray(opts.to) ? String(opts.to[0] || '') : String(opts.to);
+  const extraHeaders = { ...marketingHeadersFor(firstTo, opts.tags), ...(opts.headers || {}) };
+  if (Object.keys(extraHeaders).length) body.headers = extraHeaders;
 
   const headers: Record<string, string> = {
     authorization: `Bearer ${key}`,
@@ -183,6 +201,9 @@ export async function sendBatch(
     if (e.replyTo || replyTo) item.reply_to = e.replyTo || replyTo;
     if (e.tags?.length) item.tags = e.tags;
     if (e.scheduledAt) item.scheduled_at = e.scheduledAt;
+    const to0 = Array.isArray(e.to) ? String(e.to[0] || '') : String(e.to);
+    const eh = { ...marketingHeadersFor(to0, e.tags), ...(e.headers || {}) };
+    if (Object.keys(eh).length) item.headers = eh;
     return item;
   });
   const headers: Record<string, string> = { authorization: `Bearer ${key}`, 'content-type': 'application/json' };

@@ -25,7 +25,30 @@ const SECURITY_HEADERS: Record<string, string> = {
     "frame-ancestors 'self' http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'self'; upgrade-insecure-requests",
 };
 
-export const onRequest = defineMiddleware(async (_context, next) => {
+// ── CSRF origin guard (replaces Astro's built-in checkOrigin) ─────────
+// Same rule as Astro's: reject cross-origin state-changing requests whose
+// body is form-encoded (the only kind a plain HTML form/scanner can send).
+// JSON requests are already unforgeable cross-site without CORS. ONE exemption:
+// POST /api/unsubscribe, which must accept Gmail/Yahoo one-click unsubscribe
+// (a form POST from the mail provider's servers). That endpoint is protected
+// by its own HMAC token instead, so the exemption is safe.
+const CSRF_EXEMPT = new Set(['/api/unsubscribe']);
+function csrfBlocked(request: Request, pathname: string): boolean {
+  const m = request.method.toUpperCase();
+  if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') return false;
+  if (CSRF_EXEMPT.has(pathname)) return false;
+  const ct = (request.headers.get('content-type') || '').toLowerCase();
+  const formLike = ct.includes('application/x-www-form-urlencoded') || ct.includes('multipart/form-data') || ct.includes('text/plain');
+  if (!formLike) return false;
+  const origin = request.headers.get('origin');
+  if (!origin) return false;                    // no Origin = not a browser form post
+  try { return new URL(origin).host !== new URL(request.url).host; } catch { return true; }
+}
+
+export const onRequest = defineMiddleware(async (context, next) => {
+  if (csrfBlocked(context.request, context.url.pathname)) {
+    return new Response('Cross-site POST form submissions are forbidden', { status: 403 });
+  }
   const response = await next();
   try {
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) response.headers.set(k, v);

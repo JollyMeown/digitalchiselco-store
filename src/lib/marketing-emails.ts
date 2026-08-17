@@ -16,12 +16,36 @@ function esc(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 }
 
+// Reads env the way the rest of the app does (process.env at runtime on
+// Netlify, import.meta.env in Astro dev) — the old process.env-only read fell
+// through to the literal 'unsub' in dev, and any missing secret in prod would
+// have made every unsubscribe link forgeable. Fail closed instead.
+function envAny(name: string): string | undefined {
+  return process.env[name] ?? (import.meta as any).env?.[name];
+}
 export function unsubSig(email: string): string {
-  const secret = process.env.ACCOUNT_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'unsub';
+  const secret = envAny('ACCOUNT_TOKEN_SECRET') || envAny('SUPABASE_SERVICE_ROLE_KEY');
+  if (!secret) throw new Error('unsubscribe signing secret not configured (ACCOUNT_TOKEN_SECRET / SUPABASE_SERVICE_ROLE_KEY)');
   return crypto.createHmac('sha256', secret).update(email.toLowerCase()).digest('hex').slice(0, 24);
 }
+// Opaque token: base64url(email).hmac — keeps the address out of the URL in
+// plain text (Netlify logs, browser history). The endpoint still accepts the
+// legacy ?e=&s= form for links already in people's inboxes.
+export function unsubToken(email: string): string {
+  const e = email.toLowerCase().trim();
+  return `${Buffer.from(e, 'utf8').toString('base64url')}.${unsubSig(e)}`;
+}
 export function unsubUrl(email: string): string {
-  return `${SITE}/api/unsubscribe?e=${encodeURIComponent(email.toLowerCase())}&s=${unsubSig(email)}`;
+  return `${SITE}/api/unsubscribe?t=${unsubToken(email)}`;
+}
+// RFC 8058 one-click unsubscribe headers (Gmail/Yahoo bulk-sender requirement).
+// Attach to every marketing send: providers show a native "Unsubscribe" link
+// and POST to the URL — our /api/unsubscribe accepts that.
+export function unsubHeaders(email: string): Record<string, string> {
+  return {
+    'List-Unsubscribe': `<${unsubUrl(email)}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  };
 }
 
 export type MiniProduct = { title: string; slug: string; image_url?: string | null; price_usd?: number | null };

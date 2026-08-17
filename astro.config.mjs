@@ -9,4 +9,10 @@ export default defineConfig({
   output: 'server',
   adapter: netlify(),
   integrations: [react(), tailwind()],
+  // CSRF origin checking is done in src/middleware.ts instead of Astro's
+  // built-in guard so we can exempt exactly ONE path: POST /api/unsubscribe.
+  // Gmail/Yahoo one-click unsubscribe (List-Unsubscribe-Post) is a cross-site
+  // form POST from Google's servers and the built-in guard would 403 it (the
+  // same guard that silently killed our scheduled cron for 11 days).
+  security: { checkOrigin: false },
 });

@@ -13,6 +13,8 @@ export type ValidationOk = {
   fixed_amount_off: number | null;
   subtotal: number;
   total: number;
+  /** Cart line ids the discount applies to (scoped coupons); null = every line. */
+  eligible_ids: string[] | null;
 };
 export type ValidationErr = { ok: false; error: string };
 export type Validation = ValidationOk | ValidationErr;
@@ -61,6 +63,11 @@ export async function validateCoupon(rawCode: string, cart: CartLine[], email: s
     const { data: recent } = await db.from('orders').select('id')
       .eq('email', email.toLowerCase()).eq('status', 'paid').gte('created_at', recentCutoff).limit(1);
     if (!recent?.length) return gateErr;
+    // Scope: the one-click add-on is exactly ONE design, not already owned.
+    // Without this the visible code was a 25%-off-everything coupon for 48h.
+    if (cart.length !== 1 || (Number(cart[0].qty) || 1) !== 1) return { ok: false, error: 'This code covers a single add-on design only.' };
+    const { data: owned } = await db.from('entitlements').select('product_id').eq('email', email.toLowerCase()).eq('product_id', cart[0].id).limit(1);
+    if (owned?.length) return { ok: false, error: 'You already own this design.' };
   }
 
   // ── Scope filtering ────────────────────────────────────────────────────
@@ -94,6 +101,7 @@ export async function validateCoupon(rawCode: string, cart: CartLine[], email: s
   if (coupon.min_items && items < coupon.min_items) return { ok: false, error: `Add ${coupon.min_items - items} more item${coupon.min_items - items === 1 ? '' : 's'} to use this code (needs ${coupon.min_items}+).` };
   if (coupon.min_subtotal && subtotal < Number(coupon.min_subtotal)) return { ok: false, error: `Spend $${(Number(coupon.min_subtotal) - subtotal).toFixed(2)} more to use this code (minimum $${coupon.min_subtotal}).` };
 
+  if (coupon.single_use_per_buyer && !email) return { ok: false, error: 'Please enter your email to use this code.' };
   if (coupon.single_use_per_buyer && email) {
     const { data: prev } = await db.from('coupon_redemptions').select('id').eq('coupon_id', coupon.id).eq('email', email.toLowerCase()).limit(1);
     if (prev && prev.length) return { ok: false, error: 'You have already used this code.' };
@@ -113,5 +121,6 @@ export async function validateCoupon(rawCode: string, cart: CartLine[], email: s
     fixed_amount_off: coupon.fixed_amount_off ?? null,
     subtotal: Math.round(subtotal * 100) / 100,
     total: Math.max(0, Math.round((subtotal - discount) * 100) / 100),
+    eligible_ids: eligible === cart ? null : eligible.map((l) => l.id),
   };
 }

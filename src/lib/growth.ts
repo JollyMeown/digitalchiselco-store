@@ -105,14 +105,26 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     const s = { enrolled: 0, sent: 0, converted: 0, failed: 0 };
     // enroll confirmed subscribers not yet in the drip. Etsy buyers are excluded:
     // they get their own one-time welcome, never the "free pack" drip.
-    const { data: subs } = await db.from('subscribers').select('email').not('confirmed_at', 'is', null).is('unsubscribed_at', null).is('suppressed_at', null).neq('source', 'etsy-buyer').limit(3000);
-    const { data: inDrip } = await db.from('subscriber_drip').select('email');
-    const enrolled = new Set((inDrip || []).map((r) => r.email.toLowerCase()));
-    const newbies = (subs || []).map((r) => r.email.toLowerCase()).filter((e) => !enrolled.has(e));
-    for (let i = 0; i < newbies.length; i += 200) {
-      await db.from('subscriber_drip').insert(newbies.slice(i, i + 200).map((email) => ({ email })));
+    // Enrol via idempotent upsert (PK on email + ignoreDuplicates): no need to
+    // read the whole subscriber_drip table first. The old read-then-diff hit
+    // PostgREST's silent 1,000-row default cap once the drip grew, so genuine
+    // newbies were skipped and the batch insert failed wholesale on duplicates.
+    // Paginate the subscriber read too so >1,000 subscribers all get enrolled.
+    let enrolledNow = 0;
+    for (let from = 0; ; from += 1000) {
+      const { data: subs } = await db.from('subscribers').select('email')
+        .not('confirmed_at', 'is', null).is('unsubscribed_at', null).is('suppressed_at', null).neq('source', 'etsy-buyer')
+        .order('email').range(from, from + 999);
+      const emails = (subs || []).map((r) => r.email.toLowerCase());
+      if (!emails.length) break;
+      for (let i = 0; i < emails.length; i += 200) {
+        const { count } = await db.from('subscriber_drip')
+          .upsert(emails.slice(i, i + 200).map((email) => ({ email })), { onConflict: 'email', ignoreDuplicates: true, count: 'exact' });
+        enrolledNow += count || 0;
+      }
+      if (emails.length < 1000) break;
     }
-    s.enrolled = newbies.length;
+    s.enrolled = enrolledNow;
 
     // context shared by every send this run
     const [{ data: best }, { data: bundle }, { data: plan }] = await Promise.all([
