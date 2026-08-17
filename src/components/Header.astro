@@ -130,6 +130,9 @@ const hs = await getSettings();
       })], { type: 'application/json' }));
     } catch {}
   }
+  // Exposed so pages with their own add-to-cart flows (bundle builder, bundle
+  // of the week, favorites "add all", membership) record the SAME event.
+  window.dccAction = dccAction;
 
   // ── Wishlist / Favorites (localStorage, no login required) ─────────
   const WISH_KEY = 'dcc_wishlist';

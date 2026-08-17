@@ -70,6 +70,18 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
         <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Years of Craftsmanship</div>
       </div>
     </div>
+    {(s as any).etsy_link_enabled && (s as any).etsy_store_url && (
+      <!-- Etsy provenance link — these stats come from our Etsy shop; toggled in Admin → Settings -->
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 pb-4 -mt-1 flex justify-center">
+        <a href={(s as any).etsy_store_url} target="_blank" rel="noopener noreferrer"
+          class="group inline-flex items-center gap-2 rounded-full border border-[#F1641E]/30 bg-[#FFF3EC] pl-1.5 pr-3.5 py-1 text-xs text-ink-700 hover:border-[#F1641E] hover:bg-[#FFE9DC] transition shadow-sm"
+          aria-label="Visit our Etsy store">
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#F1641E] text-white font-serif font-bold text-[13px] leading-none select-none" aria-hidden="true">E</span>
+          <span>Stats verified on our <strong class="text-[#F1641E]">Etsy</strong> store</span>
+          <span class="text-[#F1641E] group-hover:translate-x-0.5 transition" aria-hidden="true">→</span>
+        </a>
+      </div>
+    )}
   </div>
 
   <SiteBanner />

@@ -37,6 +37,30 @@ export function isResendConfigured(): boolean {
   return !!env('RESEND_API_KEY');
 }
 
+// ── Central send ledger (email_send_log) ────────────────────────────
+// Every send/sendBatch call records one row per recipient — kind, subject,
+// status, provider id, batch key, timestamp. Written at the SOURCE so no
+// email path can forget to log. Fire-and-forget: a ledger hiccup can never
+// block or fail a real send. Supabase is lazy-loaded to keep this helper
+// dependency-light for callers that only need send().
+type LedgerRow = { kind?: string | null; week?: string | null; recipient: string; subject?: string; provider_id?: string | null; status: 'sent' | 'failed' | 'skipped'; error?: string | null; batch_key?: string | null };
+function tagOf(tags: { name: string; value: string }[] | undefined, name: string): string | null {
+  return tags?.find((t) => t.name === name)?.value ?? null;
+}
+function logSends(rows: LedgerRow[]) {
+  if (!rows.length) return;
+  (async () => {
+    try {
+      const { supabaseAdmin } = await import('./supabase');
+      const db = supabaseAdmin();
+      for (let i = 0; i < rows.length; i += 200) {
+        const { error } = await db.from('email_send_log').insert(rows.slice(i, i + 200));
+        if (error) console.error('[email_send_log]', error.message);
+      }
+    } catch (e: any) { console.error('[email_send_log] threw', e?.message); }
+  })();
+}
+
 // ── Global rate limiter ──────────────────────────────────────────────
 // Resend's API allows a fixed number of requests per second (default 2; raise
 // RESEND_MAX_RPS if your account limit is higher). EVERY call to the Resend API
@@ -98,15 +122,23 @@ export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: strin
   };
   if (opts.idempotencyKey) headers['idempotency-key'] = opts.idempotencyKey;
 
+  const recipients = (Array.isArray(opts.to) ? opts.to : [opts.to]).map(String);
+  const kind = tagOf(opts.tags, 'kind'), week = tagOf(opts.tags, 'week');
+  const ledger = (status: LedgerRow['status'], provider_id?: string | null, error?: string | null) =>
+    logSends(recipients.map((recipient) => ({ kind, week, recipient, subject: opts.subject, provider_id: provider_id ?? null, status, error: error ?? null, batch_key: opts.idempotencyKey ?? null })));
+
   try {
     const { res, data } = await resendFetch('https://api.resend.com/emails', headers, JSON.stringify(body));
     if (!res.ok) {
       console.error('[resend] send failed', res.status, data?.message || data);
+      ledger('failed', null, data?.message || `HTTP ${res.status}`);
       return { ok: false, error: data?.message || `HTTP ${res.status}` };
     }
+    ledger('sent', data?.id);
     return { ok: true, id: data?.id };
   } catch (e: any) {
     console.error('[resend] send threw', e);
+    ledger('failed', null, e.message || 'network error');
     return { ok: false, error: e.message || 'network error' };
   }
 }
@@ -146,15 +178,24 @@ export async function sendBatch(
   });
   const headers: Record<string, string> = { authorization: `Bearer ${key}`, 'content-type': 'application/json' };
   if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
+  const batchRows = (status: LedgerRow['status'], ids?: (string | null)[], error?: string | null): LedgerRow[] =>
+    emails.slice(0, 100).flatMap((e, i) => (Array.isArray(e.to) ? e.to : [e.to]).map((recipient) => ({
+      kind: tagOf(e.tags, 'kind'), week: tagOf(e.tags, 'week'), recipient: String(recipient), subject: e.subject,
+      provider_id: ids?.[i] ?? null, status, error: error ?? null, batch_key: idempotencyKey ?? null,
+    })));
   try {
     const { res, data } = await resendFetch('https://api.resend.com/emails/batch', headers, JSON.stringify(payload));
     if (!res.ok) {
       console.error('[resend] batch failed', res.status, data?.message || data);
+      logSends(batchRows('failed', undefined, data?.message || `HTTP ${res.status}`));
       return { ok: false, sent: 0, error: data?.message || `HTTP ${res.status}` };
     }
+    const ids = Array.isArray(data?.data) ? data.data.map((d: any) => d?.id ?? null) : [];
+    logSends(batchRows('sent', ids));
     return { ok: true, sent: Array.isArray(data?.data) ? data.data.length : payload.length };
   } catch (e: any) {
     console.error('[resend] batch threw', e);
+    logSends(batchRows('failed', undefined, e.message || 'network error'));
     return { ok: false, sent: 0, error: e.message || 'network error' };
   }
 }

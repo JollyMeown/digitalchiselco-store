@@ -27,6 +27,15 @@ async function handle(request: Request): Promise<Response> {
   const key = bearer || new URL(request.url).searchParams.get('key') || '';
   if (key !== secret) return json({ error: 'unauthorized' }, 401);
 
+  const t0 = Date.now();
+  // Heartbeat: record every run (ok or not) so Admin → Automations can show
+  // the cron is alive. Best-effort — never affects the run itself.
+  const heartbeat = async (ok: boolean, summary: any, error?: string) => {
+    try {
+      const { supabaseAdmin } = await import('../../../lib/supabase');
+      await supabaseAdmin().from('cron_runs').insert({ ok, duration_ms: Date.now() - t0, summary, error: error ?? null });
+    } catch { /* ignore */ }
+  };
   try {
     const stats = await runDailyAutomation();
     // Growth systems (drip / cart reminders / followups) run after the
@@ -34,9 +43,11 @@ async function handle(request: Request): Promise<Response> {
     let growth: Record<string, any> = {};
     try { growth = await runGrowthAutomation(); }
     catch (e: any) { growth = { error: e?.message || 'growth failed' }; }
+    await heartbeat(true, { stats, growth });
     return json({ ok: true, ranAt: new Date().toISOString(), stats, growth });
   } catch (e: any) {
     console.error('[cron/daily] failed:', e);
+    await heartbeat(false, null, e?.message || 'automation failed');
     return json({ ok: false, error: e?.message || 'automation failed' }, 500);
   }
 }

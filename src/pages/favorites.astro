@@ -100,7 +100,7 @@ import RecentlyViewed from '../components/RecentlyViewed.astro';
   document.getElementById('wish-addall')?.addEventListener('click', () => {
     let cart = []; try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch {}
     const have = new Set(cart.map((x) => x.id));
-    for (const p of currentList()) if (!have.has(p.id)) cart.push({ id: p.id, slug: p.slug, title: p.title, price: Number(p.price) || 0, img: p.img || '' });
+    for (const p of currentList()) if (!have.has(p.id)) { cart.push({ id: p.id, slug: p.slug, title: p.title, price: Number(p.price) || 0, img: p.img || '' }); if (window.dccAction) window.dccAction('add_to_cart', p.id); }
     localStorage.setItem('cart', JSON.stringify(cart));
     window.dispatchEvent(new Event('cart-changed'));
     window.location.href = '/cart';

@@ -106,6 +106,28 @@ export default function Settings() {
         </div>
       </Card>
 
+      <Card title="🟠 Etsy store link under the stats">
+        <p className="text-xs text-ink-700/60 mb-3">The homepage stats (files sold, rating, favorites…) come from your Etsy shop. Turn this on to show a tasteful <strong>"Stats verified on our Etsy store →"</strong> badge right under them, with Etsy's orange mark, linking to your shop in a new tab. Off = no badge, nothing else changes.</p>
+        <div className="grid md:grid-cols-3 gap-4 items-end">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={!!s.etsy_link_enabled} onChange={(e) => setS({ ...s, etsy_link_enabled: e.target.checked })} />
+            Show Etsy store link
+          </label>
+          <label className="block md:col-span-2">
+            <span className={labelCls}>Etsy shop URL</span>
+            <input value={s.etsy_store_url ?? ''} onChange={(e) => setS({ ...s, etsy_store_url: e.target.value })} className={inputCls} placeholder="https://www.etsy.com/shop/DigitalChiselCo" />
+          </label>
+        </div>
+        {s.etsy_link_enabled && (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#F1641E]/30 bg-[#FFF3EC] pl-1.5 pr-3.5 py-1 text-xs text-ink-700">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#F1641E] text-white font-serif font-bold text-[13px] leading-none">E</span>
+            <span>Stats verified on our <strong className="text-[#F1641E]">Etsy</strong> store</span>
+            <span className="text-[#F1641E]">→</span>
+            <span className="text-ink-700/40 ml-1">← preview</span>
+          </div>
+        )}
+      </Card>
+
       <Card title="🎁 Free-gift threshold (smart)">
         <p className="text-xs text-ink-700/60 mb-3">
           Just set a spend amount — the shop <strong>picks the gift automatically</strong>. When a customer's paid subtotal reaches your threshold, the webhook chooses a free design for them: <strong>same style</strong> as what they bought if their order is themed (e.g. all wildlife → a wildlife gift), or a <strong>surprise pick</strong> if their cart is mixed. It never gives a design they already own, works for first-time and guest buyers too, and is granted on the real paid total so it can't be gamed. Set to <strong>0 to turn it off</strong>.

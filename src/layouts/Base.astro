@@ -110,10 +110,10 @@ const faviconType = settings.favicon_image_url
             trk({ p: location.pathname, t: 'view_product', pid: (b && b.dataset && b.dataset.id) || null, em: em });
           }
         });
-        document.addEventListener('click', function (ev) {
-          var b = ev.target && ev.target.closest ? ev.target.closest('.add-to-cart') : null;
-          if (b) trk({ p: location.pathname, t: 'add_to_cart', pid: (b.dataset && b.dataset.id) || null });
-        });
+        // NOTE: add_to_cart is beaconed by the Header's cart handler (which
+        // knows whether an add really happened), not by a blind click listener
+        // here — the old listener double-counted every add and also counted
+        // clicks on already-in-cart buttons.
       })();
     </script>
     {gaId && (

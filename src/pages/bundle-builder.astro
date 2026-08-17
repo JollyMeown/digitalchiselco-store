@@ -151,6 +151,7 @@ const avgFive = products.length
       cart.push(item);
       localStorage.setItem('cart', JSON.stringify(cart));
       window.dispatchEvent(new Event('cart-changed'));
+      if (window.dccAction) window.dccAction('add_to_cart');
       window.location.href = '/cart';
     });
 

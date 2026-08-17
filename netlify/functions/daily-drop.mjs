@@ -15,8 +15,12 @@ export default async () => {
     return new Response('missing CRON_SECRET', { status: 200 });
   }
   try {
+    // GET, not POST: Astro's CSRF guard rejects cross-site POSTs with 403
+    // ("Cross-site POST form submissions are forbidden") — which silently
+    // killed every scheduled run. The endpoint accepts GET with the same
+    // Bearer header, so auth is unchanged and the secret stays out of the URL.
     const res = await fetch(`${site}/api/cron/daily`, {
-      method: 'POST',
+      method: 'GET',
       headers: { authorization: `Bearer ${secret}` },
     });
     const body = await res.text();

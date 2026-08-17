@@ -182,6 +182,7 @@ const featured = plans.find((p) => p.highlight) || plans[0];
         if (!cart.find((x) => x.id === cartId)) {
           cart.push({ id: cartId, slug: 'membership', title: planName, price: planPrice, img: '' });
           localStorage.setItem('cart', JSON.stringify(cart));
+          if (window.dccAction) window.dccAction('add_to_cart');
         }
         window.dispatchEvent(new Event('cart-changed'));
         msg.className = 'sm:col-span-2 text-sm text-green-700';

@@ -109,6 +109,7 @@ const saved = Math.max(0, totalValue - BUNDLE_PRICE);
           cart.push({ id: lineId, slug: 'bundle-of-week', title: btn.dataset.title, price: 25, qty: 1, img: btn.dataset.img });
           localStorage.setItem('cart', JSON.stringify(cart));
           window.dispatchEvent(new Event('cart-changed'));
+          if (window.dccAction) window.dccAction('add_to_cart');
         }
         window.location.href = '/cart';
       });

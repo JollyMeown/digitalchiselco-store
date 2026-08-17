@@ -267,6 +267,7 @@ export default function Automations() {
 
   return (
     <div className="space-y-4">
+      <CronHealth />
       <div className="text-xs text-ink-700/70 bg-cream/40 border border-bronze-600/15 rounded-lg px-3 py-2">
         🛡 <b>Review-first:</b> each system starts OFF — a <b>green</b> toggle means it's <b>ON</b>. Preview each email (right) and test-send it to yourself before enabling. The daily cron (08:00 UTC) does the actual sending, so the counters below stay at <b>0</b> until it next runs and there's activity to report — that's normal, not "off".
       </div>
@@ -315,6 +316,8 @@ export default function Automations() {
       <PicksPanel />
 
       <TelegramTest />
+
+      <SendLog />
 
       <Card>
         <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -621,5 +624,117 @@ function TelegramTest() {
         <Toast message={msg.text} kind={msg.kind} />
       </div>
     </Card>
+  );
+}
+
+// ── Email send log — the ledger of EVERY email the site has sent. ─────
+// Written by src/lib/resend.ts at send time (all kinds), so this is the
+// authoritative "what went out, to whom, when" record. Filter by kind or
+// recipient; per-kind totals for the chosen range up top.
+function SendLog() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [days, setDays] = useState(7);
+  const [kind, setKind] = useState('');
+  const [q, setQ] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const since = new Date(Date.now() - days * 86400000).toISOString();
+      let qb = supabase.from('email_send_log').select('sent_at, kind, week, recipient, subject, status, error, batch_key')
+        .gte('sent_at', since).order('sent_at', { ascending: false }).limit(2000);
+      if (kind) qb = qb.eq('kind', kind);
+      if (q.trim()) qb = qb.ilike('recipient', `%${q.trim()}%`);
+      const { data } = await qb;
+      setRows(data || []); setLoading(false);
+    })();
+  }, [days, kind, q]);
+
+  const byKind: Record<string, { sent: number; failed: number }> = {};
+  for (const r of rows) { const k = r.kind || '(untagged)'; (byKind[k] ||= { sent: 0, failed: 0 }); if (r.status === 'sent') byKind[k].sent++; else if (r.status === 'failed') byKind[k].failed++; }
+  const kinds = Object.keys(byKind).sort();
+  const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="text-sm font-bold text-ink-900">📬 Email send log</div>
+        <span className="text-[11px] text-ink-700/50">every email the site sends, recorded at the moment of sending</span>
+        <div className="ml-auto flex flex-wrap gap-1 items-center">
+          {[1, 7, 30, 90].map((d) => (
+            <button key={d} onClick={() => setDays(d)} className={`text-xs px-2 py-1 rounded ${days === d ? 'bg-bronze-600 text-cream' : 'bg-cream text-ink-700'}`}>{d === 1 ? 'Today' : d + 'd'}</button>
+          ))}
+          <select value={kind} onChange={(e) => setKind(e.target.value)} className="text-xs border border-black/15 rounded px-2 py-1 bg-white">
+            <option value="">All kinds</option>
+            {kinds.map((k) => <option key={k} value={k}>{k}</option>)}
+          </select>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recipient…" className="text-xs border border-black/15 rounded px-2 py-1 w-44" />
+        </div>
+      </div>
+      {loading ? <p className="text-xs text-ink-700/50">Loading…</p> : rows.length === 0 ? (
+        <p className="text-xs text-ink-700/50">No emails logged in this range yet. (The ledger starts recording from this deploy onward; older sends live in the "Email performance" panel above via Resend's webhooks.)</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {kinds.map((k) => (
+              <button key={k} onClick={() => setKind(kind === k ? '' : k)}
+                className={`text-xs px-2.5 py-1 rounded-full border ${kind === k ? 'bg-bronze-600 text-cream border-bronze-600' : 'bg-cream/60 border-bronze-600/15 text-ink-800 hover:border-bronze-600/40'}`}>
+                <b>{k}</b> · {byKind[k].sent} sent{byKind[k].failed ? <span className="text-red-600"> · {byKind[k].failed} failed</span> : ''}
+              </button>
+            ))}
+          </div>
+          <div className="max-h-[420px] overflow-y-auto border border-black/10 rounded-lg">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-cream/90 text-left text-ink-700/60">
+                <tr><th className="p-2">When</th><th className="p-2">Kind</th><th className="p-2">Recipient</th><th className="p-2">Subject</th><th className="p-2">Status</th></tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-t border-black/5 hover:bg-cream/30">
+                    <td className="p-2 whitespace-nowrap text-ink-700/70">{fmt(r.sent_at)}</td>
+                    <td className="p-2 whitespace-nowrap font-medium text-bronze-800">{r.kind || '—'}{r.week ? <span className="text-ink-700/40 font-normal"> · {r.week}</span> : ''}</td>
+                    <td className="p-2 text-ink-800">{r.recipient}</td>
+                    <td className="p-2 text-ink-700/70 max-w-[320px] truncate" title={r.subject || ''}>{r.subject || '—'}</td>
+                    <td className="p-2 whitespace-nowrap">
+                      {r.status === 'sent' ? <span className="text-green-700">✓ sent</span> : r.status === 'failed' ? <span className="text-red-600" title={r.error || ''}>✕ failed</span> : <span className="text-ink-700/50">skipped</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-ink-700/50 mt-2">Showing {rows.length.toLocaleString()} rows{rows.length >= 2000 ? ' (first 2,000 — narrow the filters for more)' : ''}.</p>
+        </>
+      )}
+    </Card>
+  );
+}
+
+// ── Cron heartbeat — is the nightly automation actually running? ─────
+// Shows the last run + a warning if it's overdue (>26h). Reads cron_runs,
+// which /api/cron/daily writes on every invocation.
+function CronHealth() {
+  const [runs, setRuns] = useState<any[] | null>(null);
+  useEffect(() => {
+    supabase.from('cron_runs').select('ran_at, ok, duration_ms, error, summary').order('ran_at', { ascending: false }).limit(7)
+      .then(({ data }) => setRuns(data || []));
+  }, []);
+  if (!runs) return null;
+  const last = runs[0];
+  const ageH = last ? (Date.now() - Date.parse(last.ran_at)) / 3600000 : Infinity;
+  const overdue = !last || ageH > 26;
+  const g = last?.summary?.growth || {};
+  const line = last ? Object.entries(g).filter(([, v]) => v && v !== 'off').slice(0, 8).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ') : '';
+  return (
+    <div className={`rounded-lg border px-3 py-2 text-xs ${overdue ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800'}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-base" aria-hidden="true">{overdue ? '🔴' : '🟢'}</span>
+        <b>Nightly automation {overdue ? (last ? `OVERDUE — last ran ${Math.round(ageH)}h ago` : 'has NEVER run') : `healthy — last ran ${Math.round(ageH * 60) < 90 ? Math.round(ageH * 60) + ' min' : Math.round(ageH) + 'h'} ago`}</b>
+        {last && <span className="opacity-70">({last.ok ? 'ok' : 'FAILED: ' + (last.error || '')} · {Math.round((last.duration_ms || 0) / 1000)}s · runs on record: {runs.length})</span>}
+      </div>
+      {last?.ok && line && <div className="mt-1 opacity-80 truncate" title={line}>{line}</div>}
+      {overdue && <div className="mt-1">Scheduled 08:00 UTC daily via Netlify. If this stays red past 09:00 UTC, check Netlify → Functions → daily-drop logs.</div>}
+    </div>
   );
 }
