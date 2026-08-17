@@ -182,6 +182,7 @@ export default function Overview() {
 
   return (
     <div className="space-y-5">
+      <SystemHealth />
       {/* Date range picker */}
       <Card>
         <div className="flex flex-wrap items-end gap-3">
@@ -370,6 +371,85 @@ export default function Overview() {
           </table>
         )}
       </Card>
+    </div>
+  );
+}
+
+// ── System health — the 10-second morning glance. ─────────────────────
+// Six signals, each green / amber / red, computed live from the DB:
+//   cron health · email quota (today's sends vs a soft daily cap) · bounce +
+//   complaint rate (30d) · weekly digest pending queue · last order age ·
+//   open carts awaiting reminder. Click any tile to jump to its detail tab.
+function SystemHealth() {
+  const [h, setH] = useState<any>(null);
+  useEffect(() => {
+    (async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const d30 = new Date(Date.now() - 30 * 86400000).toISOString();
+      const [{ data: runs }, { count: sentToday }, { data: evs30 }, { data: wk }, { data: lastOrder }, { count: openCarts }] = await Promise.all([
+        supabase.from('cron_runs').select('ran_at, ok, finished_at, error').order('ran_at', { ascending: false }).limit(1),
+        supabase.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', today + 'T00:00:00Z'),
+        supabase.from('email_events').select('event').gte('created_at', d30).in('event', ['sent', 'delivered', 'bounced', 'complained']).limit(20000),
+        supabase.from('weekly_digest_log').select('week_key, queued_count, drain_note').order('week_key', { ascending: false }).limit(1),
+        supabase.from('orders').select('created_at, total, currency').eq('status', 'paid').order('created_at', { ascending: false }).limit(1),
+        supabase.from('abandoned_carts').select('id', { count: 'exact', head: true }).is('recovered_at', null).is('reminded_at', null),
+      ]);
+      // weekly pending count
+      let pending = 0, sentWk = 0;
+      if (wk?.[0]) {
+        const [{ count: p }, { count: s }] = await Promise.all([
+          supabase.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', wk[0].week_key).eq('status', 'pending'),
+          supabase.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', wk[0].week_key).eq('status', 'sent'),
+        ]);
+        pending = p || 0; sentWk = s || 0;
+      }
+      const delivered = (evs30 || []).filter((e: any) => e.event === 'delivered' || e.event === 'sent').length;
+      const bounced = (evs30 || []).filter((e: any) => e.event === 'bounced').length;
+      const complained = (evs30 || []).filter((e: any) => e.event === 'complained').length;
+      setH({ run: runs?.[0] || null, sentToday: sentToday || 0, delivered, bounced, complained, wk: wk?.[0] || null, pending, sentWk, lastOrder: lastOrder?.[0] || null, openCarts: openCarts || 0 });
+    })();
+  }, []);
+  if (!h) return null;
+
+  const DAILY_SOFT_CAP = Number((import.meta as any).env?.PUBLIC_RESEND_DAILY_CAP) || 300;   // Resend free tier ≈ 100/day; set PUBLIC_RESEND_DAILY_CAP to your plan
+  const ageH = h.run ? (Date.now() - Date.parse(h.run.ran_at)) / 3600000 : Infinity;
+  const cronState = !h.run ? 'red' : h.run.ok === null ? (ageH < 0.2 ? 'amber' : 'red') : h.run.ok === false ? 'red' : ageH > 26 ? 'red' : 'green';
+  const cronText = !h.run ? 'never ran' : h.run.ok === null ? (ageH < 0.2 ? 'running…' : 'started, never finished') : h.run.ok === false ? 'FAILED' : `ok · ${ageH < 1 ? Math.round(ageH * 60) + 'm' : Math.round(ageH) + 'h'} ago`;
+  const quotaPct = Math.round((h.sentToday / DAILY_SOFT_CAP) * 100);
+  const quotaState = quotaPct >= 95 ? 'red' : quotaPct >= 75 ? 'amber' : 'green';
+  const bounceRate = h.delivered ? ((h.bounced + h.complained) / h.delivered) * 100 : 0;
+  const bounceState = bounceRate >= 5 ? 'red' : bounceRate >= 2 ? 'amber' : 'green';
+  const wkState = !h.wk ? 'amber' : h.pending === 0 ? 'green' : 'amber';
+  const lastAgeH = h.lastOrder ? (Date.now() - Date.parse(h.lastOrder.created_at)) / 3600000 : Infinity;
+  const orderState = !h.lastOrder ? 'amber' : lastAgeH > 72 ? 'amber' : 'green';
+  const cartsState = h.openCarts >= 20 ? 'amber' : 'green';
+
+  const dot: Record<string, string> = { green: 'bg-green-500', amber: 'bg-amber-500', red: 'bg-red-500 animate-pulse' };
+  const bg: Record<string, string> = { green: 'bg-green-50 border-green-200', amber: 'bg-amber-50 border-amber-200', red: 'bg-red-50 border-red-300' };
+  const Tile = ({ state, icon, label, value, sub, href }: { state: string; icon: string; label: string; value: string; sub?: string; href: string }) => (
+    <a href={href} className={`block rounded-lg border px-3 py-2.5 hover:shadow transition ${bg[state]}`}>
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-ink-700/60 font-medium"><span className={`inline-block w-2 h-2 rounded-full ${dot[state]}`} />{icon} {label}</div>
+      <div className="text-base font-bold text-ink-900 mt-0.5 leading-tight">{value}</div>
+      {sub && <div className="text-[10px] text-ink-700/60 mt-0.5 truncate" title={sub}>{sub}</div>}
+    </a>
+  );
+  const worst = [cronState, quotaState, bounceState, wkState, orderState, cartsState].includes('red') ? 'red' : [cronState, quotaState, bounceState, wkState, orderState, cartsState].includes('amber') ? 'amber' : 'green';
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className={`inline-block w-2.5 h-2.5 rounded-full ${dot[worst]}`} />
+        <span className="text-sm font-bold text-ink-900">System health</span>
+        <span className="text-[11px] text-ink-700/50">{worst === 'green' ? 'all systems normal' : worst === 'amber' ? 'something needs a look' : 'ATTENTION NEEDED'} · tap a tile for detail</span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+        <Tile state={cronState} icon="⏱" label="Nightly automation" value={cronText} sub={h.run?.error || (h.run ? new Date(h.run.ran_at).toLocaleString() : 'scheduler has never reported in')} href="#automations" />
+        <Tile state={quotaState} icon="📧" label="Email quota today" value={`${h.sentToday} / ${DAILY_SOFT_CAP}`} sub={`${quotaPct}% of soft daily cap`} href="#automations" />
+        <Tile state={bounceState} icon="📉" label="Bounce + spam (30d)" value={`${bounceRate.toFixed(1)}%`} sub={`${h.bounced} bounced · ${h.complained} complaints · ${h.delivered} delivered`} href="#automations" />
+        <Tile state={wkState} icon="📅" label="Weekly digest" value={h.wk ? `${h.sentWk}/${h.wk.queued_count || h.sentWk + h.pending}` : '—'} sub={h.wk ? (h.pending ? `${h.pending} pending · auto-retry nightly` : `${h.wk.week_key} complete`) : 'none yet'} href="#automations" />
+        <Tile state={orderState} icon="🧾" label="Last order" value={h.lastOrder ? `$${Number(h.lastOrder.total).toFixed(2)}` : 'none'} sub={h.lastOrder ? (lastAgeH < 1 ? 'just now' : lastAgeH < 48 ? `${Math.round(lastAgeH)}h ago` : `${Math.round(lastAgeH / 24)}d ago`) : ''} href="#orders" />
+        <Tile state={cartsState} icon="🛒" label="Open carts" value={String(h.openCarts)} sub="awaiting reminder" href="#insights" />
+      </div>
     </div>
   );
 }

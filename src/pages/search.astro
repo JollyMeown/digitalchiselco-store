@@ -2,15 +2,33 @@
 import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import ProductCard from '../components/ProductCard.astro';
-import { searchProducts, getSettings } from '../lib/queries';
+import { searchProducts, getSettings, titleVocabulary } from '../lib/queries';
+import { didYouMean } from '../lib/search-smart';
 import { supabaseAdmin } from '../lib/supabase';
 
 const q = (Astro.url.searchParams.get('q') || '').trim();
 const results = q ? await searchProducts(q) : [];
 const settings = await getSettings();
 
-// Log the search term + result count for the admin search-terms report.
-// Fire-and-forget: analytics must never slow or break the page.
+// Zero results → fuzzy "did you mean" against the live catalog vocabulary
+// (typos: "eagel" → "eagle"). Only offered if the suggestion itself finds
+// something, so we never suggest a dead end.
+let suggestion: string | null = null;
+let suggestionResults: any[] = [];
+if (q && !results.length) {
+  try {
+    const cand = didYouMean(q, await titleVocabulary());
+    if (cand && cand !== q.toLowerCase()) {
+      const r = await searchProducts(cand, 8);
+      if (r.length) { suggestion = cand; suggestionResults = r; }
+    }
+  } catch { /* suggestions are optional */ }
+}
+
+// Log the search term + result count for the admin search-terms report and
+// Design Scout. Fire-and-forget: analytics must never slow or break the page.
+// A zero-result search stays logged as zero even when we show a suggestion —
+// that miss IS the demand signal.
 if (q) {
   try {
     supabaseAdmin().from('site_events')
@@ -28,6 +46,26 @@ if (q) {
       {results.map((p) => <ProductCard product={p} discount={settings.discount_percent} />)}
     </div>
   ) : q ? (
-    <p class="text-ink-700/70">No matches. Try a different keyword like “eagle”, “cross”, “deer” or “fish”. <a href="/catalog" class="text-bronze-600">Browse all →</a></p>
+    <div>
+      {suggestion ? (
+        <div class="mb-6">
+          <p class="text-lg text-ink-800">Did you mean <a href={`/search?q=${encodeURIComponent(suggestion)}`} class="text-bronze-700 font-medium underline">“{suggestion}”</a>?</p>
+          <p class="text-sm text-ink-700/60 mb-4">Here are a few designs for that:</p>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {suggestionResults.map((p) => <ProductCard product={p} discount={settings.discount_percent} />)}
+          </div>
+          <a href={`/search?q=${encodeURIComponent(suggestion)}`} class="inline-block mt-4 text-sm text-bronze-600 underline">See all results for “{suggestion}” →</a>
+        </div>
+      ) : (
+        <div class="bg-[#FAEEDA] border border-bronze-600/30 rounded-lg px-4 py-4 max-w-2xl">
+          <p class="text-ink-800 font-medium">No designs match “{q}” yet.</p>
+          <p class="text-sm text-ink-700/70 mt-1">We add new designs every week and we build what makers ask for. Try a broader word (“eagle”, “cross”, “deer”, “farm”), or:</p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <a href="/catalog" class="text-xs px-3 py-1.5 rounded-md bg-bronze-600 text-cream hover:bg-bronze-700">Browse the whole catalog</a>
+            <a href={`/requests?suggest=${encodeURIComponent(q)}`} class="text-xs px-3 py-1.5 rounded-md border border-bronze-600 text-bronze-700 hover:bg-bronze-600/10">💡 Request “{q}” as a new design</a>
+          </div>
+        </div>
+      )}
+    </div>
   ) : null}
 </Shell>

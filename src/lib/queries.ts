@@ -100,8 +100,43 @@ export async function searchProducts(q: string, limit = 60) {
       return { p, titleHits, firstPos };
     });
     scored.sort((a, b) => (b.titleHits - a.titleHits) || (a.firstPos - b.firstPos));
-    return scored.slice(0, limit).map((s) => s.p) as ProductCard[];
+    const strict = scored.slice(0, limit).map((s) => s.p) as ProductCard[];
+    if (strict.length) return strict;
+
+    // ── Synonym fallback ─────────────────────────────────────────────
+    // Strict AND-of-tokens found nothing. Re-search with each token expanded
+    // to its synonym group ("cowboy hat" → western/rodeo/ranch; "xmas" →
+    // christmas; "kitty" → cat), OR-ing the alternatives, so shopper
+    // vocabulary that differs from catalog vocabulary still finds designs.
+    const { expand } = await import('./search-smart');
+    const alts = expand(term).map((t) => t.replace(/[,()*]/g, '')).filter((t) => t.length >= 2 && !tokens.includes(t)).slice(0, 12);
+    if (!alts.length) return [];
+    let qb2: any = supabase.from('products').select(CARD).eq('active', true);
+    qb2 = qb2.or(alts.map((t) => `title.ilike.*${t}*`).join(',')).limit(limit);
+    const { data: d2 } = await qb2;
+    return (d2 ?? []) as ProductCard[];
   } catch (e) { console.error('searchProducts failed:', e); return []; }
+}
+
+/** Distinct words across active product titles with frequency — the vocabulary
+ *  the fuzzy "did you mean" suggests from. Cached in-process for 10 minutes. */
+let _vocab: { at: number; map: Map<string, number> } | null = null;
+export async function titleVocabulary(): Promise<Map<string, number>> {
+  if (_vocab && Date.now() - _vocab.at < 10 * 60000) return _vocab.map;
+  const map = new Map<string, number>();
+  try {
+    for (let from = 0; ; from += 1000) {
+      const { data } = await supabase.from('products').select('title').eq('active', true).range(from, from + 999);
+      for (const p of data || []) {
+        for (const w of String((p as any).title || '').split('|')[0].toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/)) {
+          if (w.length >= 3) map.set(w, (map.get(w) || 0) + 1);
+        }
+      }
+      if (!data || data.length < 1000) break;
+    }
+  } catch { /* empty vocab → no suggestions */ }
+  _vocab = { at: Date.now(), map };
+  return map;
 }
 
 export async function getRelatedProducts(excludeId: string, limit = 5) {

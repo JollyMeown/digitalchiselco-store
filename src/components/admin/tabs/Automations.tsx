@@ -618,15 +618,30 @@ function TelegramTest() {
         <li>In Telegram, open <b>@BotFather</b> → send <code>/newbot</code> → pick a name → copy the <b>token</b> it gives you.</li>
         <li>Open <b>@userinfobot</b> and send it anything → it replies with your numeric <b>Id</b> (that's your chat ID).</li>
         <li>Open the bot <b>you just made</b> and send it any message (so it's allowed to message you back).</li>
-        <li>In Netlify → Site settings → Environment variables, add <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code>, then redeploy.</li>
-        <li>Come back here and tap <b>Send test</b> 👇</li>
+        <li>In Netlify → Site settings → Environment variables, add <code>TELEGRAM_BOT_TOKEN</code>, <code>TELEGRAM_CHAT_ID</code> and <code>TELEGRAM_WEBHOOK_SECRET</code> (any long random string, 32+ characters), then redeploy.</li>
+        <li>Come back here: tap <b>Send test</b> for alerts, then <b>Enable commands</b> for the two-way bot 👇</li>
       </ol>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <button disabled={busy} onClick={test} className={btnPrimary}>{busy ? 'Sending…' : 'Send test to my Telegram'}</button>
+        <button disabled={busy} onClick={register} className={btnGhost}>{busy ? '…' : '⚡ Enable commands (/stats /last /cron…)'}</button>
         <Toast message={msg.text} kind={msg.kind} />
       </div>
+      <p className="text-[11px] text-ink-700/50 mt-2">Two-way commands: <code>/stats</code> today's numbers · <code>/last</code> latest orders · <code>/pending</code> weekly digest delivery + open carts · <code>/cron</code> nightly automation health · <code>/scout</code> · <code>/help</code>. Only your chat ID is answered.</p>
     </Card>
   );
+
+  async function register() {
+    setBusy(true); setMsg({ kind: 'info', text: 'Registering webhook with Telegram…' });
+    try {
+      const { data } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/telegram-register', {
+        method: 'POST', headers: { authorization: `Bearer ${data.session?.access_token || ''}` },
+      });
+      const d = await res.json();
+      setMsg({ kind: d.ok ? 'success' : 'error', text: d.ok ? d.message : (d.error || 'Failed.') });
+    } catch { setMsg({ kind: 'error', text: 'Network error.' }); }
+    setBusy(false);
+  }
 }
 
 // ── Email send log — the ledger of EVERY email the site has sent. ─────
