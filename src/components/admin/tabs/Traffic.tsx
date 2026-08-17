@@ -65,8 +65,20 @@ export default function Traffic() {
   const [capped, setCapped] = useState(false);
 
   useEffect(() => { load(); }, [days]);
-  async function load() {
-    setLoading(true);
+  // Keep the whole page LIVE, not just the on-site-now strip: refresh the
+  // event/visit data every 30s and whenever the tab regains focus, so an
+  // action taken while the admin was open shows up without a manual reload.
+  // (Owner test: hearted → carted → checkout while watching the panel; the
+  // events landed in the DB instantly but the counters were a stale snapshot.)
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === 'visible') load(true); }, 30000);
+    const onFocus = () => load(true);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(true); });
+    return () => { clearInterval(t); window.removeEventListener('focus', onFocus); };
+  }, [days]);
+  async function load(silent = false) {
+    if (!silent) setLoading(true);   // background refreshes must not blank the panel
     const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
     const sinceTs = new Date(Date.now() - days * 86400000).toISOString();
     const out: Visit[] = [];
