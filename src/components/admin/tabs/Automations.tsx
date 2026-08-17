@@ -317,6 +317,8 @@ export default function Automations() {
 
       <TelegramTest />
 
+      <WeeklyTracker />
+
       <SendLog />
 
       <Card>
@@ -736,5 +738,109 @@ function CronHealth() {
       {last?.ok && line && <div className="mt-1 opacity-80 truncate" title={line}>{line}</div>}
       {overdue && <div className="mt-1">Scheduled 08:00 UTC daily via Netlify. If this stays red past 09:00 UTC, check Netlify → Functions → daily-drop logs.</div>}
     </div>
+  );
+}
+
+// ── Weekly digest delivery tracker — every recipient, every week. ────
+// Reads weekly_digest_log (per week: designs, queued, sent, drain state) +
+// weekly_send_queue (per person: pending/sent/failed, attempts, last error).
+// The daily cron drains pending rows automatically; this shows exactly
+// where each week stands and who, if anyone, is still waiting.
+function WeeklyTracker() {
+  const [weeks, setWeeks] = useState<any[]>([]);
+  const [open, setOpen] = useState<string | null>(null);
+  const [rows, setRows] = useState<any[]>([]);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'sent' | 'failed'>('all');
+  const [q, setQ] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const { data: logs } = await supabase.from('weekly_digest_log').select('*').order('week_key', { ascending: false }).limit(12);
+      const out: any[] = [];
+      for (const w of logs || []) {
+        const [{ count: pending }, { count: sent }, { count: failed }] = await Promise.all([
+          supabase.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', w.week_key).eq('status', 'pending'),
+          supabase.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', w.week_key).eq('status', 'sent'),
+          supabase.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', w.week_key).gte('attempts', 5).eq('status', 'pending'),
+        ]);
+        out.push({ ...w, pending: pending || 0, sent: sent || 0, stuck: failed || 0 });
+      }
+      setWeeks(out);
+      if (out.length && !open) setOpen(out[0].week_key);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      let qb = supabase.from('weekly_send_queue').select('email, status, attempts, last_error, queued_at, sent_at').eq('week_key', open).order('status').order('email').limit(2000);
+      if (filter !== 'all') qb = filter === 'failed' ? qb.gte('attempts', 5) : qb.eq('status', filter);
+      if (q.trim()) qb = qb.ilike('email', `%${q.trim()}%`);
+      const { data } = await qb;
+      setRows(data || []);
+    })();
+  }, [open, filter, q]);
+
+  const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+  const cur = weeks.find((w) => w.week_key === open);
+
+  return (
+    <Card>
+      <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+        <div className="text-sm font-bold text-ink-900">📅 Weekly digest delivery tracker</div>
+        <span className="text-[11px] text-ink-700/50">self-healing: anyone still pending is retried automatically every day until delivered</span>
+      </div>
+      {weeks.length === 0 ? <p className="text-xs text-ink-700/50">No weekly digests on record yet.</p> : (
+        <>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {weeks.map((w) => {
+              const total = (w.queued_count || 0) || (w.sent + w.pending);
+              const pct = total ? Math.round((w.sent / total) * 100) : 0;
+              const done = w.pending === 0 && total > 0;
+              return (
+                <button key={w.week_key} onClick={() => setOpen(w.week_key)}
+                  className={`text-left rounded-lg border px-3 py-2 min-w-[150px] transition ${open === w.week_key ? 'border-bronze-600 bg-bronze-600/10 ring-2 ring-bronze-600/30' : 'border-bronze-600/15 bg-cream/50 hover:border-bronze-600/40'}`}>
+                  <div className="text-xs font-bold text-ink-900">{w.week_key} {done ? '✅' : w.pending > 0 ? '⏳' : ''}</div>
+                  <div className="text-lg font-extrabold text-bronze-800 leading-tight">{w.sent}<span className="text-xs font-normal text-ink-700/50">/{total || '—'}</span></div>
+                  <div className="h-1.5 rounded bg-white/70 overflow-hidden mt-1"><div className="h-full bg-bronze-600" style={{ width: pct + '%' }} /></div>
+                  <div className="text-[10px] text-ink-700/60 mt-0.5">{w.product_count || 0} designs{w.pending > 0 ? <span className="text-amber-700 font-bold"> · {w.pending} pending</span> : ''}{w.stuck > 0 ? <span className="text-red-600 font-bold"> · {w.stuck} stuck</span> : ''}</div>
+                </button>
+              );
+            })}
+          </div>
+          {cur && (
+            <div className="text-xs text-ink-700/70 mb-2 flex flex-wrap gap-x-4 gap-y-1">
+              <span>Generated: <b>{fmt(cur.created_at)}</b></span>
+              <span>Last drain: <b>{fmt(cur.last_drain_at)}</b></span>
+              {cur.drain_note && <span>Status: <b className={cur.pending > 0 ? 'text-amber-700' : 'text-green-700'}>{cur.drain_note}</b></span>}
+              {cur.pending > 0 && <span className="text-amber-800">⏳ The nightly run will send the {cur.pending} pending automatically (stops cleanly if Resend's daily quota hits, resumes next day).</span>}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            {(['all', 'pending', 'sent', 'failed'] as const).map((f) => (
+              <button key={f} onClick={() => setFilter(f)} className={`text-[11px] px-2 py-0.5 rounded-full ${filter === f ? 'bg-bronze-600 text-cream' : 'bg-cream text-ink-700'}`}>{f === 'failed' ? 'stuck (5+ tries)' : f}</button>
+            ))}
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recipient…" className="text-xs border border-black/15 rounded px-2 py-1 w-44 ml-auto" />
+          </div>
+          <div className="max-h-[360px] overflow-y-auto border border-black/10 rounded-lg">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-cream/90 text-left text-ink-700/60"><tr><th className="p-2">Recipient</th><th className="p-2">Status</th><th className="p-2">Sent at</th><th className="p-2">Tries</th><th className="p-2">Last error</th></tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.email} className="border-t border-black/5 hover:bg-cream/30">
+                    <td className="p-2 text-ink-800">{r.email}</td>
+                    <td className="p-2 whitespace-nowrap">{r.status === 'sent' ? <span className="text-green-700">✓ sent</span> : r.attempts >= 5 ? <span className="text-red-600">✕ stuck</span> : <span className="text-amber-700">⏳ pending</span>}</td>
+                    <td className="p-2 whitespace-nowrap text-ink-700/70">{fmt(r.sent_at)}</td>
+                    <td className="p-2 text-ink-700/70">{r.attempts || 0}</td>
+                    <td className="p-2 text-ink-700/60 max-w-[260px] truncate" title={r.last_error || ''}>{r.last_error || ''}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && <tr><td className="p-3 text-ink-700/50" colSpan={5}>Nothing in this filter.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </Card>
   );
 }

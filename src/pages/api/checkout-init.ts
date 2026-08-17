@@ -139,7 +139,7 @@ export const POST: APIRoute = async ({ request }) => {
       // don't control (the receipt + downloads go to that inbox).
       if (email) {
         const { data: mem } = await db.from('member_subscriptions')
-          .select('id').ilike('email', email).eq('status', 'active').limit(1);
+          .select('id').eq('email', email).eq('status', 'active').limit(1);
         if (mem?.length && discountPercent < 10) discountPercent = 10;
       }
     }
@@ -283,8 +283,30 @@ export const POST: APIRoute = async ({ request }) => {
     // NOTE: coupon redemption is NOT stamped here. It is recorded in the Paddle
     // webhook (transaction.completed) AFTER payment succeeds — otherwise anyone
     // could loop this unauthenticated endpoint to exhaust a coupon's
-    // max_redemptions and disable the promo without ever paying. The coupon_id
-    // is carried through in custom_data (above) so the webhook can stamp it.
+    // max_redemptions and disable the promo without ever paying.
+
+    // SECURITY: server-side snapshot of exactly what this transaction sells.
+    // The webhook fulfils from THIS row, never from txn.custom_data (which a
+    // page-context script can forge via Paddle.js on our own approved domain).
+    // If the insert fails, checkout still proceeds — the webhook then falls
+    // back to catalog price_id matching only and flags the order for review.
+    if (txn.data?.id) {
+      try {
+        await db.from('pending_checkouts').insert({
+          txn_id: txn.data.id,
+          email: email || null,
+          cart_ids: sentIds,
+          customizations: sentCustomizations.some((c) => Array.isArray(c) && c.length) ? sentCustomizations : null,
+          coupon_id: couponMeta?.id || null,
+          coupon_code: couponMeta?.code || null,
+          coupon_discount: couponMeta?.amount ?? null,
+          gift_remainder: remainderEligible ? giftRemainder : null,
+          gift: giftData || null,
+          fx: chargeCcy !== 'USD' ? { currency: chargeCcy, rate: fxRate, usd_subtotal: usdSubtotal } : null,
+          expected_total_usd: usdSubtotal,
+        });
+      } catch (e) { console.error('[checkout-init] pending_checkouts insert failed (webhook will use safe fallback):', e); }
+    }
 
     // Funnel truth-meter: a Paddle transaction now exists. Server-side (can't
     // be ad-blocked), so checkout_start → txn_created → paid orders shows

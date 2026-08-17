@@ -27,7 +27,7 @@ export const POST: APIRoute = async ({ request }) => {
     const ids = (pcs || []).filter((r: any) => r.products?.active && Number(r.products.price_usd) > 0).map((r: any) => r.product_id);
     if (!ids.length) return json({ ok: false }, 200);
 
-    const { data: ents } = await db.from('entitlements').select('product_id').ilike('email', email).in('product_id', ids);
+    const { data: ents } = await db.from('entitlements').select('product_id').eq('email', email).in('product_id', ids);
     const owned = new Set((ents || []).map((e: any) => e.product_id)).size;
     return json({ ok: true, owned, total: ids.length });
   } catch {

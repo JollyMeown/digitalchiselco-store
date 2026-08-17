@@ -22,6 +22,14 @@ import { telegramOwner } from '../../../lib/notify';
 
 const OPS_INBOX = 'jolly@digitalchiselco.com';
 
+// supabase-js never throws on PostgREST errors. Fulfilment writes MUST throw on
+// error so the webhook 500s and Paddle retries — otherwise a transient DB blip
+// leaves a paid customer with no items/entitlements and no email, silently.
+function must<T extends { error: any }>(r: T, what: string): T {
+  if (r.error) throw new Error(what + ': ' + (r.error.message || String(r.error)));
+  return r;
+}
+
 // process.env at runtime in Netlify Functions; import.meta.env at build-time
 // in Astro dev. Read both so dev and prod behave identically.
 function env(name: string): string | undefined {
@@ -132,11 +140,39 @@ async function handleTransactionCompleted(db: any, txn: any) {
   }
   // Fallback chain in case the customer lookup fails or customer_id is missing.
   const email: string = customerEmail || (txn.customer?.email || '').toLowerCase().trim();
+  // A paid order with NO resolvable email would be filed under unknown@… and
+  // the buyer would never get downloads. Throw → 500 → Paddle retries (the
+  // customer lookup was almost certainly a transient Paddle blip).
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    throw new Error(`no customer email resolvable for txn ${txn.id} (customer_id=${txn.customer_id || 'none'}) — retry`);
+  }
 
-  // Gift orders: checkout-init passes custom_data.gift = { to, from, note }.
-  // Entitlements + the download email go to the RECIPIENT; the buyer keeps the
-  // order row, the receipt, loyalty points and referral credit.
-  const giftRaw = txn.custom_data?.gift;
+  // ── TRUSTED checkout snapshot ────────────────────────────────────────
+  // checkout-init records exactly what each transaction sells in
+  // pending_checkouts. We fulfil from THAT, never from txn.custom_data: Paddle.js
+  // on our own domain lets any page script open a checkout with forged
+  // custom_data (fake bundle5 lines → 5 designs for the price of one; fake
+  // gift_remainder → free gift codes; someone else's coupon_id…). No snapshot
+  // (transaction not created by our server) → an EMPTY trusted object: the
+  // order still fulfils via Paddle catalog price-id matching only and is
+  // flagged for review.
+  const { data: snap } = await db.from('pending_checkouts').select('*').eq('txn_id', txn.id).maybeSingle();
+  const trusted = {
+    cart_ids: (Array.isArray(snap?.cart_ids) ? snap!.cart_ids : []) as string[],
+    customizations: (Array.isArray(snap?.customizations) ? snap!.customizations : []) as any[],
+    coupon_id: (snap?.coupon_id as string | null) || null,
+    coupon_code: (snap?.coupon_code as string | null) || null,
+    coupon_discount: Number(snap?.coupon_discount) || 0,
+    gift_remainder: Number(snap?.gift_remainder) || 0,
+    gift: (snap?.gift as any) || null,
+    fx: (snap?.fx as any) || null,
+    fromServer: !!snap,
+  };
+  if (!snap) console.warn(`[webhook] txn ${txn.id} has NO pending_checkouts snapshot — fulfilling via catalog match only, flagged for review`);
+
+  // Gift orders: the RECIPIENT gets entitlements + the download email; the
+  // buyer keeps the order row, the receipt, loyalty points and referral credit.
+  const giftRaw = trusted.gift;
   const giftTo = giftRaw && typeof giftRaw.to === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(giftRaw.to)
     ? String(giftRaw.to).toLowerCase().trim() : null;
   const gift = giftTo ? {
@@ -152,27 +188,36 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // into custom_data.fx so USD-denominated rules (free-gift threshold, loyalty
   // points per dollar, referral stats) stay correct when the buyer paid in EUR
   // etc. For USD transactions these are identical to subtotal/total.
-  const usdSubtotal = Number(txn.custom_data?.fx?.usd_subtotal) > 0 ? Number(txn.custom_data.fx.usd_subtotal) : subtotal;
+  const usdSubtotal = Number(trusted.fx?.usd_subtotal) > 0 ? Number(trusted.fx.usd_subtotal) : subtotal;
   const usdTotal = currency === 'USD' ? total : usdSubtotal;
 
   // Upsert order keyed on paddle_transaction_id (the unique index makes this safe).
   const { data: existing } = await db
     .from('orders')
-    .select('id')
+    .select('id, fulfilled_at, confirmation_sent_at')
     .eq('paddle_transaction_id', txn.id)
     .maybeSingle();
+  let resumeEmailOnly = false;
   if (existing?.id) {
-    // Resume support: a previous attempt may have crashed AFTER creating the
-    // order row but BEFORE creating its items/entitlements. If items exist the
-    // order is complete — skip. If none exist, fall through and finish the job
-    // reusing the existing order id (all downstream steps are idempotent).
-    const { count: itemCount } = await db.from('order_items')
-      .select('id', { count: 'exact', head: true }).eq('order_id', existing.id);
-    if ((itemCount || 0) > 0) {
-      console.log(`Order already exists for transaction ${txn.id} → skipping create.`);
+    // Resume support, driven by explicit stamps (NOT the old 'has ≥1 item'
+    // heuristic, which treated a half-written order as done and never sent
+    // the email):
+    //   fulfilled_at + confirmation_sent_at → fully done, skip.
+    //   fulfilled_at only                   → items OK, just (re)send the email.
+    //   neither                             → wipe any partial items and redo
+    //                                          the whole fulfilment.
+    if (existing.fulfilled_at && existing.confirmation_sent_at) {
+      console.log(`Order already fulfilled+emailed for transaction ${txn.id} → skipping.`);
       return;
     }
-    console.warn(`Order ${existing.id} exists for txn ${txn.id} but has 0 items — resuming fulfilment.`);
+    if (existing.fulfilled_at) {
+      resumeEmailOnly = true;
+      console.warn(`Order ${existing.id} fulfilled but confirmation never sent — resending email only.`);
+    } else {
+      console.warn(`Order ${existing.id} exists for txn ${txn.id} but fulfilment incomplete — redoing items/entitlements.`);
+      await db.from('entitlements').delete().eq('order_id', existing.id);
+      await db.from('order_items').delete().eq('order_id', existing.id);
+    }
   }
 
   // Capture customer's name early — used both on the order row and for the
@@ -213,13 +258,13 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // Skipped on the resume path: the stamp sits immediately after the order
   // insert, so on any crash-late-then-resume it already ran once — running it
   // again would double-count the redemption.
-  const couponId: string | null = existing?.id ? null : (txn.custom_data?.coupon_id || null);
+  const couponId: string | null = existing?.id ? null : trusted.coupon_id;
   if (couponId) {
     try {
       await db.from('coupon_redemptions').insert({
         coupon_id: couponId,
         email: email || null,
-        amount_off: Number(txn.custom_data?.coupon_discount) || 0,
+        amount_off: trusted.coupon_discount,
       });
       await db.rpc('increment_coupon_redemption', { p_coupon_id: couponId }).then(() => {}, async () => {
         const { data: cur } = await db.from('coupons').select('redemption_count').eq('id', couponId).maybeSingle();
@@ -237,14 +282,14 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // entries like 'membership:slug' preserved). Used as a fallback when an
   // item came through as ad-hoc (no paddle_price_id) and so title-matching is
   // the only handle we have.
-  const cartIds: string[] = Array.isArray(txn.custom_data?.cart_ids) ? txn.custom_data.cart_ids : [];
+  const cartIds: string[] = trusted.cart_ids;
   // Per-line customization snapshots (aligned by index with cart_ids). The cart
   // page sends these via /api/checkout-init; each entry is either null or
   // [{ key, label, type, value }, ...].
-  const cartCustomizations: any[] = Array.isArray(txn.custom_data?.customizations) ? txn.custom_data.customizations : [];
+  const cartCustomizations: any[] = trusted.customizations;
   // Track membership plans in this order so we can ping ops afterwards.
   const purchasedMemberships: { name: string; slug: string; price_usd: number; months: number; files_per_month: number; qty: number }[] = [];
-  for (let i = 0; i < items.length; i++) {
+  for (let i = 0; i < (resumeEmailOnly ? 0 : items.length); i++) {
     const it = items[i];
     const priceId = it.price?.id;
     const lineTotal = Number(it.totals?.total ?? it.totals?.subtotal ?? 0) / 100;
@@ -266,18 +311,18 @@ async function handleTransactionCompleted(db: any, txn: any) {
         : { data: [] as any[] };
       const per = valid.length ? +(lineTotal / valid.length).toFixed(2) : 0;
       for (const bp of bProds || []) {
-        await db.from('order_items').insert({
+        must(await db.from('order_items').insert({
           order_id: order.id,
           product_id: bp.id,
           title: `${bp.title} (Pick-5 Bundle)`.slice(0, 240),
           price_usd: per,
           qty: 1,
-        });
-        await db.from('entitlements').insert({
+        }), 'order_items insert (bundle)');
+        must(await db.from('entitlements').insert({
           order_id: order.id,
           email: deliveryEmail || 'unknown@digitalchiselco.com',
           product_id: bp.id,
-        });
+        }), 'entitlements insert (bundle)');
       }
       continue;
     }
@@ -326,8 +371,10 @@ async function handleTransactionCompleted(db: any, txn: any) {
         .maybeSingle();
       if (p) { productId = p.id; title = p.title; }
     }
-    // (3) Last resort: match the inline title against products.title.
-    if (!productId && title) {
+    // (3) Last resort: match the inline title against products.title. ONLY
+    //     for server-created transactions — a forged checkout could otherwise
+    //     name any product in an ad-hoc line and get it fulfilled.
+    if (!productId && title && trusted.fromServer) {
       const { data: p } = await db
         .from('products')
         .select('id, title')
@@ -336,20 +383,20 @@ async function handleTransactionCompleted(db: any, txn: any) {
       if (p) { productId = p.id; }
     }
 
-    const { data: insertedItem } = await db.from('order_items').insert({
+    const { data: insertedItem } = must(await db.from('order_items').insert({
       order_id: order.id,
       product_id: productId,
       title,
       price_usd: lineUnit || lineTotal,
       qty,
-    }).select('id').single();
+    }).select('id').single(), 'order_items insert');
 
     if (productId) {
-      await db.from('entitlements').insert({
+      must(await db.from('entitlements').insert({
         order_id: order.id,
         email: deliveryEmail || 'unknown@digitalchiselco.com',
         product_id: productId,
-      });
+      }), 'entitlements insert');
     }
 
     // Persist captured customization values for this line, if any. Wrapped in
@@ -377,7 +424,19 @@ async function handleTransactionCompleted(db: any, txn: any) {
     }
   }
 
-  console.log(`Order ${order.id} created for txn ${txn.id} (${email}, $${total}).`);
+  // Fulfilment complete → stamp it (drives the resume logic above). Also flag
+  // orders whose transaction had no server snapshot so ops can review them.
+  if (!resumeEmailOnly) {
+    must(await db.from('orders').update({ fulfilled_at: new Date().toISOString() }).eq('id', order.id), 'orders.fulfilled_at update');
+    if (!trusted.fromServer) {
+      try {
+        await sendEmail({ to: OPS_INBOX, subject: `⚠️ Order #${String(order.id).slice(0, 8)} needs review: no checkout snapshot`,
+          html: `<p>Paddle txn <code>${txn.id}</code> (${email}, ${total.toFixed(2)} ${currency}) was NOT created by our checkout — fulfilled via catalog price-id match only. Please verify what was granted.</p>`,
+          text: `Order ${order.id} (txn ${txn.id}) had no checkout snapshot; fulfilled via catalog match only. Verify.`, idempotencyKey: `review-order:${order.id}` });
+      } catch { /* best-effort */ }
+    }
+  }
+  console.log(`Order ${order.id} ${resumeEmailOnly ? 'resumed (email only)' : 'created'} for txn ${txn.id} (${email}, ${total}).`);
 
   // ── Owner instant alert: a real order just landed 🎉 ─────────────────
   // Gated by growth_settings.owner_alerts_enabled; idempotent per order.
@@ -480,7 +539,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // ── Referral program: friend used a REF-XXXX share code ──────────────
   // The code is a normal 15% coupon; here we log the referral and (if reward
   // sending is enabled) mint + email the referrer their own 15% thank-you code.
-  const usedCode: string | null = txn.custom_data?.coupon_code || null;
+  const usedCode: string | null = trusted.coupon_code;
   if (usedCode && usedCode.startsWith('REF-') && email && email !== 'unknown@digitalchiselco.com') {
     try {
       const { data: rc } = await db.from('referral_codes').select('email').eq('code', usedCode).maybeSingle();
@@ -632,7 +691,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // balance and email it — the buyer never loses a cent of stored value.
   // (The original card's coupon was max_redemptions=1 and its redemption was
   // stamped above, so it can't be reused; this code IS its new balance.)
-  const giftRemainder = Number(txn.custom_data?.gift_remainder) || 0;
+  const giftRemainder = trusted.gift_remainder;
   if (giftRemainder >= 0.01 && email && email !== 'unknown@digitalchiselco.com') {
     try {
       const shortId = String(order.id).slice(0, 8);
@@ -799,6 +858,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
 
       if (sendResult.ok && !sendResult.skipped) {
         console.log(`[email] Order ${order.id.slice(0, 8)} confirmation sent to ${email} (id=${sendResult.id})`);
+        await db.from('orders').update({ confirmation_sent_at: new Date().toISOString() }).eq('id', order.id);
       } else if (sendResult.skipped) {
         console.log(`[email] skipped (Resend not configured) — order ${order.id.slice(0, 8)}`);
       } else {

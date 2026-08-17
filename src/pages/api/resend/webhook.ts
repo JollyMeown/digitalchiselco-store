@@ -91,5 +91,23 @@ export const POST: APIRoute = async ({ request }) => {
     console.error('[resend-webhook] insert failed:', e?.message);
     return json({ error: 'db error' }, 500);   // Resend retries
   }
+
+  // ── Auto-suppress on hard bounce / spam complaint ─────────────────
+  // Deliverability protection: keep mailing a bouncing or complaining address
+  // and Gmail/Yahoo start spam-foldering the whole domain. Mark the subscriber
+  // suppressed and stop their drip; every sender honours suppressed_at.
+  // (Soft bounces — mailbox full etc. — are left alone: Resend reports the
+  // bounce type; only 'hard'/'permanent' or a complaint suppresses.)
+  try {
+    const em = Array.isArray(d.to) ? String(d.to[0] || '').toLowerCase().trim() : '';
+    const bounceType = String(d.bounce?.type || d.bounce?.subType || '').toLowerCase();
+    const hard = event === 'bounced' && (!bounceType || /hard|permanent|suppress|invalid|no.?such|unknown/i.test(bounceType));
+    if (em && (hard || event === 'complained')) {
+      const db = supabaseAdmin();
+      await db.from('subscribers').update({ suppressed_at: new Date().toISOString() }).eq('email', em).is('suppressed_at', null);
+      await db.from('subscriber_drip').update({ status: 'stopped' }).eq('email', em).eq('status', 'active');
+      console.log(`[resend-webhook] suppressed ${em} (${event}${bounceType ? ':' + bounceType : ''})`);
+    }
+  } catch (e: any) { console.error('[resend-webhook] suppression failed (event still logged):', e?.message); }
   return json({ ok: true });
 };

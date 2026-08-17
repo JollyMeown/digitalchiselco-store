@@ -37,7 +37,7 @@ try {
     supabaseAdmin().from('reviews').select('name, text, rating')
       .eq('active', true).eq('generic', true).order('sort_order').limit(60),
     supabaseAdmin().from('reviews').select('id', { count: 'exact', head: true })
-      .eq('active', true).eq('rating', 5),
+      .eq('active', true).eq('status', 'approved').eq('rating', 5),
     supabaseAdmin().from('sales').select('name, percent_off, expires_at')
       .eq('active', true).eq('scope', 'all').lte('starts_at', nowIso).gte('expires_at', nowIso)
       .order('percent_off', { ascending: false }).limit(1),

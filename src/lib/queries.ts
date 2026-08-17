@@ -115,9 +115,13 @@ export async function getRelatedProducts(excludeId: string, limit = 5) {
 }
 
 // Lifetime units sold for a product (social proof on the product page).
+// order_items has no anon RLS policy, so the anon client always saw 0 and the
+// "N makers already own this" line never rendered. This runs at SSR time, so
+// use the service-role client (lazy import keeps this module browser-safe).
 export async function getSoldCount(productId: string): Promise<number> {
   try {
-    const { count } = await supabase.from('order_items').select('id', { count: 'exact', head: true }).eq('product_id', productId);
+    const { supabaseAdmin } = await import('./supabase');
+    const { count } = await supabaseAdmin().from('order_items').select('id', { count: 'exact', head: true }).eq('product_id', productId);
     return count || 0;
   } catch { return 0; }
 }
@@ -223,8 +227,11 @@ export async function getCustomizableProducts(limit = 12): Promise<ProductCard[]
 export type Review = { id: string; name: string; text: string; rating: number; source: string | null; sort_order: number };
 export async function getReviews(limit = 12): Promise<Review[]> {
   try {
+    // status='approved' is essential: website submissions land as 'pending'
+    // with active=true and sort_order 0, so without this filter an unmoderated
+    // review appeared on the homepage instantly (moderation bypass).
     const { data, error } = await supabase
-      .from('reviews').select('id,name,text,rating,source,sort_order').eq('active', true)
+      .from('reviews').select('id,name,text,rating,source,sort_order').eq('active', true).eq('status', 'approved')
       .order('sort_order').order('created_at').limit(limit);
     if (error) throw error;
     return (data ?? []) as Review[];

@@ -22,7 +22,7 @@ export const GET: APIRoute = async ({ url }) => {
   const sig = url.searchParams.get('s') || '';
   if (!email || sig !== unsubSig(email)) return page('That link is not valid.');
   const db = supabaseAdmin();
-  await db.from('subscribers').update({ unsubscribed_at: new Date().toISOString() }).ilike('email', email);
-  await db.from('subscriber_drip').update({ status: 'stopped' }).ilike('email', email);
+  await db.from('subscribers').update({ unsubscribed_at: new Date().toISOString() }).eq('email', email);
+  await db.from('subscriber_drip').update({ status: 'stopped' }).eq('email', email);
   return page("You're unsubscribed from marketing emails.");
 };

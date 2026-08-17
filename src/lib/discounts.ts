@@ -59,7 +59,7 @@ export async function validateCoupon(rawCode: string, cart: CartLine[], email: s
     if (!email) return gateErr;
     const recentCutoff = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
     const { data: recent } = await db.from('orders').select('id')
-      .ilike('email', email.toLowerCase()).eq('status', 'paid').gte('created_at', recentCutoff).limit(1);
+      .eq('email', email.toLowerCase()).eq('status', 'paid').gte('created_at', recentCutoff).limit(1);
     if (!recent?.length) return gateErr;
   }
 

@@ -30,12 +30,16 @@ export const POST: APIRoute = async ({ request }) => {
     const subtotal = items.reduce((s: number, x: any) => s + x.price * x.qty, 0);
 
     const db = supabaseAdmin();
-    // one open row per email (unique partial index) — refresh it on every note
+    // one open row per email (unique partial index) — refresh it on every note.
+    // SECURITY: exact match, never a LIKE pattern. `.ilike` here let a single
+    // request with email "%@%.%" overwrite EVERY open cart in the table (and
+    // the reminder automation would then mail all those customers the
+    // attacker's item titles). Emails are stored lowercase everywhere.
     const { error } = await db.from('abandoned_carts')
       .update({ cart: items, subtotal, updated_at: new Date().toISOString() })
-      .ilike('email', email).is('recovered_at', null);
+      .eq('email', email).is('recovered_at', null);
     // update touches 0 rows when there is no open cart yet → insert
-    const { data: existing } = await db.from('abandoned_carts').select('id').ilike('email', email).is('recovered_at', null).limit(1);
+    const { data: existing } = await db.from('abandoned_carts').select('id').eq('email', email).is('recovered_at', null).limit(1);
     if (!existing?.length) await db.from('abandoned_carts').insert({ email, cart: items, subtotal });
     void error;
 

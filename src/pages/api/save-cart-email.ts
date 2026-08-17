@@ -25,7 +25,7 @@ export const POST: APIRoute = async ({ request }) => {
     const subtotal = items.reduce((s: number, x: any) => s + x.price, 0);
 
     const db = supabaseAdmin();
-    const { data: sub } = await db.from('subscribers').select('unsubscribed_at').ilike('email', email).maybeSingle();
+    const { data: sub } = await db.from('subscribers').select('unsubscribed_at').eq('email', email).maybeSingle();
     if (sub?.unsubscribed_at) return json({ ok: true, message: 'Saved.' });   // don't email, don't reveal
 
     const { subject, html, text } = cartReminderEmail({ email, items, subtotal });

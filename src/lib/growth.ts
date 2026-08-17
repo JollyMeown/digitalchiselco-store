@@ -20,18 +20,44 @@ import { isoWeekKey } from './weekly-digest';
 
 type DB = ReturnType<typeof supabaseAdmin>;
 const DRIP_GAP_DAYS = 4;
-const DRIP_MAX_PER_RUN = 80;      // stay well under Resend's daily cap
-const FOLLOWUP_MAX_PER_RUN = 40;
+// Per-run caps are sized for the SERVERLESS TIME BUDGET, not just the Resend
+// quota: sends are serialized at ~2/s, and every step below shares one
+// invocation. Every step is idempotent + ledgered, so anything not reached
+// today is simply picked up tomorrow — smaller batches, zero loss.
+const DRIP_MAX_PER_RUN = 25;
+const FOLLOWUP_MAX_PER_RUN = 15;
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
+
+// ── Run time budget ────────────────────────────────────────────────────
+// Netlify synchronous functions are killed at ~10s (26s max). Rather than
+// let a long step take everything after it down with it (silently), each
+// step checks `outOfTime()` before starting and skips with a visible marker
+// so the admin sees "skipped: time budget" instead of nothing at all. The
+// scheduler runs daily, so skipped steps run next time.
+const RUN_STARTED_AT = { t: Date.now() };
+const TIME_BUDGET_MS = Number(process.env.CRON_TIME_BUDGET_MS) || 20000;
+const outOfTime = () => Date.now() - RUN_STARTED_AT.t > TIME_BUDGET_MS;
+
+// Wrap one numbered step: never lets a throw abort the steps after it, and
+// records the failure where the admin can see it.
+async function step(stats: Record<string, any>, key: string, fn: () => Promise<void>) {
+  if (outOfTime()) { stats[key] = 'skipped: time budget (runs next time)'; return; }
+  try { await fn(); }
+  catch (e: any) { stats[key] = `failed: ${String(e?.message || e).slice(0, 200)}`; console.error(`[growth:${key}]`, e); }
+}
 
 async function hasPaidOrder(db: DB, email: string): Promise<boolean> {
   const { data } = await db.from('orders').select('id').ilike('email', email).eq('status', 'paid').limit(1);
   return !!data?.length;
 }
+// "Do not mail": unsubscribed OR suppressed (hard bounce / spam complaint /
+// chronic never-opener). Every per-recipient sender routes through this, so
+// suppression is honoured everywhere, not just in the handful of steps that
+// checked suppressed_at explicitly.
 async function isUnsubscribed(db: DB, email: string): Promise<boolean> {
-  const { data } = await db.from('subscribers').select('unsubscribed_at').ilike('email', email).maybeSingle();
-  return !!data?.unsubscribed_at;
+  const { data } = await db.from('subscribers').select('unsubscribed_at, suppressed_at').eq('email', email.toLowerCase()).maybeSingle();
+  return !!(data?.unsubscribed_at || data?.suppressed_at);
 }
 
 const chunk = <T,>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; };
@@ -62,6 +88,7 @@ async function ensureReferralCode(db: DB, email: string): Promise<string> {
 }
 
 export async function runGrowthAutomation(): Promise<Record<string, any>> {
+  RUN_STARTED_AT.t = Date.now();
   const db = supabaseAdmin();
   const stats: Record<string, any> = { drip: 'off', carts: 'off', followups: 'off' };
   const { data: g } = await db.from('growth_settings').select('*').eq('id', 1).maybeSingle();
@@ -73,11 +100,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     applyOverride(out, ovr.get(kind), email, TEMPLATE_HEADINGS[kind] || '');
 
   // ── 1. nurture drip ─────────────────────────────────────────────────
-  if (g.drip_enabled) {
+  await step(stats, 'drip', async () => {
+    if (!g.drip_enabled) return;
     const s = { enrolled: 0, sent: 0, converted: 0, failed: 0 };
     // enroll confirmed subscribers not yet in the drip. Etsy buyers are excluded:
     // they get their own one-time welcome, never the "free pack" drip.
-    const { data: subs } = await db.from('subscribers').select('email').not('confirmed_at', 'is', null).is('unsubscribed_at', null).neq('source', 'etsy-buyer').limit(3000);
+    const { data: subs } = await db.from('subscribers').select('email').not('confirmed_at', 'is', null).is('unsubscribed_at', null).is('suppressed_at', null).neq('source', 'etsy-buyer').limit(3000);
     const { data: inDrip } = await db.from('subscriber_drip').select('email');
     const enrolled = new Set((inDrip || []).map((r) => r.email.toLowerCase()));
     const newbies = (subs || []).map((r) => r.email.toLowerCase()).filter((e) => !enrolled.has(e));
@@ -122,10 +150,11 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       } catch { s.failed++; }
     }
     stats.drip = s;
-  }
+  });
 
   // ── 2. abandoned-cart reminders ─────────────────────────────────────
-  if (g.cart_reminders_enabled) {
+  await step(stats, 'carts', async () => {
+    if (!g.cart_reminders_enabled) return;
     const s = { sent: 0, recovered: 0, skipped: 0, failed: 0 };
     const { data: carts } = await db.from('abandoned_carts')
       .select('id, email, cart, subtotal, updated_at')
@@ -157,16 +186,23 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       } catch { s.failed++; }
     }
     stats.carts = s;
-  }
+  });
 
   // ── 3. post-purchase followups ──────────────────────────────────────
-  if (g.followups_enabled) {
+  await step(stats, 'followups', async () => {
+    if (!g.followups_enabled) return;
     const s = { review: 0, arrivals: 0, loyalty: 0, failed: 0 };
     const { data: doneRows } = await db.from('order_followups').select('order_id, kind');
     const done = new Set((doneRows || []).map((r) => `${r.order_id}:${r.kind}`));
     const claim = async (orderId: string, kind: string) => {
       const { error } = await db.from('order_followups').insert({ order_id: orderId, kind });
       return !error; // unique PK — false means another run already claimed it
+    };
+    // A claim is only "done" if the email actually went out. On send failure
+    // (Resend quota, blip) release it so tomorrow's run retries instead of the
+    // followup being lost forever.
+    const release = async (orderId: string, kind: string) => {
+      await db.from('order_followups').delete().eq('order_id', orderId).eq('kind', kind);
     };
 
     // review request: paid 7–14 days ago
@@ -178,7 +214,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       if (!(await claim(o.id, 'review7'))) continue;
       const { subject, html, text } = withOvr('review7', reviewRequestEmail({ email: o.email, name: o.customer_name, itemTitles: (o.order_items || []).map((i: any) => i.title) }), o.email);
       const res = await sendEmail({ to: o.email, subject, html, text, idempotencyKey: `review7:${o.id}`, tags: [{ name: 'kind', value: 'review7' }] });
-      res.ok ? s.review++ : s.failed++;
+      if (res.ok) s.review++; else { s.failed++; await release(o.id, 'review7'); }
     }
 
     // new arrivals: paid 30–40 days ago, with the 3 newest products
@@ -191,7 +227,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       if (!(await claim(o.id, 'arrivals30'))) continue;
       const { subject, html, text } = withOvr('arrivals30', newArrivalsEmail({ email: o.email, name: o.customer_name, products: (newest || []) as MiniProduct[] }), o.email);
       const res = await sendEmail({ to: o.email, subject, html, text, idempotencyKey: `arrivals30:${o.id}`, tags: [{ name: 'kind', value: 'arrivals30' }] });
-      res.ok ? s.arrivals++ : s.failed++;
+      if (res.ok) s.arrivals++; else { s.failed++; await release(o.id, 'arrivals30'); }
     }
 
     // loyalty: 3rd paid order → permanent personal 10% code (once per customer)
@@ -213,102 +249,159 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       await db.from('coupons').insert({ code, percent_off: 10, active: true, description: `loyalty reward for ${email}` });
       const { subject, html, text } = withOvr('loyalty', loyaltyEmail({ email, name: info.name, code }), email);
       const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `loyalty:${email}`, tags: [{ name: 'kind', value: 'loyalty' }] });
-      res.ok ? s.loyalty++ : s.failed++;
+      if (res.ok) s.loyalty++; else { s.failed++; await release(anchor, 'loyalty'); }
       if (s.loyalty >= 20) break;                                          // safety cap per run
     }
     stats.followups = s;
-  }
+  });
 
-  // ── 4. weekly fresh-designs digest (Mondays) ────────────────────────
+  // ── 4. weekly fresh-designs digest — SELF-HEALING QUEUE ────────────
+  // Two phases so nobody is ever left unsent silently:
+  //   GENERATE (once per ISO week, Mon–Wed so a late/failed Monday still
+  //     catches up): freeze this week's designs into weekly_digest_log and
+  //     enqueue ONE row per eligible subscriber in weekly_send_queue.
+  //   DRAIN (EVERY daily run): send everything still 'pending' in the current
+  //     week's queue, in batches of 100. If Resend's daily quota hits, stop
+  //     cleanly and finish tomorrow — the rows just stay 'pending'. Every
+  //     recipient's status/attempts/error is recorded and visible in admin.
   stats.weekly = 'off';
-  if (g.weekly_digest_enabled) {
+  await step(stats, 'weekly', async () => {
+    if (!g.weekly_digest_enabled) return;
     const now = new Date();
-    if (now.getUTCDay() !== 1) {
-      stats.weekly = 'waiting for Monday';
-    } else {
-      const week = isoWeekKey(now);
-      // PK claim → exactly one send per ISO week, even across cron retries
+    const week = isoWeekKey(now);
+    const dow = now.getUTCDay();   // 1 = Mon
+    const s: any = { week, phase: [] as string[], generated: false, queued: 0, sent: 0, failed: 0, pending: 0 };
+
+    // ── GENERATE ──
+    const { data: wk } = await db.from('weekly_digest_log').select('week_key, product_ids').eq('week_key', week).maybeSingle();
+    if (!wk && dow >= 1 && dow <= 3) {
       const { error: claimErr } = await db.from('weekly_digest_log').insert({ week_key: week });
-      if (claimErr) {
-        stats.weekly = `already sent (${week})`;
-      } else {
-        const s = { week, products: 0, sent: 0, failed: 0 };
-        // Only designs added SINCE the last digest went out — never repeats what
-        // subscribers already saw. Falls back to the last 7 days on first run.
+      if (!claimErr) {
+        // Only designs added SINCE the last digest — never repeats. Falls back to 7d on first run.
         const { data: mk } = await db.from('site_settings').select('weekly_last_sent_at').eq('id', 1).maybeSingle();
         const sinceIso = (mk?.weekly_last_sent_at as string) || daysAgo(7);
         const { data: fresh } = await db.from('products')
-          .select('id, title, slug, price_usd, image_url, created_at')
-          .eq('active', true).gt('created_at', sinceIso)
+          .select('id').eq('active', true).gt('created_at', sinceIso)
           .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
           .order('created_at', { ascending: false }).limit(80);
-        s.products = fresh?.length || 0;
+        const ids = (fresh || []).map((p: any) => p.id);
         const nowIso = new Date().toISOString();
-        if (fresh?.length) {
-          // Email is pictures + product-page links (like every other upsell email)
-          // — no PDF. Product-page links ONLY, never raw download links.
-          const weekNumber = Number(week.split('-W')[1]) || 0;
-          const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          const startD = fmtDay(fresh[fresh.length - 1].created_at), endD = fmtDay(fresh[0].created_at);
-          const range = startD === endD ? startD : `${startD} – ${endD}`;
-          // Everyone confirmed gets the weekly digest, INCLUDING Etsy buyers
-          // (they get their one-time welcome first, then join the weekly).
-          const { data: subs } = await db.from('subscribers').select('email, best_send_hour')
+        if (ids.length) {
+          const { data: subs } = await db.from('subscribers').select('email')
             .not('confirmed_at', 'is', null).is('unsubscribed_at', null).is('suppressed_at', null).limit(20000);
-          const list = (subs || []).map((r) => ({ email: r.email.toLowerCase(), hour: r.best_send_hour as number | null }));
+          const emails = [...new Set((subs || []).map((r) => r.email.toLowerCase().trim()).filter(okEmail))];
+          for (const b of chunk(emails, 500)) {
+            await db.from('weekly_send_queue').upsert(b.map((email) => ({ week_key: week, email })), { onConflict: 'week_key,email', ignoreDuplicates: true });
+          }
+          await db.from('weekly_digest_log').update({ product_ids: ids, product_count: ids.length, queued_count: emails.length, sent_count: 0 }).eq('week_key', week);
+          s.generated = true; s.queued = emails.length; s.phase.push(`generated ${ids.length} designs → ${emails.length} queued`);
+        } else {
+          await db.from('weekly_digest_log').update({ product_ids: [], product_count: 0, queued_count: 0, sent_count: 0, drain_note: 'quiet week, no new designs' }).eq('week_key', week);
+          s.phase.push('quiet week (no new designs)');
+        }
+        // Advance the marker so next week starts fresh from here (even a quiet week).
+        await db.from('site_settings').update({ weekly_last_sent_at: nowIso }).eq('id', 1);
+      }
+    } else if (!wk) {
+      s.phase.push('waiting for Monday');
+    }
 
-          // ── Personalization: order each person's designs by their category
-          // affinity so the ones most like what they engage with come first.
-          const freshProducts = fresh as (MiniProduct & { id?: string })[];
-          const catByProduct = new Map<string, string[]>();     // productId → categoryIds
-          const affByEmail = new Map<string, Set<string>>();     // email → top categoryIds
-          if (g.weekly_personalized) {
-            const ids = (freshProducts as any[]).map((p) => p.id).filter(Boolean);
-            if (ids.length) {
-              const { data: pcs } = await db.from('product_categories').select('product_id, category_id').in('product_id', ids);
-              for (const r of pcs || []) (catByProduct.get(r.product_id) || catByProduct.set(r.product_id, []).get(r.product_id)!).push(r.category_id);
-            }
-            for (const batch of chunk(list.map((l) => l.email), 300)) {
+    // ── DRAIN (every run) ──
+    const { data: wk2 } = await db.from('weekly_digest_log').select('product_ids').eq('week_key', week).maybeSingle();
+    const productIds: string[] = Array.isArray(wk2?.product_ids) ? wk2!.product_ids : [];
+    if (productIds.length) {
+      const { data: pend } = await db.from('weekly_send_queue').select('email, attempts')
+        .eq('week_key', week).eq('status', 'pending').lt('attempts', 5).order('queued_at').limit(2000);
+      const pending = pend || [];
+      if (pending.length) {
+        // Rebuild the SAME email Monday's recipients got (frozen product list).
+        const { data: prods } = await db.from('products').select('id, title, slug, price_usd, image_url, created_at').in('id', productIds);
+        const byId = new Map((prods || []).map((p: any) => [p.id, p]));
+        const fresh = productIds.map((id) => byId.get(id)).filter(Boolean) as (MiniProduct & { id: string; created_at: string })[];
+        const weekNumber = Number(week.split('-W')[1]) || 0;
+        const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const startD = fmtDay(fresh[fresh.length - 1].created_at), endD = fmtDay(fresh[0].created_at);
+        const range = startD === endD ? startD : `${startD} – ${endD}`;
+
+        // Personalization: order each person's designs by category affinity.
+        const catByProduct = new Map<string, string[]>();
+        const affByEmail = new Map<string, Set<string>>();
+        const hourByEmail = new Map<string, number | null>();
+        if (g.weekly_personalized || g.sendtime_enabled) {
+          const { data: pcs } = await db.from('product_categories').select('product_id, category_id').in('product_id', productIds);
+          for (const r of pcs || []) (catByProduct.get(r.product_id) || catByProduct.set(r.product_id, []).get(r.product_id)!).push(r.category_id);
+          for (const batch of chunk(pending.map((p) => p.email), 300)) {
+            if (g.weekly_personalized) {
               const { data: aff } = await db.from('v_subscriber_category_affinity').select('email, category_id, score').in('email', batch);
               const perEmail = new Map<string, { c: string; s: number }[]>();
               for (const a of aff || []) (perEmail.get(a.email) || perEmail.set(a.email, []).get(a.email)!).push({ c: a.category_id, s: a.score });
               for (const [em, arr] of perEmail) affByEmail.set(em, new Set(arr.sort((x, y) => y.s - x.s).slice(0, 5).map((x) => x.c)));
             }
+            if (g.sendtime_enabled) {
+              const { data: hs } = await db.from('subscribers').select('email, best_send_hour').in('email', batch);
+              for (const h of hs || []) hourByEmail.set(h.email.toLowerCase(), h.best_send_hour);
+            }
           }
-          const personalize = (email: string): MiniProduct[] => {
-            if (!g.weekly_personalized) return freshProducts;
-            const liked = affByEmail.get(email); if (!liked?.size) return freshProducts;
-            const sc = (p: any) => ((catByProduct.get(p.id) || []).some((c) => liked.has(c)) ? 1 : 0);
-            return [...freshProducts].sort((a, b) => sc(b) - sc(a));
-          };
-
-          const tags = [{ name: 'kind', value: 'weekly' }, { name: 'week', value: week }];
-          for (const part of chunk(list, 100)) {
-            const emails = part.map((r) => {
-              const { subject, html, text } = withOvr('weekly',
-                weeklyDigestEmail({ email: r.email, products: personalize(r.email), weekNumber, range }), r.email);
-              return { to: r.email, subject, html, text, tags, scheduledAt: g.sendtime_enabled ? nextHourIso(r.hour) : undefined };
-            });
-            const res = await sendBatch(emails, hashKey(`digest:${week}`, part.map((r) => r.email)));
-            if (res.ok) s.sent += res.sent; else s.failed += emails.length;
-          }
-          await db.from('weekly_digest_log').update({ sent_count: s.sent, product_count: s.products }).eq('week_key', week);
-        } else {
-          await db.from('weekly_digest_log').update({ sent_count: 0, product_count: 0 }).eq('week_key', week);
         }
-        // Advance the marker so next Monday starts fresh from here (even a quiet week).
-        await db.from('site_settings').update({ weekly_last_sent_at: nowIso }).eq('id', 1);
-        stats.weekly = s;
+        const personalize = (email: string): MiniProduct[] => {
+          if (!g.weekly_personalized) return fresh;
+          const liked = affByEmail.get(email); if (!liked?.size) return fresh;
+          const sc = (p: any) => ((catByProduct.get(p.id) || []).some((c) => liked.has(c)) ? 1 : 0);
+          return [...fresh].sort((a, b) => sc(b) - sc(a));
+        };
+
+        const tags = [{ name: 'kind', value: 'weekly' }, { name: 'week', value: week }];
+        let quotaHit = false;
+        // Reserve time budget: leave the rest of the run enough headroom.
+        for (const part of chunk(pending, 100)) {
+          if (quotaHit) break;
+          const emails = part.map((r) => {
+            const { subject, html, text } = withOvr('weekly',
+              weeklyDigestEmail({ email: r.email, products: personalize(r.email), weekNumber, range }), r.email);
+            return { to: r.email, subject, html, text, tags, scheduledAt: g.sendtime_enabled ? nextHourIso(hourByEmail.get(r.email)) : undefined };
+          });
+          const res = await sendBatch(emails, hashKey(`digest:${week}`, part.map((r) => r.email)));
+          const nowIso = new Date().toISOString();
+          if (res.ok) {
+            s.sent += res.sent;
+            for (const b of chunk(part.map((r) => r.email), 200)) {
+              await db.from('weekly_send_queue').update({ status: 'sent', sent_at: nowIso, last_error: null }).eq('week_key', week).in('email', b);
+            }
+          } else {
+            // Leave rows PENDING (record error, bump attempts) so tomorrow's
+            // drain retries them. After 5 failed attempts a row is left alone
+            // and shows in admin as needing attention.
+            const err = (res.error || 'send failed').slice(0, 300);
+            for (const r of part) {
+              await db.from('weekly_send_queue').update({ last_error: err, attempts: (r.attempts || 0) + 1 }).eq('week_key', week).eq('email', r.email);
+            }
+            s.failed += emails.length;
+            if (res.quota) { quotaHit = true; s.phase.push('Resend daily quota reached — resuming tomorrow'); }
+          }
+        }
+        const { count: stillPending } = await db.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', week).eq('status', 'pending');
+        const { count: totalSent } = await db.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', week).eq('status', 'sent');
+        s.pending = stillPending || 0;
+        await db.from('weekly_digest_log').update({
+          sent_count: totalSent || 0, last_drain_at: new Date().toISOString(),
+          drain_note: quotaHit ? `quota hit, ${s.pending} still pending` : (s.pending ? `${s.pending} pending` : 'complete'),
+        }).eq('week_key', week);
+        s.phase.push(`drained: +${s.sent} sent, ${s.pending} still pending`);
+      } else {
+        const { count: totalSent } = await db.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', week).eq('status', 'sent');
+        s.phase.push(`queue empty — ${totalSent || 0} delivered this week`);
       }
     }
-  }
+    stats.weekly = s;
+  });
 
   // ── 4b. Etsy-buyer welcome (one-time) ───────────────────────────────
   // Any imported Etsy buyer we have not welcomed yet gets ONE welcome email
   // with this week's newest designs + a 10% code. Deduped by etsy_welcome_log
   // (PK on email), so a retry or the manual script can never double-send.
   stats.etsyWelcome = 'off';
-  if (g.etsy_welcome_enabled) {
+  await step(stats, 'etsyWelcome', async () => {
+    if (!g.etsy_welcome_enabled) return;
     const s = { candidates: 0, sent: 0, failed: 0 };
     const { data: buyers } = await db.from('subscribers').select('email')
       .eq('source', 'etsy-buyer').not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(3000);
@@ -352,11 +445,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       }
     }
     stats.etsyWelcome = s;
-  }
+  });
 
   // ── 5. abandoned-browse: viewed ≥3 designs, never carted, never bought ──
   stats.browse = 'off';
-  if (g.abandoned_browse_enabled) {
+  await step(stats, 'browse', async () => {
+    if (!g.abandoned_browse_enabled) return;
     const s = { candidates: 0, sent: 0, skipped: 0, failed: 0 };
     // recent browse events with a known email (last 3 days)
     const { data: evs } = await db.from('browse_events')
@@ -395,7 +489,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     }
     s.candidates = byEmail.size;
     stats.browse = s;
-  }
+  });
 
   const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
   const BAD = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
@@ -403,7 +497,8 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
 
   // ── 6. Win-back + deliverability suppression ─────────────────────────
   stats.winback = 'off';
-  if (g.winback_enabled) {
+  await step(stats, 'winback', async () => {
+    if (!g.winback_enabled) return;
     const s = { candidates: 0, sent: 0, suppressed: 0, failed: 0 };
     const { data: eng } = await db.from('v_subscriber_engagement')
       .select('email, joined_at, sent, opened, bounced, complained, last_opened_at, unsubscribed_at').limit(50000);
@@ -444,11 +539,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       }
     }
     stats.winback = s;
-  }
+  });
 
   // ── 7. Price-drop alerts (a design they liked got cheaper) ───────────
   stats.priceDrop = 'off';
-  if (g.price_drop_enabled) {
+  await step(stats, 'priceDrop', async () => {
+    if (!g.price_drop_enabled) return;
     const s = { drops: 0, sent: 0, failed: 0 };
     const { data: snaps } = await db.from('product_price_snapshot').select('product_id, price_usd').limit(50000);
     const snapMap = new Map((snaps || []).map((r) => [r.product_id, Number(r.price_usd)]));
@@ -485,11 +581,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     // refresh ALL snapshots to current price (so increases re-baseline and drops do not re-fire)
     for (const b of chunk(prods || [], 500)) await db.from('product_price_snapshot').upsert(b.map((p) => ({ product_id: p.id, price_usd: Number(p.price_usd), updated_at: new Date().toISOString() })), { onConflict: 'product_id' });
     stats.priceDrop = s;
-  }
+  });
 
   // ── 8. Referral nudge (ask happy customers to share their link) ──────
   stats.referralNudge = 'off';
-  if (g.referral_nudge_enabled) {
+  await step(stats, 'referralNudge', async () => {
+    if (!g.referral_nudge_enabled) return;
     const s = { candidates: 0, sent: 0, failed: 0 };
     const { data: rfm } = await db.from('v_subscriber_rfm').select('email, orders, last_order_at').gte('orders', 1).limit(50000);
     const { data: nl } = await db.from('referral_nudge_log').select('email').limit(50000);
@@ -512,10 +609,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       } catch { s.failed++; }
     }
     stats.referralNudge = s;
-  }
+  });
 
   // ── 9. Send-time learning: each subscriber's most common open hour ───
-  if (g.sendtime_enabled) {
+  stats.sendtime = 'off';
+  await step(stats, 'sendtime', async () => {
+    if (!g.sendtime_enabled) return;
     const { data: opens } = await db.from('email_events').select('email, created_at').eq('event', 'opened').gte('created_at', daysAgo(90)).limit(50000);
     const hours = new Map<string, number[]>();   // email → 24-bucket histogram
     for (const o of opens || []) {
@@ -527,13 +626,14 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     for (const [email, hist] of hours) { let bi = 0; for (let i = 1; i < 24; i++) if (hist[i] > hist[bi]) bi = i; updates.push({ email, best_send_hour: bi }); }
     for (const b of chunk(updates, 200)) for (const u of b) await db.from('subscribers').update({ best_send_hour: u.best_send_hour }).ilike('email', u.email);
     stats.sendtime = { learned: updates.length };
-  } else stats.sendtime = 'off';
+  });
 
   // ── 10. Post-refund win-back: 30 days after a refund, one olive branch ──
   // Window is 30-37 days so enabling the toggle months later never blasts
   // ancient refunds. One email per address ever (refund_winback_log).
   stats.refundWinback = 'off';
-  if (g.refund_winback_enabled) {
+  await step(stats, 'refundWinback', async () => {
+    if (!g.refund_winback_enabled) return;
     const s = { candidates: 0, sent: 0, failed: 0 };
     const { data: refunded } = await db.from('orders')
       .select('email, refunded_at')
@@ -563,7 +663,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       }
     }
     stats.refundWinback = s;
-  }
+  });
 
   // ── 11. Daily fx refresh (multi-currency checkout) ───────────────────
   // Free, keyless API. checkout-init only trusts rates < 7 days old, so a few
@@ -589,7 +689,8 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   // works). The /bundle-of-week page reads site_settings.weekly_bundle and the
   // existing bundle5: checkout path enforces the flat $25 server-side.
   stats.bundleWeek = 'off';
-  if (g.bundle_week_enabled) {
+  await step(stats, 'bundleWeek', async () => {
+    if (!g.bundle_week_enabled) return;
     try {
       const week = isoWeekKey(new Date());
       const { data: st } = await db.from('site_settings').select('weekly_bundle').eq('id', 1).maybeSingle();
@@ -627,11 +728,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         } else stats.bundleWeek = 'no category with 5 eligible designs';
       }
     } catch (e: any) { stats.bundleWeek = `failed: ${e?.message}`; }
-  }
+  });
 
   // ── 13. Owner weekly report (Mondays, to the ops inbox) ──────────────
   stats.ownerReport = 'off';
-  if (g.owner_report_enabled) {
+  await step(stats, 'ownerReport', async () => {
+    if (!g.owner_report_enabled) return;
     if (new Date().getUTCDay() !== 1) stats.ownerReport = 'waiting for Monday';
     else {
       try {
@@ -677,11 +779,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         stats.ownerReport = r.ok ? `sent (${week})` : `failed: ${r.error}`;
       } catch (e: any) { stats.ownerReport = `failed: ${e?.message}`; }
     }
-  }
+  });
 
   // ── 14. Wishlist reminders: hearted 3-14 days ago, never bought ──────
   stats.wishlistReminder = 'off';
-  if (g.wishlist_reminder_enabled) {
+  await step(stats, 'wishlistReminder', async () => {
+    if (!g.wishlist_reminder_enabled) return;
     const s = { candidates: 0, sent: 0, failed: 0 };
     const { data: favs } = await db.from('browse_events')
       .select('email, product_id')
@@ -722,14 +825,15 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       } catch { s.failed++; }
     }
     stats.wishlistReminder = s;
-  }
+  });
 
   // ── 15. AI Design Scout (Mondays): demand signals → 5 design ideas ───
   // Feeds real evidence (zero-result searches, top searches, most carted /
   // wishlisted themes) to Claude Haiku and emails the owner a ranked list of
   // designs to make next. Costs a fraction of a cent per week.
   stats.designScout = 'off';
-  if (g.design_scout_enabled) {
+  await step(stats, 'designScout', async () => {
+    if (!g.design_scout_enabled) return;
     if (new Date().getUTCDay() !== 1) stats.designScout = 'waiting for Monday';
     else if (!process.env.ANTHROPIC_API_KEY) stats.designScout = 'ANTHROPIC_API_KEY not set';
     else {
@@ -788,7 +892,7 @@ ${ideasHtml}
         stats.designScout = r.ok ? `sent (${week})` : `failed: ${r.error}`;
       } catch (e: any) { stats.designScout = `failed: ${e?.message}`; }
     }
-  }
+  });
 
   return stats;
 }

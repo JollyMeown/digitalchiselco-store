@@ -28,12 +28,22 @@ async function handle(request: Request): Promise<Response> {
   if (key !== secret) return json({ error: 'unauthorized' }, 401);
 
   const t0 = Date.now();
-  // Heartbeat: record every run (ok or not) so Admin → Automations can show
-  // the cron is alive. Best-effort — never affects the run itself.
-  const heartbeat = async (ok: boolean, summary: any, error?: string) => {
+  // Heartbeat: a row is written at START (ok=null) and finalized at the end.
+  // A serverless timeout mid-run therefore shows as "started, never finished"
+  // in Admin → Automations — distinguishable from "scheduler never fired"
+  // (which is how a dead cron hid for 11 days). Best-effort, never blocks.
+  let runId: number | null = null;
+  const { supabaseAdmin } = await import('../../../lib/supabase');
+  const { telegramOwner } = await import('../../../lib/notify');
+  try {
+    const { data } = await supabaseAdmin().from('cron_runs').insert({ ok: null, summary: { started: true } }).select('id').single();
+    runId = data?.id ?? null;
+  } catch { /* ignore */ }
+  const finish = async (ok: boolean, summary: any, error?: string) => {
     try {
-      const { supabaseAdmin } = await import('../../../lib/supabase');
-      await supabaseAdmin().from('cron_runs').insert({ ok, duration_ms: Date.now() - t0, summary, error: error ?? null });
+      const row = { ok, duration_ms: Date.now() - t0, summary, error: error ?? null, finished_at: new Date().toISOString() };
+      if (runId) await supabaseAdmin().from('cron_runs').update(row).eq('id', runId);
+      else await supabaseAdmin().from('cron_runs').insert(row);
     } catch { /* ignore */ }
   };
   try {
@@ -43,11 +53,19 @@ async function handle(request: Request): Promise<Response> {
     let growth: Record<string, any> = {};
     try { growth = await runGrowthAutomation(); }
     catch (e: any) { growth = { error: e?.message || 'growth failed' }; }
-    await heartbeat(true, { stats, growth });
+    await finish(true, { stats, growth });
+    // Surface silent per-step failures to the owner (email/Telegram), so a
+    // step reporting `failed: …` inside a 200 response is not invisible.
+    const bad = Object.entries(growth).filter(([, v]) => typeof v === 'string' && /^failed/i.test(v)).map(([k, v]) => `${k}: ${v}`);
+    const failCounts = Object.entries(growth).filter(([, v]) => v && typeof v === 'object' && Number((v as any).failed) > 0).map(([k, v]) => `${k}: ${(v as any).failed} failed`);
+    if (bad.length || failCounts.length || (stats as any)?.failures > 0) {
+      await telegramOwner(`⚠️ <b>Nightly automation finished with issues</b>\n${[...bad, ...failCounts, (stats as any)?.failures > 0 ? `membership drops: ${(stats as any).failures} failed` : ''].filter(Boolean).join('\n')}`);
+    }
     return json({ ok: true, ranAt: new Date().toISOString(), stats, growth });
   } catch (e: any) {
     console.error('[cron/daily] failed:', e);
-    await heartbeat(false, null, e?.message || 'automation failed');
+    await finish(false, null, e?.message || 'automation failed');
+    await telegramOwner(`🔴 <b>Nightly automation FAILED</b>\n${String(e?.message || e).slice(0, 300)}`);
     return json({ ok: false, error: e?.message || 'automation failed' }, 500);
   }
 }

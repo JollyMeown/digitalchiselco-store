@@ -86,8 +86,17 @@ async function resendFetch(url: string, headers: Record<string, string>, body: s
         const data = await res.json().catch(() => ({}));
         return { res, data };
       }
-      // Rate limited: wait out the window (honor headers), then retry.
+      // 429 comes in two flavours. Per-second rate limiting: wait out the
+      // window and retry. DAILY QUOTA exhausted: no amount of waiting inside
+      // this run will help — return immediately so callers can stop cleanly
+      // and resume tomorrow (retrying 6×30s here just burned the function
+      // timeout and stalled every later step).
+      const data429 = await res.clone().json().catch(() => ({}));
+      const msg = String(data429?.message || data429?.name || '');
       const resetS = Number(res.headers.get('retry-after')) || Number(res.headers.get('ratelimit-reset')) || 1;
+      if (/quota|daily/i.test(msg) || resetS > 120) {
+        return { res, data: { ...data429, quota_exhausted: true } };
+      }
       await sleep(Math.min(30000, Math.max(1000, resetS * 1000)));
     }
   });
@@ -96,7 +105,7 @@ async function resendFetch(url: string, headers: Record<string, string>, body: s
   return task;
 }
 
-export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: string; skipped?: boolean; error?: string }> {
+export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: string; skipped?: boolean; error?: string; quota?: boolean }> {
   const key = env('RESEND_API_KEY');
   if (!key) {
     console.warn('[resend] RESEND_API_KEY not set — skipping send to', opts.to);
@@ -132,7 +141,7 @@ export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: strin
     if (!res.ok) {
       console.error('[resend] send failed', res.status, data?.message || data);
       ledger('failed', null, data?.message || `HTTP ${res.status}`);
-      return { ok: false, error: data?.message || `HTTP ${res.status}` };
+      return { ok: false, error: data?.message || `HTTP ${res.status}`, quota: !!data?.quota_exhausted };
     }
     ledger('sent', data?.id);
     return { ok: true, id: data?.id };
@@ -151,7 +160,7 @@ export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: strin
 export async function sendBatch(
   emails: SendOptions[],
   idempotencyKey?: string,
-): Promise<{ ok: boolean; sent: number; skipped?: boolean; error?: string }> {
+): Promise<{ ok: boolean; sent: number; skipped?: boolean; error?: string; quota?: boolean }> {
   const key = env('RESEND_API_KEY');
   if (!key) {
     console.warn(`[resend] RESEND_API_KEY not set — skipping batch of ${emails.length}`);
@@ -188,7 +197,7 @@ export async function sendBatch(
     if (!res.ok) {
       console.error('[resend] batch failed', res.status, data?.message || data);
       logSends(batchRows('failed', undefined, data?.message || `HTTP ${res.status}`));
-      return { ok: false, sent: 0, error: data?.message || `HTTP ${res.status}` };
+      return { ok: false, sent: 0, error: data?.message || `HTTP ${res.status}`, quota: !!data?.quota_exhausted };
     }
     const ids = Array.isArray(data?.data) ? data.data.map((d: any) => d?.id ?? null) : [];
     logSends(batchRows('sent', ids));

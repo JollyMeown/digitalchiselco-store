@@ -4,6 +4,7 @@
 
 import type { APIRoute } from 'astro';
 import { send as sendEmail } from '../../lib/resend';
+import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
 
 export const prerender = false;
 
@@ -27,6 +28,12 @@ export const POST: APIRoute = async ({ request }) => {
     // Honeypot — bots fill hidden fields; real users don't.
     const honeypot = String(body.website || '').trim();
     if (honeypot) return json({ ok: true }); // silently ack
+    // Rate limit: each request sends an ops email — without this a script
+    // could flood the inbox and burn the Resend quota. Honeypot alone isn't enough.
+    const ip = clientIp(request);
+    if (!(await rateLimit(`contact:ip:${ip}`, 5, 3600)) || (email && !(await rateLimit(`contact:email:${email}`, 3, 3600)))) {
+      return tooMany('Too many messages. Please try again in an hour.');
+    }
 
     if (!name || !email || !EMAIL_RE.test(email) || !message) {
       return json({ error: 'Name, valid email, and message are required.' }, 400);

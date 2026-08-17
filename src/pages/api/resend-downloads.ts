@@ -27,9 +27,9 @@ export const POST: APIRoute = async ({ request }) => {
     // grants (gift recipients have entitlements but no order row).
     const { data: orders } = await db.from('orders')
       .select('id, created_at, status, order_items(title, product_id, products(is_customizable))')
-      .ilike('email', email).eq('status', 'paid')
+      .eq('email', email).eq('status', 'paid')
       .order('created_at', { ascending: false }).limit(60);
-    const { data: ents } = await db.from('entitlements').select('product_id').ilike('email', email).limit(500);
+    const { data: ents } = await db.from('entitlements').select('product_id').eq('email', email).limit(500);
 
     const productIds = new Set<string>();
     for (const o of orders || []) for (const it of (o as any).order_items || []) {

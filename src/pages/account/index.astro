@@ -77,7 +77,7 @@ if (session?.email) {
   const { data } = await db
     .from('orders')
     .select('id, total, currency, status, created_at, paddle_transaction_id, order_items(id, title, qty, price_usd, product_id, order_item_customizations(fields), products(image_url, slug, is_customizable))')
-    .ilike('email', session.email)
+    .eq('email', session.email)
     .order('created_at', { ascending: false })
     .limit(100);
   orders = (data as OrderRow[]) || [];
@@ -103,7 +103,9 @@ if (session?.email) {
       it.is_customized = fields.length > 0 || !!it.products?.is_customizable;
       it.image_url = it.products?.image_url || null;
       // Customized lines never show static download links — the file is built post-purchase.
-      it.downloads = it.is_customized ? [] : ((it.product_id && downloadsByProduct[it.product_id]) || []);
+      // Refunded/non-paid orders keep their history but lose the download buttons
+      // (the webhook already deleted the entitlements; this closes the UI side).
+      it.downloads = (it.is_customized || o.status !== 'paid') ? [] : ((it.product_id && downloadsByProduct[it.product_id]) || []);
     }
   }
   const paidOrders = orders.filter((o) => o.status === 'paid');
@@ -131,7 +133,7 @@ if (session?.email) {
   const { data: subs } = await db
     .from('member_subscriptions')
     .select('id, plan_slug, months, tier, status, start_date, end_date, total_drops, drops_sent')
-    .ilike('email', session.email)
+    .eq('email', session.email)
     .order('start_date', { ascending: false });
   if (subs && subs.length) {
     const [{ data: plans }, { data: packs }] = await Promise.all([
@@ -197,7 +199,7 @@ if (session?.email) {
     const db = supabaseAdmin();
     const { data: st } = await db.from('site_settings').select('loyalty_enabled, loyalty_earn_per_dollar, loyalty_redeem_per_dollar').eq('id', 1).maybeSingle();
     if (st?.loyalty_enabled) {
-      const { data: led } = await db.from('loyalty_ledger').select('points, reason, coupon_code, created_at').ilike('email', session.email).order('created_at', { ascending: false }).limit(20);
+      const { data: led } = await db.from('loyalty_ledger').select('points, reason, coupon_code, created_at').eq('email', session.email).order('created_at', { ascending: false }).limit(20);
       const balance = (led || []).reduce((s: number, r: any) => s + Number(r.points || 0), 0);
       const perDollar = Math.max(1, Number(st.loyalty_redeem_per_dollar) || 100);
       loyalty = { balance, perDollar, earn: Number(st.loyalty_earn_per_dollar) || 10, maxDollars: Math.floor(balance / perDollar), history: led || [] };

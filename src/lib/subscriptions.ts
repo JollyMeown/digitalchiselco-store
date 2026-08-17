@@ -69,10 +69,22 @@ async function sendOnce(
   }
   const { subject, html, text } = build();
   const res = await sendEmail({ to: claim.email, subject, html, text, idempotencyKey: `${claim.email_type}:${claim.subscription_id}:${claim.drop_month}` });
-  await db.from('subscription_email_logs')
-    .update({ status: res.ok ? 'sent' : 'failed', error_message: res.ok ? null : (res.error || 'send failed') })
+  if (res.ok) {
+    await db.from('subscription_email_logs')
+      .update({ status: 'sent', error_message: null })
+      .eq('subscription_id', claim.subscription_id).eq('email_type', claim.email_type).eq('drop_month', claim.drop_month);
+    return 'sent';
+  }
+  // Send FAILED (Resend quota, blip): RELEASE the claim so tomorrow's run
+  // retries. Previously the row was left as 'failed' and, because the claim
+  // still existed, every later run got 'duplicate' — a PAYING member silently
+  // lost that month's pack forever. Keep the error visible on the row instead
+  // of deleting it? No: the unique index IS the gate, so the row must go; the
+  // failure is still recorded in email_send_log by the send helper.
+  await db.from('subscription_email_logs').delete()
     .eq('subscription_id', claim.subscription_id).eq('email_type', claim.email_type).eq('drop_month', claim.drop_month);
-  return res.ok ? 'sent' : 'failed';
+  console.error(`[subscriptions] ${claim.email_type} for ${claim.email} (${claim.drop_month}) failed: ${res.error} — claim released for retry`);
+  return 'failed';
 }
 
 // ── webhook entry: create the subscription + send the first pack ──────
@@ -169,9 +181,9 @@ export async function runDailyAutomation(): Promise<{
             dropNumber, totalDrops: s.total_drops, isPremium: s.tier === 'premium', logoUrl,
           };
           const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: 'monthly_drop', drop_month: ym }, () => monthlyDropEmail(data));
-          if (r === 'failed') stats.failures++;
+          if (r === 'failed') { stats.failures++; continue; }   // claim released → retried next run; do NOT advance
           if (r !== 'duplicate') stats.drops++;
-          // Advance regardless (duplicate means it was already sent) so we move on.
+          // Advance only on sent/duplicate (duplicate = already sent earlier).
           const newDropsSent = dropNumber;
           const nextDrop = newDropsSent < s.total_drops ? addMonths(s.start_date, newDropsSent) : null;
           await db.from('member_subscriptions').update({ drops_sent: newDropsSent, next_drop_date: nextDrop }).eq('id', s.id);
