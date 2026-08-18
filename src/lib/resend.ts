@@ -86,6 +86,21 @@ function logSends(rows: LedgerRow[]) {
 const MAX_RPS = Math.max(1, Number(env('RESEND_MAX_RPS')) || 2);
 const MIN_GAP_MS = Math.ceil(1000 / MAX_RPS);
 const MAX_429_RETRIES = 6;
+
+// ── Daily-quota gate ─────────────────────────────────────────────────
+// The moment Resend says the DAILY quota is exhausted, every later send in
+// this process returns immediately with { ok:false, quota:true } instead of
+// making a doomed API call (each costs ~0.5s of serialized time and a retry
+// dance). Callers leave their ledgers unsent → retried tomorrow. Reset on the
+// next UTC day so a long-lived process (dev server) recovers by itself.
+let quotaExhaustedDay: string | null = null;
+export function isQuotaExhausted(): boolean {
+  return quotaExhaustedDay === new Date().toISOString().slice(0, 10);
+}
+export function markQuotaExhausted(): void {
+  quotaExhaustedDay = new Date().toISOString().slice(0, 10);
+  console.warn('[resend] DAILY QUOTA EXHAUSTED — remaining sends this run are deferred to tomorrow');
+}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let chain: Promise<unknown> = Promise.resolve();
 let lastCallAt = 0;
@@ -121,6 +136,7 @@ async function resendFetch(url: string, headers: Record<string, string>, body: s
 }
 
 export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: string; skipped?: boolean; error?: string; quota?: boolean }> {
+  if (isQuotaExhausted()) return { ok: false, error: 'daily quota exhausted (deferred)', quota: true };
   const key = env('RESEND_API_KEY');
   if (!key) {
     console.warn('[resend] RESEND_API_KEY not set — skipping send to', opts.to);
@@ -159,6 +175,7 @@ export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: strin
     if (!res.ok) {
       console.error('[resend] send failed', res.status, data?.message || data);
       ledger('failed', null, data?.message || `HTTP ${res.status}`);
+      if (data?.quota_exhausted) markQuotaExhausted();
       return { ok: false, error: data?.message || `HTTP ${res.status}`, quota: !!data?.quota_exhausted };
     }
     ledger('sent', data?.id);
@@ -179,6 +196,7 @@ export async function sendBatch(
   emails: SendOptions[],
   idempotencyKey?: string,
 ): Promise<{ ok: boolean; sent: number; skipped?: boolean; error?: string; quota?: boolean }> {
+  if (isQuotaExhausted()) return { ok: false, sent: 0, error: 'daily quota exhausted (deferred)', quota: true };
   const key = env('RESEND_API_KEY');
   if (!key) {
     console.warn(`[resend] RESEND_API_KEY not set — skipping batch of ${emails.length}`);
@@ -218,6 +236,7 @@ export async function sendBatch(
     if (!res.ok) {
       console.error('[resend] batch failed', res.status, data?.message || data);
       logSends(batchRows('failed', undefined, data?.message || `HTTP ${res.status}`));
+      if (data?.quota_exhausted) markQuotaExhausted();
       return { ok: false, sent: 0, error: data?.message || `HTTP ${res.status}`, quota: !!data?.quota_exhausted };
     }
     const ids = Array.isArray(data?.data) ? data.data.map((d: any) => d?.id ?? null) : [];

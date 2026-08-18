@@ -8,7 +8,7 @@
 
 import { createHash } from 'node:crypto';
 import { supabaseAdmin } from './supabase';
-import { send as sendEmail, sendBatch } from './resend';
+import { send as sendEmail, sendBatch, isQuotaExhausted } from './resend';
 import {
   dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
   weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS,
@@ -43,8 +43,14 @@ const outOfTime = () => Date.now() - RUN_STARTED_AT.t > timeBudgetMs();
 
 // Wrap one numbered step: never lets a throw abort the steps after it, and
 // records the failure where the admin can see it.
+// EMAIL_STEPS: steps whose whole job is sending marketing email. Once Resend's
+// daily quota is exhausted they are skipped with a visible 'deferred' marker —
+// no doomed API calls, no wasted seconds, and tomorrow they run first thing.
+// (Non-email steps like fx / bundle-of-week / send-time learning still run.)
+const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout']);
 async function step(stats: Record<string, any>, key: string, fn: () => Promise<void>) {
   if (outOfTime()) { stats[key] = 'skipped: time budget (runs next time)'; return; }
+  if (EMAIL_STEPS.has(key) && isQuotaExhausted()) { stats[key] = 'deferred: Resend daily quota reached (runs tomorrow)'; return; }
   try { await fn(); }
   catch (e: any) { stats[key] = `failed: ${String(e?.message || e).slice(0, 200)}`; console.error(`[growth:${key}]`, e); }
 }
@@ -100,6 +106,150 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   const ovr = new Map<string, TemplateOverride>((ovrRows || []).map((r: any) => [r.kind, r]));
   const withOvr = (kind: string, out: { subject: string; html: string; text: string }, email: string) =>
     applyOverride(out, ovr.get(kind), email, TEMPLATE_HEADINGS[kind] || '');
+
+  // ── PRIORITY: the weekly digest runs FIRST ───────────────────────────
+  // It is the highest-value, widest-reach send (every confirmed subscriber).
+  // On a quota-limited day it must never lose out to the drip.
+
+  // ── 4. weekly fresh-designs digest — SELF-HEALING QUEUE ────────────
+  // Two phases so nobody is ever left unsent silently:
+  //   GENERATE (once per ISO week, Mon–Wed so a late/failed Monday still
+  //     catches up): freeze this week's designs into weekly_digest_log and
+  //     enqueue ONE row per eligible subscriber in weekly_send_queue.
+  //   DRAIN (EVERY daily run): send everything still 'pending' in the current
+  //     week's queue, in batches of 100. If Resend's daily quota hits, stop
+  //     cleanly and finish tomorrow — the rows just stay 'pending'. Every
+  //     recipient's status/attempts/error is recorded and visible in admin.
+  stats.weekly = 'off';
+  await step(stats, 'weekly', async () => {
+    if (!g.weekly_digest_enabled) return;
+    const now = new Date();
+    const week = isoWeekKey(now);
+    const dow = now.getUTCDay();   // 1 = Mon
+    const s: any = { week, phase: [] as string[], generated: false, queued: 0, sent: 0, failed: 0, pending: 0 };
+
+    // ── GENERATE ──
+    const { data: wk } = await db.from('weekly_digest_log').select('week_key, product_ids').eq('week_key', week).maybeSingle();
+    if (!wk && dow >= 1 && dow <= 3) {
+      const { error: claimErr } = await db.from('weekly_digest_log').insert({ week_key: week });
+      if (!claimErr) {
+        // Only designs added SINCE the last digest — never repeats. Falls back to 7d on first run.
+        const { data: mk } = await db.from('site_settings').select('weekly_last_sent_at').eq('id', 1).maybeSingle();
+        const sinceIso = (mk?.weekly_last_sent_at as string) || daysAgo(7);
+        const { data: fresh } = await db.from('products')
+          .select('id').eq('active', true).gt('created_at', sinceIso)
+          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
+          .order('created_at', { ascending: false }).limit(80);
+        const ids = (fresh || []).map((p: any) => p.id);
+        const nowIso = new Date().toISOString();
+        if (ids.length) {
+          const { data: subs } = await db.from('subscribers').select('email')
+            .not('confirmed_at', 'is', null).is('unsubscribed_at', null).is('suppressed_at', null).limit(20000);
+          const emails = [...new Set((subs || []).map((r) => r.email.toLowerCase().trim()).filter(okEmail))];
+          for (const b of chunk(emails, 500)) {
+            await db.from('weekly_send_queue').upsert(b.map((email) => ({ week_key: week, email })), { onConflict: 'week_key,email', ignoreDuplicates: true });
+          }
+          await db.from('weekly_digest_log').update({ product_ids: ids, product_count: ids.length, queued_count: emails.length, sent_count: 0 }).eq('week_key', week);
+          s.generated = true; s.queued = emails.length; s.phase.push(`generated ${ids.length} designs → ${emails.length} queued`);
+        } else {
+          await db.from('weekly_digest_log').update({ product_ids: [], product_count: 0, queued_count: 0, sent_count: 0, drain_note: 'quiet week, no new designs' }).eq('week_key', week);
+          s.phase.push('quiet week (no new designs)');
+        }
+        // Advance the marker so next week starts fresh from here (even a quiet week).
+        await db.from('site_settings').update({ weekly_last_sent_at: nowIso }).eq('id', 1);
+      }
+    } else if (!wk) {
+      s.phase.push('waiting for Monday');
+    }
+
+    // ── DRAIN (every run) ──
+    const { data: wk2 } = await db.from('weekly_digest_log').select('product_ids').eq('week_key', week).maybeSingle();
+    const productIds: string[] = Array.isArray(wk2?.product_ids) ? wk2!.product_ids : [];
+    if (productIds.length) {
+      const { data: pend } = await db.from('weekly_send_queue').select('email, attempts')
+        .eq('week_key', week).eq('status', 'pending').lt('attempts', 5).order('queued_at').limit(2000);
+      const pending = pend || [];
+      if (pending.length) {
+        // Rebuild the SAME email Monday's recipients got (frozen product list).
+        const { data: prods } = await db.from('products').select('id, title, slug, price_usd, image_url, created_at').in('id', productIds);
+        const byId = new Map((prods || []).map((p: any) => [p.id, p]));
+        const fresh = productIds.map((id) => byId.get(id)).filter(Boolean) as (MiniProduct & { id: string; created_at: string })[];
+        const weekNumber = Number(week.split('-W')[1]) || 0;
+        const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const startD = fmtDay(fresh[fresh.length - 1].created_at), endD = fmtDay(fresh[0].created_at);
+        const range = startD === endD ? startD : `${startD} – ${endD}`;
+
+        // Personalization: order each person's designs by category affinity.
+        const catByProduct = new Map<string, string[]>();
+        const affByEmail = new Map<string, Set<string>>();
+        const hourByEmail = new Map<string, number | null>();
+        if (g.weekly_personalized || g.sendtime_enabled) {
+          const { data: pcs } = await db.from('product_categories').select('product_id, category_id').in('product_id', productIds);
+          for (const r of pcs || []) (catByProduct.get(r.product_id) || catByProduct.set(r.product_id, []).get(r.product_id)!).push(r.category_id);
+          for (const batch of chunk(pending.map((p) => p.email), 300)) {
+            if (g.weekly_personalized) {
+              const { data: aff } = await db.from('v_subscriber_category_affinity').select('email, category_id, score').in('email', batch);
+              const perEmail = new Map<string, { c: string; s: number }[]>();
+              for (const a of aff || []) (perEmail.get(a.email) || perEmail.set(a.email, []).get(a.email)!).push({ c: a.category_id, s: a.score });
+              for (const [em, arr] of perEmail) affByEmail.set(em, new Set(arr.sort((x, y) => y.s - x.s).slice(0, 5).map((x) => x.c)));
+            }
+            if (g.sendtime_enabled) {
+              const { data: hs } = await db.from('subscribers').select('email, best_send_hour').in('email', batch);
+              for (const h of hs || []) hourByEmail.set(h.email.toLowerCase(), h.best_send_hour);
+            }
+          }
+        }
+        const personalize = (email: string): MiniProduct[] => {
+          if (!g.weekly_personalized) return fresh;
+          const liked = affByEmail.get(email); if (!liked?.size) return fresh;
+          const sc = (p: any) => ((catByProduct.get(p.id) || []).some((c) => liked.has(c)) ? 1 : 0);
+          return [...fresh].sort((a, b) => sc(b) - sc(a));
+        };
+
+        const tags = [{ name: 'kind', value: 'weekly' }, { name: 'week', value: week }];
+        let quotaHit = false;
+        // Reserve time budget: leave the rest of the run enough headroom.
+        for (const part of chunk(pending, 100)) {
+          if (quotaHit) break;
+          const emails = part.map((r) => {
+            const { subject, html, text } = withOvr('weekly',
+              weeklyDigestEmail({ email: r.email, products: personalize(r.email), weekNumber, range }), r.email);
+            return { to: r.email, subject, html, text, tags, scheduledAt: g.sendtime_enabled ? nextHourIso(hourByEmail.get(r.email)) : undefined };
+          });
+          const res = await sendBatch(emails, hashKey(`digest:${week}`, part.map((r) => r.email)));
+          const nowIso = new Date().toISOString();
+          if (res.ok) {
+            s.sent += res.sent;
+            for (const b of chunk(part.map((r) => r.email), 200)) {
+              await db.from('weekly_send_queue').update({ status: 'sent', sent_at: nowIso, last_error: null }).eq('week_key', week).in('email', b);
+            }
+          } else {
+            // Leave rows PENDING (record error, bump attempts) so tomorrow's
+            // drain retries them. After 5 failed attempts a row is left alone
+            // and shows in admin as needing attention.
+            const err = (res.error || 'send failed').slice(0, 300);
+            for (const r of part) {
+              await db.from('weekly_send_queue').update({ last_error: err, attempts: (r.attempts || 0) + 1 }).eq('week_key', week).eq('email', r.email);
+            }
+            s.failed += emails.length;
+            if (res.quota) { quotaHit = true; s.phase.push('Resend daily quota reached — resuming tomorrow'); }
+          }
+        }
+        const { count: stillPending } = await db.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', week).eq('status', 'pending');
+        const { count: totalSent } = await db.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', week).eq('status', 'sent');
+        s.pending = stillPending || 0;
+        await db.from('weekly_digest_log').update({
+          sent_count: totalSent || 0, last_drain_at: new Date().toISOString(),
+          drain_note: quotaHit ? `quota hit, ${s.pending} still pending` : (s.pending ? `${s.pending} pending` : 'complete'),
+        }).eq('week_key', week);
+        s.phase.push(`drained: +${s.sent} sent, ${s.pending} still pending`);
+      } else {
+        const { count: totalSent } = await db.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', week).eq('status', 'sent');
+        s.phase.push(`queue empty — ${totalSent || 0} delivered this week`);
+      }
+    }
+    stats.weekly = s;
+  });
 
   // ── 1. nurture drip ─────────────────────────────────────────────────
   await step(stats, 'drip', async () => {
@@ -269,146 +419,6 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     stats.followups = s;
   });
 
-  // ── 4. weekly fresh-designs digest — SELF-HEALING QUEUE ────────────
-  // Two phases so nobody is ever left unsent silently:
-  //   GENERATE (once per ISO week, Mon–Wed so a late/failed Monday still
-  //     catches up): freeze this week's designs into weekly_digest_log and
-  //     enqueue ONE row per eligible subscriber in weekly_send_queue.
-  //   DRAIN (EVERY daily run): send everything still 'pending' in the current
-  //     week's queue, in batches of 100. If Resend's daily quota hits, stop
-  //     cleanly and finish tomorrow — the rows just stay 'pending'. Every
-  //     recipient's status/attempts/error is recorded and visible in admin.
-  stats.weekly = 'off';
-  await step(stats, 'weekly', async () => {
-    if (!g.weekly_digest_enabled) return;
-    const now = new Date();
-    const week = isoWeekKey(now);
-    const dow = now.getUTCDay();   // 1 = Mon
-    const s: any = { week, phase: [] as string[], generated: false, queued: 0, sent: 0, failed: 0, pending: 0 };
-
-    // ── GENERATE ──
-    const { data: wk } = await db.from('weekly_digest_log').select('week_key, product_ids').eq('week_key', week).maybeSingle();
-    if (!wk && dow >= 1 && dow <= 3) {
-      const { error: claimErr } = await db.from('weekly_digest_log').insert({ week_key: week });
-      if (!claimErr) {
-        // Only designs added SINCE the last digest — never repeats. Falls back to 7d on first run.
-        const { data: mk } = await db.from('site_settings').select('weekly_last_sent_at').eq('id', 1).maybeSingle();
-        const sinceIso = (mk?.weekly_last_sent_at as string) || daysAgo(7);
-        const { data: fresh } = await db.from('products')
-          .select('id').eq('active', true).gt('created_at', sinceIso)
-          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
-          .order('created_at', { ascending: false }).limit(80);
-        const ids = (fresh || []).map((p: any) => p.id);
-        const nowIso = new Date().toISOString();
-        if (ids.length) {
-          const { data: subs } = await db.from('subscribers').select('email')
-            .not('confirmed_at', 'is', null).is('unsubscribed_at', null).is('suppressed_at', null).limit(20000);
-          const emails = [...new Set((subs || []).map((r) => r.email.toLowerCase().trim()).filter(okEmail))];
-          for (const b of chunk(emails, 500)) {
-            await db.from('weekly_send_queue').upsert(b.map((email) => ({ week_key: week, email })), { onConflict: 'week_key,email', ignoreDuplicates: true });
-          }
-          await db.from('weekly_digest_log').update({ product_ids: ids, product_count: ids.length, queued_count: emails.length, sent_count: 0 }).eq('week_key', week);
-          s.generated = true; s.queued = emails.length; s.phase.push(`generated ${ids.length} designs → ${emails.length} queued`);
-        } else {
-          await db.from('weekly_digest_log').update({ product_ids: [], product_count: 0, queued_count: 0, sent_count: 0, drain_note: 'quiet week, no new designs' }).eq('week_key', week);
-          s.phase.push('quiet week (no new designs)');
-        }
-        // Advance the marker so next week starts fresh from here (even a quiet week).
-        await db.from('site_settings').update({ weekly_last_sent_at: nowIso }).eq('id', 1);
-      }
-    } else if (!wk) {
-      s.phase.push('waiting for Monday');
-    }
-
-    // ── DRAIN (every run) ──
-    const { data: wk2 } = await db.from('weekly_digest_log').select('product_ids').eq('week_key', week).maybeSingle();
-    const productIds: string[] = Array.isArray(wk2?.product_ids) ? wk2!.product_ids : [];
-    if (productIds.length) {
-      const { data: pend } = await db.from('weekly_send_queue').select('email, attempts')
-        .eq('week_key', week).eq('status', 'pending').lt('attempts', 5).order('queued_at').limit(2000);
-      const pending = pend || [];
-      if (pending.length) {
-        // Rebuild the SAME email Monday's recipients got (frozen product list).
-        const { data: prods } = await db.from('products').select('id, title, slug, price_usd, image_url, created_at').in('id', productIds);
-        const byId = new Map((prods || []).map((p: any) => [p.id, p]));
-        const fresh = productIds.map((id) => byId.get(id)).filter(Boolean) as (MiniProduct & { id: string; created_at: string })[];
-        const weekNumber = Number(week.split('-W')[1]) || 0;
-        const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        const startD = fmtDay(fresh[fresh.length - 1].created_at), endD = fmtDay(fresh[0].created_at);
-        const range = startD === endD ? startD : `${startD} – ${endD}`;
-
-        // Personalization: order each person's designs by category affinity.
-        const catByProduct = new Map<string, string[]>();
-        const affByEmail = new Map<string, Set<string>>();
-        const hourByEmail = new Map<string, number | null>();
-        if (g.weekly_personalized || g.sendtime_enabled) {
-          const { data: pcs } = await db.from('product_categories').select('product_id, category_id').in('product_id', productIds);
-          for (const r of pcs || []) (catByProduct.get(r.product_id) || catByProduct.set(r.product_id, []).get(r.product_id)!).push(r.category_id);
-          for (const batch of chunk(pending.map((p) => p.email), 300)) {
-            if (g.weekly_personalized) {
-              const { data: aff } = await db.from('v_subscriber_category_affinity').select('email, category_id, score').in('email', batch);
-              const perEmail = new Map<string, { c: string; s: number }[]>();
-              for (const a of aff || []) (perEmail.get(a.email) || perEmail.set(a.email, []).get(a.email)!).push({ c: a.category_id, s: a.score });
-              for (const [em, arr] of perEmail) affByEmail.set(em, new Set(arr.sort((x, y) => y.s - x.s).slice(0, 5).map((x) => x.c)));
-            }
-            if (g.sendtime_enabled) {
-              const { data: hs } = await db.from('subscribers').select('email, best_send_hour').in('email', batch);
-              for (const h of hs || []) hourByEmail.set(h.email.toLowerCase(), h.best_send_hour);
-            }
-          }
-        }
-        const personalize = (email: string): MiniProduct[] => {
-          if (!g.weekly_personalized) return fresh;
-          const liked = affByEmail.get(email); if (!liked?.size) return fresh;
-          const sc = (p: any) => ((catByProduct.get(p.id) || []).some((c) => liked.has(c)) ? 1 : 0);
-          return [...fresh].sort((a, b) => sc(b) - sc(a));
-        };
-
-        const tags = [{ name: 'kind', value: 'weekly' }, { name: 'week', value: week }];
-        let quotaHit = false;
-        // Reserve time budget: leave the rest of the run enough headroom.
-        for (const part of chunk(pending, 100)) {
-          if (quotaHit) break;
-          const emails = part.map((r) => {
-            const { subject, html, text } = withOvr('weekly',
-              weeklyDigestEmail({ email: r.email, products: personalize(r.email), weekNumber, range }), r.email);
-            return { to: r.email, subject, html, text, tags, scheduledAt: g.sendtime_enabled ? nextHourIso(hourByEmail.get(r.email)) : undefined };
-          });
-          const res = await sendBatch(emails, hashKey(`digest:${week}`, part.map((r) => r.email)));
-          const nowIso = new Date().toISOString();
-          if (res.ok) {
-            s.sent += res.sent;
-            for (const b of chunk(part.map((r) => r.email), 200)) {
-              await db.from('weekly_send_queue').update({ status: 'sent', sent_at: nowIso, last_error: null }).eq('week_key', week).in('email', b);
-            }
-          } else {
-            // Leave rows PENDING (record error, bump attempts) so tomorrow's
-            // drain retries them. After 5 failed attempts a row is left alone
-            // and shows in admin as needing attention.
-            const err = (res.error || 'send failed').slice(0, 300);
-            for (const r of part) {
-              await db.from('weekly_send_queue').update({ last_error: err, attempts: (r.attempts || 0) + 1 }).eq('week_key', week).eq('email', r.email);
-            }
-            s.failed += emails.length;
-            if (res.quota) { quotaHit = true; s.phase.push('Resend daily quota reached — resuming tomorrow'); }
-          }
-        }
-        const { count: stillPending } = await db.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', week).eq('status', 'pending');
-        const { count: totalSent } = await db.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', week).eq('status', 'sent');
-        s.pending = stillPending || 0;
-        await db.from('weekly_digest_log').update({
-          sent_count: totalSent || 0, last_drain_at: new Date().toISOString(),
-          drain_note: quotaHit ? `quota hit, ${s.pending} still pending` : (s.pending ? `${s.pending} pending` : 'complete'),
-        }).eq('week_key', week);
-        s.phase.push(`drained: +${s.sent} sent, ${s.pending} still pending`);
-      } else {
-        const { count: totalSent } = await db.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', week).eq('status', 'sent');
-        s.phase.push(`queue empty — ${totalSent || 0} delivered this week`);
-      }
-    }
-    stats.weekly = s;
-  });
-
   // ── 4b. Etsy-buyer welcome (one-time) ───────────────────────────────
   // Any imported Etsy buyer we have not welcomed yet gets ONE welcome email
   // with this week's newest designs + a 10% code. Deduped by etsy_welcome_log
@@ -460,6 +470,84 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     }
     stats.etsyWelcome = s;
   });
+
+  // ── 7. Price-drop alerts (a design they liked got cheaper) ───────────
+  stats.priceDrop = 'off';
+  await step(stats, 'priceDrop', async () => {
+    if (!g.price_drop_enabled) return;
+    const s = { drops: 0, sent: 0, failed: 0 };
+    const { data: snaps } = await db.from('product_price_snapshot').select('product_id, price_usd').limit(50000);
+    const snapMap = new Map((snaps || []).map((r) => [r.product_id, Number(r.price_usd)]));
+    const { data: prods } = await db.from('products').select('id, slug, title, image_url, price_usd').eq('active', true).not('price_usd', 'is', null).limit(50000);
+    const drops = (prods || []).filter((p) => snapMap.has(p.id) && Number(p.price_usd) < (snapMap.get(p.id) as number) - 0.001).slice(0, 20);
+    s.drops = drops.length;
+    const suppressed = new Set(((await db.from('subscribers').select('email').not('suppressed_at', 'is', null).limit(50000)).data || []).map((r) => r.email.toLowerCase()));
+    for (const p of drops) {
+      const oldPrice = snapMap.get(p.id) as number, newPrice = Number(p.price_usd);
+      // interested non-buyers: clickers + browsers
+      const interested = new Set<string>();
+      const [{ data: cl }, { data: br }, { data: buys }] = await Promise.all([
+        db.from('email_events').select('email').eq('event', 'clicked').ilike('url', `%/product/${p.slug}%`).limit(5000),
+        db.from('browse_events').select('email').eq('product_id', p.id).limit(5000),
+        db.from('order_items').select('order_id').eq('product_id', p.id).limit(5000),
+      ]);
+      for (const r of cl || []) interested.add((r.email || '').toLowerCase());
+      for (const r of br || []) interested.add((r.email || '').toLowerCase());
+      const buyers = new Set<string>();
+      for (const b of chunk((buys || []).map((x) => x.order_id), 300)) { const { data } = await db.from('orders').select('email').in('id', b).is('deleted_at', null); (data || []).forEach((o) => buyers.add((o.email || '').toLowerCase())); }
+      let cands = [...interested].filter((e) => okEmail(e) && !buyers.has(e) && !suppressed.has(e));
+      // confirmed, non-unsubscribed subscribers only
+      const sendable = new Set<string>();
+      for (const b of chunk(cands, 300)) { const { data } = await db.from('subscribers').select('email, confirmed_at, unsubscribed_at').in('email', b); for (const su of data || []) if (su.confirmed_at && !su.unsubscribed_at) sendable.add(su.email.toLowerCase()); }
+      // drop already-notified for this product
+      for (const b of chunk([...sendable], 300)) { const { data } = await db.from('price_drop_log').select('email').eq('product_id', p.id).in('email', b); for (const r of data || []) sendable.delete((r.email || '').toLowerCase()); }
+      const recips = [...sendable].slice(0, 300);
+      for (const part of chunk(recips, 100)) {
+        const emails = part.map((email) => { const { subject, html, text } = withOvr('priceDrop', priceDropEmail({ email, product: p as MiniProduct, oldPrice, newPrice }), email); return { to: email, subject, html, text, tags: [{ name: 'kind', value: 'price-drop' }] }; });
+        const res = await sendBatch(emails, hashKey(`pricedrop:${p.id}`, part));
+        if (res.ok) { s.sent += res.sent; await db.from('price_drop_log').upsert(part.map((email) => ({ product_id: p.id, email, price_usd: newPrice })), { onConflict: 'product_id,email', ignoreDuplicates: true }); } else s.failed += part.length;
+      }
+    }
+    // refresh ALL snapshots to current price (so increases re-baseline and drops do not re-fire)
+    for (const b of chunk(prods || [], 500)) await db.from('product_price_snapshot').upsert(b.map((p) => ({ product_id: p.id, price_usd: Number(p.price_usd), updated_at: new Date().toISOString() })), { onConflict: 'product_id' });
+    stats.priceDrop = s;
+  });
+
+  // ── 8. Referral nudge (ask happy customers to share their link) ──────
+  stats.referralNudge = 'off';
+  await step(stats, 'referralNudge', async () => {
+    if (!g.referral_nudge_enabled) return;
+    const s = { candidates: 0, sent: 0, failed: 0 };
+    const { data: rfm } = await db.from('v_subscriber_rfm').select('email, orders, last_order_at').gte('orders', 1).limit(50000);
+    const { data: nl } = await db.from('referral_nudge_log').select('email').limit(50000);
+    const nudged = new Set((nl || []).map((r) => r.email.toLowerCase()));
+    const now = Date.now();
+    const cand = (rfm || []).filter((r) => {
+      const e = r.email.toLowerCase();
+      return okEmail(e) && !nudged.has(e) && (!r.last_order_at || new Date(r.last_order_at).getTime() < now - 14 * 86400000);
+    }).map((r) => r.email.toLowerCase()).slice(0, 40);
+    s.candidates = cand.length;
+    for (const email of cand) {
+      try {
+        // must be a confirmed, non-unsubscribed, non-suppressed subscriber
+        const { data: su } = await db.from('subscribers').select('confirmed_at, unsubscribed_at, suppressed_at').ilike('email', email).maybeSingle();
+        if (!su?.confirmed_at || su.unsubscribed_at || su.suppressed_at) continue;
+        const code = await ensureReferralCode(db, email);
+        const { subject, html, text } = withOvr('referralNudge', referralNudgeEmail({ email, code, link: `${SITE}/?ref=${code}` }), email);
+        const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `refnudge:${email}`, tags: [{ name: 'kind', value: 'referral-nudge' }] });
+        if (res.ok) { s.sent++; await db.from('referral_nudge_log').upsert({ email }, { onConflict: 'email', ignoreDuplicates: true }); } else s.failed++;
+      } catch { s.failed++; }
+    }
+    stats.referralNudge = s;
+  });
+
+  // ── PRIORITY NOTE ─────────────────────────────────────────────────────
+  // Steps 5 (abandoned-browse) and 6 (win-back) are the LOWEST-value emails
+  // (people who never carted / haven't opened in 60+ days). They are run
+  // AFTER the high-value senders (weekly digest, cart reminders, followups,
+  // Etsy welcome, price drops, referral) so on a quota-limited day the daily
+  // email budget goes to what converts. Order chosen 2026-08-18 after the
+  // first quota-exhausted day (drip+digest+winback all competing).
 
   // ── 5. abandoned-browse: viewed ≥3 designs, never carted, never bought ──
   stats.browse = 'off';
@@ -553,76 +641,6 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       }
     }
     stats.winback = s;
-  });
-
-  // ── 7. Price-drop alerts (a design they liked got cheaper) ───────────
-  stats.priceDrop = 'off';
-  await step(stats, 'priceDrop', async () => {
-    if (!g.price_drop_enabled) return;
-    const s = { drops: 0, sent: 0, failed: 0 };
-    const { data: snaps } = await db.from('product_price_snapshot').select('product_id, price_usd').limit(50000);
-    const snapMap = new Map((snaps || []).map((r) => [r.product_id, Number(r.price_usd)]));
-    const { data: prods } = await db.from('products').select('id, slug, title, image_url, price_usd').eq('active', true).not('price_usd', 'is', null).limit(50000);
-    const drops = (prods || []).filter((p) => snapMap.has(p.id) && Number(p.price_usd) < (snapMap.get(p.id) as number) - 0.001).slice(0, 20);
-    s.drops = drops.length;
-    const suppressed = new Set(((await db.from('subscribers').select('email').not('suppressed_at', 'is', null).limit(50000)).data || []).map((r) => r.email.toLowerCase()));
-    for (const p of drops) {
-      const oldPrice = snapMap.get(p.id) as number, newPrice = Number(p.price_usd);
-      // interested non-buyers: clickers + browsers
-      const interested = new Set<string>();
-      const [{ data: cl }, { data: br }, { data: buys }] = await Promise.all([
-        db.from('email_events').select('email').eq('event', 'clicked').ilike('url', `%/product/${p.slug}%`).limit(5000),
-        db.from('browse_events').select('email').eq('product_id', p.id).limit(5000),
-        db.from('order_items').select('order_id').eq('product_id', p.id).limit(5000),
-      ]);
-      for (const r of cl || []) interested.add((r.email || '').toLowerCase());
-      for (const r of br || []) interested.add((r.email || '').toLowerCase());
-      const buyers = new Set<string>();
-      for (const b of chunk((buys || []).map((x) => x.order_id), 300)) { const { data } = await db.from('orders').select('email').in('id', b).is('deleted_at', null); (data || []).forEach((o) => buyers.add((o.email || '').toLowerCase())); }
-      let cands = [...interested].filter((e) => okEmail(e) && !buyers.has(e) && !suppressed.has(e));
-      // confirmed, non-unsubscribed subscribers only
-      const sendable = new Set<string>();
-      for (const b of chunk(cands, 300)) { const { data } = await db.from('subscribers').select('email, confirmed_at, unsubscribed_at').in('email', b); for (const su of data || []) if (su.confirmed_at && !su.unsubscribed_at) sendable.add(su.email.toLowerCase()); }
-      // drop already-notified for this product
-      for (const b of chunk([...sendable], 300)) { const { data } = await db.from('price_drop_log').select('email').eq('product_id', p.id).in('email', b); for (const r of data || []) sendable.delete((r.email || '').toLowerCase()); }
-      const recips = [...sendable].slice(0, 300);
-      for (const part of chunk(recips, 100)) {
-        const emails = part.map((email) => { const { subject, html, text } = withOvr('priceDrop', priceDropEmail({ email, product: p as MiniProduct, oldPrice, newPrice }), email); return { to: email, subject, html, text, tags: [{ name: 'kind', value: 'price-drop' }] }; });
-        const res = await sendBatch(emails, hashKey(`pricedrop:${p.id}`, part));
-        if (res.ok) { s.sent += res.sent; await db.from('price_drop_log').upsert(part.map((email) => ({ product_id: p.id, email, price_usd: newPrice })), { onConflict: 'product_id,email', ignoreDuplicates: true }); } else s.failed += part.length;
-      }
-    }
-    // refresh ALL snapshots to current price (so increases re-baseline and drops do not re-fire)
-    for (const b of chunk(prods || [], 500)) await db.from('product_price_snapshot').upsert(b.map((p) => ({ product_id: p.id, price_usd: Number(p.price_usd), updated_at: new Date().toISOString() })), { onConflict: 'product_id' });
-    stats.priceDrop = s;
-  });
-
-  // ── 8. Referral nudge (ask happy customers to share their link) ──────
-  stats.referralNudge = 'off';
-  await step(stats, 'referralNudge', async () => {
-    if (!g.referral_nudge_enabled) return;
-    const s = { candidates: 0, sent: 0, failed: 0 };
-    const { data: rfm } = await db.from('v_subscriber_rfm').select('email, orders, last_order_at').gte('orders', 1).limit(50000);
-    const { data: nl } = await db.from('referral_nudge_log').select('email').limit(50000);
-    const nudged = new Set((nl || []).map((r) => r.email.toLowerCase()));
-    const now = Date.now();
-    const cand = (rfm || []).filter((r) => {
-      const e = r.email.toLowerCase();
-      return okEmail(e) && !nudged.has(e) && (!r.last_order_at || new Date(r.last_order_at).getTime() < now - 14 * 86400000);
-    }).map((r) => r.email.toLowerCase()).slice(0, 40);
-    s.candidates = cand.length;
-    for (const email of cand) {
-      try {
-        // must be a confirmed, non-unsubscribed, non-suppressed subscriber
-        const { data: su } = await db.from('subscribers').select('confirmed_at, unsubscribed_at, suppressed_at').ilike('email', email).maybeSingle();
-        if (!su?.confirmed_at || su.unsubscribed_at || su.suppressed_at) continue;
-        const code = await ensureReferralCode(db, email);
-        const { subject, html, text } = withOvr('referralNudge', referralNudgeEmail({ email, code, link: `${SITE}/?ref=${code}` }), email);
-        const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `refnudge:${email}`, tags: [{ name: 'kind', value: 'referral-nudge' }] });
-        if (res.ok) { s.sent++; await db.from('referral_nudge_log').upsert({ email }, { onConflict: 'email', ignoreDuplicates: true }); } else s.failed++;
-      } catch { s.failed++; }
-    }
-    stats.referralNudge = s;
   });
 
   // ── 9. Send-time learning: each subscriber's most common open hour ───

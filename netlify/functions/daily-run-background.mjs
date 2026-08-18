@@ -22,7 +22,7 @@ import { telegramOwner } from '../../src/lib/notify.ts';
 
 const env = (n) => process.env[n];
 
-export default async (request) => {
+async function run(request) {
   const secret = env('CRON_SECRET') || '';
   const auth = request.headers.get('authorization') || '';
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : '';
@@ -31,8 +31,18 @@ export default async (request) => {
     return new Response('unauthorized', { status: 401 });
   }
 
+  // Fail LOUD, never silent: a background function has already acked 202 by
+  // the time anything here throws, so an unhandled error is invisible. Check
+  // the env this function needs and shout to Telegram + logs if it's missing.
+  const missing = ['PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'].filter((k) => !env(k));
+  if (missing.length) {
+    console.error('[daily-run] MISSING ENV for background function:', missing.join(', '));
+    await telegramOwner(`🔴 <b>Nightly runner cannot start</b>\nMissing env in Netlify Functions scope: ${missing.join(', ')}`).catch(() => {});
+    return new Response('missing env: ' + missing.join(','), { status: 500 });
+  }
   const db = createClient(env('PUBLIC_SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false } });
   const t0 = Date.now();
+  console.log('[daily-run] started', new Date().toISOString());
   let runId = null;
   try {
     const { data } = await db.from('cron_runs').insert({ ok: null, summary: { started: true, runner: 'background' } }).select('id').single();
@@ -65,4 +75,15 @@ export default async (request) => {
     await telegramOwner(`🔴 <b>Nightly automation FAILED</b>\n${String(e?.message || e).slice(0, 300)}`);
   }
   return new Response('ok', { status: 200 });
+}
+
+// Outer guard: NOTHING may escape silently from a background function.
+export default async (request) => {
+  try { return await run(request); }
+  catch (e) {
+    console.error("[daily-run] UNCAUGHT:", e);
+    try { await telegramOwner(`🔴 <b>Nightly runner crashed</b>
+${String(e?.message || e).slice(0, 300)}`); } catch {}
+    return new Response("crashed", { status: 500 });
+  }
 };
