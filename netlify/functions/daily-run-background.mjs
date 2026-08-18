@@ -62,7 +62,7 @@ async function run(request) {
     const stats = await runDailyAutomation();
     let growth = {};
     try { growth = await runGrowthAutomation(); } catch (e) { growth = { error: e?.message || 'growth failed' }; }
-    await finish(true, { stats, growth });
+    await finish(true, { runner: 'background', stats, growth });
     const bad = Object.entries(growth).filter(([, v]) => typeof v === 'string' && /^failed/i.test(v)).map(([k, v]) => `${k}: ${v}`);
     const failCounts = Object.entries(growth).filter(([, v]) => v && typeof v === 'object' && Number(v.failed) > 0).map(([k, v]) => `${k}: ${v.failed} failed`);
     if (bad.length || failCounts.length || (stats?.failures > 0)) {

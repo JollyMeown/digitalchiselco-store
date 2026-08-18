@@ -56,7 +56,7 @@ async function handle(request: Request): Promise<Response> {
     let growth: Record<string, any> = {};
     try { growth = await runGrowthAutomation(); }
     catch (e: any) { growth = { error: e?.message || 'growth failed' }; }
-    await finish(true, { stats, growth });
+    await finish(true, { runner: 'ssr', stats, growth });
     // Surface silent per-step failures to the owner (email/Telegram), so a
     // step reporting `failed: …` inside a 200 response is not invisible.
     const bad = Object.entries(growth).filter(([, v]) => typeof v === 'string' && /^failed/i.test(v)).map(([k, v]) => `${k}: ${v}`);
