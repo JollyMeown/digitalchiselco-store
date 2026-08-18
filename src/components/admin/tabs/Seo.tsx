@@ -4,6 +4,7 @@
 // `npm run seo:generate`; this tab is the human review gate.
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { useLiveRefresh } from '../useLiveRefresh';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls } from '../ui';
 
 type Row = {
@@ -35,6 +36,7 @@ export default function Seo() {
   const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => { load(); loadCounts(); setSelected(new Set()); }, [status]);
+  useLiveRefresh(() => { load(); loadCounts(); }, 30000, [status]);   // keep this tab live (pauses while editing)
 
   function toggle(id: string) {
     setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });

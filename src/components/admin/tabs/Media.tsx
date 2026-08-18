@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, btnGhost, btnPrimary, inputCls, labelCls } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 import ImageUpload from '../ImageUpload';
 
 export default function Media() {
@@ -10,6 +11,7 @@ export default function Media() {
   const [products, setProducts] = useState<any[]>([]);
 
   useEffect(() => { load(); }, []);
+  useLiveRefresh(() => load(), 30000);   // keep this tab live (pauses while editing)
   async function load() {
     const [{ data: ss }, { data: cs }, { data: ps }] = await Promise.all([
       supabase.from('site_settings').select('*').eq('id', 1).maybeSingle(),
