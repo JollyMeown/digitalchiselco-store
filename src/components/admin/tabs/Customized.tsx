@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls, Toast } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 import ProductSearchPicker, { type PickerProduct } from '../ProductSearchPicker';
 
 type CustomField = {
@@ -58,8 +59,9 @@ export default function Customized() {
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
 
   useEffect(() => { load(); }, []);
-  async function load() {
-    setLoading(true);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     const { data, error } = await supabase
       .from('products')
       .select('id,title,slug,image_url,active,product_custom_fields(id,label,field_key,field_type,required,placeholder,help_text,max_length,sort_order)')

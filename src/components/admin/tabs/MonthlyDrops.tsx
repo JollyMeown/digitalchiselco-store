@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls, labelCls, Toast } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 type Pack = {
   id: string;
@@ -21,8 +22,9 @@ export default function MonthlyDrops() {
   const [open, setOpen] = useState<Pack | 'new' | null>(null);
 
   useEffect(() => { load(); }, []);
-  async function load() {
-    setLoading(true);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     const { data } = await supabase.from('monthly_files').select('*').order('month', { ascending: false });
     setRows((data ?? []) as Pack[]); setLoading(false);
   }

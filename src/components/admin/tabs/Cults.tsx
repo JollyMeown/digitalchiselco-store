@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, btnGhost, btnPrimary } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 type Sale = {
   id: string;
@@ -31,8 +32,8 @@ export default function Cults() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>('');
 
-  async function load() {
-    setLoading(true); setErr('');
+  async function load(silent = false) {
+    if (!silent) setLoading(true); setErr('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -44,6 +45,7 @@ export default function Cults() {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
 
   function exportCsv() {
     const rows = data?.sales || [];

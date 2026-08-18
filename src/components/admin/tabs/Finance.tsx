@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 type Daily = { day: string; channel: string; revenue_usd: number; ad_spend_usd: number; fees_usd: number };
 type Gran = 'week' | 'month' | 'year';
@@ -82,8 +83,9 @@ export default function Finance() {
 
   const [web30, setWeb30] = useState(0);
   useEffect(() => { load(); }, []);
-  async function load() {
-    setLoading(true);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     const since = new Date(); since.setUTCFullYear(since.getUTCFullYear() - 1);
     const [{ data: d }, { data: s }, { data: ord }] = await Promise.all([
       supabase.from('finance_daily').select('day, channel, revenue_usd, ad_spend_usd, fees_usd').order('day'),

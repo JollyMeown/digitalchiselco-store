@@ -1,6 +1,13 @@
 [build]
   command = "npm run build"
 
+# Our own Netlify functions (the nightly scheduler + its background runner).
+# esbuild bundles their TypeScript imports from src/lib/*. The Astro SSR
+# server function is separate and unaffected.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 [build.environment]
   NODE_VERSION = "22"
   # The anon key is public by design (RLS-protected); service_role runs only in the

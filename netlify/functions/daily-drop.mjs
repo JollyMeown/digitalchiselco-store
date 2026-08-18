@@ -1,10 +1,14 @@
-// Netlify Scheduled Function — fires the membership automation once a day.
-// It simply calls the site's own /api/cron/daily endpoint with the shared
-// CRON_SECRET, so all the logic lives in the Astro app (one code path, easy to
-// test manually). Configure CRON_SECRET in Netlify env vars.
+// Netlify Scheduled Function — the nightly TRIGGER. Fires the background
+// runner (netlify/functions/daily-run-background.mjs), which does the actual
+// work under a 15-minute limit. This function itself returns in ~1 s.
+//
+// History: this used to call the SSR route /api/cron/daily and WAIT for it.
+// That route runs inside Astro's synchronous server function (10 s cap); a
+// cold DB + email sends took longer, the run was killed before its heartbeat,
+// and the admin showed "never ran". Delegating to a background function fixes
+// the ceiling for good. Non-200 from the trigger step pings the owner.
 //
 // Schedule: 08:00 UTC daily. Change the cron below + redeploy to adjust.
-
 export const config = { schedule: '0 8 * * *' };
 
 export default async () => {
@@ -15,18 +19,30 @@ export default async () => {
     return new Response('missing CRON_SECRET', { status: 200 });
   }
   try {
-    // GET, not POST: Astro's CSRF guard rejects cross-site POSTs with 403
-    // ("Cross-site POST form submissions are forbidden") — which silently
-    // killed every scheduled run. The endpoint accepts GET with the same
-    // Bearer header, so auth is unchanged and the secret stays out of the URL.
-    const res = await fetch(`${site}/api/cron/daily`, {
-      method: 'GET',
+    const res = await fetch(`${site}/.netlify/functions/daily-run-background`, {
+      method: 'POST',
       headers: { authorization: `Bearer ${secret}` },
+      signal: AbortSignal.timeout(20000),
     });
-    const body = await res.text();
-    console.log('[daily-drop]', res.status, body.slice(0, 500));
+    // Background functions ack with 202 immediately and keep running.
+    console.log('[daily-drop] triggered background run →', res.status);
+    if (res.status !== 202 && res.status !== 200) {
+      await notify(`🔴 <b>Nightly trigger failed</b>\nBackground runner answered HTTP ${res.status}`);
+    }
   } catch (e) {
-    console.error('[daily-drop] fetch failed', e);
+    console.error('[daily-drop] trigger failed', e);
+    await notify(`🔴 <b>Nightly trigger failed</b>\n${String(e?.message || e).slice(0, 200)}`);
   }
   return new Response('ok', { status: 200 });
 };
+
+async function notify(text) {
+  const token = process.env.TELEGRAM_BOT_TOKEN, chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+    });
+  } catch { /* best-effort */ }
+}

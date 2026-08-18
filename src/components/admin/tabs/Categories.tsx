@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 import ImageUpload from '../ImageUpload';
 
 const slugify = (s: string) =>
@@ -13,6 +14,7 @@ export default function Categories() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => { load(); }, []);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   async function load() {
     const { data } = await supabase.from('categories').select('*').order('sort_order').order('name');
     setRows(data ?? []);

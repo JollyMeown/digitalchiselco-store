@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, btnPrimary, btnGhost, inputCls, Toast } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'drip1', label: '1 · Did you carve the free pack?', group: 'Subscriber drip' },
@@ -89,6 +90,7 @@ export default function Automations() {
   const [pickerFor, setPickerFor] = useState<number | null>(null);
 
   useEffect(() => { load(); }, []);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   useEffect(() => { loadPreview(kind); }, [kind]);
 
   async function load() {

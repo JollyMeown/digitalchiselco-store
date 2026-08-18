@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, btnGhost, btnPrimary, btnDanger, inputCls, labelCls } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 const STATUSES = ['open', 'planned', 'in_progress', 'done', 'declined'];
 const STATUS_LABEL: Record<string, string> = { open: 'Idea', planned: 'Planned', in_progress: 'In progress', done: '✓ Made', declined: 'Declined' };
@@ -11,6 +12,7 @@ export default function DesignBoard() {
   const [editing, setEditing] = useState<Record<string, any>>({});
 
   useEffect(() => { load(); }, []);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   async function load() {
     const { data } = await supabase.from('design_requests').select('*').order('votes', { ascending: false }).order('created_at', { ascending: false });
     setRows(data ?? []);

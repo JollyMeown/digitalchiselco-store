@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 export default function Faqs() {
   const [rows, setRows] = useState<any[]>([]);
@@ -8,6 +9,7 @@ export default function Faqs() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => { load(); }, []);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   async function load() {
     const { data } = await supabase.from('faqs').select('*').order('sort_order').order('created_at');
     setRows(data ?? []);

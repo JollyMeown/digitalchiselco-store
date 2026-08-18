@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 const blank = { slug: '', title: '', subtitle: '', keywords: '', hero_image_url: '', starts_at: '', ends_at: '', active: true, sort_order: 0 };
 
@@ -10,6 +11,7 @@ export default function Seasonal() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => { load(); }, []);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   async function load() {
     const { data } = await supabase.from('seasonal_collections').select('*').order('sort_order').order('created_at');
     setRows(data ?? []);

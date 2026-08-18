@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls, labelCls, Toast } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 import ImageUpload from '../ImageUpload';
 import ProductSearchPicker, { type PickerProduct } from '../ProductSearchPicker';
 
@@ -25,8 +26,9 @@ export default function Bundles() {
   const [open, setOpen] = useState<BundleRow | 'new' | null>(null);
 
   useEffect(() => { load(); }, []);
-  async function load() {
-    setLoading(true);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     // bundle_items has two FKs to products (bundle_product_id, source_product_id),
     // so Supabase needs explicit hints to disambiguate the join. We use the
     // bundle side as the outer link and the source side as the nested embed.

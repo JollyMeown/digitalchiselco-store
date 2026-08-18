@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, children, wide = false }: any) {
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose} data-modal-open="true">
       <div
         onClick={(e) => e.stopPropagation()}
         className={cls('bg-white rounded-lg shadow-xl w-full overflow-hidden flex flex-col max-h-[92vh]', wide ? 'max-w-4xl' : 'max-w-lg')}

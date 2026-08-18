@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, linkColor, btnGhost } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 export default function Links() {
   const [rows, setRows] = useState<any[]>([]);
@@ -8,8 +9,9 @@ export default function Links() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { load(); }, [filter]);
-  async function load() {
-    setLoading(true);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     let q = supabase.from('products')
       .select('id,title,slug,link_status,link_verified,product_downloads(download_link)')
       .order('link_status').limit(300);

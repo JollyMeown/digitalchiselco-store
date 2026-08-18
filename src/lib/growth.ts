@@ -36,8 +36,10 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString()
 // so the admin sees "skipped: time budget" instead of nothing at all. The
 // scheduler runs daily, so skipped steps run next time.
 const RUN_STARTED_AT = { t: Date.now() };
-const TIME_BUDGET_MS = Number(process.env.CRON_TIME_BUDGET_MS) || 20000;
-const outOfTime = () => Date.now() - RUN_STARTED_AT.t > TIME_BUDGET_MS;
+// Read at RUN time (not import time) so the background runner can raise it via env
+// before calling runGrowthAutomation(); the SSR route keeps the 20s default.
+const timeBudgetMs = () => Number(process.env.CRON_TIME_BUDGET_MS) || 20000;
+const outOfTime = () => Date.now() - RUN_STARTED_AT.t > timeBudgetMs();
 
 // Wrap one numbered step: never lets a throw abort the steps after it, and
 // records the failure where the admin can see it.

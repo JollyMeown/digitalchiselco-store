@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 type PurchaseRow = {
   order_id: string;
@@ -22,6 +23,7 @@ export default function Membership() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => { load(); }, []);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   async function load() {
     const [{ data: p }, { data: l }] = await Promise.all([
       supabase.from('membership_plans').select('*').order('sort_order'),

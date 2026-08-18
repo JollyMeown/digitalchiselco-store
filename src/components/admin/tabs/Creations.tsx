@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls, labelCls, Toast } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 import ImageUpload from '../ImageUpload';
 import ProductSearchPicker from '../ProductSearchPicker';
 
@@ -22,8 +23,9 @@ export default function Creations() {
   const [open, setOpen] = useState<Creation | 'new' | null>(null);
 
   useEffect(() => { load(); }, []);
-  async function load() {
-    setLoading(true);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     // Product list no longer pre-fetched — picker is server-backed now.
     const { data: cs } = await supabase
       .from('customer_creations')

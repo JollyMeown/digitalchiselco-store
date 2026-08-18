@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 export default function Orders() {
   const [rows, setRows] = useState<any[]>([]);
@@ -14,8 +15,9 @@ export default function Orders() {
   const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => { load(); }, [status, dateFrom, dateTo, showDeleted]);
-  async function load() {
-    setLoading(true);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     let q = supabase.from('orders').select('id,email,total,status,currency,provider,provider_order_id,created_at,deleted_at,admin_note,order_items(id,title,price_usd,qty,order_item_customizations(fields))').order('created_at', { ascending: false }).limit(500);
     if (status !== 'all') q = q.eq('status', status);
     if (dateFrom) q = q.gte('created_at', new Date(dateFrom).toISOString());

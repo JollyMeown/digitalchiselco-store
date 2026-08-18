@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls, labelCls, Toast } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 type Sub = { id: string; email: string; source: string | null; created_at: string };
 
@@ -11,8 +12,9 @@ export default function Subscribers() {
   const [open, setOpen] = useState<Sub | 'new' | null>(null);
 
   useEffect(() => { load(); }, []);
-  async function load() {
-    setLoading(true);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     const { data } = await supabase.from('subscribers').select('*').order('created_at', { ascending: false }).limit(2000);
     setRows((data ?? []) as Sub[]); setLoading(false);
   }

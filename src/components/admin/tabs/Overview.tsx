@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, StatBox, btnGhost, btnPrimary, inputCls } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 type Order = { id: string; email: string; total: number; status: string; created_at: string };
 type Item = { title: string; price_usd: number; qty: number; order_id: string };
@@ -30,8 +31,9 @@ export default function Overview() {
   const [dateTo, setDateTo] = useState(today);
 
   useEffect(() => { load(); }, []);
-  async function load() {
-    setLoading(true);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     const [allOrdersRes, allItemsRes, recentRes, products, categories, subs, settings] = await Promise.all([
       supabase.from('orders').select('id,email,total,status,created_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(5000),
       supabase.from('order_items').select('title,price_usd,qty,order_id').limit(20000),

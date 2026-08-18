@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls, labelCls, Toast } from '../ui';
+import { useLiveRefresh } from '../useLiveRefresh';
 import ProductSearchPicker, { type PickerProduct } from '../ProductSearchPicker';
 
 type Sale = { id: string; name: string; percent_off: number; starts_at: string; expires_at: string; active: boolean; scope: string; scope_ids: string[] | null; terms: string | null };
@@ -261,8 +262,9 @@ function Sales() {
   const [open, setOpen] = useState<Sale | 'new' | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => { load(); }, []);
-  async function load() {
-    setLoading(true);
+  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     const { data } = await supabase.from('sales').select('*').order('starts_at', { ascending: false });
     setRows((data ?? []) as any); setLoading(false);
   }
