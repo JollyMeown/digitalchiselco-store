@@ -388,7 +388,7 @@ function SystemHealth() {
     (async () => {
       const today = new Date().toISOString().slice(0, 10);
       const d30 = new Date(Date.now() - 30 * 86400000).toISOString();
-      const [{ data: runs }, { count: sentToday }, { data: evs30 }, { data: wk }, { data: lastOrder }, { count: openCarts }, { data: cultsPoll }, { data: lastCults }] = await Promise.all([
+      const [{ data: runs }, { count: sentToday }, { data: evs30 }, { data: wk }, { data: lastOrder }, { count: openCarts }, { data: cultsPoll }, { data: lastCults }, { data: actProds }, { data: dlRows }] = await Promise.all([
         supabase.from('cron_runs').select('ran_at, ok, finished_at, error').order('ran_at', { ascending: false }).limit(1),
         supabase.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', today + 'T00:00:00Z'),
         supabase.from('email_events').select('event').gte('created_at', d30).in('event', ['sent', 'delivered', 'bounced', 'complained']).limit(20000),
@@ -397,7 +397,12 @@ function SystemHealth() {
         supabase.from('abandoned_carts').select('id', { count: 'exact', head: true }).is('recovered_at', null).is('reminded_at', null),
         supabase.from('poll_status').select('ran_at, ok, note, runner').eq('key', 'cults_sales').maybeSingle(),
         supabase.from('cults_sales').select('sold_at, income, currency, product_name').order('sold_at', { ascending: false }).limit(1),
+        supabase.from('products').select('id, slug').eq('active', true).gt('price_usd', 0).limit(5000),
+        supabase.from('product_downloads').select('product_id').limit(20000),
       ]);
+      // Sellable products with NO download row = a buyer would receive nothing.
+      const hasDl = new Set((dlRows || []).map((r: any) => r.product_id));
+      const missingFile = (actProds || []).filter((p: any) => !hasDl.has(p.id) && !/^gift-card|membership/i.test(p.slug)).map((p: any) => p.slug);
       // weekly pending count
       let pending = 0, sentWk = 0;
       if (wk?.[0]) {
@@ -410,7 +415,7 @@ function SystemHealth() {
       const delivered = (evs30 || []).filter((e: any) => e.event === 'delivered' || e.event === 'sent').length;
       const bounced = (evs30 || []).filter((e: any) => e.event === 'bounced').length;
       const complained = (evs30 || []).filter((e: any) => e.event === 'complained').length;
-      setH({ run: runs?.[0] || null, sentToday: sentToday || 0, delivered, bounced, complained, wk: wk?.[0] || null, pending, sentWk, lastOrder: lastOrder?.[0] || null, openCarts: openCarts || 0, cultsPoll: cultsPoll || null, lastCults: lastCults?.[0] || null });
+      setH({ run: runs?.[0] || null, sentToday: sentToday || 0, delivered, bounced, complained, wk: wk?.[0] || null, pending, sentWk, lastOrder: lastOrder?.[0] || null, openCarts: openCarts || 0, cultsPoll: cultsPoll || null, lastCults: lastCults?.[0] || null, missingFile });
     })();
   }, []);
   if (!h) return null;
@@ -443,7 +448,8 @@ function SystemHealth() {
       {sub && <div className="text-[10px] text-ink-700/60 mt-0.5 truncate" title={sub}>{sub}</div>}
     </a>
   );
-  const all = [cronState, quotaState, bounceState, wkState, orderState, cartsState, cultsState];
+  const fileState = h.missingFile.length ? 'red' : 'green';
+  const all = [cronState, quotaState, bounceState, wkState, orderState, cartsState, cultsState, fileState];
   const worst = all.includes('red') ? 'red' : all.includes('amber') ? 'amber' : 'green';
 
   return (
@@ -453,7 +459,7 @@ function SystemHealth() {
         <span className="text-sm font-bold text-ink-900">System health</span>
         <span className="text-[11px] text-ink-700/50">{worst === 'green' ? 'all systems normal' : worst === 'amber' ? 'something needs a look' : 'ATTENTION NEEDED'} · tap a tile for detail</span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
         <Tile state={cronState} icon="⏱" label="Nightly automation" value={cronText} sub={h.run?.error || (h.run ? new Date(h.run.ran_at).toLocaleString() : 'scheduler has never reported in')} href="#automations" />
         <Tile state={quotaState} icon="📧" label="Email quota today" value={`${h.sentToday} / ${DAILY_SOFT_CAP}`} sub={`${quotaPct}% of soft daily cap`} href="#automations" />
         <Tile state={bounceState} icon="📉" label="Bounce + spam (30d)" value={`${bounceRate.toFixed(1)}%`} sub={`${h.bounced} bounced · ${h.complained} complaints · ${h.delivered} delivered`} href="#automations" />
@@ -461,6 +467,7 @@ function SystemHealth() {
         <Tile state={orderState} icon="🧾" label="Last order" value={h.lastOrder ? `$${Number(h.lastOrder.total).toFixed(2)}` : 'none'} sub={h.lastOrder ? (lastAgeH < 1 ? 'just now' : lastAgeH < 48 ? `${Math.round(lastAgeH)}h ago` : `${Math.round(lastAgeH / 24)}d ago`) : ''} href="#orders" />
         <Tile state={cartsState} icon="🛒" label="Open carts" value={String(h.openCarts)} sub="awaiting reminder" href="#insights" />
         <Tile state={cultsState} icon="◈" label="Cults3D sale alerts" value={cultsText} sub={cultsSub} href="#cults" />
+        <Tile state={fileState} icon="📎" label="Products missing file" value={h.missingFile.length ? `${h.missingFile.length} broken` : 'all have files'} sub={h.missingFile.length ? 'buyer would get NOTHING: ' + h.missingFile.join(', ') : 'every sellable product has a download'} href="#products" />
       </div>
     </div>
   );

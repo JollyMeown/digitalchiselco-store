@@ -128,10 +128,10 @@ async function fetchProducts() {
   const done = new Set(Object.keys(ledger));
   const rows = [];
   const q = db.from('products')
-    .select('id, slug, title, seo_title, seo_description, description, seo_keywords, price_usd, image_url, gallery, is_bestseller, is_bundle, cults3d_file_name')
+    .select('id, slug, title, seo_title, seo_description, description, seo_keywords, price_usd, image_url, gallery, is_bestseller, is_bundle, cults3d_file_name, created_at')
     .eq('active', true).not('image_url', 'is', null)
     .is('cults3d_uploaded_at', null)                            // DB tracking: skip already-uploaded
-    .order('is_bestseller', { ascending: false }).order('slug'); // bestsellers first, then the rest
+    .order('is_bestseller', { ascending: false }).order('created_at', { ascending: false }); // bestsellers first, then NEWEST first
   for (let from = 0; ; from += 1000) {
     const { data, error } = await q.range(from, from + 999);
     if (error) throw error;
@@ -146,14 +146,67 @@ async function fetchDownloadMap(ids) {
   const map = {};
   for (let i = 0; i < ids.length; i += 200) {
     const slice = ids.slice(i, i + 200);
-    const { data } = await db.from('product_downloads').select('product_id, download_link').in('product_id', slice);
-    for (const r of data || []) if (!map[r.product_id]) map[r.product_id] = r.download_link;
+    const { data } = await db.from('product_downloads').select('id, product_id, download_link, drive_file_id, sort_order').in('product_id', slice).order('sort_order');
+    for (const r of data || []) if (!map[r.product_id]) map[r.product_id] = r;
   }
   return map;
 }
 
-function buildPayload(p, downloadLink, driveMap) {
-  const id = driveId(downloadLink);
+// ── PDF-guide products (newer uploads from Bundle Relief Studio) ──────────
+// Since July 2026 the website deliverable is a branded "Download Guide" PDF on
+// Supabase Storage; the Drive STL link lives INSIDE the PDF (ReportLab writes
+// URIs in plain text). Cults needs the Drive file itself, so resolve:
+//   product_downloads.drive_file_id (if BRS stored it)  →  else parse the PDF
+// then look up the real filename via the Drive API and PERSIST both
+// (drive_file_id + products.cults3d_file_name) so each PDF is fetched once ever.
+const RESOLVE_PER_RUN = parseInt(val('--resolve', '40'), 10);
+function driveIdsFromPdf(buf) {
+  const s = buf.toString('latin1');
+  const ids = [];
+  for (const m of s.matchAll(/drive\.google\.com\/(?:uc\?[^)\s]*?id=|file\/d\/|open\?id=)([A-Za-z0-9_-]{20,})/g)) if (!ids.includes(m[1])) ids.push(m[1]);
+  for (const m of s.matchAll(/drive\.usercontent\.com\/download\?id=([A-Za-z0-9_-]{20,})/g)) if (!ids.includes(m[1])) ids.push(m[1]);
+  return ids;
+}
+async function driveMeta(id) {
+  if (!GOOGLE_API_KEY) return null;
+  try {
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=name,size,mimeType&key=${GOOGLE_API_KEY}`);
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+async function resolvePdfGuides(products, dlMap) {
+  let budget = RESOLVE_PER_RUN, resolved = 0, failed = 0;
+  for (const p of products) {
+    if (budget <= 0) break;
+    const row = dlMap[p.id];
+    if (!row || driveId(row.download_link)) continue;          // classic Drive link: nothing to do
+    let id = row.drive_file_id || null;
+    if (!id) {
+      if (!/\.pdf(\?|$)/i.test(String(row.download_link || ''))) continue;  // not a guide PDF
+      budget--;
+      try {
+        const r = await fetch(row.download_link);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const ids = driveIdsFromPdf(Buffer.from(await r.arrayBuffer()));
+        if (ids.length !== 1 && !p.is_bundle) console.log(`  ! ${p.slug.slice(0, 50)}: ${ids.length} Drive links in guide PDF`);
+        id = ids[0] || null;
+      } catch (e) { failed++; console.log(`  ! ${p.slug.slice(0, 50)}: guide PDF unreadable (${e.message})`); continue; }
+      if (!id) { failed++; continue; }
+      await db.from('product_downloads').update({ drive_file_id: id }).eq('id', row.id);
+    }
+    if (!p.cults3d_file_name) {
+      const meta = await driveMeta(id);
+      if (meta?.name) { p.cults3d_file_name = meta.name; await db.from('products').update({ cults3d_file_name: meta.name }).eq('id', p.id); }
+    }
+    row.drive_file_id = id;
+    resolved++;
+  }
+  if (resolved || failed) console.log(`Guide-PDF products resolved to Drive files: ${resolved}${failed ? ` (${failed} unresolved)` : ''}`);
+}
+
+function buildPayload(p, dlRow, driveMap) {
+  const downloadLink = dlRow?.download_link;
+  const id = driveId(downloadLink) || dlRow?.drive_file_id || null;
   const drive = id ? driveMap[id] : null;
   const filename = p.cults3d_file_name || drive?.name || (id ? `${p.slug}.stl` : null);
   const images = [p.image_url, ...(Array.isArray(p.gallery) ? p.gallery : [])]
@@ -276,6 +329,7 @@ async function main() {
   // rollout — every run re-picked it and published nothing. fetchDownloadMap paginates and
   // buildPayload is in-memory, so scanning all candidates each run is cheap.
   const dlMap = await fetchDownloadMap(products.map((p) => p.id));
+  await resolvePdfGuides(products, dlMap);
   const driveRaw = existsSync('drive_stls.json') ? JSON.parse(readFileSync('drive_stls.json', 'utf8')) : [];
   const driveArr = Array.isArray(driveRaw) ? driveRaw : (driveRaw.files || Object.values(driveRaw));
   const driveMap = Object.fromEntries(driveArr.filter((f) => f && f.id).map((f) => [f.id, f]));
