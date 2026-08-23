@@ -388,7 +388,19 @@ function SystemHealth() {
     (async () => {
       const today = new Date().toISOString().slice(0, 10);
       const d30 = new Date(Date.now() - 30 * 86400000).toISOString();
-      const [{ data: runs }, { count: sentToday }, { data: evs30 }, { data: wk }, { data: lastOrder }, { count: openCarts }, { data: cultsPoll }, { data: lastCults }, { data: actProds }, { data: dlRows }] = await Promise.all([
+      // PostgREST returns at most 1000 rows per request; products and download
+      // rows both exceed that (a truncated list once made 282 healthy products
+      // look broken), so page through them.
+      const pageAll = async (build: (from: number, to: number) => any) => {
+        const out: any[] = [];
+        for (let from = 0; from < 50000; from += 1000) {
+          const { data } = await build(from, from + 999);
+          out.push(...(data || []));
+          if (!data || data.length < 1000) break;
+        }
+        return out;
+      };
+      const [{ data: runs }, { count: sentToday }, { data: evs30 }, { data: wk }, { data: lastOrder }, { count: openCarts }, { data: cultsPoll }, { data: lastCults }, actProds, dlRows] = await Promise.all([
         supabase.from('cron_runs').select('ran_at, ok, finished_at, error').order('ran_at', { ascending: false }).limit(1),
         supabase.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', today + 'T00:00:00Z'),
         supabase.from('email_events').select('event').gte('created_at', d30).in('event', ['sent', 'delivered', 'bounced', 'complained']).limit(20000),
@@ -397,12 +409,12 @@ function SystemHealth() {
         supabase.from('abandoned_carts').select('id', { count: 'exact', head: true }).is('recovered_at', null).is('reminded_at', null),
         supabase.from('poll_status').select('ran_at, ok, note, runner').eq('key', 'cults_sales').maybeSingle(),
         supabase.from('cults_sales').select('sold_at, income, currency, product_name').order('sold_at', { ascending: false }).limit(1),
-        supabase.from('products').select('id, slug').eq('active', true).gt('price_usd', 0).limit(5000),
-        supabase.from('product_downloads').select('product_id').limit(20000),
+        pageAll((a, b) => supabase.from('products').select('id, slug').eq('active', true).gt('price_usd', 0).order('id').range(a, b)),
+        pageAll((a, b) => supabase.from('product_downloads').select('product_id').order('id').range(a, b)),
       ]);
       // Sellable products with NO download row = a buyer would receive nothing.
-      const hasDl = new Set((dlRows || []).map((r: any) => r.product_id));
-      const missingFile = (actProds || []).filter((p: any) => !hasDl.has(p.id) && !/^gift-card|membership/i.test(p.slug)).map((p: any) => p.slug);
+      const hasDl = new Set(dlRows.map((r: any) => r.product_id));
+      const missingFile = actProds.filter((p: any) => !hasDl.has(p.id) && !/^gift-card|membership/i.test(p.slug)).map((p: any) => p.slug);
       // weekly pending count
       let pending = 0, sentWk = 0;
       if (wk?.[0]) {

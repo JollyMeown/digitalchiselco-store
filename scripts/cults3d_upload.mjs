@@ -55,7 +55,8 @@ const CATEGORY_ID = val('--category-id', 'Q2F0ZWdvcnkvMjM');   // "Art"
 const LICENSE_CODE = val('--license-code', 'cults_cu');        // CULTS CU - Commercial Use
 const VISIBILITY = val('--visibility', 'PUBLIC');              // PUBLIC | SECRET | DEACTIVATED
 const USAGES = ['3dp', 'cnc_laser'];                           // 3D printing + CNC machining / laser cutting
-const PRICE_FLAG = val('--price', '');                         // optional explicit price override
+const PRICE_FLAG = val('--price', '');
+const ONLY = val('--only', '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean); // publish just these slugs (prefix match), e.g. --only owl-family,bald-eagle                         // optional explicit price override
 const PRICE_OPTIONS = [4.99, 5.99];                            // randomly assigned per listing (looks organic)
 const JITTER_MIN = parseInt(val('--jitter', '0'), 10);         // sleep 0..N random minutes before posting (human-like)
 const MAX_TAGS = 12;
@@ -337,7 +338,9 @@ async function main() {
   const allPayloads = products.map((p) => buildPayload(p, dlMap[p.id], driveMap));
   const publishable = allPayloads.filter((x) => x.fileUrls.length && x.imageUrls.length);
   const noFile = allPayloads.filter((x) => !x.fileUrls.length);
-  const ready = publishable.slice(0, LIMIT);
+  const pool = ONLY.length ? publishable.filter((x) => ONLY.some((s) => x.slug.toLowerCase().startsWith(s))) : publishable;
+  if (ONLY.length) console.log('--only matched', pool.length, 'of', ONLY.length, 'requested');
+  const ready = pool.slice(0, LIMIT);
 
   console.log(`Unpublished: ${products.length} | publishable: ${publishable.length} | no-file (skipped): ${noFile.length} | posting this run: ${ready.length}`);
   if (noFile.length) console.log('  no-file slugs (skipped):', noFile.slice(0, 15).map((x) => x.slug).join(', ') + (noFile.length > 15 ? ` …+${noFile.length - 15} more` : ''));
