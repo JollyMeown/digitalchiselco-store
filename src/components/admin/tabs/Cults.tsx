@@ -31,6 +31,31 @@ export default function Cults() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>('');
+  const [poll, setPoll] = useState<any>(null);
+  const [busy, setBusy] = useState<string>('');
+  const [alerts, setAlerts] = useState<any[]>([]);
+
+  async function loadAlerts() {
+    const [{ data: ps }, { data: al }] = await Promise.all([
+      supabase.from('poll_status').select('ran_at, ok, note, runner').eq('key', 'cults_sales').maybeSingle(),
+      supabase.from('owner_alerts').select('id, kind, title, body, url, created_at').order('id', { ascending: false }).limit(12),
+    ]);
+    setPoll(ps || null); setAlerts(al || []);
+  }
+  async function action(kind: 'poll' | 'test') {
+    setBusy(kind);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/cults-poll', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify(kind === 'test' ? { test: true } : {}) });
+      const j = await res.json();
+      if (kind === 'test') alert(j.ok ? `Test alert sent.
+Dashboard feed: ${j.feed ? 'ok (chime + toast should fire within 20 s)' : 'failed'}
+Telegram: ${j.telegram}` : `Test failed: ${j.error || res.status}`);
+      else alert(j.ok ? `Polled Cults3D: ${j.total} sales checked, ${j.inserted} new, ${j.alerted} alerted${j.seeded ? ' (history seeded silently)' : ''}.` : `Poll failed: ${j.error}`);
+      await loadAlerts();
+    } catch (e: any) { alert(String(e?.message || e)); }
+    setBusy('');
+  }
 
   async function load(silent = false) {
     if (!silent) setLoading(true); setErr('');
@@ -44,8 +69,8 @@ export default function Cults() {
     } catch (e: any) { setErr(String(e?.message || e)); }
     setLoading(false);
   }
-  useEffect(() => { load(); }, []);
-  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  useEffect(() => { load(); loadAlerts(); }, []);
+  useLiveRefresh(() => { load(true); loadAlerts(); }, 30000);   // keep this tab live (silent, pauses while editing)
 
   function exportCsv() {
     const rows = data?.sales || [];
@@ -67,8 +92,10 @@ export default function Cults() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-ink-700/70">Live sales pulled from your Cults3D account.</p>
-        <div className="flex gap-2">
-          <button className={btnGhost} onClick={load} disabled={loading}>{loading ? 'Loading…' : '↻ Refresh'}</button>
+        <div className="flex gap-2 flex-wrap">
+          <button className={btnGhost} onClick={() => action('test')} disabled={!!busy} title="Inserts a test alert: the admin chime + toast fire and a Telegram test is sent">{busy === 'test' ? 'Testing…' : '🔔 Test sale alert'}</button>
+          <button className={btnGhost} onClick={() => action('poll')} disabled={!!busy} title="Check Cults3D for new sales right now">{busy === 'poll' ? 'Polling…' : '⟳ Poll Cults now'}</button>
+          <button className={btnGhost} onClick={() => load()} disabled={loading}>{loading ? 'Loading…' : '↻ Refresh'}</button>
           {sales.length > 0 && <button className={btnPrimary} onClick={exportCsv}>Export CSV</button>}
         </div>
       </div>
@@ -84,6 +111,26 @@ export default function Cults() {
           )}
         </Card>
       )}
+
+      <Card title="🔔 Sale alerts">
+        <p className="text-xs text-ink-700/60">
+          Cults3D is checked <strong>every 10 minutes</strong> (and on every refresh of this tab). Each new sale rings the cha-ching in the admin, shows a toast, and sends you a Telegram message, exactly once.
+          {' '}Poller: {poll ? <span className={poll.ok ? 'text-green-700' : 'text-red-700'}>{poll.ok ? 'ok' : 'FAILED'} · {new Date(poll.ran_at).toLocaleString()} · {poll.note} ({poll.runner})</span> : <span className="text-amber-700">not yet run</span>}
+        </p>
+        {alerts.length > 0 && (
+          <ul className="mt-2 divide-y divide-ink-700/5 text-sm">
+            {alerts.map((a) => (
+              <li key={a.id} className="py-1.5 flex items-start gap-2">
+                <span>{a.kind === 'cults_sale' ? '💶' : a.kind === 'website_order' ? '🛒' : '🔔'}</span>
+                <div className="min-w-0">
+                  <div className="font-medium text-ink-900 truncate">{a.url?.startsWith('http') ? <a href={a.url} target="_blank" rel="noreferrer" className="hover:underline">{a.title}</a> : a.title}</div>
+                  <div className="text-xs text-ink-700/60 truncate">{a.body} · {new Date(a.created_at).toLocaleString()}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {data?.ok && (
         <>

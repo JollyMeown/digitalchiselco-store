@@ -3,18 +3,21 @@
 // instead of hitting Cults directly. Returns sales rows + a summary, plus how many
 // of our products we've published to Cults so far.
 //
+// Every call also INGESTS what it fetched (src/lib/cults.ts): new sales are
+// persisted, pushed to the owner_alerts feed (chime) and Telegram, exactly
+// once. So while the Cults tab is open, its 30 s refresh doubles as a poller.
+//
 // Requires CULTS3D_USERNAME + CULTS3D_API_KEY in the server env (Netlify).
 
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../lib/supabase';
+import { cultsConfigured, fetchCultsSales, ingestCultsSales, markPoll } from '../../../lib/cults';
 
 export const prerender = false;
 
 const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY!;
-const CULTS_USER = process.env.CULTS3D_USERNAME || import.meta.env.CULTS3D_USERNAME || '';
-const CULTS_KEY = process.env.CULTS3D_API_KEY || import.meta.env.CULTS3D_API_KEY || '';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
@@ -33,44 +36,25 @@ async function isCallerAdmin(request: Request): Promise<boolean> {
 
 export const GET: APIRoute = async ({ request }) => {
   if (!(await isCallerAdmin(request))) return json({ error: 'unauthorized' }, 401);
-  if (!CULTS_USER || !CULTS_KEY) {
+  if (!cultsConfigured()) {
     return json({ error: 'Cults3D API not configured on the server. Set CULTS3D_USERNAME and CULTS3D_API_KEY in Netlify env vars.' }, 503);
   }
 
-  const authHeader = 'Basic ' + Buffer.from(`${CULTS_USER}:${CULTS_KEY}`).toString('base64');
-  const gql = async (query: string) => {
-    const r = await fetch('https://cults3d.com/graphql', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: authHeader },
-      body: JSON.stringify({ query }),
-    });
-    return r.json();
-  };
-
-  // Pull all sales (paginated). Cults rate limit is generous for occasional admin views.
-  const sales: any[] = [];
+  const admin = supabaseAdmin();
+  let sales: any[] = [];
   try {
-    for (let offset = 0; offset < 5000; offset += 100) {
-      const q = `{ myself { salesBatch(limit:100, offset:${offset}){ total results {
-        id createdAt payedOutAt
-        income { value currency formatted }
-        totalTaxed { value formatted }
-        commission { value formatted }
-        orderCountry { name code }
-        creation { name slug url(locale:EN) }
-      } } } }`;
-      const d = await gql(q);
-      if (d.errors) return json({ error: 'Cults3D API error', detail: d.errors }, 502);
-      const batch = d.data?.myself?.salesBatch?.results || [];
-      sales.push(...batch);
-      if (batch.length < 100) break;
-    }
+    sales = await fetchCultsSales(5000);
   } catch (e: any) {
+    await markPoll(admin, false, String(e?.message || e), 'admin-tab');
     return json({ error: 'Failed to reach Cults3D', detail: String(e?.message || e) }, 502);
   }
 
-  // Newest first.
-  sales.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  // Ingest + alert-once (never fails the dashboard read).
+  let ingest: any = null;
+  try {
+    ingest = await ingestCultsSales(admin, sales, { runner: 'admin-tab' });
+    await markPoll(admin, true, `${ingest.total} checked · ${ingest.inserted} new · ${ingest.alerted} alerted${ingest.seeded ? ' · seeded history silently' : ''}`, 'admin-tab');
+  } catch (e: any) { console.error('[cults-sales] ingest failed:', e?.message); }
 
   const currency = sales[0]?.income?.currency || 'EUR';
   const totalIncome = sales.reduce((s, x) => s + (x.income?.value || 0), 0);
@@ -85,7 +69,6 @@ export const GET: APIRoute = async ({ request }) => {
   // How many of our products are live on Cults so far.
   let listed = 0;
   try {
-    const admin = supabaseAdmin();
     const { count } = await admin.from('products').select('id', { count: 'exact', head: true }).not('cults3d_uploaded_at', 'is', null);
     listed = count || 0;
   } catch {}
@@ -99,5 +82,6 @@ export const GET: APIRoute = async ({ request }) => {
     salesCount: sales.length,
     listed,
     sales,
+    ingest: ingest ? { inserted: ingest.inserted, alerted: ingest.alerted, seeded: ingest.seeded } : null,
   });
 };

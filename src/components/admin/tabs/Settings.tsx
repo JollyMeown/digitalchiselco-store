@@ -68,6 +68,9 @@ export default function Settings() {
       a.volume = Math.min(1, Math.max(0, (Number(s.order_sound_volume) || 80) / 100));
       a.play().catch(() => {});
     } catch {}
+    // Same click also asks for desktop-notification permission, so a Cults3D
+    // or website sale pops up even when this tab is in the background.
+    try { if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission(); } catch {}
   }
 
   // Read/merge a marquee section's settings with defaults.
@@ -139,12 +142,12 @@ export default function Settings() {
         </label>
       </Card>
 
-      <Card title="🔔 Order sound notifications">
-        <p className="text-xs text-ink-700/60 mb-3">When a new order lands while you're in the admin, play a short chime. Browser tab must be open for the sound to play.</p>
+      <Card title="🔔 Sale sound notifications (website + Cults3D)">
+        <p className="text-xs text-ink-700/60 mb-3">When a website order lands, or the Cults3D poller (every 10 minutes) finds a new sale, the admin plays the cha-ching, shows a toast with the design + country + amount, and sends a desktop notification. The admin tab must be open (it can be in the background).</p>
         <div className="grid md:grid-cols-3 gap-4 items-end">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={!!s.order_sound_enabled} onChange={(e) => setS({ ...s, order_sound_enabled: e.target.checked })} />
-            Play sound on new order
+            Play sound on new sale (website + Cults3D)
           </label>
           <div>
             <label className={labelCls}>Volume: <span className="font-mono text-bronze-700">{vol}%</span></label>
@@ -155,7 +158,7 @@ export default function Settings() {
           </div>
           <div>
             <button className={btnGhost} onClick={testChime}>▶ Test cha-ching</button>
-            <p className="text-[11px] text-ink-700/50 mt-1">Plays the cha-ching order sound. Browsers require a click to enable audio — clicking this also unlocks the sound for live orders this session.</p>
+            <p className="text-[11px] text-ink-700/50 mt-1">Plays the cha-ching. Browsers require a click to enable audio, so this also unlocks the sound for live sales this session and asks permission for desktop notifications.</p>
           </div>
         </div>
       </Card>

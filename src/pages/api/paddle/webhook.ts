@@ -453,8 +453,19 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // Gated by growth_settings.owner_alerts_enabled; idempotent per order.
   try {
     const { data: gset } = await db.from('growth_settings').select('owner_alerts_enabled').eq('id', 1).maybeSingle();
+    const { data: oiAlert } = await db.from('order_items').select('title, price_usd').eq('order_id', order.id).limit(10);
+    // Dashboard feed row (all channels live here; the admin chime for website
+    // orders comes from the `orders` realtime insert, so the listener does not
+    // ring twice for this kind). Not gated: it is history, not a notification.
+    if (!resumeEmailOnly) {
+      await db.from('owner_alerts').insert({
+        kind: 'website_order',
+        title: `Website order: $${total.toFixed(2)} ${currency}`,
+        body: `${email} · ${(oiAlert || []).slice(0, 3).map((r: any) => String(r.title).split('|')[0].trim()).join(', ')}`,
+        amount: total, currency, url: '#orders', meta: { order_id: order.id, txn_id: txn.id },
+      });
+    }
     if (gset?.owner_alerts_enabled) {
-      const { data: oiAlert } = await db.from('order_items').select('title, price_usd').eq('order_id', order.id).limit(10);
       const lines = (oiAlert || []).map((r: any) => `• ${String(r.title).split('|')[0].trim()} ($${Number(r.price_usd).toFixed(2)})`).join('<br/>');
       await sendEmail({
         to: OPS_INBOX,

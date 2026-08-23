@@ -388,13 +388,15 @@ function SystemHealth() {
     (async () => {
       const today = new Date().toISOString().slice(0, 10);
       const d30 = new Date(Date.now() - 30 * 86400000).toISOString();
-      const [{ data: runs }, { count: sentToday }, { data: evs30 }, { data: wk }, { data: lastOrder }, { count: openCarts }] = await Promise.all([
+      const [{ data: runs }, { count: sentToday }, { data: evs30 }, { data: wk }, { data: lastOrder }, { count: openCarts }, { data: cultsPoll }, { data: lastCults }] = await Promise.all([
         supabase.from('cron_runs').select('ran_at, ok, finished_at, error').order('ran_at', { ascending: false }).limit(1),
         supabase.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', today + 'T00:00:00Z'),
         supabase.from('email_events').select('event').gte('created_at', d30).in('event', ['sent', 'delivered', 'bounced', 'complained']).limit(20000),
         supabase.from('weekly_digest_log').select('week_key, queued_count, drain_note').order('week_key', { ascending: false }).limit(1),
         supabase.from('orders').select('created_at, total, currency').eq('status', 'paid').order('created_at', { ascending: false }).limit(1),
         supabase.from('abandoned_carts').select('id', { count: 'exact', head: true }).is('recovered_at', null).is('reminded_at', null),
+        supabase.from('poll_status').select('ran_at, ok, note, runner').eq('key', 'cults_sales').maybeSingle(),
+        supabase.from('cults_sales').select('sold_at, income, currency, product_name').order('sold_at', { ascending: false }).limit(1),
       ]);
       // weekly pending count
       let pending = 0, sentWk = 0;
@@ -408,7 +410,7 @@ function SystemHealth() {
       const delivered = (evs30 || []).filter((e: any) => e.event === 'delivered' || e.event === 'sent').length;
       const bounced = (evs30 || []).filter((e: any) => e.event === 'bounced').length;
       const complained = (evs30 || []).filter((e: any) => e.event === 'complained').length;
-      setH({ run: runs?.[0] || null, sentToday: sentToday || 0, delivered, bounced, complained, wk: wk?.[0] || null, pending, sentWk, lastOrder: lastOrder?.[0] || null, openCarts: openCarts || 0 });
+      setH({ run: runs?.[0] || null, sentToday: sentToday || 0, delivered, bounced, complained, wk: wk?.[0] || null, pending, sentWk, lastOrder: lastOrder?.[0] || null, openCarts: openCarts || 0, cultsPoll: cultsPoll || null, lastCults: lastCults?.[0] || null });
     })();
   }, []);
   if (!h) return null;
@@ -425,6 +427,12 @@ function SystemHealth() {
   const lastAgeH = h.lastOrder ? (Date.now() - Date.parse(h.lastOrder.created_at)) / 3600000 : Infinity;
   const orderState = !h.lastOrder ? 'amber' : lastAgeH > 72 ? 'amber' : 'green';
   const cartsState = h.openCarts >= 20 ? 'amber' : 'green';
+  // Cults3D poller: runs every 10 min (Netlify) + on every Cults-tab refresh.
+  const cpAgeM = h.cultsPoll ? (Date.now() - Date.parse(h.cultsPoll.ran_at)) / 60000 : Infinity;
+  const cultsState = !h.cultsPoll ? 'amber' : h.cultsPoll.ok === false ? 'red' : cpAgeM > 45 ? 'amber' : 'green';
+  const cultsText = !h.cultsPoll ? 'not yet polled' : h.cultsPoll.ok === false ? 'poll FAILED' : `watching · ${cpAgeM < 1 ? 'just now' : cpAgeM < 90 ? Math.round(cpAgeM) + 'm ago' : Math.round(cpAgeM / 60) + 'h ago'}`;
+  const lastCultsAgeH = h.lastCults ? (Date.now() - Date.parse(h.lastCults.sold_at)) / 3600000 : null;
+  const cultsSub = h.cultsPoll?.ok === false ? (h.cultsPoll.note || 'error') : h.lastCults ? `last sale €${Number(h.lastCults.income).toFixed(2)} · ${lastCultsAgeH! < 1 ? 'just now' : lastCultsAgeH! < 48 ? Math.round(lastCultsAgeH!) + 'h ago' : Math.round(lastCultsAgeH! / 24) + 'd ago'}` : 'no Cults sales recorded yet';
 
   const dot: Record<string, string> = { green: 'bg-green-500', amber: 'bg-amber-500', red: 'bg-red-500 animate-pulse' };
   const bg: Record<string, string> = { green: 'bg-green-50 border-green-200', amber: 'bg-amber-50 border-amber-200', red: 'bg-red-50 border-red-300' };
@@ -435,7 +443,8 @@ function SystemHealth() {
       {sub && <div className="text-[10px] text-ink-700/60 mt-0.5 truncate" title={sub}>{sub}</div>}
     </a>
   );
-  const worst = [cronState, quotaState, bounceState, wkState, orderState, cartsState].includes('red') ? 'red' : [cronState, quotaState, bounceState, wkState, orderState, cartsState].includes('amber') ? 'amber' : 'green';
+  const all = [cronState, quotaState, bounceState, wkState, orderState, cartsState, cultsState];
+  const worst = all.includes('red') ? 'red' : all.includes('amber') ? 'amber' : 'green';
 
   return (
     <div>
@@ -444,13 +453,14 @@ function SystemHealth() {
         <span className="text-sm font-bold text-ink-900">System health</span>
         <span className="text-[11px] text-ink-700/50">{worst === 'green' ? 'all systems normal' : worst === 'amber' ? 'something needs a look' : 'ATTENTION NEEDED'} · tap a tile for detail</span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
         <Tile state={cronState} icon="⏱" label="Nightly automation" value={cronText} sub={h.run?.error || (h.run ? new Date(h.run.ran_at).toLocaleString() : 'scheduler has never reported in')} href="#automations" />
         <Tile state={quotaState} icon="📧" label="Email quota today" value={`${h.sentToday} / ${DAILY_SOFT_CAP}`} sub={`${quotaPct}% of soft daily cap`} href="#automations" />
         <Tile state={bounceState} icon="📉" label="Bounce + spam (30d)" value={`${bounceRate.toFixed(1)}%`} sub={`${h.bounced} bounced · ${h.complained} complaints · ${h.delivered} delivered`} href="#automations" />
         <Tile state={wkState} icon="📅" label="Weekly digest" value={h.wk ? `${h.sentWk}/${h.wk.queued_count || h.sentWk + h.pending}` : '—'} sub={h.wk ? (h.pending ? `${h.pending} pending · auto-retry nightly` : `${h.wk.week_key} complete`) : 'none yet'} href="#automations" />
         <Tile state={orderState} icon="🧾" label="Last order" value={h.lastOrder ? `$${Number(h.lastOrder.total).toFixed(2)}` : 'none'} sub={h.lastOrder ? (lastAgeH < 1 ? 'just now' : lastAgeH < 48 ? `${Math.round(lastAgeH)}h ago` : `${Math.round(lastAgeH / 24)}d ago`) : ''} href="#orders" />
         <Tile state={cartsState} icon="🛒" label="Open carts" value={String(h.openCarts)} sub="awaiting reminder" href="#insights" />
+        <Tile state={cultsState} icon="◈" label="Cults3D sale alerts" value={cultsText} sub={cultsSub} href="#cults" />
       </div>
     </div>
   );
