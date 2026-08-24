@@ -107,6 +107,14 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   const withOvr = (kind: string, out: { subject: string; html: string; text: string }, email: string) =>
     applyOverride(out, ovr.get(kind), email, TEMPLATE_HEADINGS[kind] || '');
 
+  // Shared helpers MUST be defined before the first step that uses them: the
+  // weekly digest was moved to run first (2026-08-18) but okEmail still lived
+  // beside the win-back step below, so the Monday GENERATE path died with a
+  // temporal-dead-zone error on 2026-08-24 (W35). Defined here, used everywhere.
+  const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
+  const BAD = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
+  const okEmail = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !BAD.test(e);
+
   // ── PRIORITY: the weekly digest runs FIRST ───────────────────────────
   // It is the highest-value, widest-reach send (every confirmed subscriber).
   // On a quota-limited day it must never lose out to the drip.
@@ -593,9 +601,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     stats.browse = s;
   });
 
-  const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
-  const BAD = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
-  const okEmail = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !BAD.test(e);
+  // (SITE / BAD / okEmail are defined at the top of this function.)
 
   // ── 6. Win-back + deliverability suppression ─────────────────────────
   stats.winback = 'off';
