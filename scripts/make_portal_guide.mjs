@@ -98,13 +98,30 @@ function footer(page, n) {
   let y = H - 70;
   p.drawText('Signing in, step by step', { x: M, y, size: 22, font: serif, color: BRONZE }); y -= 30;
 
-  p.drawText('Step 1 · Open the portal and enter your email', { x: M, y, size: 13, font: bold, color: INK }); y -= 18;
-  y = para(p, body, 'Go to digitalchiselco.com/account (the "Account" link in the top menu of the website). Type the SAME email address you used at checkout and press "Email me a sign-in link".', 10.5, M, y, W - 2 * M, SOFT); y -= 8;
+  p.drawText('Step 1 · Click "Account" in the top menu', { x: M, y, size: 13, font: bold, color: INK }); y -= 18;
+  y = para(p, body, 'On any page of digitalchiselco.com, look at the menu bar at the top. Click the "Account" link (highlighted in red below). On a phone, tap the menu icon first, then Account. You land on the page shown here: type the SAME email address you used at checkout and press "Email me a sign-in link".', 10.5, M, y, W - 2 * M, SOFT); y -= 8;
   const shot1 = await doc.embedPng(fs.readFileSync(path.join(SHOTS, 'portal-signin.png')));
-  { const s = Math.min((W - 2 * M) / shot1.width, 300 / shot1.height); const iw = shot1.width * s, ih = shot1.height * s; const x = (W - iw) / 2;
-    p.drawImage(shot1, { x, y: y - ih, width: iw, height: ih });
-    p.drawRectangle({ x, y: y - ih, width: iw, height: ih, borderColor: BRONZE, borderWidth: 1 });
-    y -= ih + 26; }
+  { const s = Math.min((W - 2 * M) / shot1.width, 290 / shot1.height); const iw = shot1.width * s, ih = shot1.height * s; const x = (W - iw) / 2;
+    // Red callout so buyers know exactly what to click: label sits ABOVE the
+    // screenshot (never over page content) with an arrow down to a ring around
+    // the "Account" link (fractions measured on the 1280x900 capture:
+    // rect 1001,45 69x38 px).
+    const RED = rgb(0.85, 0.1, 0.1);
+    const label = 'Click "Account" to open your portal';
+    const lw = bold.widthOfTextAtSize(label, 11);
+    const imgTop = y - 20;                        // reserve a line for the label
+    const hx = x + (1001 / 1280) * iw, hw = (69 / 1280) * iw;
+    const hTop = imgTop - (45 / 900) * ih, hh = (38 / 900) * ih;
+    p.drawText(label, { x: hx + hw - lw - 40, y: y - 8, size: 11, font: bold, color: RED });
+    p.drawImage(shot1, { x, y: imgTop - ih, width: iw, height: ih });
+    p.drawRectangle({ x, y: imgTop - ih, width: iw, height: ih, borderColor: BRONZE, borderWidth: 1 });
+    p.drawRectangle({ x: hx, y: hTop - hh, width: hw, height: hh, borderColor: RED, borderWidth: 2, opacity: 0 });
+    // short arrow from the label down-right onto the ring
+    const ax = hx + hw / 2, ay = hTop + 2;        // tip just above the ring
+    p.drawLine({ start: { x: hx + hw - 36, y: y - 10 }, end: { x: ax, y: ay }, thickness: 1.6, color: RED });
+    p.drawLine({ start: { x: ax, y: ay }, end: { x: ax - 8, y: ay + 6 }, thickness: 1.6, color: RED });
+    p.drawLine({ start: { x: ax, y: ay }, end: { x: ax + 2, y: ay + 10 }, thickness: 1.6, color: RED });
+    y = imgTop - ih - 26; }
 
   p.drawText('Step 2 · Click the link in your inbox', { x: M, y, size: 13, font: bold, color: INK }); y -= 18;
   y = para(p, body, 'Within a minute you will receive an email titled "Sign in to your DigitalChiselCo account". Click the "View my account" button inside it. The link signs you in instantly and stays valid for 30 days. If you do not see the email, check your Spam or Promotions folder.', 10.5, M, y, W - 2 * M, SOFT); y -= 14;
