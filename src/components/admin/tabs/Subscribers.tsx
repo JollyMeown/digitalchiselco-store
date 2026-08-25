@@ -43,6 +43,7 @@ export default function Subscribers() {
 
   return (
     <div className="space-y-4">
+      <PortalGuideSender subscribers={rows} />
       <Card>
         <div className="flex flex-wrap items-center gap-3">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by email or source…" className={inputCls + ' max-w-xs'} />
@@ -82,6 +83,110 @@ export default function Subscribers() {
         {open && <SubForm s={open === 'new' ? null : (open as Sub)} onDone={() => { setOpen(null); load(); }} />}
       </Modal>
     </div>
+  );
+}
+
+// ── Send the "How your portal works" PDF to anyone who needs help ──────
+// Single customer, a pasted list, or one-click groups (buyers / subscribers).
+function PortalGuideSender({ subscribers }: { subscribers: Sub[] }) {
+  const [recipients, setRecipients] = useState<string[]>([]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState('');
+  const [results, setResults] = useState<{ email: string; ok: boolean; error?: string }[] | null>(null);
+
+  const addEmails = (list: string[]) => {
+    const valid = list.map((e) => e.toLowerCase().trim()).filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+    setRecipients((r) => [...new Set([...r, ...valid])]);
+  };
+  const suggestions = input.trim().length >= 2
+    ? subscribers.filter((s) => s.email.toLowerCase().includes(input.toLowerCase()) && !recipients.includes(s.email.toLowerCase())).slice(0, 6)
+    : [];
+
+  async function addBuyers() {
+    setBusy('buyers');
+    // paid orders above $1 (the $1 orders are the owner's tests)
+    const { data } = await supabase.from('orders').select('email,total').eq('status', 'paid').is('deleted_at', null).gt('total', 1).limit(2000);
+    addEmails([...new Set((data || []).map((o: any) => String(o.email || '')))].filter((e) => e && !e.includes('unknown@')));
+    setBusy('');
+  }
+
+  async function call(body: any) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin/send-portal-guide', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify(body) });
+    return res.json();
+  }
+  async function doPreview() {
+    setBusy('preview');
+    try {
+      const j = await call({ preview: true });
+      if (j.ok) { const url = URL.createObjectURL(new Blob([j.html], { type: 'text/html' })); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000); }
+      else alert(j.error || 'preview failed');
+    } catch (e: any) { alert(String(e?.message || e)); }
+    setBusy('');
+  }
+  async function doSend(test = false) {
+    if (!test && recipients.length === 0) { alert('Add at least one recipient first.'); return; }
+    if (!test && recipients.length > 20 && !confirm(`Send the portal guide to ${recipients.length} people?`)) return;
+    setBusy(test ? 'test' : 'send');
+    setResults(null);
+    try {
+      const j = await call(test ? { test: true } : { emails: recipients });
+      setResults(j.results || []);
+      if (!test && j.ok) setRecipients((r) => r.filter((e) => !(j.results || []).some((x: any) => x.email === e && x.ok)));
+    } catch (e: any) { alert(String(e?.message || e)); }
+    setBusy('');
+  }
+
+  return (
+    <Card title="📖 Send the portal guide (help a customer)">
+      <p className="text-xs text-ink-700/60 mb-3">
+        Emails the branded <strong>"How Your Portal Works"</strong> PDF (sign-in steps with pictures, lifetime re-downloads, points, referral link) to whoever needs it. Type any email, pick a subscriber from the suggestions, or add a whole group. Each address gets it at most once per day, and buyer order-emails always keep priority over big sends.
+      </p>
+      <div className="flex flex-wrap gap-2 items-start">
+        <div className="relative">
+          <input value={input} onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { addEmails(input.split(/[\s,;]+/)); setInput(''); } }}
+            placeholder="Type an email (or search subscribers)…" className={inputCls + ' w-72'} />
+          {suggestions.length > 0 && (
+            <div className="absolute z-20 mt-1 w-72 bg-white border border-black/10 rounded-md shadow-lg">
+              {suggestions.map((s) => (
+                <button key={s.id} className="block w-full text-left px-3 py-1.5 text-sm hover:bg-cream/60"
+                  onClick={() => { addEmails([s.email]); setInput(''); }}>{s.email}</button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button className={btnGhost} onClick={() => { addEmails(input.split(/[\s,;]+/)); setInput(''); }}>+ Add</button>
+        <button className={btnGhost} disabled={busy === 'buyers'} onClick={addBuyers}>{busy === 'buyers' ? 'Loading…' : '+ All buyers'}</button>
+        <button className={btnGhost} onClick={() => addEmails(subscribers.map((s) => s.email))}>+ All subscribers ({subscribers.length})</button>
+        {recipients.length > 0 && <button className={btnGhost} onClick={() => setRecipients([])}>Clear</button>}
+      </div>
+      {recipients.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {recipients.slice(0, 40).map((e) => (
+            <span key={e} className="inline-flex items-center gap-1 text-xs bg-cream border border-bronze-600/20 rounded-full px-2.5 py-1">
+              {e}
+              <button className="text-ink-700/50 hover:text-red-600" onClick={() => setRecipients((r) => r.filter((x) => x !== e))}>✕</button>
+            </span>
+          ))}
+          {recipients.length > 40 && <span className="text-xs text-ink-700/60 self-center">+{recipients.length - 40} more</span>}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2 mt-3">
+        <button className={btnPrimary} disabled={!!busy || recipients.length === 0} onClick={() => doSend(false)}>
+          {busy === 'send' ? 'Sending…' : `📧 Send guide${recipients.length ? ` to ${recipients.length}` : ''}`}
+        </button>
+        <button className={btnGhost} disabled={!!busy} onClick={doPreview}>{busy === 'preview' ? 'Building…' : '👁 Preview'}</button>
+        <button className={btnGhost} disabled={!!busy} onClick={() => doSend(true)} title="Sends the exact email (with the PDF) to your own inbox">{busy === 'test' ? 'Sending…' : 'Send test to me'}</button>
+      </div>
+      {results && (
+        <div className="mt-3 text-xs space-y-0.5">
+          {results.map((r) => (
+            <div key={r.email} className={r.ok ? 'text-green-700' : 'text-red-700'}>{r.ok ? '✓' : '✗'} {r.email}{r.error ? ` · ${r.error}` : ''}</div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 

@@ -559,3 +559,27 @@ export function abandonedBrowseEmail(d: { email: string; products: MiniProduct[]
   const text = `Designs you viewed at DigitalChiselCo: ` + d.products.slice(0, 6).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join(' · ') + `\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'Still thinking it over? 🪵', body, d.email), text };
 }
+
+// ── Portal guide (help email, sent from Admin → Subscribers) ──────────
+// One consistent message used for the buyer catch-up blast and the admin
+// "send the guide to whoever needs help" tool. The PDF itself is attached by
+// the caller (see order-email.ts PORTAL_GUIDE_URL / PORTAL_GUIDE_FILENAME).
+export function portalGuideEmail(): { subject: string; html: string; text: string } {
+  const subject = 'Your DigitalChiselCo portal: lifetime downloads, points and more (guide attached)';
+  const html = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#2a241d;">
+<p>Hi,</p>
+<p>Thank you for being part of <strong>DigitalChiselCo</strong>. I wanted to make sure you know about something many customers miss: every purchase comes with <strong>lifetime access to your own customer portal</strong>.</p>
+<p>In your portal you can:</p>
+<ul style="line-height:1.7;">
+<li><strong>Re-download every file you have ever bought</strong>, forever and free (lost files are never a problem)</li>
+<li>See all your orders in one place, each with its own download button</li>
+<li>Collect <strong>loyalty points</strong> (10 points per $1) that turn into store credit</li>
+<li>Share your personal <strong>give 15%, get 15%</strong> referral link</li>
+</ul>
+<p>I attached a short 3 page guide with pictures showing exactly how to sign in. In short: on <a href="https://digitalchiselco.com" style="color:#854F0B;">digitalchiselco.com</a>, click <strong>Account</strong> in the top menu, enter the email this message was sent to, and click the sign in link we email you. No password needed.</p>
+<p style="margin:22px 0;"><a href="https://digitalchiselco.com/account" style="background:#854F0B;color:#fff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:bold;">Open my portal</a></p>
+<p>Any question at all, just reply to this email and I will help personally.</p>
+<p>Happy carving!<br/>Jolly · DigitalChiselCo</p></div>`;
+  const text = 'Thank you for being part of DigitalChiselCo. Every purchase includes lifetime access to your customer portal: re-download every file you have bought (free, forever), see all orders, collect loyalty points (10 per $1), and share your give 15% get 15% referral link. How to sign in: go to digitalchiselco.com, click Account in the top menu, enter the email this message was sent to, then click the sign-in link we email you. No password needed. The attached PDF shows it with pictures. Questions? Just reply. Jolly, DigitalChiselCo';
+  return { subject, html, text };
+}
