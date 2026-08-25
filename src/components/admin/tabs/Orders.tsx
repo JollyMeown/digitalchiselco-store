@@ -30,6 +30,23 @@ export default function Orders() {
     setRows(data ?? []); setLoading(false);
   }
   const [resending, setResending] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  async function previewEmail(id: string) {
+    setPreviewing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/resend-order-email', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ order_id: id, preview: true }) });
+      const j = await res.json();
+      if (!j.ok) { alert(`Preview failed: ${j.error || res.status}`); }
+      else {
+        const doc = `<title>Preview: ${j.subject.replace(/</g, '&lt;')}</title><div style="background:#eee;padding:10px 14px;font:13px system-ui;border-bottom:1px solid #ccc;"><b>To:</b> ${j.email} &nbsp; <b>Subject:</b> ${j.subject.replace(/</g, '&lt;')} &nbsp; <i>(preview only, nothing sent; the portal-guide PDF is attached on real sends)</i></div>` + j.html;
+        const url = URL.createObjectURL(new Blob([doc], { type: 'text/html' }));
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }
+    } catch (e: any) { alert(String(e?.message || e)); }
+    setPreviewing(false);
+  }
   async function resendEmail(id: string) {
     setResending(true);
     try {
@@ -217,6 +234,7 @@ export default function Orders() {
               {['paid', 'pending', 'refunded', 'failed', 'canceled'].map((s) => (
                 <button key={s} className={btnGhost} onClick={() => setStatusFor(open.id, s)}>{s}</button>
               ))}
+              <button className={btnGhost} disabled={previewing} onClick={() => previewEmail(open.id)} title="Opens the exact rebuilt confirmation email in a new tab without sending anything">{previewing ? 'Building…' : '👁 Preview email'}</button>
               <button className={open.confirmation_sent_at ? btnGhost : btnPrimary} disabled={resending} onClick={() => resendEmail(open.id)} title="Rebuilds the order confirmation with all download links and emails it to the buyer now (bypasses the daily marketing quota)">{resending ? 'Sending…' : '📧 Resend download email'}</button>
               <a href={`/admin/invoice/${open.id}`} target="_blank" className={btnGhost}>Invoice ↗</a>
               <div className="ml-auto flex gap-2">

@@ -4,7 +4,7 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../lib/supabase';
-import { sendOrderConfirmationForOrder } from '../../../lib/order-email';
+import { buildOrderConfirmationForOrder, sendOrderConfirmationForOrder } from '../../../lib/order-email';
 
 export const prerender = false;
 
@@ -28,6 +28,12 @@ export const POST: APIRoute = async ({ request }) => {
   const body = await request.json().catch(() => ({}));
   const orderId = String(body?.order_id || '');
   if (!orderId) return json({ error: 'order_id required' }, 400);
+  // preview: return the exact rebuilt email (subject + HTML) without sending.
+  if (body?.preview) {
+    const b = await buildOrderConfirmationForOrder(supabaseAdmin(), orderId);
+    if (!b.ok) return json({ ok: false, error: b.error }, 502);
+    return json({ ok: true, subject: b.subject, html: b.html, email: b.order.email });
+  }
   const r = await sendOrderConfirmationForOrder(supabaseAdmin(), orderId, { reason: 'admin', force: body?.force !== false });
   return json(r, r.ok ? 200 : 502);
 };

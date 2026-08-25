@@ -21,19 +21,30 @@ function env(name: string): string | undefined {
   return process.env[name] ?? (import.meta as any).env?.[name];
 }
 
-export async function sendOrderConfirmationForOrder(
+// The buyer guide attached to every order confirmation. Regenerate with
+// `node scripts/make_portal_guide.mjs` (same URL, upsert).
+export const PORTAL_GUIDE_URL = 'https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/downloads/portal-guide.pdf';
+export const PORTAL_GUIDE_FILENAME = 'How-Your-DigitalChiselCo-Portal-Works.pdf';
+
+// A short block appended to the confirmation HTML pointing at the attached
+// guide, so buyers discover the portal (lifetime re-downloads, points, ...).
+export function portalGuideBlock(): string {
+  return `<div style="margin:26px 0 0;padding:16px 18px;background:#faf6ee;border:1px solid #e5d9c3;border-radius:8px;">
+    <p style="margin:0 0 6px;font-weight:bold;color:#5a3a10;">📖 New here? Your portal in 3 pages</p>
+    <p style="margin:0;color:#6b5d4a;font-size:14px;line-height:1.5;">We attached a short PDF showing how to sign in to your customer portal and what it gives you: lifetime re-downloads of every file you buy, loyalty points (10 per $1), and your personal give-15%-get-15% referral link. You can also <a href="${PORTAL_GUIDE_URL}" style="color:#854F0B;">view the guide online</a> or go straight to <a href="https://digitalchiselco.com/account" style="color:#854F0B;">digitalchiselco.com/account</a>.</p>
+  </div>`;
+}
+
+export async function buildOrderConfirmationForOrder(
   db: SupabaseClient,
   orderId: string,
-  opts: { reason: string; force?: boolean },
-): Promise<{ ok: boolean; sent?: boolean; error?: string; email?: string; skippedWhy?: string }> {
+): Promise<{ ok: true; order: any; subject: string; html: string; text: string } | { ok: false; error: string }> {
   const { data: order, error: oErr } = await db.from('orders')
     .select('id, email, status, total, subtotal, currency, created_at, customer_name, paddle_transaction_id, discount_amount, confirmation_sent_at, deleted_at')
     .eq('id', orderId).maybeSingle();
   if (oErr || !order) return { ok: false, error: oErr?.message || 'order not found' };
   if (order.deleted_at) return { ok: false, error: 'order is deleted' };
-  if (order.status !== 'paid') return { ok: false, error: `order status is '${order.status}', not paid` };
   if (!order.email || order.email === 'unknown@digitalchiselco.com') return { ok: false, error: 'order has no usable email' };
-  if (order.confirmation_sent_at && !opts.force) return { ok: true, sent: false, email: order.email, skippedWhy: 'already sent ' + order.confirmation_sent_at };
 
   // Items + customizations + downloads + logo — same sources as the webhook.
   const [{ data: orderItems }, { data: settings }] = await Promise.all([
@@ -81,7 +92,7 @@ export async function sendOrderConfirmationForOrder(
     } catch { /* receipt extras are optional */ }
   }
 
-  const { subject, html, text } = orderConfirmation({
+  const built = orderConfirmation({
     email: order.email,
     customerName: order.customer_name || null,
     gift: null,
@@ -100,6 +111,23 @@ export async function sendOrderConfirmationForOrder(
     discountTotal: Number(order.discount_amount) || 0,
     paymentMethod,
   } as any);
+  // Portal guide pointer, inserted just before the closing of the email body.
+  const html = built.html.includes('</body>')
+    ? built.html.replace('</body>', portalGuideBlock() + '</body>')
+    : built.html + portalGuideBlock();
+  return { ok: true, order, subject: built.subject, html, text: built.text };
+}
+
+export async function sendOrderConfirmationForOrder(
+  db: SupabaseClient,
+  orderId: string,
+  opts: { reason: string; force?: boolean },
+): Promise<{ ok: boolean; sent?: boolean; error?: string; email?: string; skippedWhy?: string }> {
+  const built = await buildOrderConfirmationForOrder(db, orderId);
+  if (!built.ok) return { ok: false, error: built.error };
+  const { order, subject, html, text } = built;
+  if (order.status !== 'paid') return { ok: false, error: `order status is '${order.status}', not paid`, email: order.email };
+  if (order.confirmation_sent_at && !opts.force) return { ok: true, sent: false, email: order.email, skippedWhy: 'already sent ' + order.confirmation_sent_at };
 
   const res = await sendEmail({
     to: order.email,
@@ -110,6 +138,7 @@ export async function sendOrderConfirmationForOrder(
     // Resend's idempotency window would swallow a same-key retry as a no-op.
     idempotencyKey: `order:${order.id}:${opts.reason}:${new Date().toISOString().slice(0, 13)}`,
     tags: [{ name: 'kind', value: 'order' }],
+    attachments: [{ filename: PORTAL_GUIDE_FILENAME, path: PORTAL_GUIDE_URL }],
   });
   if (res.ok && !res.skipped) {
     await db.from('orders').update({ confirmation_sent_at: new Date().toISOString() }).eq('id', order.id);

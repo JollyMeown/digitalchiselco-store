@@ -36,6 +36,9 @@ type SendOptions = {
   /** Extra SMTP headers (e.g. List-Unsubscribe). Marketing sends get
    *  unsubscribe headers attached automatically — see marketingHeadersFor(). */
   headers?: Record<string, string>;
+  /** Optional attachments. `path` is a public URL Resend fetches server-side
+   *  (preferred: keeps our request small); `content` is base64 file bytes. */
+  attachments?: { filename: string; path?: string; content?: string }[];
 };
 
 // Transactional kinds carry no unsubscribe header (order receipts, gift
@@ -193,6 +196,7 @@ export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: strin
   if (replyTo) body.reply_to = replyTo;
   if (opts.tags?.length) body.tags = opts.tags;
   if (opts.scheduledAt) body.scheduled_at = opts.scheduledAt;
+  if (opts.attachments?.length) body.attachments = opts.attachments;
   const firstTo = Array.isArray(opts.to) ? String(opts.to[0] || '') : String(opts.to);
   const extraHeaders = { ...marketingHeadersFor(firstTo, opts.tags), ...(opts.headers || {}) };
   if (Object.keys(extraHeaders).length) body.headers = extraHeaders;

@@ -851,13 +851,18 @@ async function handleTransactionCompleted(db: any, txn: any) {
         paymentMethod,
       });
 
+      // Every buyer also receives the "How your portal works" PDF (sign-in
+      // steps + benefits, with screenshots) and a pointer to it in the body.
+      const { portalGuideBlock, PORTAL_GUIDE_URL, PORTAL_GUIDE_FILENAME } = await import('../../../lib/order-email');
+      const htmlWithGuide = html.includes('</body>') ? html.replace('</body>', portalGuideBlock() + '</body>') : html + portalGuideBlock();
       const sendResult = await sendEmail({
         to: deliveryEmail,
         subject,
-        html,
+        html: htmlWithGuide,
         text,
         idempotencyKey: `order:${order.id}`,   // Resend dedupes if we accidentally retry
         tags: [{ name: 'kind', value: 'order' }],
+        attachments: [{ filename: PORTAL_GUIDE_FILENAME, path: PORTAL_GUIDE_URL }],
       });
 
       // Gift orders: the buyer also gets a short "delivered" note (their money
