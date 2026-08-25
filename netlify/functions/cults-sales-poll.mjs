@@ -5,6 +5,7 @@
 // Heartbeat in poll_status (key 'cults_sales') feeds the System-health tile.
 import { createClient } from '@supabase/supabase-js';
 import { pollCultsSales } from '../../src/lib/cults.ts';
+import { sweepUnsentOrderConfirmations } from '../../src/lib/order-email.ts';
 
 export const config = { schedule: '*/10 * * * *' };
 
@@ -17,6 +18,15 @@ export default async () => {
     console.log('[cults-poll]', JSON.stringify({ ok: r.ok, total: r.total, inserted: r.inserted, alerted: r.alerted, seeded: r.seeded, error: r.error }));
   } catch (e) {
     console.error('[cults-poll] crashed', e?.message || e);
+  }
+  // Piggyback: every 10 minutes, resend any paid order whose confirmation
+  // email never went out (quota outage, crash, ...). Buyer emails are the
+  // top priority — this retries until Resend accepts, then Telegrams you.
+  try {
+    const s = await sweepUnsentOrderConfirmations(db, 5);
+    if (s.checked) console.log('[order-email-sweep]', JSON.stringify(s));
+  } catch (e) {
+    console.error('[order-email-sweep] crashed', e?.message || e);
   }
   return new Response('ok', { status: 200 });
 };

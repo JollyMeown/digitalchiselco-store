@@ -56,6 +56,7 @@ export const POST: APIRoute = async ({ request }) => {
     subject: 'Sign in to your DigitalChiselCo account',
     html,
     text,
+    tags: [{ name: 'kind', value: 'auth' }],   // buyer-critical: bypasses the daily-quota gate
   });
 
   return Response.json({ ok: true });

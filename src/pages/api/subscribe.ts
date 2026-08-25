@@ -60,6 +60,7 @@ export const POST: APIRoute = async ({ request }) => {
       html,
       text,
       idempotencyKey: `subscribe-confirm:${email}`,
+      tags: [{ name: 'kind', value: 'optin' }],   // user-initiated: bypasses the daily-quota gate
     });
 
     return json({ ok: true });

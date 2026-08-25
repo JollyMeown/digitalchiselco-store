@@ -115,6 +115,16 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   const BAD = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
   const okEmail = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !BAD.test(e);
 
+  // ── STEP 0: buyer emails owed from earlier outages ───────────────────
+  // A paid order whose confirmation never went out (quota exhausted, crash)
+  // is resent BEFORE any marketing spends today's quota. Kind 'order' also
+  // bypasses the quota gate entirely (see resend.ts BUYER_CRITICAL).
+  await step(stats, 'orderEmails', async () => {
+    const { sweepUnsentOrderConfirmations } = await import('./order-email');
+    const s = await sweepUnsentOrderConfirmations(db, 20);
+    stats.orderEmails = s.checked ? s : 'none owed';
+  });
+
   // ── PRIORITY: the weekly digest runs FIRST ───────────────────────────
   // It is the highest-value, widest-reach send (every confirmed subscriber).
   // On a quota-limited day it must never lose out to the drip.

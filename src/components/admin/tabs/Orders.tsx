@@ -18,7 +18,7 @@ export default function Orders() {
   useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   async function load(silent = false) {
     if (!silent) setLoading(true);
-    let q = supabase.from('orders').select('id,email,total,status,currency,provider,provider_order_id,created_at,deleted_at,admin_note,order_items(id,title,price_usd,qty,order_item_customizations(fields))').order('created_at', { ascending: false }).limit(500);
+    let q = supabase.from('orders').select('id,email,total,status,currency,provider,provider_order_id,created_at,deleted_at,admin_note,confirmation_sent_at,order_items(id,title,price_usd,qty,order_item_customizations(fields))').order('created_at', { ascending: false }).limit(500);
     if (status !== 'all') q = q.eq('status', status);
     if (dateFrom) q = q.gte('created_at', new Date(dateFrom).toISOString());
     if (dateTo) {
@@ -28,6 +28,18 @@ export default function Orders() {
     if (!showDeleted) q = q.is('deleted_at', null);
     const { data } = await q;
     setRows(data ?? []); setLoading(false);
+  }
+  const [resending, setResending] = useState(false);
+  async function resendEmail(id: string) {
+    setResending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/resend-order-email', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ order_id: id, force: true }) });
+      const j = await res.json();
+      alert(j.ok && j.sent ? `Confirmation email sent to ${j.email}.` : `Send failed: ${j.error || res.status}`);
+      load(true);
+    } catch (e: any) { alert(String(e?.message || e)); }
+    setResending(false);
   }
   async function setStatusFor(id: string, s: string) {
     await supabase.from('orders').update({ status: s }).eq('id', id);
@@ -153,6 +165,7 @@ export default function Orders() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-ink-700/60 text-xs">Customer</span><div>{open.email}</div></div>
+              <div><span className="text-ink-700/60 text-xs">Download email</span><div>{open.confirmation_sent_at ? <span className="text-green-700 text-xs">✓ sent {new Date(open.confirmation_sent_at).toLocaleString()}</span> : <span className="text-red-700 text-xs font-bold">✗ NOT SENT, buyer has no links!</span>}</div></div>
               <div><span className="text-ink-700/60 text-xs">Date</span><div>{new Date(open.created_at).toLocaleString()}</div></div>
               <div><span className="text-ink-700/60 text-xs">Provider</span><div>{open.provider || '—'} {open.provider_order_id ? `· ${open.provider_order_id}` : ''}</div></div>
               <div><span className="text-ink-700/60 text-xs">Status</span><div><span className={`text-xs px-2 py-0.5 rounded ${badge(open.status)}`}>{open.status}</span></div></div>
@@ -204,6 +217,7 @@ export default function Orders() {
               {['paid', 'pending', 'refunded', 'failed', 'canceled'].map((s) => (
                 <button key={s} className={btnGhost} onClick={() => setStatusFor(open.id, s)}>{s}</button>
               ))}
+              <button className={open.confirmation_sent_at ? btnGhost : btnPrimary} disabled={resending} onClick={() => resendEmail(open.id)} title="Rebuilds the order confirmation with all download links and emails it to the buyer now (bypasses the daily marketing quota)">{resending ? 'Sending…' : '📧 Resend download email'}</button>
               <a href={`/admin/invoice/${open.id}`} target="_blank" className={btnGhost}>Invoice ↗</a>
               <div className="ml-auto flex gap-2">
                 {open.deleted_at

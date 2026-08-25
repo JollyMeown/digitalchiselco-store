@@ -97,6 +97,40 @@ let quotaExhaustedDay: string | null = null;
 export function isQuotaExhausted(): boolean {
   return quotaExhaustedDay === new Date().toISOString().slice(0, 10);
 }
+
+// ── Buyer-critical sends + daily reserve ─────────────────────────────
+// Lesson from 2026-08-24: the weekly digest consumed the whole Resend daily
+// quota, then a real buyer's order confirmation, magic-link sign-in, and
+// opt-in emails all failed — the customer paid $55.99 and had NO path to
+// their files. Two protections now:
+//   1. BUYER_CRITICAL kinds ('order', 'gift', 'resendLibrary', 'auth',
+//      'optin', 'payRecovery') are NEVER short-circuited by the quota gate —
+//      they always reach the Resend API (the real quota may still 429, in
+//      which case the order-email sweep retries every 10 minutes).
+//   2. Everything else (digest, drip, win-back, ...) stops once today's sent
+//      count reaches CAP - RESERVE, so RESERVE emails are always left for
+//      buyers. Defaults: cap 100 (Resend free tier), reserve 20 — override
+//      with RESEND_DAILY_CAP / RESEND_DAILY_RESERVE.
+const BUYER_CRITICAL = new Set(['order', 'gift', 'resendLibrary', 'auth', 'optin', 'payRecovery']);
+export function isBuyerCritical(tags?: { name: string; value: string }[]): boolean {
+  return BUYER_CRITICAL.has(tags?.find((t) => t.name === 'kind')?.value || '');
+}
+const DAILY_CAP = Math.max(20, Number(env('RESEND_DAILY_CAP')) || Number(env('PUBLIC_RESEND_DAILY_CAP')) || 100);
+const DAILY_RESERVE = Math.max(0, Number(env('RESEND_DAILY_RESERVE')) || 20);
+let reserveCache: { day: string; count: number; at: number } = { day: '', count: 0, at: 0 };
+async function marketingBudgetLeft(batchSize = 1): Promise<boolean> {
+  const day = new Date().toISOString().slice(0, 10);
+  try {
+    if (reserveCache.day !== day || Date.now() - reserveCache.at > 60000) {
+      const { supabaseAdmin } = await import('./supabase');
+      const { count } = await supabaseAdmin().from('email_send_log')
+        .select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', day + 'T00:00:00Z');
+      reserveCache = { day, count: count || 0, at: Date.now() };
+    }
+  } catch { return true; /* ledger unavailable → do not block sending */ }
+  return reserveCache.count + batchSize <= DAILY_CAP - DAILY_RESERVE;
+}
+export function noteSent(n: number) { reserveCache.count += n; }
 export function markQuotaExhausted(): void {
   quotaExhaustedDay = new Date().toISOString().slice(0, 10);
   console.warn('[resend] DAILY QUOTA EXHAUSTED — remaining sends this run are deferred to tomorrow');
@@ -136,7 +170,11 @@ async function resendFetch(url: string, headers: Record<string, string>, body: s
 }
 
 export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: string; skipped?: boolean; error?: string; quota?: boolean }> {
-  if (isQuotaExhausted()) return { ok: false, error: 'daily quota exhausted (deferred)', quota: true };
+  const critical = isBuyerCritical(opts.tags);
+  if (!critical) {
+    if (isQuotaExhausted()) return { ok: false, error: 'daily quota exhausted (deferred)', quota: true };
+    if (!(await marketingBudgetLeft(1))) return { ok: false, error: 'daily reserve reached (deferred, buyer emails protected)', quota: true };
+  }
   const key = env('RESEND_API_KEY');
   if (!key) {
     console.warn('[resend] RESEND_API_KEY not set — skipping send to', opts.to);
@@ -179,6 +217,7 @@ export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: strin
       return { ok: false, error: data?.message || `HTTP ${res.status}`, quota: !!data?.quota_exhausted };
     }
     ledger('sent', data?.id);
+    noteSent(recipients.length);
     return { ok: true, id: data?.id };
   } catch (e: any) {
     console.error('[resend] send threw', e);
@@ -196,7 +235,10 @@ export async function sendBatch(
   emails: SendOptions[],
   idempotencyKey?: string,
 ): Promise<{ ok: boolean; sent: number; skipped?: boolean; error?: string; quota?: boolean }> {
-  if (isQuotaExhausted()) return { ok: false, sent: 0, error: 'daily quota exhausted (deferred)', quota: true };
+  if (!emails.some((e) => isBuyerCritical(e.tags))) {
+    if (isQuotaExhausted()) return { ok: false, sent: 0, error: 'daily quota exhausted (deferred)', quota: true };
+    if (!(await marketingBudgetLeft(Math.min(emails.length, 100)))) return { ok: false, sent: 0, error: 'daily reserve reached (deferred, buyer emails protected)', quota: true };
+  }
   const key = env('RESEND_API_KEY');
   if (!key) {
     console.warn(`[resend] RESEND_API_KEY not set — skipping batch of ${emails.length}`);
@@ -241,7 +283,9 @@ export async function sendBatch(
     }
     const ids = Array.isArray(data?.data) ? data.data.map((d: any) => d?.id ?? null) : [];
     logSends(batchRows('sent', ids));
-    return { ok: true, sent: Array.isArray(data?.data) ? data.data.length : payload.length };
+    const sentN = Array.isArray(data?.data) ? data.data.length : payload.length;
+    noteSent(sentN);
+    return { ok: true, sent: sentN };
   } catch (e: any) {
     console.error('[resend] batch threw', e);
     logSends(batchRows('failed', undefined, e.message || 'network error'));
