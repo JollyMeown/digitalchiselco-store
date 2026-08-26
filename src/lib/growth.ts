@@ -758,6 +758,11 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           // mirror the bundle5 checkout eligibility exactly, or the add-to-cart would 400
           const eligible = (pool || []).map((r: any) => r.products).filter((p: any) =>
             p?.active && !p.is_bundle && !p.is_subscription && p.image_url && Number(p.price_usd) > 0
+            // keep the advertised flat $25 truthful: the bundle5: checkout now
+            // prices max($25, $25 + 0.7 x (sum - $40)), so the weekly five must
+            // sum to $40 or less -> only standard-priced designs qualify
+            && Number(p.price_usd) <= 8
+            && !/personalized|made.to.order|from your (picture|photo)|membership/i.test(String(p.title || ''))
             && !String(p.slug || '').startsWith('gift-card-') && !String(p.slug || '').startsWith('catalogue-')
             && !/bundle/i.test(String(p.title || '')));
           if (eligible.length >= 5) {

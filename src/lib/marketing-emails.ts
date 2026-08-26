@@ -298,7 +298,7 @@ export function weeklyDigestEmail(d: {
     <p style="margin:10px 0 16px;font-size:15px;line-height:1.6;color:#555;">The chisels have not been idle — <strong>${n} brand-new design${n === 1 ? '' : 's'}</strong> landed in the shop this week. Fresh geometry, clean toolpaths, ready to carve:</p>
     ${rows.join('')}
     ${btn(SITE + '/catalog', 'See everything new')}
-    <p style="margin:14px 0 0;font-size:13px;color:#777;text-align:center;">Buying a few? <a href="${SITE}/bundle-builder" style="color:${BRONZE};">Pick any 5 for a flat $25 →</a></p>`;
+    <p style="margin:14px 0 0;font-size:13px;color:#777;text-align:center;">Buying a few? <a href="${SITE}/bundle-builder" style="color:${BRONZE};">Pick any 5 and save, bundles from $25 →</a></p>`;
   const text = `${n} new designs this week at DigitalChiselCo: ` + d.products.slice(0, 12).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join(' · ') + `\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'Fresh from the workshop 🪵', body, d.email), text };
 }
@@ -555,7 +555,7 @@ export function abandonedBrowseEmail(d: { email: string; products: MiniProduct[]
     <p style="margin:10px 0 16px;font-size:15px;line-height:1.6;color:#555;">You were browsing a few designs at the workshop recently — here they are again in case one is calling to your machine:</p>
     ${rows.join('')}
     ${btn(SITE + '/catalog', 'Back to browsing')}
-    <p style="margin:14px 0 0;font-size:13px;color:#777;text-align:center;">Buying a few? <a href="${SITE}/bundle-builder" style="color:${BRONZE};">Pick any 5 for a flat $25 →</a></p>`;
+    <p style="margin:14px 0 0;font-size:13px;color:#777;text-align:center;">Buying a few? <a href="${SITE}/bundle-builder" style="color:${BRONZE};">Pick any 5 and save, bundles from $25 →</a></p>`;
   const text = `Designs you viewed at DigitalChiselCo: ` + d.products.slice(0, 6).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join(' · ') + `\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'Still thinking it over? 🪵', body, d.email), text };
 }

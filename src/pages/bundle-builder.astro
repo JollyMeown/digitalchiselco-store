@@ -1,9 +1,12 @@
 ---
-// "Pick any 5 for $25" bundle builder. The buyer picks exactly 5 single designs;
-// the whole selection goes into the cart as ONE special item whose id is
-// 'bundle5:<id1>,<id2>,...'. Pricing is enforced server-side in
-// /api/checkout-init (flat $25, never combined with other discounts) and the
-// webhook expands the line back into 5 order_items + entitlements.
+// "Pick any 5 — from $25" bundle builder. The buyer picks exactly 5 single
+// designs; the selection goes into the cart as ONE special item whose id is
+// 'bundle5:<id1>,<id2>,...'. ONE continuous pricing rule (src/lib/bundle5.ts):
+// flat $25 while the five list prices sum to $40 or less; above that each
+// extra dollar of list value adds $0.70 — premium designs raise the live
+// price instead of being excluded. Enforced server-side in /api/checkout-init
+// (browser numbers are never trusted); the webhook expands the line back into
+// 5 order_items + entitlements.
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
@@ -12,7 +15,11 @@ import { supabaseAdmin } from '../lib/supabase';
 
 export const prerender = false;
 
-const BUNDLE_PRICE = 25;
+const BUNDLE_PRICE = 25;          // keep all three in sync with src/lib/bundle5.ts
+const BUNDLE_VALUE_CAP = 40;      // flat $25 up to this combined list value
+const BUNDLE_OVERAGE = 0.70;      // above it, each extra $1 of value adds $0.70
+// (inline scripts can't import server libs — checkout-init re-computes the
+// price from DB values and its number is the one actually charged)
 // Eligible = active single designs. Bundles/catalogues/gift cards are excluded —
 // the deal is for singles only (same filter is re-checked in checkout-init).
 const { data: prods } = await supabaseAdmin()
@@ -23,6 +30,11 @@ const { data: prods } = await supabaseAdmin()
   .not('slug', 'like', 'gift-card-%')
   .not('slug', 'like', 'catalogue-%')
   .not('title', 'ilike', '%bundle%')
+  .not('title', 'ilike', '%membership%')
+  .not('title', 'ilike', '%personalized%')
+  .not('title', 'ilike', '%from your picture%')
+  .not('title', 'ilike', '%from your photo%')
+  .not('is_customizable', 'is', true)
   .order('created_at', { ascending: false })
   .limit(600);
 const products = (prods || []).map((p) => ({
@@ -37,19 +49,18 @@ const avgFive = products.length
   : 0;
 ---
 <Base
-  title="Pick Any 5 for $25 — STL Bundle Builder | DigitalChiselCo"
-  description={`Build your own bas-relief STL bundle: pick any 5 designs from our catalog for a flat $${BUNDLE_PRICE}. Instant download, commercial use included.`}
+  title="Pick Any 5 from $25 — STL Bundle Builder | DigitalChiselCo"
+  description={`Build your own bas-relief STL bundle: pick any 5 designs. Five designs worth up to $40 together cost a flat $${BUNDLE_PRICE}. Instant download, commercial use included.`}
 >
   <Header />
   <Breadcrumbs crumbs={[{ label: 'Bundle builder' }]} />
   <main class="px-4 sm:px-6 pb-28 max-w-6xl mx-auto">
     <div class="text-center max-w-2xl mx-auto mb-6">
-      <h1 class="text-3xl sm:text-4xl">Pick any 5 — pay just ${BUNDLE_PRICE}</h1>
+      <h1 class="text-3xl sm:text-4xl">Pick any 5 — from ${BUNDLE_PRICE}</h1>
       <p class="mt-2 text-sm text-ink-700/70">
-        Build your own bundle from {products.length} single designs.
-        {avgFive > BUNDLE_PRICE * 1.4 && (
-          <span> Five designs normally average <s>${avgFive.toFixed(0)}</s> — you pay a flat <strong class="text-bronze-700">${BUNDLE_PRICE}</strong>.</span>
-        )}
+        Build your own bundle from {products.length} single designs — any five worth up to $40 together
+        cost a flat <strong class="text-bronze-700">${BUNDLE_PRICE}</strong>. Premium picks simply raise
+        the price bar live, and you always see exactly what you pay before adding to cart.
         Instant downloads, commercial use included.
       </p>
       <p class="mt-2 text-xs text-bronze-700">In a hurry? <a href="/bundle-of-week" class="underline font-medium">See this week's ready-made bundle →</a></p>
@@ -61,7 +72,7 @@ const avgFive = products.length
         <span id="bb-status" class="text-sm text-bronze-800 font-medium">Pick 5 designs to unlock the deal</span>
         <button id="bb-add" disabled
           class="ml-auto bg-bronze-600 text-cream text-sm px-5 py-2.5 rounded-md disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bronze-700 transition">
-          Add my 5-pack — ${BUNDLE_PRICE}
+          Add my 5-pack — from ${BUNDLE_PRICE}
         </button>
       </div>
     </div>
@@ -74,7 +85,7 @@ const avgFive = products.length
   </main>
   <Footer />
 
-  <script is:inline define:vars={{ PRODUCTS: products, BUNDLE_PRICE }}>
+  <script is:inline define:vars={{ PRODUCTS: products, BUNDLE_PRICE, BUNDLE_VALUE_CAP, BUNDLE_OVERAGE }}>
     const grid = document.getElementById('bb-grid');
     const slotsEl = document.getElementById('bb-slots');
     const statusEl = document.getElementById('bb-status');
@@ -92,7 +103,7 @@ const avgFive = products.length
           <span class="block aspect-square bg-cream overflow-hidden">${p.img ? `<img src="${esc(p.img)}" alt="${esc(p.title)}" loading="lazy" class="w-full h-full object-cover">` : ''}</span>
           <span class="block p-2">
             <span class="block text-xs leading-snug text-ink-800 line-clamp-2 min-h-[2.4em]">${esc(p.title)}</span>
-            <span class="block text-xs mt-1"><s class="text-ink-700/40">$${p.price.toFixed(2)}</s> <span class="text-bronze-700 font-medium">$${(BUNDLE_PRICE / 5).toFixed(2)} in the 5-pack</span></span>
+            <span class="block text-xs mt-1"><s class="text-ink-700/40">$${p.price.toFixed(2)}</s> <span class="text-bronze-700 font-medium">from $${Math.max(p.price * BUNDLE_OVERAGE, BUNDLE_PRICE / 5).toFixed(2)} in a 5-pack</span></span>
           </span>
         </button>`;
     }
@@ -125,11 +136,21 @@ const avgFive = products.length
           : '<span class="w-9 h-9 rounded border border-dashed border-bronze-600/40 bg-white/50"></span>';
       }).join('');
       const value = arr.reduce((s, p) => s + p.price, 0);
+      // ONE rule, mirrored from src/lib/bundle5.ts (the server re-computes it
+      // and its number is what gets charged): flat $25 while the combined
+      // value is $40 or less, then 70 cents per extra dollar.
+      const price = Math.max(BUNDLE_PRICE, Math.round((BUNDLE_PRICE + BUNDLE_OVERAGE * (value - BUNDLE_VALUE_CAP)) * 100) / 100);
       if (arr.length === 5) {
-        statusEl.innerHTML = '✓ Ready — <s>$' + value.toFixed(2) + '</s> <strong>$' + BUNDLE_PRICE.toFixed(2) + '</strong> (you save $' + Math.max(0, value - BUNDLE_PRICE).toFixed(2) + ')';
+        const save = Math.max(0, value - price);
+        const pct = value > 0 ? Math.round((save / value) * 100) : 0;
+        statusEl.innerHTML = price <= BUNDLE_PRICE
+          ? '✓ Ready — <s>$' + value.toFixed(2) + '</s> <strong>$' + price.toFixed(2) + ' flat</strong> (you save $' + save.toFixed(2) + ')'
+          : '✓ Ready — <s>$' + value.toFixed(2) + '</s> <strong>$' + price.toFixed(2) + '</strong> (premium bundle · you save $' + save.toFixed(2) + ', ' + pct + '%)';
+        addBtn.textContent = 'Add my 5-pack — $' + price.toFixed(2);
         addBtn.disabled = false;
       } else {
         statusEl.textContent = arr.length ? `${arr.length} of 5 picked — add ${5 - arr.length} more` : 'Pick 5 designs to unlock the deal';
+        addBtn.textContent = 'Add my 5-pack — from $' + BUNDLE_PRICE.toFixed(2);
         addBtn.disabled = true;
       }
     }
@@ -138,11 +159,13 @@ const avgFive = products.length
       const arr = [...picked.values()];
       if (arr.length !== 5) return;
       const ids = arr.map((p) => p.id);
+      const value = arr.reduce((s, p) => s + p.price, 0);
+      const price = Math.max(BUNDLE_PRICE, Math.round((BUNDLE_PRICE + BUNDLE_OVERAGE * (value - BUNDLE_VALUE_CAP)) * 100) / 100);
       const item = {
         id: 'bundle5:' + ids.join(','),
         slug: 'bundle-builder',
         title: 'Pick-5 Bundle: ' + arr.map((p) => p.title).join(' · ').slice(0, 160),
-        price: BUNDLE_PRICE,
+        price,
         qty: 1,
         img: arr[0].img || '',
       };

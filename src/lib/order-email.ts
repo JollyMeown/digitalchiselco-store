@@ -49,7 +49,7 @@ export async function buildOrderConfirmationForOrder(
   // Items + customizations + downloads + logo — same sources as the webhook.
   const [{ data: orderItems }, { data: settings }] = await Promise.all([
     db.from('order_items')
-      .select('id, title, qty, price_usd, product_id, order_item_customizations(fields), products(is_customizable)')
+      .select('id, title, qty, price_usd, product_id, order_item_customizations(fields), products(is_customizable, image_url)')
       .eq('order_id', order.id),
     db.from('site_settings').select('logo_image_url').eq('id', 1).maybeSingle(),
   ]);
@@ -68,6 +68,7 @@ export async function buildOrderConfirmationForOrder(
       qty: it.qty || 1,
       price_usd: Number(it.price_usd) || 0,
       download_links: isCustomized ? undefined : (it.product_id ? downloadsByProduct[it.product_id] : undefined),
+      image_url: (it.products as any)?.image_url || null,
       is_customized: isCustomized,
       customization_fields: fields,
     };

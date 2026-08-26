@@ -199,17 +199,18 @@ export const POST: APIRoute = async ({ request }) => {
           return json({ error: 'The Pick-5 bundle must contain exactly 5 different designs.' }, 400);
         }
         const { data: bps } = await db.from('products')
-          .select('id, slug, title, active, price_usd').in('id', ids);
-        const eligible = (bps || []).filter((p: any) =>
-          p.active && Number(p.price_usd) > 0 &&
-          !String(p.slug || '').startsWith('gift-card-') &&
-          !String(p.slug || '').startsWith('catalogue-') &&
-          !/bundle/i.test(String(p.title || '')));
+          .select('id, slug, title, active, price_usd, is_customizable').in('id', ids);
+        const { bundle5Eligible, bundle5Price } = await import('../../lib/bundle5');
+        const eligible = (bps || []).filter((p: any) => bundle5Eligible(p));
         if (eligible.length !== 5) {
           return json({ error: 'One of the designs in your Pick-5 bundle is no longer available — please rebuild it.' }, 400);
         }
-        // Flat $25 — no sale/coupon/member discount ever stacks on top.
-        items.push(adhocItem('Pick-5 Bundle — 5 Premium STL Designs', 25, 1));
+        // One rule: flat $25, or 30% off the list total when that is higher
+        // (premium picks raise the price instead of being excluded). Priced
+        // HERE from DB prices — the browser's number is never trusted.
+        // No sale/coupon/member discount ever stacks on top.
+        const b5 = bundle5Price(eligible.map((p: any) => Number(p.price_usd)));
+        items.push(adhocItem('Pick-5 Bundle — 5 Premium STL Designs', b5, 1));
         sentIds.push(String(c.id)); sentCustomizations.push(customizations[ci] ?? null);
         continue;
       }

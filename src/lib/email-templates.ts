@@ -15,6 +15,8 @@ export type OrderEmailItem = {
   title: string;
   qty: number;
   price_usd: number;
+  /** Product photo shown as a thumbnail beside the item in the email. */
+  image_url?: string | null;
   download_links?: { name?: string; url: string }[];
   // Customized items skip the download button and show a "we're crafting it"
   // message. The captured field values are listed so the buyer has a record
@@ -80,9 +82,13 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
               </td>
             </tr>`).join('')}
         </table>` : '';
+      const cThumb = it.image_url
+        ? `<img src="${esc(it.image_url)}" alt="" width="64" height="64" style="float:left;width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid #E5DDD0;margin-right:12px;">`
+        : '';
       return `
         <tr>
           <td style="padding:14px 0;border-bottom:1px solid #E5DDD0;font-family:Helvetica,Arial,sans-serif;">
+            ${cThumb}
             <div style="font-size:15px;color:${BRAND_INK};font-weight:500;">${esc(it.title)} <span style="background:#FAC775;color:${BRAND_BRONZE_DARK};font-size:10px;padding:2px 6px;border-radius:8px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;vertical-align:middle;margin-left:4px;">✎ Custom</span></div>
             <div style="font-size:13px;color:#777;margin-top:2px;">${it.qty}× &middot; ${money(it.price_usd)}</div>
             <div style="margin-top:10px;background:${BRAND_CREAM};border-left:3px solid ${BRAND_BRONZE};padding:12px 14px;border-radius:0 6px 6px 0;font-size:13px;color:${BRAND_INK};line-height:1.55;">
@@ -99,13 +105,22 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
     const noLinkNote = (!it.download_links || it.download_links.length === 0)
       ? `<div style="font-size:13px;color:#777;margin-top:6px;">Download link will be emailed within a few minutes if not already attached.</div>`
       : '';
+    // Product thumbnail beside the item (nested table = safe in all clients).
+    const thumb = it.image_url
+      ? `<td width="72" valign="top" style="padding-right:12px;"><img src="${esc(it.image_url)}" alt="" width="64" height="64" style="display:block;width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid #E5DDD0;"></td>`
+      : '';
     return `
       <tr>
         <td style="padding:14px 0;border-bottom:1px solid #E5DDD0;font-family:Helvetica,Arial,sans-serif;">
-          <div style="font-size:15px;color:${BRAND_INK};font-weight:500;">${esc(it.title)}</div>
-          <div style="font-size:13px;color:#777;margin-top:2px;">${it.qty}× &middot; ${money(it.price_usd)}</div>
-          ${links}
-          ${noLinkNote}
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%"><tr>
+            ${thumb}
+            <td valign="top">
+              <div style="font-size:15px;color:${BRAND_INK};font-weight:500;">${esc(it.title)}</div>
+              <div style="font-size:13px;color:#777;margin-top:2px;">${it.qty}× &middot; ${money(it.price_usd)}</div>
+              ${links}
+              ${noLinkNote}
+            </td>
+          </tr></table>
         </td>
       </tr>`;
   }).join('');

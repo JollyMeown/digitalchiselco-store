@@ -324,15 +324,23 @@ async function handleTransactionCompleted(db: any, txn: any) {
       const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const valid = bIds.filter((id: string) => uuidRe.test(id));
       const { data: bProds } = valid.length
-        ? await db.from('products').select('id, title').in('id', valid)
+        ? await db.from('products').select('id, title, price_usd').in('id', valid)
         : { data: [] as any[] };
-      const per = valid.length ? +(lineTotal / valid.length).toFixed(2) : 0;
-      for (const bp of bProds || []) {
+      // Split the paid amount across the five picks PROPORTIONALLY to their
+      // list prices (a $12 premium pick records more than a $5.99 one); the
+      // last line absorbs rounding so the parts always sum to what was paid.
+      const listSum = (bProds || []).reduce((s: number, p: any) => s + (Number(p.price_usd) || 0), 0);
+      let remaining = lineTotal;
+      for (const [bi, bp] of (bProds || []).entries()) {
+        const isLast = bi === (bProds || []).length - 1;
+        const share = isLast ? +remaining.toFixed(2)
+          : +(listSum > 0 ? lineTotal * (Number(bp.price_usd) || 0) / listSum : lineTotal / (bProds || []).length).toFixed(2);
+        remaining -= share;
         must(await db.from('order_items').insert({
           order_id: order.id,
           product_id: bp.id,
           title: `${bp.title} (Pick-5 Bundle)`.slice(0, 240),
-          price_usd: per,
+          price_usd: share,
           qty: 1,
         }), 'order_items insert (bundle)');
         must(await db.from('entitlements').insert({
@@ -756,7 +764,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
       // flag), product download links, and the brand logo — all in parallel.
       const [{ data: orderItems }, { data: settings }] = await Promise.all([
         db.from('order_items')
-          .select('id, title, qty, price_usd, product_id, order_item_customizations(fields), products(is_customizable)')
+          .select('id, title, qty, price_usd, product_id, order_item_customizations(fields), products(is_customizable, image_url)')
           .eq('order_id', order.id),
         db.from('site_settings').select('logo_image_url').eq('id', 1).maybeSingle(),
       ]);
@@ -785,7 +793,8 @@ async function handleTransactionCompleted(db: any, txn: any) {
           // Skip download links entirely for customized lines — the file
           // doesn't exist yet; the customer gets it once the artisan delivers.
           download_links: isCustomized ? undefined : (it.product_id ? downloadsByProduct[it.product_id] : undefined),
-          is_customized: isCustomized,
+          image_url: (it.products as any)?.image_url || null,
+      is_customized: isCustomized,
           customization_fields: fields,
         };
       });
