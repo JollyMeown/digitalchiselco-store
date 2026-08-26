@@ -303,9 +303,15 @@ async function handleTransactionCompleted(db: any, txn: any) {
   for (let i = 0; i < (resumeEmailOnly ? 0 : items.length); i++) {
     const it = items[i];
     const priceId = it.price?.id;
-    const lineTotal = Number(it.totals?.total ?? it.totals?.subtotal ?? 0) / 100;
+    // Paddle's webhook payload carries per-line money under details.line_items
+    // (matched by price id), NOT under items[i].totals — items[i] only has the
+    // price object. Missing that made a $25 Pick-5 bundle record five $0.00
+    // order_items on 2026-08-26. Resolve: line_items total → items[i].totals
+    // (some payload versions do include it) → unit_price × qty.
+    const li = (txn.details?.line_items || []).find((l: any) => l?.price_id === it.price?.id || l?.price?.id === it.price?.id);
     const lineUnit = Number(it.price?.unit_price?.amount ?? 0) / 100;
     const qty = Number(it.quantity ?? 1);
+    const lineTotal = Number(li?.totals?.total ?? it.totals?.total ?? it.totals?.subtotal ?? 0) / 100 || lineUnit * qty;
 
     let productId: string | null = null;
     let title: string = String(it.price?.description || it.price?.name || '').slice(0, 240);
