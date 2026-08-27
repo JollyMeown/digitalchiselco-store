@@ -260,7 +260,7 @@ function LiveNow() {
 }
 
 function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Record<string, string>; paid: number; days: number }) {
-  const [range, setRange] = useState<'today' | 'week' | 'month'>('month');
+  const [range, setRange] = useState<'today' | 'week' | 'month'>('today');
   const [open, setOpen] = useState<string | null>(null);      // drill-down metric type
   const [people, setPeople] = useState<{ label: string; rows: { who: string; what: string; when: string }[] } | null>(null);
   const [peopleBusy, setPeopleBusy] = useState(false);
