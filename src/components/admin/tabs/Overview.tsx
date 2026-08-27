@@ -446,10 +446,13 @@ function SystemHealth() {
   const cartsState = h.openCarts >= 20 ? 'amber' : 'green';
   // Cults3D poller: runs every 10 min (Netlify) + on every Cults-tab refresh.
   const cpAgeM = h.cultsPoll ? (Date.now() - Date.parse(h.cultsPoll.ran_at)) / 60000 : Infinity;
-  const cultsState = !h.cultsPoll ? 'amber' : h.cultsPoll.ok === false ? 'red' : cpAgeM > 45 ? 'amber' : 'green';
-  const cultsText = !h.cultsPoll ? 'not yet polled' : h.cultsPoll.ok === false ? 'poll FAILED' : `watching · ${cpAgeM < 1 ? 'just now' : cpAgeM < 90 ? Math.round(cpAgeM) + 'm ago' : Math.round(cpAgeM / 60) + 'h ago'}`;
+  // "not configured" (Cults API keys absent in Netlify) is an owner setup
+  // task, not a system failure — show it amber with a clear message, not red.
+  const cultsNotConfigured = h.cultsPoll?.ok === false && /not set|not configured/i.test(h.cultsPoll?.note || '');
+  const cultsState = !h.cultsPoll ? 'amber' : cultsNotConfigured ? 'amber' : h.cultsPoll.ok === false ? 'red' : cpAgeM > 45 ? 'amber' : 'green';
+  const cultsText = !h.cultsPoll ? 'not yet polled' : cultsNotConfigured ? 'needs Netlify keys' : h.cultsPoll.ok === false ? 'poll FAILED' : `watching · ${cpAgeM < 1 ? 'just now' : cpAgeM < 90 ? Math.round(cpAgeM) + 'm ago' : Math.round(cpAgeM / 60) + 'h ago'}`;
   const lastCultsAgeH = h.lastCults ? (Date.now() - Date.parse(h.lastCults.sold_at)) / 3600000 : null;
-  const cultsSub = h.cultsPoll?.ok === false ? (h.cultsPoll.note || 'error') : h.lastCults ? `last sale €${Number(h.lastCults.income).toFixed(2)} · ${lastCultsAgeH! < 1 ? 'just now' : lastCultsAgeH! < 48 ? Math.round(lastCultsAgeH!) + 'h ago' : Math.round(lastCultsAgeH! / 24) + 'd ago'}` : 'no Cults sales recorded yet';
+  const cultsSub = cultsNotConfigured ? 'Add CULTS3D_USERNAME + CULTS3D_API_KEY in Netlify to enable sale alerts' : h.cultsPoll?.ok === false ? (h.cultsPoll.note || 'error') : h.lastCults ? `last sale €${Number(h.lastCults.income).toFixed(2)} · ${lastCultsAgeH! < 1 ? 'just now' : lastCultsAgeH! < 48 ? Math.round(lastCultsAgeH!) + 'h ago' : Math.round(lastCultsAgeH! / 24) + 'd ago'}` : 'no Cults sales recorded yet';
 
   const dot: Record<string, string> = { green: 'bg-green-500', amber: 'bg-amber-500', red: 'bg-red-500 animate-pulse' };
   const bg: Record<string, string> = { green: 'bg-green-50 border-green-200', amber: 'bg-amber-50 border-amber-200', red: 'bg-red-50 border-red-300' };
