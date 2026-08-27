@@ -118,36 +118,44 @@ const BUYER_CRITICAL = new Set(['order', 'gift', 'resendLibrary', 'auth', 'optin
 export function isBuyerCritical(tags?: { name: string; value: string }[]): boolean {
   return BUYER_CRITICAL.has(tags?.find((t) => t.name === 'kind')?.value || '');
 }
-const DAILY_CAP = Math.max(20, Number(env('RESEND_DAILY_CAP')) || Number(env('PUBLIC_RESEND_DAILY_CAP')) || 100);
-const DAILY_RESERVE = Math.max(0, Number(env('RESEND_DAILY_RESERVE')) || 20);
-let reserveCache: { day: string; count: number; at: number } = { day: '', count: 0, at: 0 };
-async function marketingBudgetLeft(batchSize = 1): Promise<boolean> {
+// Cap + reserve are ADMIN-EDITABLE (growth_settings, migration 062). Env vars,
+// if set, OVERRIDE the DB (so an emergency Netlify change still wins). Both are
+// cached ~60s alongside today's send count.
+const CAP_ENV = Number(env('RESEND_DAILY_CAP')) || Number(env('PUBLIC_RESEND_DAILY_CAP')) || 0;
+const RESERVE_ENV = env('RESEND_DAILY_RESERVE') != null ? Number(env('RESEND_DAILY_RESERVE')) : NaN;
+let reserveCache: { day: string; count: number; at: number; cap: number; reserve: number } =
+  { day: '', count: 0, at: 0, cap: 180, reserve: 20 };
+async function refreshBudget(): Promise<void> {
   const day = new Date().toISOString().slice(0, 10);
-  try {
-    if (reserveCache.day !== day || Date.now() - reserveCache.at > 60000) {
-      const { supabaseAdmin } = await import('./supabase');
-      const { count } = await supabaseAdmin().from('email_send_log')
-        .select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', day + 'T00:00:00Z');
-      reserveCache = { day, count: count || 0, at: Date.now() };
-    }
-  } catch { return true; /* ledger unavailable → do not block sending */ }
-  return reserveCache.count + batchSize <= DAILY_CAP - DAILY_RESERVE;
+  if (reserveCache.day === day && Date.now() - reserveCache.at <= 60000) return;
+  const { supabaseAdmin } = await import('./supabase');
+  const db = supabaseAdmin();
+  const [{ count }, { data: gs }] = await Promise.all([
+    db.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', day + 'T00:00:00Z'),
+    db.from('growth_settings').select('email_daily_cap, email_daily_reserve').eq('id', 1).maybeSingle(),
+  ]);
+  // DB (admin-editable) is PRIMARY so the owner's control always wins; env is
+  // only a fallback if the column is somehow missing.
+  const cap = Math.max(20, Number(gs?.email_daily_cap) || CAP_ENV || 180);
+  const reserve = Math.min(cap, Math.max(0, Number.isFinite(Number(gs?.email_daily_reserve)) ? Number(gs?.email_daily_reserve) : (!Number.isNaN(RESERVE_ENV) ? RESERVE_ENV : 20)));
+  reserveCache = { day, count: count || 0, at: Date.now(), cap, reserve };
+}
+async function marketingBudgetLeft(batchSize = 1): Promise<boolean> {
+  try { await refreshBudget(); } catch { return true; /* ledger unavailable → do not block */ }
+  return reserveCache.count + batchSize <= reserveCache.cap - reserveCache.reserve;
 }
 // How many MARKETING emails may still go out today (cap − reserve − sent).
 // Callers that send in bulk (the weekly digest drain) MUST size each batch to
 // this, or a fixed batch larger than the remaining budget is rejected wholesale
 // and nothing sends — the bug that stalled 110 W35 digests for 3 days.
 export async function marketingBudgetRemaining(): Promise<number> {
-  const day = new Date().toISOString().slice(0, 10);
-  try {
-    if (reserveCache.day !== day || Date.now() - reserveCache.at > 60000) {
-      const { supabaseAdmin } = await import('./supabase');
-      const { count } = await supabaseAdmin().from('email_send_log')
-        .select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', day + 'T00:00:00Z');
-      reserveCache = { day, count: count || 0, at: Date.now() };
-    }
-  } catch { return DAILY_CAP; /* ledger unavailable → assume full budget */ }
-  return Math.max(0, DAILY_CAP - DAILY_RESERVE - reserveCache.count);
+  try { await refreshBudget(); } catch { return 999; /* ledger unavailable → assume plenty */ }
+  return Math.max(0, reserveCache.cap - reserveCache.reserve - reserveCache.count);
+}
+// Live throttle snapshot for the admin status panel.
+export async function emailThrottleStatus(): Promise<{ cap: number; reserve: number; sentToday: number; marketingLeft: number }> {
+  try { await refreshBudget(); } catch { return { cap: 180, reserve: 20, sentToday: 0, marketingLeft: 160 }; }
+  return { cap: reserveCache.cap, reserve: reserveCache.reserve, sentToday: reserveCache.count, marketingLeft: Math.max(0, reserveCache.cap - reserveCache.reserve - reserveCache.count) };
 }
 export function noteSent(n: number) { reserveCache.count += n; }
 export function markQuotaExhausted(): void {

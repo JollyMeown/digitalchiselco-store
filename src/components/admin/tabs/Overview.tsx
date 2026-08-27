@@ -412,6 +412,9 @@ function SystemHealth() {
         pageAll((a, b) => supabase.from('products').select('id, slug').eq('active', true).gt('price_usd', 0).order('id').range(a, b)),
         pageAll((a, b) => supabase.from('product_downloads').select('product_id').order('id').range(a, b)),
       ]);
+      // Admin-controlled daily cap (Automations tab); falls back to 180.
+      const { data: gsCap } = await supabase.from('growth_settings').select('email_daily_cap').eq('id', 1).maybeSingle();
+      const dailyCap = Number(gsCap?.email_daily_cap) || 180;
       // Sellable products with NO download row = a buyer would receive nothing.
       const hasDl = new Set(dlRows.map((r: any) => r.product_id));
       const missingFile = actProds.filter((p: any) => !hasDl.has(p.id) && !/^gift-card|membership/i.test(p.slug)).map((p: any) => p.slug);
@@ -427,12 +430,12 @@ function SystemHealth() {
       const delivered = (evs30 || []).filter((e: any) => e.event === 'delivered' || e.event === 'sent').length;
       const bounced = (evs30 || []).filter((e: any) => e.event === 'bounced').length;
       const complained = (evs30 || []).filter((e: any) => e.event === 'complained').length;
-      setH({ run: runs?.[0] || null, sentToday: sentToday || 0, delivered, bounced, complained, wk: wk?.[0] || null, pending, sentWk, lastOrder: lastOrder?.[0] || null, openCarts: openCarts || 0, cultsPoll: cultsPoll || null, lastCults: lastCults?.[0] || null, missingFile });
+      setH({ run: runs?.[0] || null, sentToday: sentToday || 0, delivered, bounced, complained, wk: wk?.[0] || null, pending, sentWk, lastOrder: lastOrder?.[0] || null, openCarts: openCarts || 0, cultsPoll: cultsPoll || null, lastCults: lastCults?.[0] || null, missingFile, dailyCap });
     })();
   }, []);
   if (!h) return null;
 
-  const DAILY_SOFT_CAP = Number((import.meta as any).env?.PUBLIC_RESEND_DAILY_CAP) || 300;   // Resend free tier ≈ 100/day; set PUBLIC_RESEND_DAILY_CAP to your plan
+  const DAILY_SOFT_CAP = h.dailyCap || 180;   // admin-controlled in Automations → Daily email limits
   const ageH = h.run ? (Date.now() - Date.parse(h.run.ran_at)) / 3600000 : Infinity;
   const cronState = !h.run ? 'red' : h.run.ok === null ? (ageH < 0.2 ? 'amber' : 'red') : h.run.ok === false ? 'red' : ageH > 26 ? 'red' : 'green';
   const cronText = !h.run ? 'never ran' : h.run.ok === null ? (ageH < 0.2 ? 'running…' : 'started, never finished') : h.run.ok === false ? 'FAILED' : `ok · ${ageH < 1 ? Math.round(ageH * 60) + 'm' : Math.round(ageH) + 'h'} ago`;

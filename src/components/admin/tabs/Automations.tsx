@@ -746,51 +746,150 @@ const EMAIL_KIND_LABELS: Record<string, string> = {
   'wishlistReminder': 'Wishlist reminders', 'refundWinback': 'Refund win-back', 'picks': 'Hand-picked designs',
   'ownerReport': 'Owner report', 'designScout': 'Design scout', '(untagged)': 'Other',
 };
+type Light = { state: 'green' | 'amber' | 'red'; label: string; detail: string };
 function TodayEmailStats() {
   const [rows, setRows] = useState<{ kind: string; sent: number; failed: number }[] | null>(null);
-  const [tot, setTot] = useState({ sent: 0, failed: 0 });
+  const [tot, setTot] = useState({ sent: 0, failed: 0, lastFailErr: '' });
+  const [cfg, setCfg] = useState<{ cap: number; reserve: number } | null>(null);
+  const [edit, setEdit] = useState<{ cap: number; reserve: number } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [lights, setLights] = useState<Light[]>([]);
+
   const load = async () => {
     const today = new Date().toISOString().slice(0, 10);
-    const { data } = await supabase.from('email_send_log').select('kind, status').gte('sent_at', today + 'T00:00:00Z').limit(20000);
+    const [{ data: sends }, { data: gs }, { data: runs }, { data: weeks }] = await Promise.all([
+      supabase.from('email_send_log').select('kind, status, error, sent_at').gte('sent_at', today + 'T00:00:00Z').limit(20000),
+      supabase.from('growth_settings').select('email_daily_cap, email_daily_reserve').eq('id', 1).maybeSingle(),
+      supabase.from('cron_runs').select('ran_at, ok, error').order('ran_at', { ascending: false }).limit(1),
+      supabase.from('weekly_digest_log').select('week_key, queued_count, last_drain_at').order('week_key', { ascending: false }).limit(1),
+    ]);
     const agg: Record<string, { sent: number; failed: number }> = {};
-    let s = 0, f = 0;
-    for (const r of data || []) {
+    let s = 0, f = 0, lastFailErr = '';
+    for (const r of sends || []) {
       const k = r.kind || '(untagged)';
       agg[k] = agg[k] || { sent: 0, failed: 0 };
       if (r.status === 'sent') { agg[k].sent++; s++; }
-      else if (r.status === 'failed') { agg[k].failed++; f++; }
+      else if (r.status === 'failed') { agg[k].failed++; f++; if (r.error) lastFailErr = r.error; }
     }
     setRows(Object.entries(agg).map(([kind, v]) => ({ kind, ...v })).sort((a, b) => (b.sent + b.failed) - (a.sent + a.failed)));
-    setTot({ sent: s, failed: f });
+    setTot({ sent: s, failed: f, lastFailErr });
+    const cap = Number(gs?.email_daily_cap) || 180;
+    const reserve = Number(gs?.email_daily_reserve) ?? 20;
+    setCfg({ cap, reserve });
+    setEdit((e) => e || { cap, reserve });
+
+    // ── Status lights: catch issues + say what's happening ──
+    const L: Light[] = [];
+    // 1. failures today
+    if (f > 0) L.push({ state: 'red', label: `${f} email${f === 1 ? '' : 's'} failed today`, detail: lastFailErr ? `Last error: ${lastFailErr.slice(0, 120)}` : 'Check the send log below.' });
+    else L.push({ state: 'green', label: 'No send failures today', detail: `${s} email${s === 1 ? '' : 's'} delivered successfully so far.` });
+    // 2. weekly digest progress
+    const wk = weeks?.[0];
+    if (wk) {
+      const [{ count: pending }, { count: stuck }, { count: sentW }] = await Promise.all([
+        supabase.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', wk.week_key).eq('status', 'pending'),
+        supabase.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', wk.week_key).eq('status', 'pending').gte('attempts', 5),
+        supabase.from('weekly_send_queue').select('email', { count: 'exact', head: true }).eq('week_key', wk.week_key).eq('status', 'sent'),
+      ]);
+      const marketingPerDay = Math.max(1, cap - reserve);
+      if ((pending || 0) === 0) L.push({ state: 'green', label: `Weekly digest ${wk.week_key} fully delivered`, detail: `${sentW || 0} of ${wk.queued_count || sentW} sent.` });
+      else if ((stuck || 0) > 0) L.push({ state: 'red', label: `${stuck} recipient${stuck === 1 ? '' : 's'} stuck on the weekly digest`, detail: `Failed 5+ times — needs a look (see the tracker below). ${pending} still pending overall.` });
+      else {
+        const days = Math.ceil((pending || 0) / marketingPerDay);
+        L.push({ state: 'amber', label: `Weekly digest sending: ${sentW || 0} done, ${pending} to go`, detail: `At ${marketingPerDay}/day this finishes in ~${days} day${days === 1 ? '' : 's'}. Raise the daily cap to go faster.` });
+      }
+    }
+    // 3. today's budget
+    const left = Math.max(0, cap - reserve - s);
+    if (left === 0) L.push({ state: 'amber', label: "Today's marketing budget is used up", detail: `Buyer emails still send (the ${reserve} reserve). Marketing resumes at 00:00 UTC.` });
+    // 4. nightly cron
+    const last = runs?.[0];
+    const ageH = last ? (Date.now() - Date.parse(last.ran_at)) / 3600000 : Infinity;
+    if (!last || ageH > 26) L.push({ state: 'red', label: 'Nightly automation overdue', detail: last ? `Last ran ${Math.round(ageH)}h ago.` : 'Has never run.' });
+    else if (last.ok === false) L.push({ state: 'red', label: 'Last nightly run FAILED', detail: (last.error || '').slice(0, 120) });
+    setLights(L);
   };
   useEffect(() => { load(); }, []);
   useLiveRefresh(load, 30000);
-  if (!rows) return null;
-  const cap = Number((import.meta as any).env?.PUBLIC_RESEND_DAILY_CAP) || 100;
-  const reserve = 20;
-  const marketingLeft = Math.max(0, cap - reserve - tot.sent);
+  if (!rows || !cfg || !edit) return null;
+
+  async function saveThrottle() {
+    if (!edit) return;
+    const cap = Math.max(20, Math.round(edit.cap));
+    const reserve = Math.min(cap, Math.max(0, Math.round(edit.reserve)));
+    setSaving(true);
+    await supabase.from('growth_settings').update({ email_daily_cap: cap, email_daily_reserve: reserve }).eq('id', 1);
+    setCfg({ cap, reserve }); setEdit({ cap, reserve }); setSaving(false);
+    load();
+  }
+
+  const marketingLeft = Math.max(0, cfg.cap - cfg.reserve - tot.sent);
   const label = (k: string) => EMAIL_KIND_LABELS[k] || k;
+  const dot: Record<string, string> = { green: 'bg-green-500', amber: 'bg-amber-500', red: 'bg-red-500 animate-pulse' };
+  const dirty = edit.cap !== cfg.cap || edit.reserve !== cfg.reserve;
+  const worst = lights.some((l) => l.state === 'red') ? 'red' : lights.some((l) => l.state === 'amber') ? 'amber' : 'green';
+
   return (
     <Card>
       <div className="flex items-baseline gap-2 mb-3 flex-wrap">
-        <div className="text-sm font-bold text-ink-900">📧 Today's email sends</div>
-        <span className="text-[11px] text-ink-700/50">every type sent today (UTC) · updates live</span>
+        <span className={`inline-block w-2.5 h-2.5 rounded-full ${dot[worst]}`} />
+        <div className="text-sm font-bold text-ink-900">📧 Email sending — status &amp; today's activity</div>
+        <span className="text-[11px] text-ink-700/50">updates live</span>
       </div>
-      <div className="flex flex-wrap gap-3 mb-3">
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 min-w-[120px]">
+
+      {/* Green/red status lights */}
+      <div className="space-y-1.5 mb-4">
+        {lights.map((l, i) => (
+          <div key={i} className={`flex items-start gap-2 rounded-md border px-3 py-2 ${l.state === 'red' ? 'bg-red-50 border-red-200' : l.state === 'amber' ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+            <span className={`mt-1 inline-block w-2 h-2 rounded-full flex-shrink-0 ${dot[l.state]}`} />
+            <div className="min-w-0">
+              <div className={`text-sm font-bold ${l.state === 'red' ? 'text-red-800' : l.state === 'amber' ? 'text-amber-800' : 'text-green-800'}`}>{l.label}</div>
+              <div className="text-xs text-ink-700/70">{l.detail}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bold stat tiles */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 min-w-[110px]">
           <div className="text-[10px] uppercase tracking-wide text-green-700/70 font-medium">Sent today</div>
           <div className="text-2xl font-extrabold text-green-800 leading-tight">{tot.sent}</div>
         </div>
-        <div className={`rounded-lg border px-4 py-2.5 min-w-[120px] ${tot.failed ? 'border-red-300 bg-red-50' : 'border-black/10 bg-cream/40'}`}>
+        <div className={`rounded-lg border px-4 py-2.5 min-w-[110px] ${tot.failed ? 'border-red-300 bg-red-50' : 'border-black/10 bg-cream/40'}`}>
           <div className={`text-[10px] uppercase tracking-wide font-medium ${tot.failed ? 'text-red-700/70' : 'text-ink-700/50'}`}>Failed today</div>
           <div className={`text-2xl font-extrabold leading-tight ${tot.failed ? 'text-red-700' : 'text-ink-700/60'}`}>{tot.failed}</div>
         </div>
         <div className="rounded-lg border border-bronze-600/20 bg-cream/40 px-4 py-2.5 min-w-[150px]">
-          <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Marketing budget left</div>
-          <div className="text-2xl font-extrabold text-bronze-800 leading-tight">{marketingLeft}<span className="text-sm font-medium text-ink-700/50"> / {cap - reserve}</span></div>
-          <div className="text-[10px] text-ink-700/50 mt-0.5">{reserve} always reserved for buyer emails</div>
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Marketing budget left today</div>
+          <div className="text-2xl font-extrabold text-bronze-800 leading-tight">{marketingLeft}<span className="text-sm font-medium text-ink-700/50"> / {cfg.cap - cfg.reserve}</span></div>
         </div>
       </div>
+
+      {/* Admin-editable cap + reserve */}
+      <div className="rounded-lg border border-bronze-600/15 bg-cream/30 px-3 py-3 mb-4">
+        <div className="text-xs font-bold text-ink-900 mb-1">⚙️ Daily email limits (you control these)</div>
+        <p className="text-[11px] text-ink-700/60 mb-2.5">
+          <b>Daily cap</b> = the most emails the site sends in one day (keep it under your Resend plan's real limit; about 200/day works today).
+          <b> Buyer reserve</b> = how many of those to always hold back for order confirmations &amp; sign-in links, so a big newsletter can never block a paying customer.
+          Everything else (newsletters, drips) shares <b>cap − reserve = {edit.cap - edit.reserve}</b> per day.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Daily cap</span>
+            <input type="number" min={20} max={5000} value={edit.cap} onChange={(e) => setEdit({ ...edit, cap: Number(e.target.value) })} className={inputCls + ' w-28'} />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Buyer reserve</span>
+            <input type="number" min={0} max={edit.cap} value={edit.reserve} onChange={(e) => setEdit({ ...edit, reserve: Number(e.target.value) })} className={inputCls + ' w-28'} />
+          </label>
+          <div className="text-xs text-ink-700/60 pb-2">→ <b className="text-bronze-800">{Math.max(0, edit.cap - edit.reserve)}</b> for newsletters/day</div>
+          <button className={dirty ? btnPrimary : btnGhost} disabled={saving || !dirty} onClick={saveThrottle}>{saving ? 'Saving…' : dirty ? 'Save limits' : 'Saved'}</button>
+        </div>
+      </div>
+
+      {/* Per-type breakdown */}
+      <div className="text-xs font-bold text-ink-900 mb-1.5">Sent today by type</div>
       {rows.length === 0 ? (
         <p className="text-xs text-ink-700/50">No emails sent yet today.</p>
       ) : (
