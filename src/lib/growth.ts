@@ -8,7 +8,7 @@
 
 import { createHash } from 'node:crypto';
 import { supabaseAdmin } from './supabase';
-import { send as sendEmail, sendBatch, isQuotaExhausted } from './resend';
+import { send as sendEmail, sendBatch, isQuotaExhausted, marketingBudgetRemaining } from './resend';
 import {
   dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
   weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS,
@@ -226,8 +226,19 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
 
         const tags = [{ name: 'kind', value: 'weekly' }, { name: 'week', value: week }];
         let quotaHit = false;
-        // Reserve time budget: leave the rest of the run enough headroom.
-        for (const part of chunk(pending, 100)) {
+        // Only drain as many as today's MARKETING budget allows (cap − reserve
+        // − already-sent). A fixed 100-batch is larger than the 80/day
+        // marketing budget, so sendBatch rejected it wholesale and NOTHING
+        // sent — that stalled 110 W35 digests for 3 days. Size to the budget,
+        // send what fits today, leave the rest pending for tomorrow.
+        const budget = await marketingBudgetRemaining();
+        if (budget <= 0) {
+          quotaHit = true;
+          s.phase.push('Daily email budget already used — resuming tomorrow');
+        }
+        const drainable = pending.slice(0, budget);
+        // Resend batch endpoint caps at 100; never exceed the budget either.
+        for (const part of chunk(drainable, Math.min(100, Math.max(1, budget)))) {
           if (quotaHit) break;
           const emails = part.map((r) => {
             const { subject, html, text } = withOvr('weekly',

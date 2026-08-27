@@ -133,6 +133,22 @@ async function marketingBudgetLeft(batchSize = 1): Promise<boolean> {
   } catch { return true; /* ledger unavailable → do not block sending */ }
   return reserveCache.count + batchSize <= DAILY_CAP - DAILY_RESERVE;
 }
+// How many MARKETING emails may still go out today (cap − reserve − sent).
+// Callers that send in bulk (the weekly digest drain) MUST size each batch to
+// this, or a fixed batch larger than the remaining budget is rejected wholesale
+// and nothing sends — the bug that stalled 110 W35 digests for 3 days.
+export async function marketingBudgetRemaining(): Promise<number> {
+  const day = new Date().toISOString().slice(0, 10);
+  try {
+    if (reserveCache.day !== day || Date.now() - reserveCache.at > 60000) {
+      const { supabaseAdmin } = await import('./supabase');
+      const { count } = await supabaseAdmin().from('email_send_log')
+        .select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', day + 'T00:00:00Z');
+      reserveCache = { day, count: count || 0, at: Date.now() };
+    }
+  } catch { return DAILY_CAP; /* ledger unavailable → assume full budget */ }
+  return Math.max(0, DAILY_CAP - DAILY_RESERVE - reserveCache.count);
+}
 export function noteSent(n: number) { reserveCache.count += n; }
 export function markQuotaExhausted(): void {
   quotaExhaustedDay = new Date().toISOString().slice(0, 10);

@@ -270,6 +270,7 @@ export default function Automations() {
   return (
     <div className="space-y-4">
       <CronHealth />
+      <TodayEmailStats />
       <div className="text-xs text-ink-700/70 bg-cream/40 border border-bronze-600/15 rounded-lg px-3 py-2">
         🛡 <b>Review-first:</b> each system starts OFF — a <b>green</b> toggle means it's <b>ON</b>. Preview each email (right) and test-send it to yourself before enabling. The daily cron (08:00 UTC) does the actual sending, so the counters below stay at <b>0</b> until it next runs and there's activity to report — that's normal, not "off".
       </div>
@@ -731,6 +732,84 @@ function SendLog() {
 }
 
 // ── Cron heartbeat — is the nightly automation actually running? ─────
+// ── Today's email sends — every type, in bold, live. ─────────────────
+// Reads email_send_log for the current UTC day and breaks it down by kind so
+// the owner can see at a glance exactly what went out today and whether any
+// send failed. Numbers are bold per the owner's request.
+const EMAIL_KIND_LABELS: Record<string, string> = {
+  'order': 'Order confirmations', 'gift': 'Gift deliveries', 'auth': 'Sign-in links',
+  'optin': 'Opt-in confirmations', 'resendLibrary': 'Library re-sends', 'payRecovery': 'Payment recovery',
+  'portalGuide': 'Portal guide', 'weekly-digest': 'Weekly digest', 'drip1': 'Nurture drip 1',
+  'drip2': 'Nurture drip 2', 'drip3': 'Nurture drip 3', 'drip4': 'Nurture drip 4', 'drip5': 'Nurture drip 5',
+  'cartSave': 'Cart reminders', 'browse': 'Browse reminders', 'winback': 'Win-back',
+  'priceDrop': 'Price-drop alerts', 'referralNudge': 'Referral nudges', 'etsyWelcome': 'Etsy welcome',
+  'wishlistReminder': 'Wishlist reminders', 'refundWinback': 'Refund win-back', 'picks': 'Hand-picked designs',
+  'ownerReport': 'Owner report', 'designScout': 'Design scout', '(untagged)': 'Other',
+};
+function TodayEmailStats() {
+  const [rows, setRows] = useState<{ kind: string; sent: number; failed: number }[] | null>(null);
+  const [tot, setTot] = useState({ sent: 0, failed: 0 });
+  const load = async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase.from('email_send_log').select('kind, status').gte('sent_at', today + 'T00:00:00Z').limit(20000);
+    const agg: Record<string, { sent: number; failed: number }> = {};
+    let s = 0, f = 0;
+    for (const r of data || []) {
+      const k = r.kind || '(untagged)';
+      agg[k] = agg[k] || { sent: 0, failed: 0 };
+      if (r.status === 'sent') { agg[k].sent++; s++; }
+      else if (r.status === 'failed') { agg[k].failed++; f++; }
+    }
+    setRows(Object.entries(agg).map(([kind, v]) => ({ kind, ...v })).sort((a, b) => (b.sent + b.failed) - (a.sent + a.failed)));
+    setTot({ sent: s, failed: f });
+  };
+  useEffect(() => { load(); }, []);
+  useLiveRefresh(load, 30000);
+  if (!rows) return null;
+  const cap = Number((import.meta as any).env?.PUBLIC_RESEND_DAILY_CAP) || 100;
+  const reserve = 20;
+  const marketingLeft = Math.max(0, cap - reserve - tot.sent);
+  const label = (k: string) => EMAIL_KIND_LABELS[k] || k;
+  return (
+    <Card>
+      <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+        <div className="text-sm font-bold text-ink-900">📧 Today's email sends</div>
+        <span className="text-[11px] text-ink-700/50">every type sent today (UTC) · updates live</span>
+      </div>
+      <div className="flex flex-wrap gap-3 mb-3">
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 min-w-[120px]">
+          <div className="text-[10px] uppercase tracking-wide text-green-700/70 font-medium">Sent today</div>
+          <div className="text-2xl font-extrabold text-green-800 leading-tight">{tot.sent}</div>
+        </div>
+        <div className={`rounded-lg border px-4 py-2.5 min-w-[120px] ${tot.failed ? 'border-red-300 bg-red-50' : 'border-black/10 bg-cream/40'}`}>
+          <div className={`text-[10px] uppercase tracking-wide font-medium ${tot.failed ? 'text-red-700/70' : 'text-ink-700/50'}`}>Failed today</div>
+          <div className={`text-2xl font-extrabold leading-tight ${tot.failed ? 'text-red-700' : 'text-ink-700/60'}`}>{tot.failed}</div>
+        </div>
+        <div className="rounded-lg border border-bronze-600/20 bg-cream/40 px-4 py-2.5 min-w-[150px]">
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Marketing budget left</div>
+          <div className="text-2xl font-extrabold text-bronze-800 leading-tight">{marketingLeft}<span className="text-sm font-medium text-ink-700/50"> / {cap - reserve}</span></div>
+          <div className="text-[10px] text-ink-700/50 mt-0.5">{reserve} always reserved for buyer emails</div>
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-xs text-ink-700/50">No emails sent yet today.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5">
+          {rows.map((r) => (
+            <div key={r.kind} className="flex items-baseline justify-between border-b border-black/5 py-1">
+              <span className="text-sm text-ink-800">{label(r.kind)}</span>
+              <span className="text-sm">
+                <b className="text-ink-900">{r.sent}</b>
+                {r.failed > 0 && <b className="text-red-600 ml-1.5">· {r.failed} failed</b>}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // Shows the last run + a warning if it's overdue (>26h). Reads cron_runs,
 // which /api/cron/daily writes on every invocation.
 function CronHealth() {
