@@ -123,3 +123,12 @@ software products.
 - **Git push gotcha (this machine)**: `git push` from PowerShell fails with
   "could not read Username" (Git Credential Manager can't reach the vault from that
   context) — push via Git Bash instead, which works.
+- **Second Cults3D listing (meownjolly account)**: the same free Ogee Bell pack is
+  also published from the owner's personal Cults account (uploaded via the site UI,
+  not the API — that account has no API key):
+  <https://cults3d.com/en/3d-model/home/vase-lampshade-studio-free-lamp-shade-generator-105-designs-built-in-e27-e1-meownjolly-2>
+  Same title/description/tags/images, Home > Lamps, FREE, CULTS PU. Both listings
+  funnel to `/lamp-studio#playground`.
+- **Printables (pending owner upload)**: complete listing pack staged at
+  `D:\LAMP SHADE OGEE\desktop\printables-upload` (`PRINTABLES-LISTING.md` +
+  unpacked STL/PDF/README) — Printables has no upload API.
