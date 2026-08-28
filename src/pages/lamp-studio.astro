@@ -1,0 +1,211 @@
+---
+import Shell from '../layouts/Shell.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { getSettings } from '../lib/queries';
+const s: any = await getSettings();
+// Image slots are admin-manageable (Admin → Media) with static fallbacks.
+const IMG = {
+  hero:   s.vls_hero_url   || '/lamp-studio/hero.jpg',
+  poster: s.vls_poster_url || '/lamp-studio/poster.jpg',
+};
+// Buy = the store's own product page → existing checkout, emails & delivery all
+// run through the normal DigitalChiselCo order flow. Admin-overridable.
+const BUY = s.vls_buy_url || '/product/vase-lampshade-studio';
+const DEMO_URL = '/lamp-studio-app/index.html?demo=1&buy=' + encodeURIComponent('https://www.digitalchiselco.com' + (BUY.startsWith('/') ? BUY : '/lamp-studio'));
+---
+<Shell
+  title="Vase Lampshade Studio — 3D Printable Lampshade Generator with Built-in E27/E14 Fitters | Vase Mode STL Software"
+  description="Design watertight 3D-printable lampshade STL files in minutes — 105 parametric lamp shade designs, lithophane photo embossing, custom text, and a built-in E27/E14 bulb holder that prints in ONE piece in vase mode. Free browser playground, one-time purchase, no supports."
+  image={IMG.hero}
+  ogType="product"
+  price="14.99"
+  currency="USD"
+  availability="in stock"
+  scrollPastBanner={true}
+>
+  <Breadcrumbs crumbs={[{ label: 'Lampshade Studio' }]} />
+
+  <article class="max-w-5xl mx-auto">
+
+    <!-- ===== HERO ===== -->
+    <header class="text-center mb-10 reveal">
+      <p class="text-xs tracking-widest text-bronze-600 mb-3">★ NEW FROM DIGITALCHISELCO · DESKTOP + WEB SOFTWARE</p>
+      <h1 class="font-serif text-4xl md:text-6xl text-bronze-800 leading-tight">
+        Vase Lampshade <em class="italic text-bronze-600">Studio</em>
+      </h1>
+      <p class="mt-5 text-lg md:text-xl text-ink-700/85 max-w-3xl mx-auto">
+        Design a designer lampshade in minutes — with the bulb holder <em>built in</em> —
+        and print the whole lamp in one continuous vase-mode piece. No CAD. No supports. No mesh repairs, ever.
+      </p>
+      <div class="mt-6 flex flex-wrap justify-center gap-3">
+        <a href={BUY} class="bg-bronze-600 text-cream px-8 py-3.5 rounded-md text-sm font-medium hover:bg-bronze-700 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow">Get the full Studio →</a>
+        <a href="#playground" class="border border-bronze-600 text-bronze-700 px-8 py-3.5 rounded-md text-sm hover:bg-bronze-600/10 transition">Try it free, right here ↓</a>
+      </div>
+      <p class="mt-3 text-xs text-ink-700/60">Windows 10/11 desktop app + browser playground · one-time purchase · 100% offline · nothing uploaded, ever</p>
+    </header>
+
+    <figure class="rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg mb-16 reveal max-w-3xl mx-auto">
+      <img src={IMG.hero} alt="3D printable lampshade designed in Vase Lampshade Studio — glowing vase-mode table lamp with built-in E27 fitter, printed in one piece with no supports" width="1254" height="1254" loading="eager" fetchpriority="high" decoding="async" class="w-full" />
+      <figcaption class="text-center text-xs text-ink-700/60 py-2 bg-cream">Every lamp here was designed in the Studio and 3D-printed in one continuous vase-mode piece.</figcaption>
+    </figure>
+
+    <script type="application/ld+json" set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: 'Vase Lampshade Studio',
+      operatingSystem: 'Windows 10, Windows 11, Web',
+      applicationCategory: 'DesignApplication',
+      description: 'Parametric 3D-printable lampshade generator: 105 lamp shade designs with built-in E27/E14 fitters, lithophane photo embossing, custom text, one-piece vase-mode printing and watertight STL, OBJ and 3MF export.',
+      image: 'https://www.digitalchiselco.com' + IMG.hero,
+      url: 'https://www.digitalchiselco.com/lamp-studio',
+      offers: { '@type': 'Offer', price: '14.99', priceCurrency: 'USD', availability: 'https://schema.org/InStock', url: 'https://www.digitalchiselco.com' + (BUY.startsWith('/') ? BUY : '/lamp-studio') },
+      publisher: { '@type': 'Organization', name: 'DigitalChiselCo', url: 'https://www.digitalchiselco.com' },
+    })} />
+
+    <!-- ===== WHY ===== -->
+    <section class="mb-16">
+      <div class="text-center reveal">
+        <p class="text-xs tracking-widest text-bronze-600 mb-3">WHY IT'S DIFFERENT</p>
+        <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">The lamp prints itself.<br class="hidden md:block"/> Holder and all.</h2>
+        <p class="mt-4 text-ink-700/85 max-w-3xl mx-auto">
+          Every other lampshade file leaves you gluing a separate bulb ring in place. The Studio fuses a spoked
+          E27/E14 holder into the shade and computes your slicer's exact vase-mode settings — so one print, with
+          zero supports, comes off the bed as a finished lamp.
+        </p>
+      </div>
+      <div class="mt-10 grid md:grid-cols-3 gap-5">
+        {[
+          { i: '🏺', t: '105 shapes, infinite lamps', p: 'Ogee bells, twisted stars, pumpkins, nautilus spirals, basket weaves — every profile is parametric, so height, radii, flutes and twists are yours to drag. Or draw your own silhouette and trace a photo outline.' },
+          { i: '💡', t: 'The one-piece vase-mode trick', p: 'The bulb holder sits at the bottom, and the app calculates the solid bottom-layer count for YOUR ring height and layer height (e.g. 10 mm ÷ 0.2 mm = 50). Enable vase mode, set the number, print the whole lamp in one go.' },
+          { i: '🖼️', t: 'Photos & names that glow', p: 'Lithophane mode embosses any photo into the wall so it appears when the lamp lights. Text mode wraps names and dates on a curved baseline — glowing, raised or engraved. Personalised gifts, ready in minutes.' },
+          { i: '🧱', t: 'Watertight, guaranteed', p: 'Every STL, OBJ and 3MF export is a closed, consistently-oriented manifold. Orca, Cura, Prusa and Bambu open them with zero warnings — no Netfabb, no repair step, no failed prints from bad meshes.' },
+          { i: '📐', t: 'Your printer, checked', p: 'Pick your printer (Ender, Prusa, Bambu & more, or custom L×W×H) and the build volume appears around your design. Outgrow the bed and the validator warns you with the exact failing dimension — before you waste filament.' },
+          { i: '📄', t: 'A print guide per lamp', p: 'One click writes a professional PDF tailored to your exact design: mode, walls, computed bottom layers, materials and assembly. The illustrated user manual is included too.' },
+        ].map((c, n) => (
+          <div class={`gc-card reveal reveal-d${n % 3} group border border-bronze-600/25 rounded-xl p-6 bg-gradient-to-br from-cream to-white hover:-translate-y-1.5 hover:shadow-xl hover:border-bronze-600/50 transition-all duration-300`}>
+            <div class="w-12 h-12 rounded-full bg-bronze-600/10 border border-bronze-600/25 flex items-center justify-center text-2xl group-hover:bg-bronze-600/20 group-hover:scale-110 transition-all duration-300">{c.i}</div>
+            <h3 class="font-serif text-xl text-bronze-800 mt-4">{c.t}</h3>
+            <p class="mt-2 text-sm text-ink-700/85 leading-relaxed">{c.p}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- ===== LIVE PLAYGROUND ===== -->
+    <section id="playground" class="mb-16">
+      <div class="text-center reveal">
+        <p class="text-xs tracking-widest text-bronze-600 mb-3">DON'T TAKE OUR WORD FOR IT</p>
+        <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">Design one right now — free</h2>
+        <p class="mt-3 text-ink-700/85 max-w-2xl mx-auto">
+          This is the real Studio, running live in your browser. Play with every shape, modifier, photo and text
+          tool. The full version adds STL/OBJ/3MF export, the fitter files and the PDF print guide.
+        </p>
+      </div>
+      <div class="mt-8 rounded-xl overflow-hidden border border-bronze-600/40 shadow-xl reveal bg-[#0b0f17]">
+        <iframe
+          src={DEMO_URL}
+          title="Vase Lampshade Studio — free playground"
+          class="w-full block"
+          style="height: min(78vh, 820px); border: 0;"
+          loading="lazy"
+          allow="fullscreen"
+        ></iframe>
+      </div>
+      <p class="mt-3 text-xs text-ink-700/60 text-center">Runs entirely in your browser — nothing is uploaded. Works best on desktop.</p>
+    </section>
+
+    <!-- ===== POSTER / EVERYTHING INSIDE ===== -->
+    <section class="mb-16">
+      <div class="grid md:grid-cols-2 gap-8 items-center reveal">
+        <figure class="img-zoom rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg max-w-md mx-auto md:mx-0">
+          <img src={IMG.poster} alt="Vase Lampshade Studio feature overview — 105 parametric 3D printing lamp shade shapes, lithophane maker, custom text emboss, profile editor, printer bed fit check and auto-calculated vase mode slicer settings" width="1024" height="1536" loading="lazy" decoding="async" class="w-full transition-transform duration-500" />
+        </figure>
+        <div>
+          <p class="text-xs tracking-widest text-bronze-600 mb-2">EVERYTHING INSIDE</p>
+          <h3 class="font-serif text-3xl text-bronze-800 leading-snug">A complete lamp<br/>design studio.</h3>
+          <ul class="mt-5 space-y-2.5 text-sm text-ink-700/85">
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> 105 parametric shapes in 7 families, each with live silhouette previews</li>
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> E27 · E14 · B22 · GU10 fitters — 8 spoke styles, auto-sized to the opening</li>
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> Lithophane photo embossing (wrap, tile or front-panel)</li>
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> Curved text — glowing, raised or engraved</li>
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> Draw-your-own profile editor + trace-from-image</li>
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> 11 stackable modifiers: twist, weave, ribs, facet & more</li>
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> Lit preview — see the lamp glowing before you print</li>
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> Printer-bed fit check, bulb clearance, material estimates</li>
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> Watertight STL / OBJ / 3MF + per-design PDF print guide</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FACTS ===== -->
+    <section class="mb-8 text-center reveal">
+      <h2 class="font-serif text-3xl text-bronze-800">The plain facts</h2>
+      <ul class="not-prose mt-5 grid sm:grid-cols-2 gap-3 text-sm max-w-2xl mx-auto text-left text-ink-700/85">
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Windows 10 / 11 installer — desktop, start-menu &amp; startup shortcuts</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> One-time purchase — no subscription, ever</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> 100% offline — your photos never leave your PC</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Illustrated user manual + per-lamp PDF print guides</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Sell what you print — your designs are yours, commercially</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Made by the studio behind 1,200+ STL designs</li>
+      </ul>
+    </section>
+
+    <section class="mt-12 mb-4 border border-bronze-600/30 rounded-xl p-8 text-center bg-gradient-to-br from-cream to-white reveal">
+      <h3 class="font-serif text-2xl text-bronze-800">Design tonight. Print tonight. Glow tonight.</h3>
+      <p class="mt-2 text-ink-700">Own the Studio forever — and turn every bulb in the house into something you made.</p>
+      <div class="mt-5 flex flex-wrap justify-center gap-3">
+        <a href={BUY} class="bg-bronze-600 text-cream px-7 py-3 rounded-md text-sm font-medium hover:bg-bronze-700 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow">Get Vase Lampshade Studio →</a>
+        <a href="#playground" class="border border-bronze-600 text-bronze-700 px-7 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">Keep playing first</a>
+      </div>
+    </section>
+
+  </article>
+</Shell>
+
+<style is:global>
+  .js-anim .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+  .js-anim .reveal.in { opacity: 1; transform: none; }
+  .js-anim .reveal.now { transition: none !important; }
+  .js-anim .reveal-d1 { transition-delay: .12s; }
+  .js-anim .reveal-d2 { transition-delay: .24s; }
+  .js-anim .reveal-d3 { transition-delay: .36s; }
+  .img-zoom:hover img { transform: scale(1.03); }
+  @media (prefers-reduced-motion: reduce) { .js-anim .reveal { opacity: 1; transform: none; transition: none; } }
+</style>
+
+<script is:inline>
+  (function () {
+    var els = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+    if (!els.length) return;
+    document.documentElement.classList.add('js-anim');
+    function pass() {
+      var vh = window.innerHeight || 800;
+      els = els.filter(function (el) {
+        var r = el.getBoundingClientRect();
+        if (r.top < vh * 0.92 && r.bottom > 0) { el.classList.add('in'); return false; }
+        return true;
+      });
+      if (!els.length) {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onScroll);
+      }
+    }
+    var last = 0;
+    function onScroll() {
+      var now = Date.now();
+      if (now - last < 80) return;
+      last = now; pass();
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    pass();
+    setTimeout(pass, 300);
+    setTimeout(function () {
+      document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('now', 'in'); });
+      els = [];
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    }, 2500);
+  })();
+</script>
