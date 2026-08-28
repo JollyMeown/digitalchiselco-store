@@ -112,3 +112,14 @@ software products.
 - **Print-guide wording** (app + playground): combined mode explicitly recommended as
   THE way to print BOTH fitter and shade in vase mode; Option B now notes the shade
   alone can always print in vase mode too.
+- **Idle turntable** (playground, commit 24457d9): the live demo read as a static
+  picture on first load. The 3D view now auto-rotates gently (OrbitControls
+  `autoRotate`, speed 1.2) with a "Drag to rotate · scroll to zoom" hint pill at the
+  bottom of the viewport; the first grab of the view OR first click in the design
+  panel stops the spin for good and fades the hint. Source lives in the studio app
+  (`js/main.js`, `index.html`, `styles/app.css`) and is copied into
+  `public/lamp-studio-app/`. Debug helper `window.__tick(n)` steps the control loop
+  for headless/background-tab verification (rAF is paused in background tabs).
+- **Git push gotcha (this machine)**: `git push` from PowerShell fails with
+  "could not read Username" (Git Credential Manager can't reach the vault from that
+  context) — push via Git Bash instead, which works.
