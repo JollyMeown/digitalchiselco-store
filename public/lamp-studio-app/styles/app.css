@@ -102,6 +102,8 @@ optgroup { color: var(--dim); }
 #viewport { grid-area: view; position: relative; overflow: hidden; }
 #viewport canvas { display: block; width: 100% !important; height: 100% !important; }
 #errorMsg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: #ffb4b4; font-weight: 600; white-space: pre-line; text-align: center; padding: 0 24px; }
+#spinHint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(12,17,25,.72); border: 1px solid rgba(255,255,255,.14); color: var(--dim); font-size: 12px; padding: 5px 13px; border-radius: 999px; pointer-events: none; white-space: nowrap; transition: opacity .7s; backdrop-filter: blur(4px); }
+#spinHint.gone { opacity: 0; }
 
 .fit-warn { border: 1px solid #4d3a1f; background: #1c150c; color: var(--warn); border-radius: 9px; padding: 9px 12px; font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
 .ex.primary-fix { background: var(--accent); color: #221900; border-color: var(--accent); }

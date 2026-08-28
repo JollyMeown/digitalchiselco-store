@@ -57,6 +57,19 @@ try {
   A.position.set(320, -340, 260);
   O = new OrbitControls(A, R.domElement);
   O.enableDamping = true; O.dampingFactor = 0.08;
+  /* Idle turntable: without it the first frame reads as a static picture.
+   * Spins gently until the visitor grabs the view (or starts designing in
+   * the panel), then stays off for the rest of the session. */
+  O.autoRotate = true; O.autoRotateSpeed = 1.2;
+  const stopSpin = () => {
+    if (!O.autoRotate) return;
+    O.autoRotate = false;
+    const h = document.getElementById('spinHint');
+    if (h) h.classList.add('gone');
+  };
+  O.addEventListener('start', stopSpin);
+  const panelEl = document.getElementById('panel');
+  if (panelEl) panelEl.addEventListener('pointerdown', stopSpin, { once: true });
   hemiL = new THREE.HemisphereLight(0xbcd0ff, 0x202430, 0.7); S.add(hemiL);
   keyL = new THREE.DirectionalLight(0xffffff, 1.1); keyL.position.set(300, -200, 500); S.add(keyL);
   fillL = new THREE.DirectionalLight(0x8899ff, 0.5); fillL.position.set(-300, 200, 100); S.add(fillL);
@@ -615,6 +628,10 @@ window.__hero = (w = 1400, h = 1750, o = {}) => {
   glow.intensity = keep.gi; hemiL.intensity = keep.hi; keyL.intensity = keep.ki;
   r.dispose();
   return url;
+};
+window.__tick = (n = 1) => {                               // step the control loop (rAF is paused in background tabs)
+  for (let i = 0; i < n; i++) O.update();
+  R.render(S, A);
 };
 window.__capture = (maxW = 640) => {                       // downscaled PNG data URI for the manual
   R.render(S, A); const src = R.domElement, sc = Math.min(1, maxW / src.width);
