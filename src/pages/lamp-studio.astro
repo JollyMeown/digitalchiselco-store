@@ -265,4 +265,30 @@ const DEMO_URL = '/lamp-studio-app/index.html?demo=1&buy=' + encodeURIComponent(
       window.removeEventListener('resize', onScroll);
     }, 2500);
   })();
+
+  // ── Playground engagement beacon ──────────────────────────────────────
+  // Fire ONE 'lamp_try' event the first time the live playground iframe is
+  // actually scrolled into view (≥40% visible) — a much stronger "used the
+  // app" signal than a bare landing-page view. Feeds Admin → Traffic.
+  (function () {
+    var frame = document.querySelector('#playground iframe');
+    if (!frame || !('IntersectionObserver' in window)) return;
+    var fired = false;
+    function beacon() {
+      if (fired) return; fired = true;
+      try {
+        var d = JSON.stringify({ t: 'lamp_try', p: '/lamp-studio' });
+        if (navigator.sendBeacon) navigator.sendBeacon('/api/track', new Blob([d], { type: 'application/json' }));
+        else fetch('/api/track', { method: 'POST', body: d, keepalive: true, headers: { 'content-type': 'application/json' } });
+      } catch (_) {}
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting && e.intersectionRatio >= 0.4) { beacon(); io.disconnect(); } });
+    }, { threshold: [0, 0.4] });
+    io.observe(frame);
+    // Also count a click into the iframe (it steals focus on interaction).
+    window.addEventListener('blur', function () {
+      if (document.activeElement === frame) beacon();
+    });
+  })();
 </script>

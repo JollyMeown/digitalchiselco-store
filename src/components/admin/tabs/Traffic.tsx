@@ -179,6 +179,8 @@ export default function Traffic() {
 
           <ShopperActions events={eventsExt} names={prodNames} paid={paidCount} days={days} />
 
+          <LampStudio days={days} />
+
           <LiveVisitorMap />
 
           <Card>
@@ -206,6 +208,73 @@ export default function Traffic() {
         </>
       )}
     </div>
+  );
+}
+
+// ── Lamp Studio engagement — page views, playground tries, live-now. ────
+// The /lamp-studio landing page embeds the live Vase Lampshade Studio
+// playground (an iframe). Landing-page views land in site_visits; the deeper
+// "actually used the app" signal is the 'lamp_try' site_event, fired when the
+// playground scrolls into view. Live-now = distinct visitors on /lamp-studio
+// in the last 5 minutes (same signal as the LIVE strip, filtered to this page).
+function LampStudio({ days }: { days: number }) {
+  const [d, setD] = useState<{ views: number; viewers: number; tries: number; triers: number; live: number } | null>(null);
+  const load = async () => {
+    const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+    const liveSince = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const [{ data: visits }, { data: tries }, { data: liveRows }] = await Promise.all([
+      supabase.from('site_visits').select('visitor_hash').eq('path', '/lamp-studio').gte('day', since).limit(20000),
+      supabase.from('site_events').select('visitor_hash').eq('type', 'lamp_try').gte('day', since).limit(20000),
+      supabase.from('site_visits').select('visitor_hash').eq('path', '/lamp-studio').gte('ts', liveSince).limit(2000),
+    ]);
+    const uniq = (rows: any[]) => new Set((rows || []).map((r) => r.visitor_hash || Math.random())).size;
+    setD({
+      views: (visits || []).length, viewers: uniq(visits || []),
+      tries: (tries || []).length, triers: uniq(tries || []),
+      live: uniq(liveRows || []),
+    });
+  };
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 20000);   // keep live-now fresh
+    return () => clearInterval(t);
+  }, [days]);
+  if (!d) return null;
+  const convo = d.viewers ? Math.round((d.triers / d.viewers) * 100) : 0;
+  return (
+    <Card>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <div className="text-sm font-bold text-ink-900">💡 Lamp Studio engagement</div>
+        <span className="text-[11px] text-ink-700/50">the /lamp-studio page + its live playground · last {days}d</span>
+        <a href="/lamp-studio" target="_blank" rel="noreferrer" className="text-[11px] text-bronze-600 hover:underline ml-auto">open page ↗</a>
+        <span className={`flex items-center gap-1 text-xs font-medium ${d.live > 0 ? 'text-green-700' : 'text-ink-700/40'}`}>
+          <span className={`inline-block w-2 h-2 rounded-full ${d.live > 0 ? 'bg-green-500 animate-pulse' : 'bg-ink-700/20'}`} />
+          {d.live > 0 ? `${d.live} on this page now` : 'nobody on it right now'}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-lg border border-bronze-600/15 bg-cream/40 px-4 py-3">
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Page views</div>
+          <div className="text-2xl font-extrabold text-bronze-800 leading-tight">{d.views}</div>
+          <div className="text-[11px] text-ink-700/50 mt-0.5"><b>{d.viewers}</b> unique visitors</div>
+        </div>
+        <div className="rounded-lg border border-bronze-600/15 bg-cream/40 px-4 py-3">
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Tried the playground</div>
+          <div className="text-2xl font-extrabold text-bronze-800 leading-tight">{d.triers}</div>
+          <div className="text-[11px] text-ink-700/50 mt-0.5"><b>{d.tries}</b> total opens</div>
+        </div>
+        <div className="rounded-lg border border-bronze-600/15 bg-cream/40 px-4 py-3">
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Play rate</div>
+          <div className="text-2xl font-extrabold text-bronze-800 leading-tight">{convo}%</div>
+          <div className="text-[11px] text-ink-700/50 mt-0.5">of visitors tried it</div>
+        </div>
+        <div className={`rounded-lg border px-4 py-3 ${d.live > 0 ? 'border-green-200 bg-green-50' : 'border-black/10 bg-cream/40'}`}>
+          <div className={`text-[10px] uppercase tracking-wide font-medium ${d.live > 0 ? 'text-green-700/70' : 'text-ink-700/50'}`}>Live now</div>
+          <div className={`text-2xl font-extrabold leading-tight ${d.live > 0 ? 'text-green-700' : 'text-ink-700/60'}`}>{d.live}</div>
+          <div className="text-[11px] text-ink-700/50 mt-0.5">on the page (5 min)</div>
+        </div>
+      </div>
+    </Card>
   );
 }
 
