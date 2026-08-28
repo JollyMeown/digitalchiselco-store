@@ -45,9 +45,49 @@ function csrfBlocked(request: Request, pathname: string): boolean {
   try { return new URL(origin).host !== new URL(request.url).host; } catch { return true; }
 }
 
+// ── Legacy-URL rescue (Google Search Console cleanup, 2026-08-28) ─────
+// GSC reported 229 crawled 404s. Patterns and where they now 301 to:
+//   /product/<etsy-listing-id>-<slug>  → the live /product/<slug> when a
+//       matching product exists (93% do; exact then prefix match), else
+//       /catalog. These are URLs from the old Etsy-divert landing site.
+//   /blog.html, /catalog.html, /blog/x.html, /category/x.html → .html stripped
+//   /category/<anything>               → /collections (old section scheme)
+// Lookups only run on these rare legacy shapes, never on normal traffic.
+async function legacyRedirect(pathname: string): Promise<string | null> {
+  let p = pathname;
+  if (p === '/blog.html') return '/blog';
+  if (p === '/catalog.html') return '/catalog';
+  const blogHtml = p.match(/^\/blog\/(.+)\.html$/);
+  if (blogHtml) return `/blog/${blogHtml[1]}`;
+  if (/^\/category\//.test(p)) return '/collections';
+  const etsy = p.match(/^\/product\/\d{5,}-(.+?)\/?$/);
+  if (etsy) {
+    try {
+      const slug = decodeURIComponent(etsy[1]).toLowerCase();
+      const { supabaseAdmin } = await import('./lib/supabase');
+      const db = supabaseAdmin();
+      const { data: exact } = await db.from('products').select('slug').eq('slug', slug).maybeSingle();
+      if (exact?.slug) return `/product/${exact.slug}`;
+      // Old exports truncated slugs at a different length: prefix match both ways.
+      const { data: pre } = await db.from('products').select('slug').ilike('slug', slug.slice(0, 60).replace(/[%_]/g, '') + '%').limit(1);
+      if (pre?.[0]?.slug) return `/product/${pre[0].slug}`;
+    } catch { /* fall through */ }
+    return '/catalog';
+  }
+  return null;
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   if (csrfBlocked(context.request, context.url.pathname)) {
     return new Response('Cross-site POST form submissions are forbidden', { status: 403 });
+  }
+  if (context.request.method === 'GET') {
+    const path = context.url.pathname;
+    // cheap pre-filter so the async helper only runs on legacy-looking paths
+    if (/\.html$/.test(path) || path.startsWith('/category/') || /^\/product\/\d{5,}-/.test(path)) {
+      const to = await legacyRedirect(path);
+      if (to) return context.redirect(to, 301);
+    }
   }
   const response = await next();
   try {
