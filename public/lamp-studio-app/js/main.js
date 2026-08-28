@@ -30,7 +30,7 @@ function showUpsell() {
         <li>A tailored <b>PDF print guide</b> with computed slicer settings</li>
         <li>Offline desktop app + illustrated manual</li>
       </ul>
-      <a class="up-buy" href="${ETSY_URL}" target="_blank" rel="noopener">Get the full studio on Etsy →</a>
+      <a class="up-buy" href="${ETSY_URL}" target="_blank" rel="noopener">Get the full studio →</a>
       <button class="up-close">Keep designing</button>
     </div>`;
     document.body.appendChild(m);
@@ -626,5 +626,5 @@ rebuildShade();
 applyLitPreview();
 if (DEMO) {
   const hb = document.getElementById('hintbar');
-  if (hb) hb.innerHTML = '<span class="demo-badge">FREE PLAYGROUND</span> Full studio with STL export on <a class="demo-link" href="' + ETSY_URL + '" target="_blank" rel="noopener">Etsy</a>';
+  if (hb) hb.innerHTML = '<span class="demo-badge">FREE PLAYGROUND</span> <a class="demo-link" href="' + ETSY_URL + '" target="_blank" rel="noopener">Get the full studio with STL export →</a>';
 }
