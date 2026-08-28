@@ -403,6 +403,7 @@ function guideSections() {
 
   if (hasFit && P.fitPosition === 'bottom') {
     S.push({ type: 'h1', n: 'OPTION A - RECOMMENDED', text: 'Combined STL in Vase mode (one piece)' });
+    S.push({ type: 'call', kind: 'note', label: 'Why combined is the recommended way', text: 'COMBINED MODE prints BOTH the fitter AND the shade in vase mode in a single job - one file, one continuous print, no assembly. It is the only option where the fitter itself benefits from vase mode (via the solid bottom layers).' });
     S.push({ type: 'p', text: 'The whole lamp prints as a single spiralized piece. This works because the fitter sits at the BOTTOM: the slicer prints the first stretch fully solid (covering the bulb-holder ring), then switches to the single-wall vase spiral for the shade above - automatically.' });
     S.push({ type: 'big', label: 'CALCULATED FOR THIS MODEL', text: `Bottom shell layers = ${ringH} mm / ${lh} mm = ${botLayers} layers` });
     S.push({ type: 'p', text: `At ${lh} mm layer height, ${perMM} layers make 1 mm - so the ${ringH} mm bulb-holder ring needs ${botLayers} solid bottom layers. Above layer ${botLayers}, Orca continues in vase mode by itself.` });
@@ -439,6 +440,7 @@ function guideSections() {
     ['WALL', 'set by line width - 0.8-1.2 mm looks great'],
     ['SUPPORTS', 'None'],
   ]});
+  S.push({ type: 'call', kind: 'note', label: 'The shade alone can always print in vase mode', text: 'Even as a watertight shell, the shade on its own prints beautifully in vase mode: Spiralize ON, 3-5 bottom layers, 0 top layers, 0% infill - the slicer follows the outer wall as one continuous spiral. To print BOTH the shade and the fitter in vase mode, use Option A (combined) - recommended.' });
   if (hasFit) {
     S.push({ type: 'h2', text: 'Fitter - bulb holder' });
     S.push({ type: 'kv', labW: 170, rows: [

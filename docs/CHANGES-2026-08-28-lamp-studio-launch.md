@@ -98,3 +98,17 @@ software products.
 - One end-to-end test purchase of the $14.99 product (delivery email with Drive link).
 - Optional later: code-signing cert to remove the SmartScreen prompt; $4.99 web
   single-export credit tier (needs server-side metering — deliberately deferred).
+
+## Addendum (same day)
+- **Cults3D "No files associated" FIX**: Cults' ingestion silently dropped the
+  exe-containing demo ZIP. Replaced the listing file with
+  `VaseLampshadeStudio_3_Sample_Lamps.zip` (3 ready-to-print combined lamp STLs
+  generated from the studio modules + sample print guide PDF + README/.url linking
+  to /lamp-studio), Drive id `1Itnx6z7UVArS5eFfEp5tkqwyaXul8fWl`, attached via
+  GraphQL `createBlueprint(creationId, fileUrl)` — verified `fileName` present.
+  Listing description rewritten around the samples. **API gotchas:** find your
+  creations via `myself.creationsBatch` (not `creations`); `updateCreation` re-validates
+  price, so always pass `downloadPrice: 0, currency: USD` for the free listing.
+- **Print-guide wording** (app + playground): combined mode explicitly recommended as
+  THE way to print BOTH fitter and shade in vase mode; Option B now notes the shade
+  alone can always print in vase mode too.
