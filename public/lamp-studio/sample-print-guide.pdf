@@ -1,0 +1,188 @@
+%PDF-1.4
+1 0 obj
+<</Type/Catalog/Pages 2 0 R>>
+endobj
+2 0 obj
+<</Type/Pages/Kids[7 0 R 9 0 R]/Count 2>>
+endobj
+3 0 obj
+<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>
+endobj
+4 0 obj
+<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>
+endobj
+5 0 obj
+<</Type/Font/Subtype/Type1/BaseFont/Courier>>
+endobj
+6 0 obj
+<</Type/Font/Subtype/Type1/BaseFont/Courier-Bold>>
+endobj
+7 0 obj
+<</Type/Page/Parent 2 0 R/MediaBox[0 0 595.28 841.89]/Resources<</Font<</F1 3 0 R/F2 4 0 R/F3 5 0 R/F4 6 0 R>>>>/Contents 8 0 R>>
+endobj
+8 0 obj
+<</Length 5426>>
+stream
+0.043 0.059 0.090 rg 0.0 691.9 595.3 150.0 re f
+0.700 0.420 0.030 rg 0.0 691.9 595.3 4.0 re f
+BT /F3 9 Tf 0.914 0.847 0.651 rg 54.0 789.9 Td (VASE LAMPSHADE STUDIO) Tj ET
+BT /F2 24 Tf 1.000 1.000 1.000 rg 54.0 757.9 Td (Print Guide) Tj ET
+BT /F1 11 Tf 0.670 0.710 0.780 rg 54.0 735.9 Td (Ogee Bell lampshade with E27 fitter) Tj ET
+BT /F3 9 Tf 0.620 0.660 0.720 rg 54.0 709.9 Td (2026-08-28  -  tailored to this model) Tj ET
+BT /F4 8.5 Tf 0.700 0.420 0.030 rg 54.0 649.9 Td (YOUR MODEL) Tj ET
+BT /F2 15.5 Tf 0.100 0.130 0.190 rg 54.0 634.9 Td (Model summary) Tj ET
+0.700 0.420 0.030 RG 1.3 w 54.0 626.9 m 541.3 626.9 l S
+0.957 0.969 0.988 rg 54.0 521.9 487.3 101.0 re f
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 599.9 Td (SHADE) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 204.0 599.9 Td (Ogee Bell - 132 mm tall, O 78 bottom / O 136 top) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 593.9 m 533.3 593.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 580.9 Td (WALL) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 204.0 580.9 Td (1.6 mm watertight shell) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 574.9 m 533.3 574.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 561.9 Td (FITTER) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 204.0 561.9 Td (E27 \(40 mm bore\), 3 x Straight spokes, at bottom) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 555.9 m 533.3 555.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 542.9 Td (RING HEIGHT) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 204.0 542.9 Td (12 mm) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 536.9 m 533.3 536.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 523.9 Td (LAYER HEIGHT) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 204.0 523.9 Td (0.2 mm \(5 layers per mm\)) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 517.9 m 533.3 517.9 l S
+BT /F4 8.5 Tf 0.700 0.420 0.030 rg 54.0 487.9 Td (OPTION A - RECOMMENDED) Tj ET
+BT /F2 15.5 Tf 0.100 0.130 0.190 rg 54.0 472.9 Td (Combined STL in Vase mode \(one piece\)) Tj ET
+0.700 0.420 0.030 RG 1.3 w 54.0 464.9 m 541.3 464.9 l S
+BT /F1 9.6 Tf 0.420 0.470 0.550 rg 54.0 450.9 Td (The whole lamp prints as a single spiralized piece. This works because the fitter sits at the BOTTOM:) Tj ET
+BT /F1 9.6 Tf 0.420 0.470 0.550 rg 54.0 437.9 Td (the slicer prints the first stretch fully solid \(covering the bulb-holder ring\), then switches to the) Tj ET
+BT /F1 9.6 Tf 0.420 0.470 0.550 rg 54.0 424.9 Td (single-wall vase spiral for the shade above - automatically.) Tj ET
+0.043 0.059 0.090 rg 54.0 363.9 487.3 50.0 re f
+BT /F4 7.6 Tf 0.914 0.847 0.651 rg 68.0 395.9 Td (CALCULATED FOR THIS MODEL) Tj ET
+BT /F4 14 Tf 1.000 1.000 1.000 rg 68.0 374.9 Td (Bottom shell layers = 12 mm / 0.2 mm = 60 layers) Tj ET
+BT /F1 9.6 Tf 0.420 0.470 0.550 rg 54.0 351.9 Td (At 0.2 mm layer height, 5 layers make 1 mm - so the 12 mm bulb-holder ring needs 60 solid bottom) Tj ET
+BT /F1 9.6 Tf 0.420 0.470 0.550 rg 54.0 338.9 Td (layers. Above layer 60, Orca continues in vase mode by itself.) Tj ET
+BT /F2 11 Tf 0.180 0.370 0.750 rg 54.0 315.9 Td (Slicer settings \(Orca / Bambu / Prusa / Cura\)) Tj ET
+0.957 0.969 0.988 rg 54.0 171.9 487.3 139.0 re f
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 287.9 Td (FILE) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 287.9 Td (lamp_combined.stl) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 281.9 m 533.3 281.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 268.9 Td (MODE) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 268.9 Td (Vase mode ON \(Orca: "Spiral vase" - Cura: "Spiralize Outer) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 262.9 m 533.3 262.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 249.9 Td (BOTTOM SHELL LAYERS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 249.9 Td (60 \(= ring 12 mm / 0.2 mm layer\)) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 243.9 m 533.3 243.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 230.9 Td (TOP SHELL LAYERS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 230.9 Td (0) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 224.9 m 533.3 224.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 211.9 Td (SPARSE INFILL) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 211.9 Td (0 %) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 205.9 m 533.3 205.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 192.9 Td (SUPPORTS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 192.9 Td (None - the fitter web sits flat on the plate) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 186.9 m 533.3 186.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 173.9 Td (BOTTOM SURFACE) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 173.9 Td (100 % density, Monotonic) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 167.9 m 533.3 167.9 l S
+0.984 0.945 0.874 rg 54.0 83.9 487.3 80.0 re f
+0.700 0.420 0.030 rg 54.0 83.9 2.6 80.0 re f
+BT /F4 7.6 Tf 0.700 0.420 0.030 rg 68.0 148.9 Td (WHY THIS WORKS) Tj ET
+BT /F1 9.2 Tf 0.100 0.130 0.190 rg 68.0 133.9 Td (In vase mode the slicer still prints "Bottom shell layers" as fully solid layers before starting) Tj ET
+BT /F1 9.2 Tf 0.100 0.130 0.190 rg 68.0 121.4 Td (the spiral. Setting them to the exact height of the bulb-holder ring makes the whole fitter print) Tj ET
+BT /F1 9.2 Tf 0.100 0.130 0.190 rg 68.0 108.9 Td (solid, and the shade above prints as a clean single-wall spiral. No supports, no seams, one) Tj ET
+BT /F1 9.2 Tf 0.100 0.130 0.190 rg 68.0 96.4 Td (continuous print.) Tj ET
+0.840 0.870 0.920 RG 0.7 w 54.0 42.0 m 541.3 42.0 l S
+BT /F1 8 Tf 0.420 0.470 0.550 rg 54.0 31.0 Td (Vase Lampshade Studio - Print Guide) Tj ET
+BT /F4 9 Tf 0.100 0.130 0.190 rg 529.3 31.0 Td (1) Tj ET
+endstream
+endobj
+9 0 obj
+<</Type/Page/Parent 2 0 R/MediaBox[0 0 595.28 841.89]/Resources<</Font<</F1 3 0 R/F2 4 0 R/F3 5 0 R/F4 6 0 R>>>>/Contents 10 0 R>>
+endobj
+10 0 obj
+<</Length 4926>>
+stream
+BT /F3 7.5 Tf 0.620 0.660 0.720 rg 54.0 801.9 Td (VASE LAMPSHADE STUDIO) Tj ET
+BT /F3 7.5 Tf 0.620 0.660 0.720 rg 496.7 801.9 Td (PRINT GUIDE) Tj ET
+0.840 0.870 0.920 RG 0.7 w 54.0 794.9 m 541.3 794.9 l S
+0.700 0.420 0.030 RG 1.6 w 54.0 794.9 m 94.0 794.9 l S
+BT /F4 8.5 Tf 0.700 0.420 0.030 rg 54.0 755.9 Td (OPTION B) Tj ET
+BT /F2 15.5 Tf 0.100 0.130 0.190 rg 54.0 740.9 Td (Separate parts \(best surface quality\)) Tj ET
+0.700 0.420 0.030 RG 1.3 w 54.0 732.9 m 541.3 732.9 l S
+BT /F2 11 Tf 0.180 0.370 0.750 rg 54.0 712.9 Td (Shade - watertight shell) Tj ET
+0.957 0.969 0.988 rg 54.0 587.9 487.3 120.0 re f
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 684.9 Td (MODE) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 684.9 Td (Normal \(Spiralize OFF\)) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 678.9 m 533.3 678.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 665.9 Td (WALLS / PERIMETERS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 665.9 Td (2) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 659.9 m 533.3 659.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 646.9 Td (TOP SHELL LAYERS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 646.9 Td (0) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 640.9 m 533.3 640.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 627.9 Td (BOTTOM SHELL LAYERS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 627.9 Td (0 \(open bottom\)) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 621.9 m 533.3 621.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 608.9 Td (SPARSE INFILL) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 608.9 Td (0 %) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 602.9 m 533.3 602.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 589.9 Td (SUPPORTS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 589.9 Td (None) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 583.9 m 533.3 583.9 l S
+BT /F2 11 Tf 0.180 0.370 0.750 rg 54.0 561.9 Td (Fitter - bulb holder) Tj ET
+0.957 0.969 0.988 rg 54.0 455.9 487.3 101.0 re f
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 533.9 Td (MODE) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 533.9 Td (Normal \(never vase for a LONE fitter\)) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 527.9 m 533.3 527.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 514.9 Td (WALLS / PERIMETERS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 514.9 Td (3-4 \(or 2 walls + 20 % infill\)) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 508.9 m 533.3 508.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 495.9 Td (TOP / BOTTOM LAYERS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 495.9 Td (3 / 3) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 489.9 m 533.3 489.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 476.9 Td (SUPPORTS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 476.9 Td (None \(designed flat\)) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 470.9 m 533.3 470.9 l S
+BT /F3 8.4 Tf 0.420 0.470 0.550 rg 64.0 457.9 Td (SPOKE THICKNESS) Tj ET
+BT /F2 9.4 Tf 0.100 0.130 0.190 rg 224.0 457.9 Td (4 mm = ~20 layers) Tj ET
+0.840 0.870 0.920 RG 0.4 w 62.0 451.9 m 533.3 451.9 l S
+0.984 0.937 0.867 rg 54.0 380.4 487.3 67.5 re f
+0.660 0.380 0.050 rg 54.0 380.4 2.6 67.5 re f
+BT /F4 7.6 Tf 0.660 0.380 0.050 rg 68.0 432.9 Td (VASE MODE AND THE LONE FITTER) Tj ET
+BT /F1 9.2 Tf 0.100 0.130 0.190 rg 68.0 417.9 Td (A fitter printed ON ITS OWN must use normal mode - in vase mode a flat solid only prints its first) Tj ET
+BT /F1 9.2 Tf 0.100 0.130 0.190 rg 68.0 405.4 Td (few layers. Vase mode is fine for the COMBINED file \(Option A\), because there the fitter is covered) Tj ET
+BT /F1 9.2 Tf 0.100 0.130 0.190 rg 68.0 392.9 Td (by the solid bottom layers.) Tj ET
+BT /F4 8.5 Tf 0.700 0.420 0.030 rg 54.0 346.4 Td (FINISH) Tj ET
+BT /F2 15.5 Tf 0.100 0.130 0.190 rg 54.0 331.4 Td (Assembly & safety) Tj ET
+0.700 0.420 0.030 RG 1.3 w 54.0 323.4 m 541.3 323.4 l S
+BT /F4 9.6 Tf 0.700 0.420 0.030 rg 56.0 309.4 Td (1.) Tj ET
+BT /F1 9.6 Tf 0.420 0.470 0.550 rg 76.0 309.4 Td (If printed separately: drop the fitter into the shade opening - the shade rests on its rim.) Tj ET
+BT /F4 9.6 Tf 0.700 0.420 0.030 rg 56.0 293.4 Td (2.) Tj ET
+BT /F1 9.6 Tf 0.420 0.470 0.550 rg 76.0 293.4 Td (Thread the lamp socket through the hub ring and secure with the socket ring.) Tj ET
+BT /F4 9.6 Tf 0.700 0.420 0.030 rg 56.0 277.4 Td (3.) Tj ET
+BT /F1 9.6 Tf 0.420 0.470 0.550 rg 76.0 277.4 Td (Fit an LED bulb \(LED only - incandescent and halogen run far too hot for printed plastic\).) Tj ET
+BT /F4 9.6 Tf 0.700 0.420 0.030 rg 56.0 261.4 Td (4.) Tj ET
+BT /F1 9.6 Tf 0.420 0.470 0.550 rg 76.0 261.4 Td (Keep 30 mm or more between bulb and wall. Prefer PETG near any warmth.) Tj ET
+BT /F4 9.6 Tf 0.700 0.420 0.030 rg 56.0 245.4 Td (5.) Tj ET
+BT /F1 9.6 Tf 0.420 0.470 0.550 rg 76.0 245.4 Td (Use rated lamp hardware - the printed fitter carries the shade, not the electricity.) Tj ET
+0.840 0.870 0.920 RG 0.7 w 54.0 42.0 m 541.3 42.0 l S
+BT /F1 8 Tf 0.420 0.470 0.550 rg 54.0 31.0 Td (Vase Lampshade Studio - Print Guide) Tj ET
+BT /F4 9 Tf 0.100 0.130 0.190 rg 529.3 31.0 Td (2) Tj ET
+endstream
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000009 00000 n 
+0000000054 00000 n 
+0000000111 00000 n 
+0000000174 00000 n 
+0000000242 00000 n 
+0000000303 00000 n 
+0000000369 00000 n 
+0000000514 00000 n 
+0000005990 00000 n 
+0000006136 00000 n 
+trailer
+<</Size 11/Root 1 0 R>>
+startxref
+11113
+%%EOF

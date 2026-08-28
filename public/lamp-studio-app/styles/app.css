@@ -103,6 +103,10 @@ optgroup { color: var(--dim); }
 #viewport canvas { display: block; width: 100% !important; height: 100% !important; }
 #errorMsg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: #ffb4b4; font-weight: 600; white-space: pre-line; text-align: center; padding: 0 24px; }
 
+.fit-warn { border: 1px solid #4d3a1f; background: #1c150c; color: var(--warn); border-radius: 9px; padding: 9px 12px; font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
+.ex.primary-fix { background: var(--accent); color: #221900; border-color: var(--accent); }
+.ex.primary-fix:hover { filter: brightness(1.06); }
+
 /* demo upsell modal */
 #upsell { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; background: #05070cd0; backdrop-filter: blur(4px); }
 .up-card { width: min(440px, 92vw); background: linear-gradient(180deg, #141c2c, #0e1522); border: 1px solid var(--line2); border-radius: 18px; padding: 28px 30px; text-align: center; box-shadow: 0 30px 80px #000a; }

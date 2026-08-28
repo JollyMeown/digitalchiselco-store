@@ -282,6 +282,20 @@ export function initUI(app) {
         selectCtrl('fitPosition', 'Position', ['top', 'bottom']),
       ]));
       if (P.fitEnable) {
+        const missing = app.fitterMissing && app.fitterMissing();
+        body.appendChild(group('Opening size', [
+          ...(missing ? [h('div', { class: 'fit-warn' }, `⚠ The ${P.fitPosition} opening is too small for the ${P.fitType} holder ring — the fitter is hidden. Widen it below, or use the one-click fix.`)] : []),
+          slider(['bottomRadius', 'Bottom radius', 5, 300, 1]),
+          slider(['topRadius', 'Top radius', 5, 200, 1]),
+          h('div', { class: 'exrow' }, [h('button', {
+            class: 'ex' + (missing ? ' primary-fix' : ''),
+            title: `Widens the ${P.fitPosition} opening to the minimum diameter that seats the ${P.fitType} holder ring, so the fitter appears.`,
+            onclick: () => { app.fitOpening(); setTimeout(renderBody, 350); },
+          }, `⚡ Fit opening to ${P.fitType} holder`)]),
+          h('p', { class: 'hint' }, 'The fitter only exists where its ring physically fits through the opening. This sets the minimum opening for the selected holder in one click.'),
+        ]));
+      }
+      if (P.fitEnable) {
         const spokeBlock = [
           selectCtrl('spokeStyle', 'Spoke style', ['Straight', 'Y-branch', 'Spiral', 'Arc', 'Wavy', 'Cross-brace', 'Double', 'Concentric']),
           ...(P.spokeStyle === 'Spiral' || P.spokeStyle === 'Arc' ? [slider(['spokeTurns', P.spokeStyle === 'Spiral' ? 'Coil turns' : 'Arc sweep', 0.1, 2, 0.05])] : []),

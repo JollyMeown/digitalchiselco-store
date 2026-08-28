@@ -114,6 +114,63 @@ const DEMO_URL = '/lamp-studio-app/index.html?demo=1&buy=' + encodeURIComponent(
       <p class="mt-3 text-xs text-ink-700/60 text-center">Runs entirely in your browser — nothing is uploaded. Works best on desktop.</p>
     </section>
 
+    <!-- ===== INSIDE THE STUDIO (annotated UI) ===== -->
+    <section class="mb-16">
+      <div class="text-center reveal">
+        <p class="text-xs tracking-widest text-bronze-600 mb-3">INSIDE THE STUDIO</p>
+        <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">Four steps. Every control explained.</h2>
+        <p class="mt-3 text-ink-700/85 max-w-2xl mx-auto">
+          Real, annotated screenshots of the software — click any of them to inspect the full-size detail.
+        </p>
+      </div>
+      <div class="mt-8 grid sm:grid-cols-2 gap-5">
+        {[
+          { img: '/lamp-studio/ui-1.jpg', t: 'Step 1 · Profile', p: 'Presets, size and orientation, plus the 105-shape library with live silhouette thumbnails.' },
+          { img: '/lamp-studio/ui-2.jpg', t: 'Step 2 · Detail', p: 'Two-tone blends, lithophane photos, curved text and 11 stackable modifiers.' },
+          { img: '/lamp-studio/ui-3.jpg', t: 'Step 3 · Fitter', p: 'E27/E14/B22/GU10 holder with 8 spoke styles — auto-sized to the shade opening.' },
+          { img: '/lamp-studio/ui-4.jpg', t: 'Step 4 · Export', p: 'Computed vase-mode slicer settings, printer-bed check and watertight STL/OBJ/3MF export.' },
+        ].map((c, n) => (
+          <a href={c.img} target="_blank" rel="noopener" class={`reveal reveal-d${n % 2} group border border-bronze-600/25 rounded-xl overflow-hidden bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 block`}>
+            <div class="overflow-hidden bg-[#0b0f17]">
+              <img src={c.img} alt={`${c.t} of the 3D printable lampshade generator — annotated interface screenshot`} width="1600" height="943" loading="lazy" decoding="async" class="w-full group-hover:scale-[1.02] transition-transform duration-500" />
+            </div>
+            <div class="p-4 border-t border-bronze-600/15">
+              <strong class="text-bronze-800 font-serif">{c.t}</strong>
+              <p class="text-sm text-ink-700/80 mt-1">{c.p}</p>
+            </div>
+          </a>
+        ))}
+      </div>
+      <p class="mt-3 text-xs text-ink-700/60 text-center">Numbered balloons on each screenshot match the legends in the included manual.</p>
+    </section>
+
+    <!-- ===== SAMPLE PRINT GUIDE ===== -->
+    <section class="mb-16">
+      <div class="grid md:grid-cols-2 gap-8 items-center reveal">
+        <div>
+          <p class="text-xs tracking-widest text-bronze-600 mb-2">NO GUESSWORK PRINTING</p>
+          <h3 class="font-serif text-3xl text-bronze-800 leading-snug">A print guide,<br/>computed per lamp.</h3>
+          <p class="mt-4 text-ink-700/85 leading-relaxed">
+            One click in the Studio writes a professional PDF tailored to <em>your exact design</em> — including the
+            one-piece vase-mode recipe: <strong>Bottom shell layers = ring height ÷ layer height</strong>, so the slicer
+            prints the bulb holder solid and spiralizes the shade above it automatically.
+          </p>
+          <ul class="mt-4 space-y-2 text-sm text-ink-700/85">
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> Your model's exact dimensions, ring height and layer counts</li>
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> Combined one-piece settings <em>and</em> separate-parts settings</li>
+            <li class="flex gap-2"><span class="text-bronze-600">✓</span> Assembly steps and LED-bulb safety notes</li>
+          </ul>
+          <a href="/lamp-studio/sample-print-guide.pdf" download
+             class="mt-6 inline-flex items-center gap-2 bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm font-medium hover:bg-bronze-700 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow">
+            📄 Download a sample print guide (PDF)
+          </a>
+        </div>
+        <a href="/lamp-studio/sample-print-guide.pdf" target="_blank" rel="noopener" class="img-zoom rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg max-w-sm mx-auto md:mx-0 block">
+          <img src="/lamp-studio/guide-preview.jpg" alt="Sample per-design PDF print guide with computed vase mode slicer settings for a 3D printed lampshade with E27 fitter" width="953" height="1348" loading="lazy" decoding="async" class="w-full transition-transform duration-500" />
+        </a>
+      </div>
+    </section>
+
     <!-- ===== POSTER / EVERYTHING INSIDE ===== -->
     <section class="mb-16">
       <div class="grid md:grid-cols-2 gap-8 items-center reveal">

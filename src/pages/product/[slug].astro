@@ -200,12 +200,28 @@ const breadcrumbLd = {
         </p>
       )}
 
-      <ul class="mt-6 text-sm text-ink-700 space-y-1.5">
-        <li>📦 Instant digital download (STL file)</li>
-        <li>🛠️ Tested in Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360</li>
-        <li>♾ Unlimited re-downloads</li>
-        <li>✅ Personal &amp; commercial-use license</li>
-      </ul>
+      {p.slug === 'vase-lampshade-studio' ? (
+        <>
+          <ul class="mt-6 text-sm text-ink-700 space-y-1.5">
+            <li>💻 Instant digital download — Windows 10/11 installer + illustrated PDF manual</li>
+            <li>🖨️ Prints on any FDM printer — works with Orca, Cura, PrusaSlicer &amp; Bambu Studio</li>
+            <li>💡 105 lamp designs · built-in E27/E14 fitter · one-piece vase-mode printing</li>
+            <li>♾ Unlimited re-downloads · free v1.x updates · no subscription</li>
+            <li>✅ Commercial-use license — sell every lamp and STL you design</li>
+          </ul>
+          <a href="/lamp-studio#playground"
+             class="mt-4 inline-flex items-center gap-2 border border-bronze-600 text-bronze-700 px-5 py-2.5 rounded-md text-sm font-medium hover:bg-bronze-600/10 transition">
+            ▶ Try the live demo in your browser first
+          </a>
+        </>
+      ) : (
+        <ul class="mt-6 text-sm text-ink-700 space-y-1.5">
+          <li>📦 Instant digital download (STL file)</li>
+          <li>🛠️ Tested in Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360</li>
+          <li>♾ Unlimited re-downloads</li>
+          <li>✅ Personal &amp; commercial-use license</li>
+        </ul>
+      )}
 
       {reviews.length > 0 && (
         <div class="mt-6 border-t border-black/10 pt-4">

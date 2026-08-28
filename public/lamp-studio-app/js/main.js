@@ -542,6 +542,22 @@ const app = {
   },
   export: exportModel,
   bedPresets() { return Object.keys(BED_PRESETS); },
+  /* One click: widen the mounting opening just enough for the selected holder,
+   * so a vanished fitter re-appears. Scales the radius of the mounting end. */
+  fitOpening() {
+    if (!shadeMeta) return;
+    const bore = FITTINGS[P.fitType] ?? P.bore;
+    const required = bore / 2 + P.hubWall + P.rimClearance + 4;   // ring outer + vanish-rule margin + rim room
+    const ring = P.fitPosition === 'bottom' ? shadeMeta.bottomRing : shadeMeta.topRing;
+    let cur = Infinity; for (const r of ring.R) if (r < cur) cur = r;
+    if (!isFinite(cur) || cur < 1) cur = 1;
+    if (cur >= required) { reportStats(); return; }
+    const f = (required / cur) * 1.03;
+    const keys = P.fitPosition === 'bottom' ? ['bottomRadius', 'baseRadius'] : ['topRadius', 'baseRadius'];
+    for (const k of keys) P[k] = Math.min(300, Math.round(P[k] * f * 10) / 10);
+    uiRef && uiRef.refresh(); rebuildShade(); saveToURL(P);
+  },
+  fitterMissing() { return P.fitEnable && fitterParts.length === 0 && !!shadeMeta; },
   printGuide: printGuideText,
   downloadGuide() {
     if (DEMO) { showUpsell(); return; }
