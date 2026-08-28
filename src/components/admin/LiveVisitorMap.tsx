@@ -29,7 +29,31 @@ const CENTROID: Record<string, [number, number]> = {
   NP: [28.4, 84.1], IR: [32.4, 53.7], IQ: [33.2, 43.7], AU: [-25.3, 133.8], NZ: [-40.9, 172.9],
 };
 
-type Row = { code: string; count: number };
+type Row = { code: string; count: number; lastSeen?: string | null; tz?: string | null };
+
+// Fallback local-time zone per country for visits logged before the browser
+// beacon started sending the exact timezone (or when it is blocked).
+const COUNTRY_TZ: Record<string, string> = {
+  US: 'America/Chicago', CA: 'America/Toronto', MX: 'America/Mexico_City', BR: 'America/Sao_Paulo',
+  AR: 'America/Argentina/Buenos_Aires', GB: 'Europe/London', IE: 'Europe/Dublin', FR: 'Europe/Paris',
+  DE: 'Europe/Berlin', NL: 'Europe/Amsterdam', BE: 'Europe/Brussels', ES: 'Europe/Madrid',
+  PT: 'Europe/Lisbon', IT: 'Europe/Rome', CH: 'Europe/Zurich', AT: 'Europe/Vienna', PL: 'Europe/Warsaw',
+  CZ: 'Europe/Prague', SE: 'Europe/Stockholm', NO: 'Europe/Oslo', DK: 'Europe/Copenhagen',
+  FI: 'Europe/Helsinki', UA: 'Europe/Kyiv', RO: 'Europe/Bucharest', GR: 'Europe/Athens',
+  TR: 'Europe/Istanbul', RU: 'Europe/Moscow', IL: 'Asia/Jerusalem', SA: 'Asia/Riyadh',
+  AE: 'Asia/Dubai', PK: 'Asia/Karachi', IN: 'Asia/Kolkata', BD: 'Asia/Dhaka', TH: 'Asia/Bangkok',
+  VN: 'Asia/Ho_Chi_Minh', CN: 'Asia/Shanghai', HK: 'Asia/Hong_Kong', TW: 'Asia/Taipei',
+  JP: 'Asia/Tokyo', KR: 'Asia/Seoul', PH: 'Asia/Manila', ID: 'Asia/Jakarta', MY: 'Asia/Kuala_Lumpur',
+  SG: 'Asia/Singapore', AU: 'Australia/Sydney', NZ: 'Pacific/Auckland', ZA: 'Africa/Johannesburg',
+  EG: 'Africa/Cairo', NG: 'Africa/Lagos', KE: 'Africa/Nairobi',
+};
+const clock = (d: Date) => d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+function localTimeIn(tz: string | null | undefined, code: string): string | null {
+  const zone = tz || COUNTRY_TZ[code];
+  if (!zone) return null;
+  try { return new Date().toLocaleTimeString(undefined, { timeZone: zone, hour: '2-digit', minute: '2-digit' }); }
+  catch { return null; }
+}
 const WINDOWS: [string, string, number][] = [['30 min', 'live', 30 * 60000], ['24 h', 'today', 24 * 3600000], ['7 days', 'week', 7 * 86400000]];
 
 function flag(code: string): string {
@@ -63,18 +87,24 @@ export default function LiveVisitorMap() {
   async function load(ms: number) {
     const sinceIso = new Date(Date.now() - ms).toISOString();
     const { data } = await supabase.from('site_visits')
-      .select('country, visitor_hash').gte('ts', sinceIso).neq('device', 'bot').limit(20000);
+      .select('country, visitor_hash, ts, tz').gte('ts', sinceIso).neq('device', 'bot').order('ts', { ascending: false }).limit(20000);
     // unique visitors per country — visitors WITHOUT a resolvable country are
     // never dropped: they count toward the total and get a 🌐 Unknown row.
     const byCountry = new Map<string, Set<string>>();
+    const lastSeen = new Map<string, string>();   // country -> newest ts (rows arrive newest-first)
+    const tzOf = new Map<string, string>();       // country -> most recent known visitor tz
     const allUniq = new Set<string>();
     for (const r of data || []) {
       const vh = r.visitor_hash || Math.random().toString();
       allUniq.add(vh);
       const code = /^[A-Z]{2}$/i.test(r.country || '') ? (r.country as string).toUpperCase() : '??';
       (byCountry.get(code) || byCountry.set(code, new Set()).get(code)!).add(vh);
+      if (!lastSeen.has(code) && (r as any).ts) lastSeen.set(code, (r as any).ts);
+      if (!tzOf.has(code) && (r as any).tz) tzOf.set(code, (r as any).tz);
     }
-    const list = [...byCountry.entries()].map(([code, set]) => ({ code, count: set.size })).sort((a, b) => b.count - a.count);
+    const list = [...byCountry.entries()].map(([code, set]) => ({
+      code, count: set.size, lastSeen: lastSeen.get(code) || null, tz: tzOf.get(code) || null,
+    })).sort((a, b) => b.count - a.count);
     setRows(list);
     setTotal(allUniq.size);
     setUpdated(new Date());
@@ -115,7 +145,7 @@ export default function LiveVisitorMap() {
           ))}
         </div>
       </div>
-      <div className="grid lg:grid-cols-[1fr_180px] gap-4">
+      <div className="grid lg:grid-cols-[1fr_225px] gap-4">
         <div className="relative">
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full rounded-xl" role="img" aria-label="visitor world map">
             <defs>
@@ -151,19 +181,31 @@ export default function LiveVisitorMap() {
           {hover && (
             <div className="absolute top-2 left-2 bg-white/95 border border-black/10 rounded-md px-2.5 py-1.5 text-xs shadow pointer-events-none">
               {flag(hover.code)} <b>{nameOf(hover.code)}</b> · {hover.count} visitor{hover.count === 1 ? '' : 's'}
+              {(() => { const rr = rows.find((x) => x.code === hover.code); const lt = rr ? localTimeIn(rr.tz, rr.code) : null; return lt ? <> · their time <b>{lt}</b></> : null; })()}
             </div>
           )}
           {total === 0 && <p className="text-xs text-ink-700/50 mt-2">No visitors in this window yet — check back or widen the range.</p>}
         </div>
         <div className="max-h-[260px] overflow-y-auto">
           <div className="text-[11px] uppercase tracking-wider text-ink-700/50 mb-1">Top countries</div>
-          {rows.slice(0, 25).map((r) => (
-            <div key={r.code} className="flex items-center gap-2 text-sm py-0.5">
-              <span>{flag(r.code)}</span>
-              <span className="flex-1 truncate text-ink-800">{nameOf(r.code)}</span>
-              <span className="text-bronze-700 font-medium">{r.count}</span>
-            </div>
-          ))}
+          {rows.slice(0, 25).map((r) => {
+            const seen = r.lastSeen ? new Date(r.lastSeen) : null;
+            const ageMin = seen ? Math.max(0, Math.round((Date.now() - seen.getTime()) / 60000)) : null;
+            const local = localTimeIn(r.tz, r.code);
+            return (
+              <div key={r.code} className="py-1 border-b border-black/5 last:border-0">
+                <div className="flex items-center gap-2 text-sm">
+                  <span>{flag(r.code)}</span>
+                  <span className="flex-1 truncate text-ink-800">{nameOf(r.code)}</span>
+                  <span className="text-bronze-700 font-medium">{r.count}</span>
+                </div>
+                <div className="text-[10.5px] text-ink-700/55 pl-6 leading-snug">
+                  {seen && <>seen <b className="text-ink-700/80">{clock(seen)}</b>{ageMin !== null && ageMin < 90 && <> ({ageMin < 1 ? 'now' : ageMin + 'm ago'})</>}</>}
+                  {local && <> · their time <b className="text-ink-700/80">{local}</b></>}
+                </div>
+              </div>
+            );
+          })}
           {rows.length === 0 && <div className="text-xs text-ink-700/50">—</div>}
         </div>
       </div>

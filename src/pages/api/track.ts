@@ -84,8 +84,11 @@ export const POST: APIRoute = async ({ request }) => {
     // Campaign tag from ?src= / utm_* (sanitized: tag-like strings only).
     const rawCamp = String(body.c || '').toLowerCase();
     const campaign = /^[a-z0-9][a-z0-9._-]{1,59}$/.test(rawCamp) ? rawCamp : null;
+    // Visitor timezone (IANA name like "America/Chicago"); strict shape check.
+    const rawTz = String(body.tz || '');
+    const tz = /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){0,2}$/.test(rawTz) && rawTz.length <= 50 ? rawTz : null;
 
-    await supabaseAdmin().from('site_visits').insert({ day, path, referrer_host, device, country: countryOf(request), visitor_hash, campaign });
+    await supabaseAdmin().from('site_visits').insert({ day, path, referrer_host, device, country: countryOf(request), visitor_hash, campaign, tz });
     return new Response(null, { status: 204 });
   } catch {
     return new Response(null, { status: 204 });   // analytics must never error a page

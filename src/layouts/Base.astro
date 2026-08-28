@@ -105,7 +105,11 @@ const faviconType = settings.favicon_image_url
           if (camp) sessionStorage.setItem('dcc_camp', camp);
           else camp = sessionStorage.getItem('dcc_camp') || '';
         } catch (_) {}
-        trk({ p: location.pathname, r: document.referrer || '', c: camp });
+        // Visitor's own timezone (IANA name) → the admin live screen can show
+        // what time it is where they are. No PII beyond what geo already implies.
+        var tz = '';
+        try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_) {}
+        trk({ p: location.pathname, r: document.referrer || '', c: camp, tz: tz });
         // Capture a referral code from a shared ?ref= link → auto-applies in cart.
         try {
           var rp = new URLSearchParams(location.search).get('ref');
