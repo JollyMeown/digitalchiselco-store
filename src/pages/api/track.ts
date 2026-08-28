@@ -81,7 +81,11 @@ export const POST: APIRoute = async ({ request }) => {
     const secret = process.env.ACCOUNT_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'trk';
     const visitor_hash = crypto.createHash('sha256').update(`${ip}|${ua}|${day}|${secret}`).digest('hex').slice(0, 32);
 
-    await supabaseAdmin().from('site_visits').insert({ day, path, referrer_host, device, country: countryOf(request), visitor_hash });
+    // Campaign tag from ?src= / utm_* (sanitized: tag-like strings only).
+    const rawCamp = String(body.c || '').toLowerCase();
+    const campaign = /^[a-z0-9][a-z0-9._-]{1,59}$/.test(rawCamp) ? rawCamp : null;
+
+    await supabaseAdmin().from('site_visits').insert({ day, path, referrer_host, device, country: countryOf(request), visitor_hash, campaign });
     return new Response(null, { status: 204 });
   } catch {
     return new Response(null, { status: 204 });   // analytics must never error a page

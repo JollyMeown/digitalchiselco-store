@@ -96,7 +96,16 @@ const faviconType = settings.favicon_image_url
             else fetch('/api/track', { method: 'POST', body: d, keepalive: true, headers: { 'content-type': 'application/json' } });
           } catch (_) {}
         }
-        trk({ p: location.pathname, r: document.referrer || '' });
+        // Campaign tag: ?src=reddit-cnc (ours) or standard ?utm_source/utm_campaign.
+        // Remembered for the session so the tag survives navigation to other pages.
+        var camp = '';
+        try {
+          var qs = new URLSearchParams(location.search);
+          camp = (qs.get('src') || qs.get('utm_campaign') || qs.get('utm_source') || '').slice(0, 60);
+          if (camp) sessionStorage.setItem('dcc_camp', camp);
+          else camp = sessionStorage.getItem('dcc_camp') || '';
+        } catch (_) {}
+        trk({ p: location.pathname, r: document.referrer || '', c: camp });
         // Capture a referral code from a shared ?ref= link → auto-applies in cart.
         try {
           var rp = new URLSearchParams(location.search).get('ref');

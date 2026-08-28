@@ -3,7 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { Card } from '../ui';
 import LiveVisitorMap from '../LiveVisitorMap';
 
-type Visit = { day: string; path: string; referrer_host: string | null; device: string | null; country: string | null; visitor_hash: string | null };
+type Visit = { day: string; path: string; referrer_host: string | null; device: string | null; country: string | null; visitor_hash: string | null; campaign?: string | null };
 
 const RANGES = [7, 30, 90] as const;
 
@@ -84,7 +84,7 @@ export default function Traffic() {
     const out: Visit[] = [];
     for (let from = 0; from < 60000; from += 1000) {
       const { data } = await supabase.from('site_visits')
-        .select('day, path, referrer_host, device, country, visitor_hash')
+        .select('day, path, referrer_host, device, country, visitor_hash, campaign')
         .gte('day', since).order('day').range(from, from + 999);
       out.push(...((data || []) as Visit[]));
       if (!data || data.length < 1000) { setCapped(false); break; }
@@ -129,7 +129,7 @@ export default function Traffic() {
 
   const stats = useMemo(() => {
     const byDay = new Map<string, { pv: number; uniq: Set<string> }>();
-    const pages = new Map<string, number>(), refs = new Map<string, number>(), devices = new Map<string, number>(), countries = new Map<string, number>();
+    const pages = new Map<string, number>(), refs = new Map<string, number>(), devices = new Map<string, number>(), countries = new Map<string, number>(), camps = new Map<string, number>();
     const allUniq = new Set<string>();
     for (const r of rows) {
       const d = byDay.get(r.day) || { pv: 0, uniq: new Set<string>() };
@@ -139,6 +139,7 @@ export default function Traffic() {
       if (r.referrer_host) refs.set(r.referrer_host, (refs.get(r.referrer_host) || 0) + 1);
       if (r.device) devices.set(r.device, (devices.get(r.device) || 0) + 1);
       if (r.country) countries.set(r.country, (countries.get(r.country) || 0) + 1);
+      if (r.campaign) camps.set(r.campaign, (camps.get(r.campaign) || 0) + 1);
     }
     // fill missing days with zeros for an honest chart
     const points: { label: string; visitors: number; pageviews: number }[] = [];
@@ -152,7 +153,7 @@ export default function Traffic() {
     return {
       points, pv: rows.length, visitors: allUniq.size,
       today: { pv: byDay.get(todayKey)?.pv || 0, uniq: byDay.get(todayKey)?.uniq.size || 0 },
-      topPages: top(pages, 10), topRefs: top(refs), devices: top(devices, 4), countries: top(countries),
+      topPages: top(pages, 10), topRefs: top(refs), devices: top(devices, 4), countries: top(countries), campaigns: top(camps, 12),
     };
   }, [rows, days]);
 
@@ -202,6 +203,7 @@ export default function Traffic() {
             <SearchTerms events={events} />
             <TopList title="Top pages" rows={stats.topPages} total={stats.pv} />
             <TopList title="Referrer sources" rows={stats.topRefs} total={stats.pv} />
+            <TopList title="Campaigns (?src= links)" rows={stats.campaigns} total={stats.pv} />
             <TopList title="Devices" rows={stats.devices} total={stats.pv} />
             <TopList title="Countries" rows={stats.countries} total={stats.pv} />
           </div>
