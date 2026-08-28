@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vase Lampshade Studio</title>
+  <link rel="stylesheet" href="./styles/app.css" />
+  <script type="importmap">
+    { "imports": {
+      "three": "./vendor/three.module.js",
+      "three/OrbitControls": "./vendor/OrbitControls.js"
+    } }
+  </script>
+</head>
+
+<body>
+  <div id="app">
+    <header>
+      <div class="brand">
+        <span class="logo">◑</span>
+        <h1>Vase Lampshade Studio <span class="pill">vase-mode · print-ready</span></h1>
+      </div>
+      <div class="actions">
+        <span class="hintbar" id="hintbar">Watertight shade + E27/E14 fitter · 104 profiles</span>
+      </div>
+    </header>
+    <aside id="panel"></aside>
+    <main id="viewport">
+      <div id="errorMsg"></div>
+    </main>
+  </div>
+  <input type="file" id="presetFile" accept="application/json" style="display:none" />
+  <script type="module" src="./js/main.js"></script>
+</body>
+
+</html>
