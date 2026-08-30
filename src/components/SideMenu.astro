@@ -1,6 +1,19 @@
 ---
 import { getCategories } from '../lib/queries';
+import { supabase } from '../lib/supabase';
 const categories = await getCategories();
+// Etsy-style item counts beside each category (v_category_counts view,
+// migration 065: active products per category in one aggregate query).
+let countBy: Record<string, number> = {};
+let allCount = 0;
+try {
+  const [{ data: counts }, { count }] = await Promise.all([
+    supabase.from('v_category_counts').select('category_id, active_count'),
+    supabase.from('products').select('id', { count: 'exact', head: true }).eq('active', true).gt('price_usd', 0),
+  ]);
+  for (const r of counts || []) countBy[(r as any).category_id] = (r as any).active_count;
+  allCount = count || 0;
+} catch { /* counts are decorative — the menu renders fine without them */ }
 const path = Astro.url.pathname;
 const activeSlug = path.startsWith('/collections/') ? path.split('/').filter(Boolean)[1] : '';
 const isCatalog = path === '/catalog';
@@ -10,15 +23,17 @@ const isCatalog = path === '/catalog';
     <h2 class="text-xs font-medium text-ink-800 mb-3 uppercase tracking-wide">Categories</h2>
     <nav class="text-sm space-y-0.5">
       <a href="/catalog"
-        class={`block py-1.5 px-2 rounded ${isCatalog ? 'bg-cream text-bronze-700 font-medium' : 'text-bronze-700 font-medium hover:bg-cream'}`}>
-        All designs
+        class={`flex items-center justify-between gap-2 py-1.5 px-2 rounded ${isCatalog ? 'bg-cream text-bronze-700 font-medium' : 'text-bronze-700 font-medium hover:bg-cream'}`}>
+        <span>All designs</span>
+        {allCount > 0 && <span class="text-xs text-ink-700/45 tabular-nums">{allCount}</span>}
       </a>
       {categories.map((c) => (
         <a
           href={`/collections/${c.slug}`}
-          class={`block py-1.5 px-2 rounded transition ${activeSlug === c.slug ? 'bg-cream text-bronze-700 font-medium' : 'text-ink-700 hover:bg-cream'}`}
+          class={`flex items-center justify-between gap-2 py-1.5 px-2 rounded transition ${activeSlug === c.slug ? 'bg-cream text-bronze-700 font-medium' : 'text-ink-700 hover:bg-cream'}`}
         >
-          {c.name}
+          <span class="truncate">{c.name}</span>
+          {countBy[c.id] > 0 && <span class="text-xs text-ink-700/45 tabular-nums flex-shrink-0">{countBy[c.id]}</span>}
         </a>
       ))}
     </nav>
