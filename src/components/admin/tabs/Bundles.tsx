@@ -454,7 +454,7 @@ function BundleForm({ bundle, onDone }: { bundle: BundleRow | null; onDone: () =
             <div className="mt-4">
               <div className="text-xs text-ink-700/60 mb-2">Auto gallery preview ({gallery.length})</div>
               <div className="grid grid-cols-5 gap-1">
-                {gallery.slice(0, 10).map((g, i) => <img key={i} src={g} alt="" className="w-full aspect-square object-cover rounded" />)}
+                {gallery.slice(0, 20).map((g, i) => <img key={i} src={g} alt="" className="w-full aspect-square object-cover rounded" />)}
               </div>
             </div>
           )}

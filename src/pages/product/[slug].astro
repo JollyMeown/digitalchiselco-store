@@ -121,7 +121,7 @@ const breadcrumbLd = {
       </div>
       {gallery.length > 1 && (
         <div class="mt-3 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-          {gallery.slice(0, 10).map((g, i) => (
+          {gallery.slice(0, 20).map((g, i) => (
             <button class="thumb aspect-square bg-cream rounded overflow-hidden border-2 border-transparent" data-src={img(g, { w: 1000, q: 82, square: true })} aria-label={`View image ${i + 1}`}>
               <img src={img(g, { w: 200, q: 75, square: true })} alt={`${cleanTitle} bas-relief STL — view ${i + 1}`} loading="lazy" width="200" height="200" class="w-full h-full object-cover" />
             </button>
