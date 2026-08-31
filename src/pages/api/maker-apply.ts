@@ -60,7 +60,9 @@ export const POST: APIRoute = async ({ request }) => {
     capacity_per_week: intOrNull(b.capacity_per_week),
     payment_methods: strArr(b.payment_methods, ['paypal', 'wise', 'venmo', 'bank', 'cash', 'other']),
     deposit_policy: str(b.deposit_policy, 300) || null,
-    portfolio_urls: strArr(b.portfolio_urls).filter((u) => /^https?:\/\//.test(u)),
+    // NOT strArr — its 60-char cap truncates URLs (broke a real application 8/31)
+    portfolio_urls: (Array.isArray(b.portfolio_urls) ? b.portfolio_urls : [])
+      .map((u: unknown) => String(u).slice(0, 500)).filter((u: string) => /^https?:\/\//.test(u)).slice(0, 8),
     etsy_url: str(b.etsy_url, 300) || null,
     website_url: str(b.website_url, 300) || null,
     instagram_url: str(b.instagram_url, 300) || null,
