@@ -43,6 +43,15 @@ export function verifyMakerToken(token?: string | null): { email: string } | nul
   return d && d.s === 'maker' && d.email ? { email: String(d.email).toLowerCase() } : null;
 }
 
+// Application-form upload pass (3 hours). Issued when /become-a-maker renders,
+// so the public upload endpoint only serves visitors who actually loaded the
+// form, not bots hitting the API directly.
+export const signUploadToken = () => sign({ s: 'upl' }, 60 * 60 * 3);
+export function verifyUploadToken(token?: string | null): boolean {
+  const d = verify(token);
+  return !!d && d.s === 'upl';
+}
+
 // Buyer's link to one request (90 days).
 export const signRequestToken = (requestId: string, email: string) => sign({ s: 'req', id: requestId, email: email.toLowerCase() }, 60 * 60 * 24 * 90);
 export function verifyRequestToken(token?: string | null): { id: string; email: string } | null {

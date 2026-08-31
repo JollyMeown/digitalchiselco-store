@@ -151,6 +151,19 @@ async function handleTransactionCompleted(db: any, txn: any) {
     return; // credit purchases create no order/entitlements
   }
 
+  // ── Cut Local success-fee settlement ────────────────────────────────
+  // Same trusted-snapshot pattern: settle from the maker_fee_invoices row
+  // keyed by this txn id; custom_data is a routing hint only. Idempotent.
+  if (txn.custom_data?.source === 'cut-local-fees') {
+    const { data: inv } = await db.from('maker_fee_invoices').select('*').eq('txn_id', txn.id).maybeSingle();
+    if (inv && inv.status === 'pending') {
+      must(await db.from('maker_fee_invoices').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', inv.id), 'settle fee invoice');
+      await db.from('maker_ledger').insert({ maker_id: inv.maker_id, kind: 'fee_paid', amount_usd: inv.amount_usd, note: `invoice ${inv.id} settled` });
+      console.log(`[cut-local] fee invoice ${inv.id} paid: $${inv.amount_usd} (txn ${txn.id})`);
+    }
+    return; // fee payments create no order/entitlements
+  }
+
   // Paddle's webhook payload only embeds customer_id (not the full customer
   // record). Fetch the customer separately so we have the email + name for
   // the order row and the transactional receipt.

@@ -5,6 +5,7 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
+import { verifyUploadToken, verifyMakerToken } from '../../lib/marketplace-token';
 
 export const prerender = false;
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json' } });
@@ -16,6 +17,10 @@ export const POST: APIRoute = async ({ request }) => {
   if (!(await rateLimit(`maker-upload:ip:${ip}`, 30, 3600))) return tooMany('Too many uploads. Please slow down.');
 
   const form = await request.formData().catch(() => null);
+  // an upload needs a pass: either the short-lived form token from
+  // /become-a-maker, or a signed-in maker's session token (progress photos)
+  const t = String(form?.get('t') || '');
+  if (!verifyUploadToken(t) && !verifyMakerToken(t)) return json({ error: 'Upload session expired. Please reload the page and try again.' }, 401);
   const file = form?.get('file');
   if (!(file instanceof File)) return json({ error: 'No file provided.' }, 400);
   const ext = OK_TYPES[file.type];

@@ -29,7 +29,7 @@ export const POST: APIRoute = async ({ request }) => {
         items: [{
           quantity: 1,
           price: {
-            description: `Cut Local — ${pack.label}`,
+            description: `Cut Local ${pack.label}`,
             name: `Cut Local ${pack.label}`,
             product: { name: `Cut Local ${pack.label}`, tax_category: 'standard' },
             unit_price: { amount: String(Math.round(pack.price * 100)), currency_code: 'USD' },

@@ -47,7 +47,7 @@ const outOfTime = () => Date.now() - RUN_STARTED_AT.t > timeBudgetMs();
 // daily quota is exhausted they are skipped with a visible 'deferred' marker —
 // no doomed API calls, no wasted seconds, and tomorrow they run first thing.
 // (Non-email steps like fx / bundle-of-week / send-time learning still run.)
-const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits', 'makerRecruitDrip']);
+const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits', 'makerRecruitDrip', 'makerFeeSettlement']);
 async function step(stats: Record<string, any>, key: string, fn: () => Promise<void>) {
   if (outOfTime()) { stats[key] = 'skipped: time budget (runs next time)'; return; }
   if (EMAIL_STEPS.has(key) && isQuotaExhausted()) { stats[key] = 'deferred: Resend daily quota reached (runs tomorrow)'; return; }
@@ -1009,6 +1009,7 @@ ${ideasHtml}
   // and remind low-credit makers to top up (max once/7d each).
   stats.makerJobsNudge = 'off';
   stats.makerLowCredits = 'off';
+  stats.makerFeeSettlement = 'off';
   if (g.maker_automations_enabled) {
     const { matchMakers } = await import('./marketplace');
     await step(stats, 'makerJobsNudge', async () => {
@@ -1039,6 +1040,52 @@ ${ideasHtml}
         } catch { s.failed++; }
       }
       stats.makerJobsNudge = s;
+    });
+    // ── Fee settlement: roll un-invoiced success fees into invoices ──
+    // Invoice when a maker's unbilled fees reach $5, or when the oldest
+    // unbilled fee is over 45 days old. 14-day terms; one overdue reminder;
+    // overdue invoices pause new quotes (enforced in /api/mp/action).
+    await step(stats, 'makerFeeSettlement', async () => {
+      const s: any = { invoiced: 0, reminded: 0 };
+      const { signMakerToken } = await import('./marketplace-token');
+      const { data: unbilled } = await db.from('maker_ledger').select('id, maker_id, amount_usd, created_at').eq('kind', 'success_fee').is('invoice_id', null).limit(2000);
+      const byMaker = new Map<string, any[]>();
+      for (const row of unbilled || []) { if (!byMaker.has(row.maker_id)) byMaker.set(row.maker_id, []); byMaker.get(row.maker_id)!.push(row); }
+      for (const [makerId, rows] of byMaker) {
+        if (outOfTime()) break;
+        const total = Math.round(rows.reduce((t: number, r: any) => t + Number(r.amount_usd || 0), 0) * 100) / 100;
+        const oldest = Math.min(...rows.map((r: any) => new Date(r.created_at).getTime()));
+        if (total < 5 && Date.now() - oldest < 45 * 86400000) continue;
+        if (total <= 0) continue;
+        // one open invoice per maker at a time — new fees wait for the next run
+        const { data: openInv } = await db.from('maker_fee_invoices').select('id').eq('maker_id', makerId).eq('status', 'pending').limit(1);
+        if (openInv?.length) continue;
+        const { data: mk } = await db.from('makers').select('email, maker_name').eq('id', makerId).maybeSingle();
+        if (!mk) continue;
+        const { data: inv, error: ie } = await db.from('maker_fee_invoices').insert({ maker_id: makerId, amount_usd: total }).select('*').single();
+        if (ie || !inv) { s.failed = (s.failed || 0) + 1; continue; }
+        await db.from('maker_ledger').update({ invoice_id: inv.id }).in('id', rows.map((r: any) => r.id));
+        const link = `${SITE}/maker?t=${encodeURIComponent(signMakerToken(mk.email))}`;
+        const r = await sendEmail({ to: mk.email, subject: `Your Cut Local success fees: $${total.toFixed(2)}`,
+          html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#2a241d;"><p>Hi ${(mk.maker_name || '').split(' ')[0] || 'there'},</p><p>Congrats on your completed jobs! Your 3% success fees come to <b>$${total.toFixed(2)}</b>, due within 14 days. Pay in one click from your dashboard:</p><p style="margin:18px 0;"><a href="${link}" style="background:#854F0B;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:bold;">Pay $${total.toFixed(2)} →</a></p><p style="font-size:13px;color:#6b5d4a;">This keeps Cut Local free to join and brings you more local jobs. Unpaid invoices pause new quotes after the due date.</p><p>Jolly · DigitalChiselCo</p></div>`,
+          text: `Your Cut Local success fees: $${total.toFixed(2)}, due in 14 days. Pay: ${link}`,
+          idempotencyKey: `fee-invoice:${inv.id}`, tags: [{ name: 'kind', value: 'marketplace' }] });
+        if (r.ok && !r.skipped) s.invoiced++;
+      }
+      // one reminder when an invoice goes overdue
+      const { data: late } = await db.from('maker_fee_invoices').select('*').eq('status', 'pending').lt('due_at', new Date().toISOString()).is('reminded_at', null).limit(100);
+      for (const inv of late || []) {
+        if (outOfTime()) break;
+        const { data: mk } = await db.from('makers').select('email').eq('id', inv.maker_id).maybeSingle();
+        if (!mk) continue;
+        const link = `${SITE}/maker?t=${encodeURIComponent(signMakerToken(mk.email))}`;
+        const r = await sendEmail({ to: mk.email, subject: 'Action needed: your Cut Local fees are overdue',
+          html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#2a241d;"><p>Your success-fee invoice of <b>$${Number(inv.amount_usd).toFixed(2)}</b> is past due, so new quotes are paused on your account. Pay it in one click and you are instantly back in the game:</p><p style="margin:18px 0;"><a href="${link}" style="background:#854F0B;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:bold;">Pay now →</a></p></div>`,
+          text: `Your Cut Local fee invoice ($${inv.amount_usd}) is overdue and quoting is paused. Pay: ${link}`,
+          idempotencyKey: `fee-overdue:${inv.id}`, tags: [{ name: 'kind', value: 'marketplace' }] });
+        if (r.ok && !r.skipped) { s.reminded++; await db.from('maker_fee_invoices').update({ reminded_at: new Date().toISOString() }).eq('id', inv.id); }
+      }
+      stats.makerFeeSettlement = s;
     });
     await step(stats, 'makerLowCredits', async () => {
       const s: any = { sent: 0 };

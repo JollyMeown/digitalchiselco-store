@@ -91,7 +91,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
   const response = await next();
   try {
-    for (const [k, v] of Object.entries(SECURITY_HEADERS)) response.headers.set(k, v);
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+      // a page may pre-set a STRICTER Referrer-Policy (token-in-URL pages use
+      // no-referrer) — don't overwrite it with the site default
+      if (k === 'Referrer-Policy' && response.headers.get(k) === 'no-referrer') continue;
+      response.headers.set(k, v);
+    }
   } catch {
     // Some responses (e.g. certain redirects) may have immutable headers — never
     // let a header-set failure break the page.

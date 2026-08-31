@@ -25,6 +25,9 @@ export const POST: APIRoute = async ({ request }) => {
     if (!maker) return json({ error: 'Makers only.' }, 403);
     const { data: m } = await db.from('makers').select('*').eq('email', maker.email).eq('status', 'approved').maybeSingle();
     if (!m) return json({ error: 'Your maker account is not active.' }, 403);
+    // an overdue fee invoice pauses new quotes until it's paid
+    const { data: overdue } = await db.from('maker_fee_invoices').select('id').eq('maker_id', m.id).eq('status', 'pending').lt('due_at', new Date().toISOString()).limit(1);
+    if (overdue?.length) return json({ error: 'You have overdue success fees. Pay them from your dashboard to resume quoting.' }, 402);
     const price = Math.round(Number(b.price) * 100) / 100;
     if (!(price > 0)) return json({ error: 'Enter a price.' }, 400);
     const { data: req } = await db.from('maker_requests').select('*').eq('id', b.request_id).eq('status', 'open').maybeSingle();

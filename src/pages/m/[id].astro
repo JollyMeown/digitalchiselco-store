@@ -9,7 +9,24 @@ const db = supabaseAdmin();
 const { data: m } = await db.from('makers').select('id, maker_name, city, region, country, rating_avg, rating_count, jobs_completed, machine_types, materials, finishes, machine_models, max_size, min_lead_days, years_experience, bio, portfolio_urls, etsy_url, website_url, instagram_url, deliver_radius_km, deliver_domestic_ship, deliver_intl, status')
   .eq('id', id).eq('status', 'approved').maybeSingle();
 let reviews: any[] = [];
-if (m) { const { data: rv } = await db.from('maker_reviews').select('rating, comment, created_at, buyer_email').eq('maker_id', id).order('created_at', { ascending: false }).limit(20); reviews = rv || []; }
+let jobs: any[] = [];
+if (m) {
+  const { data: rv } = await db.from('maker_reviews').select('request_id, rating, comment, created_at, buyer_email').eq('maker_id', id).order('created_at', { ascending: false }).limit(50);
+  reviews = rv || [];
+  // Complete job record: every completed job this maker delivered, with the
+  // design, the date, the buyer's feedback, and the maker's finished-work
+  // photo from the job chat when one exists.
+  const { data: done } = await db.from('maker_requests').select('id, product_title, product_image, product_slug, completed_at, city, region')
+    .eq('awarded_maker_id', id).eq('status', 'completed').order('completed_at', { ascending: false }).limit(30);
+  const byReq = new Map(reviews.map((r: any) => [r.request_id, r]));
+  const jobIds = (done || []).map((j: any) => j.id);
+  const photoByReq = new Map<string, string>();
+  if (jobIds.length) {
+    const { data: msgs } = await db.from('maker_messages').select('request_id, attachments').eq('maker_id', id).in('request_id', jobIds).eq('sender', 'maker').order('id');
+    for (const ms of msgs || []) if (ms.attachments?.length) photoByReq.set(ms.request_id, ms.attachments[ms.attachments.length - 1]);
+  }
+  jobs = (done || []).map((j: any) => ({ ...j, review: byReq.get(j.id) || null, work_photo: photoByReq.get(j.id) || null }));
+}
 const stars = (n: number) => '★★★★★'.slice(0, Math.round(n || 0)) + '☆☆☆☆☆'.slice(0, 5 - Math.round(n || 0));
 const firstName = (e: string) => (e || '').split('@')[0].replace(/[._].*$/, '').replace(/^\w/, (c) => c.toUpperCase()) || 'Verified buyer';
 const label = (a?: string[]) => (a || []).join(' · ');
@@ -63,14 +80,26 @@ const MACHINE: Record<string, string> = { cnc_router: 'CNC router', cnc_mill: 'C
           {(m.etsy_url || m.website_url || m.instagram_url) && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Links</span><div class="text-bronze-600 break-words">{[m.etsy_url, m.website_url, m.instagram_url].filter(Boolean).join('  ·  ')}</div></div>}
         </div>
 
-        {reviews.length > 0 && (
+        {jobs.length > 0 && (
           <section class="mb-8">
-            <h2 class="font-serif text-xl text-bronze-800 mb-3">Reviews</h2>
+            <h2 class="font-serif text-xl text-bronze-800 mb-1">Completed jobs</h2>
+            <p class="text-xs text-ink-700/55 mb-3">Every job {m.maker_name} delivered through Cut Local, with the customer's own feedback.</p>
             <div class="space-y-3">
-              {reviews.map((r) => (
-                <div class="border border-black/10 rounded-xl p-4">
-                  <div class="flex items-center gap-2"><span class="text-bronze-600">{stars(r.rating)}</span> <span class="text-xs text-ink-700/50">{firstName(r.buyer_email)} · {new Date(r.created_at).toLocaleDateString()}</span></div>
-                  {r.comment && <p class="text-sm text-ink-700/80 mt-1.5">{r.comment}</p>}
+              {jobs.map((j) => (
+                <div class="border border-black/10 rounded-xl p-4 flex gap-4">
+                  {(j.work_photo || j.product_image) && (
+                    <img src={j.work_photo || j.product_image} loading="lazy" class="w-20 h-20 object-cover rounded-lg border border-black/10 flex-shrink-0" alt="" />
+                  )}
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <b class="text-ink-800 text-sm">{(j.product_title || 'Custom job').split('|')[0].trim()}</b>
+                      <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">✓ Delivered</span>
+                    </div>
+                    <div class="text-xs text-ink-700/50 mt-0.5">{j.completed_at ? new Date(j.completed_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}{[j.city, j.region].filter(Boolean).length ? ` · ${[j.city, j.region].filter(Boolean).join(', ')}` : ''}{j.work_photo ? ' · photo by the maker' : ''}</div>
+                    {j.review
+                      ? <div class="mt-1.5"><span class="text-bronze-600">{stars(j.review.rating)}</span> <span class="text-xs text-ink-700/50">{firstName(j.review.buyer_email)}</span>{j.review.comment && <p class="text-sm text-ink-700/80 mt-1">“{j.review.comment}”</p>}</div>
+                      : <p class="text-xs text-ink-700/45 mt-1.5">Completed · awaiting review</p>}
+                  </div>
                 </div>
               ))}
             </div>

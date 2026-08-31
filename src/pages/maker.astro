@@ -10,14 +10,18 @@ const paddleEnv = ((process.env.PADDLE_ENV ?? import.meta.env.PADDLE_ENV) === 'p
 const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
 const packs = Object.entries(CREDIT_PACKS).map(([id, p]) => ({ id, ...p }));
 
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');   // token lives in the URL
 const t = Astro.url.searchParams.get('t') || '';
 const auth = verifyMakerToken(t);
 const db = supabaseAdmin();
 let maker: any = null, openJobs: any[] = [], myQuoted: Set<string> = new Set(), activeJobs: any[] = [];
+let feeInvoice: any = null;
 if (auth) {
   const { data } = await db.from('makers').select('*').eq('email', auth.email).eq('status', 'approved').maybeSingle();
   maker = data;
   if (maker) {
+    const { data: inv } = await db.from('maker_fee_invoices').select('*').eq('maker_id', maker.id).eq('status', 'pending').order('created_at').limit(1);
+    feeInvoice = inv?.[0] || null;
     const { data: open } = await db.from('maker_requests').select('*').eq('status', 'open').order('created_at', { ascending: false }).limit(60);
     const mc = (maker.country || '').toLowerCase();
     openJobs = (open || []).filter((r: any) => !mc || (r.country || '').toLowerCase() === mc || maker.deliver_intl).slice(0, 20);
@@ -90,6 +94,21 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
           </div>
         </section>
 
+        {feeInvoice && (
+          <section class={`mb-8 rounded-2xl p-5 border ${new Date(feeInvoice.due_at) < new Date() ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'}`}>
+            <div class="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h2 class="font-serif text-xl text-bronze-800">Success fees due: ${Number(feeInvoice.amount_usd).toFixed(2)}</h2>
+                <p class="text-sm text-ink-700/70 mt-1">
+                  Your 3% share on completed jobs, due {new Date(feeInvoice.due_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.
+                  {new Date(feeInvoice.due_at) < new Date() && <b class="text-red-700"> This invoice is overdue, so new quotes are paused until it's paid.</b>}
+                </p>
+              </div>
+              <button id="payfees" class="bg-bronze-600 text-cream font-bold px-5 py-2.5 rounded-lg hover:bg-bronze-700 transition">Pay now</button>
+            </div>
+          </section>
+        )}
+
         {/* BUY CREDITS */}
         <section class="mb-8 bg-cream/50 border border-bronze-600/20 rounded-2xl p-5">
           <div class="flex items-baseline justify-between flex-wrap gap-2">
@@ -161,6 +180,17 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
         } catch(e){ alert('Checkout error — try again.'); }
         b.disabled=false;
       });});
+      var pf=document.getElementById('payfees');
+      if(pf){ pf.addEventListener('click', async function(){
+        pf.disabled=true;
+        try {
+          var r=await fetch('/api/mp/fees-checkout',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:MAKER_TOKEN})});
+          var j=await r.json();
+          if(j.transaction_id){ Paddle.Checkout.open({ transactionId: j.transaction_id }); }
+          else { alert(j.error||'Could not start checkout.'); }
+        } catch(e){ alert('Checkout error, try again.'); }
+        pf.disabled=false;
+      });}
     })();
   </script>
 
@@ -226,7 +256,7 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
       async function send(){ var i=document.getElementById('msg'); var body=i.value.trim(); if(!body||!activeReq) return; i.value=''; await api('message',{request_id:activeReq,maker_id:activeMaker,body:body}); loadMsgs(); }
       // progress photo
       document.getElementById('photo').addEventListener('change', async function(e){
-        var f=e.target.files[0]; if(!f||!activeReq) return; var fd=new FormData(); fd.append('file',f);
+        var f=e.target.files[0]; if(!f||!activeReq) return; var fd=new FormData(); fd.append('file',f); fd.append('t', token);
         var r=await fetch('/api/maker-upload',{method:'POST',body:fd}); var j=await r.json();
         if(j.url){ await api('message',{request_id:activeReq,maker_id:activeMaker,body:'',attachments:[j.url]}); loadMsgs(); }
         e.target.value='';

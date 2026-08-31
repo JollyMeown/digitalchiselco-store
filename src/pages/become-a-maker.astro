@@ -2,7 +2,9 @@
 // Maker application form. GATED for Phase-1 testing: noindex + not linked in
 // nav/sitemap. Reachable only by the recruit email's link until launch.
 import Shell from '../layouts/Shell.astro';
+import { signUploadToken } from '../lib/marketplace-token';
 const FEE_SUCCESS = 3;   // % success fee, per owner (credit-to-quote + 3%)
+const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
 ---
 <Shell
   title="Become a Maker · Cut Local"
@@ -206,6 +208,7 @@ const FEE_SUCCESS = 3;   // % success fee, per owner (credit-to-quote + 3%)
     #gallery .rm{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#b23b3b;color:#fff;border:0;font-size:12px;cursor:pointer;line-height:1}
   </style>
 
+  <script is:inline define:vars={{ UPLOAD_TOKEN: uploadToken }}>window.__UPT = UPLOAD_TOKEN;</script>
   <script is:inline>
     (function(){
       // prefill email from ?email= (the recruit link) or stored buyer email
@@ -235,7 +238,7 @@ const FEE_SUCCESS = 3;   // % success fee, per owner (credit-to-quote + 3%)
         for(var i=0;i<files.length;i++){
           if(urls.length>=8){ note.textContent='Max 8 photos.'; break; }
           var f=files[i]; note.textContent='Uploading '+f.name+'…';
-          var fd=new FormData(); fd.append('file',f);
+          var fd=new FormData(); fd.append('file',f); fd.append('t', window.__UPT||'');
           try{
             var r=await fetch('/api/maker-upload',{method:'POST',body:fd}); var j=await r.json();
             if(j.url){ urls.push(j.url); addThumb(j.url); note.textContent=urls.length+' photo'+(urls.length>1?'s':'')+' added'; }

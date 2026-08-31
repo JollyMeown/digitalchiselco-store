@@ -159,11 +159,16 @@ function MarketplaceMonitor() {
       supabase.from('maker_ledger').select('amount_usd').eq('kind', 'success_fee'),
       supabase.from('maker_requests').select('id, product_title, flag_reason, buyer_email').eq('flagged', true).order('flagged_at', { ascending: false }).limit(10),
     ]);
+    const { data: unpaidInv } = await supabase.from('maker_fee_invoices').select('amount_usd, due_at').eq('status', 'pending');
+    const feesUnpaid = (unpaidInv || []).reduce((s: number, f: any) => s + Number(f.amount_usd || 0), 0);
+    const feesOverdue = (unpaidInv || []).filter((f: any) => new Date(f.due_at) < new Date()).length;
+    const { data: paidInv } = await supabase.from('maker_fee_invoices').select('amount_usd').eq('status', 'paid');
+    const feesCollected = (paidInv || []).reduce((s: number, f: any) => s + Number(f.amount_usd || 0), 0);
     const quoteCounts: Record<string, number> = {};
     const ids = (reqs || []).map((r: any) => r.id);
     if (ids.length) { const { data: qs } = await supabase.from('maker_quotes').select('request_id').in('request_id', ids); for (const q of qs || []) quoteCounts[q.request_id] = (quoteCounts[q.request_id] || 0) + 1; }
     const totalFees = (fees || []).reduce((s: number, f: any) => s + Number(f.amount_usd || 0), 0);
-    setD({ reqs: reqs || [], open: open || 0, completed: completed || 0, totalFees, flagged: flagged || [], quoteCounts });
+    setD({ reqs: reqs || [], open: open || 0, completed: completed || 0, totalFees, feesUnpaid, feesOverdue, feesCollected, flagged: flagged || [], quoteCounts });
   };
   useEffect(() => { load(); }, []);
   useLiveRefresh(load, 30000);
@@ -174,7 +179,7 @@ function MarketplaceMonitor() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         <div className="rounded-lg border border-black/10 bg-cream/40 px-3 py-2.5"><div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Open requests</div><div className="text-xl font-bold text-bronze-800">{d.open}</div></div>
         <div className="rounded-lg border border-black/10 bg-cream/40 px-3 py-2.5"><div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Completed jobs</div><div className="text-xl font-bold text-green-700">{d.completed}</div></div>
-        <div className="rounded-lg border border-black/10 bg-cream/40 px-3 py-2.5"><div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Fees earned (3%)</div><div className="text-xl font-bold text-bronze-800">${d.totalFees.toFixed(2)}</div></div>
+        <div className="rounded-lg border border-black/10 bg-cream/40 px-3 py-2.5"><div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Fees earned (3%)</div><div className="text-xl font-bold text-bronze-800">${d.totalFees.toFixed(2)}</div><div className="text-[10px] text-ink-700/50 mt-0.5">${d.feesCollected.toFixed(2)} collected · <span className={d.feesOverdue ? 'text-red-600 font-bold' : ''}>${d.feesUnpaid.toFixed(2)} invoiced{d.feesOverdue ? ` (${d.feesOverdue} overdue)` : ''}</span></div></div>
         <div className={`rounded-lg border px-3 py-2.5 ${d.flagged.length ? 'border-red-300 bg-red-50' : 'border-black/10 bg-cream/40'}`}><div className={`text-[10px] uppercase tracking-wide font-medium ${d.flagged.length ? 'text-red-700/70' : 'text-ink-700/50'}`}>Disputes</div><div className={`text-xl font-bold ${d.flagged.length ? 'text-red-700' : 'text-ink-700/60'}`}>{d.flagged.length}</div></div>
       </div>
       {d.flagged.length > 0 && (
