@@ -36,7 +36,11 @@ export default function Makers() {
   useLiveRefresh(() => load(true), 30000);
 
   async function setStatus(id: string, status: string) {
-    await supabase.from('makers').update({ status, reviewed_at: new Date().toISOString() }).eq('id', id);
+    // Route through the API so approval sends the maker welcome email once.
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin/maker-approve', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ id, status }) });
+    const j = await res.json().catch(() => ({}));
+    if (status === 'approved' && j.welcomed) { try { /* small confirmation */ } catch {} }
     setOpen((o: Maker) => (o && o.id === id ? { ...o, status } : o));
     load(true);
   }
@@ -50,6 +54,7 @@ export default function Makers() {
         🛠️ <b>Cut Local — maker network · Phase 1 (testing).</b> The application form lives at <code>/become-a-maker</code> (noindex, not linked yet). Recruit subscribers, review + approve applications, and message approved makers as a separate list — all before anything goes live.
       </div>
 
+      <MakerAutomationsToggle />
       <RecruitSender />
       <MakerBroadcast />
 
@@ -140,6 +145,25 @@ export default function Makers() {
 function Field({ k, v }: { k: string; v?: string | null }) {
   if (!v) return null;
   return <div><div className="text-[11px] uppercase text-ink-700/45 font-semibold">{k}</div><div className="text-ink-800 break-words">{v}</div></div>;
+}
+
+// ── Maker automation toggle (nightly job nudges + low-credit reminders) ─
+function MakerAutomationsToggle() {
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => { supabase.from('growth_settings').select('maker_automations_enabled').eq('id', 1).maybeSingle().then(({ data }) => setOn(!!data?.maker_automations_enabled)); }, []);
+  if (on === null) return null;
+  async function toggle() { const v = !on; setOn(v); await supabase.from('growth_settings').update({ maker_automations_enabled: v }).eq('id', 1); }
+  return (
+    <Card>
+      <label className="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" checked={on} onChange={toggle} className="mt-1" />
+        <div>
+          <div className="text-sm font-bold text-ink-900">🔔 Maker automations {on ? <span className="text-green-700">ON</span> : <span className="text-ink-700/50">off</span>}</div>
+          <p className="text-xs text-ink-700/60 mt-0.5">When ON, the nightly run emails approved makers who have unquoted jobs near them (max once/20h each) and reminds low-credit makers to top up (max once/week). Approval welcome emails send regardless of this toggle.</p>
+        </div>
+      </label>
+    </Card>
+  );
 }
 
 // ── Broadcast to approved makers — the maker mailing list ─────────────

@@ -5,6 +5,10 @@
 import Shell from '../layouts/Shell.astro';
 import { supabaseAdmin } from '../lib/supabase';
 import { verifyMakerToken, signMakerToken } from '../lib/marketplace-token';
+import { CREDIT_PACKS } from '../lib/marketplace';
+const paddleEnv = ((process.env.PADDLE_ENV ?? import.meta.env.PADDLE_ENV) === 'production' ? 'production' : 'sandbox');
+const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
+const packs = Object.entries(CREDIT_PACKS).map(([id, p]) => ({ id, ...p }));
 
 const t = Astro.url.searchParams.get('t') || '';
 const auth = verifyMakerToken(t);
@@ -86,6 +90,24 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
           </div>
         </section>
 
+        {/* BUY CREDITS */}
+        <section class="mb-8 bg-cream/50 border border-bronze-600/20 rounded-2xl p-5">
+          <div class="flex items-baseline justify-between flex-wrap gap-2">
+            <h2 class="font-serif text-xl text-bronze-800">Quote credits</h2>
+            <span class="text-sm text-ink-700/60">You have <b id="credits2" class="text-bronze-800">{maker.credits}</b>. One credit per quote.</span>
+          </div>
+          <div class="grid sm:grid-cols-3 gap-3 mt-3">
+            {packs.map((p) => (
+              <button class="buycredits text-left bg-white border border-bronze-600/25 rounded-xl p-4 hover:border-bronze-600 transition" data-pack={p.id}>
+                <div class="font-serif text-2xl text-bronze-800">{p.credits} credits</div>
+                <div class="text-sm text-ink-700/70 mt-0.5">${p.price} · ${(p.price / p.credits).toFixed(2)}/quote</div>
+                <div class="mt-2 text-xs text-bronze-600 font-medium">Buy →</div>
+              </button>
+            ))}
+          </div>
+          <p class="text-xs text-ink-700/50 mt-2">Secure checkout by Paddle. Credits are added to your account instantly on payment.</p>
+        </section>
+
         {/* NEARBY OPEN JOBS */}
         <section>
           <h2 class="font-serif text-xl text-bronze-800 mb-3">Jobs near you <span class="text-sm text-ink-700/50">({openJobs.length})</span></h2>
@@ -118,6 +140,29 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
       </div>
     )}
   </main>
+
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js" is:inline></script>
+  <script is:inline define:vars={{ PADDLE_TOKEN: paddleToken, PADDLE_ENV: paddleEnv, MAKER_TOKEN: token }}>
+    (function(){
+      if (typeof Paddle === 'undefined' || !PADDLE_TOKEN) return;
+      try {
+        if (PADDLE_ENV === 'sandbox') Paddle.Environment.set('sandbox');
+        Paddle.Initialize({ token: PADDLE_TOKEN, eventCallback: function(e){
+          if (e.name === 'checkout.completed') { setTimeout(function(){ location.reload(); }, 1500); }
+        }});
+      } catch(err){ console.error('Paddle init', err); }
+      document.querySelectorAll('.buycredits').forEach(function(b){ b.addEventListener('click', async function(){
+        b.disabled=true;
+        try {
+          var r=await fetch('/api/mp/credits-checkout',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:MAKER_TOKEN,pack:b.dataset.pack})});
+          var j=await r.json();
+          if(j.transaction_id){ Paddle.Checkout.open({ transactionId: j.transaction_id }); }
+          else { alert(j.error||'Could not start checkout.'); }
+        } catch(e){ alert('Checkout error — try again.'); }
+        b.disabled=false;
+      });});
+    })();
+  </script>
 
   <script is:inline>
     (function(){

@@ -89,3 +89,29 @@ export async function notifyMakerWon(req: any, maker: any) {
 export function esc(s: unknown): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// Credit packs makers can buy via Paddle. Keep prices whole-dollar-ish.
+export const CREDIT_PACKS: Record<string, { credits: number; price: number; label: string }> = {
+  starter: { credits: 10, price: 8, label: '10 credits' },
+  pro: { credits: 30, price: 21, label: '30 credits' },
+  bulk: { credits: 75, price: 45, label: '75 credits' },
+};
+
+// Welcome email when a maker is approved (dashboard link + founding credits).
+export async function sendMakerWelcome(maker: { email: string; maker_name?: string | null; credits?: number }) {
+  const link = `${SITE}/maker?t=${encodeURIComponent(signMakerToken(maker.email))}`;
+  await sendEmail({
+    to: maker.email,
+    subject: '🎉 You’re in — welcome to Cut Local',
+    html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#2a241d;">
+<p style="font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#854F0B;">Cut Local · approved</p>
+<p>Hi ${esc(maker.maker_name || '')}, your application is approved — welcome aboard!</p>
+<p>You’re listed as a Cut Local maker and can start quoting jobs now. We’ve added <b>${maker.credits ?? 5} founding credits</b> to get you going (one credit per quote).</p>
+<p style="margin:20px 0;"><a href="${link}" style="background:#854F0B;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;">Open my maker dashboard →</a></p>
+<p style="font-size:13px;color:#6b5d4a;">Reminder: buyers pay you directly, and we take just a ${SUCCESS_FEE_PCT}% success fee on completed jobs. Keep your profile photos fresh — they win work.</p>
+<p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`,
+    text: `You're approved as a Cut Local maker! ${maker.credits ?? 5} founding credits added. Open your dashboard: ${link}`,
+    idempotencyKey: `maker-welcome:${maker.email}`,
+    tags: [{ name: 'kind', value: 'makerNews' }],
+  });
+}

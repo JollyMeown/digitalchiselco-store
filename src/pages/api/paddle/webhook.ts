@@ -135,6 +135,22 @@ export const POST: APIRoute = async ({ request }) => {
 async function handleTransactionCompleted(db: any, txn: any) {
   if (!txn?.id) throw new Error('transaction.data.id missing');
 
+  // ── Cut Local maker credit purchase ─────────────────────────────────
+  // Detected by custom_data.source (routing only). Credits are granted from
+  // the TRUSTED maker_credit_purchases row (keyed by txn id), never from the
+  // forgeable custom_data values. Idempotent: only grants a 'pending' row.
+  if (txn.custom_data?.source === 'cut-local-credits') {
+    const { data: mp } = await db.from('maker_credit_purchases').select('*').eq('txn_id', txn.id).maybeSingle();
+    if (mp && mp.status === 'pending') {
+      const { data: mk } = await db.from('makers').select('credits').eq('id', mp.maker_id).maybeSingle();
+      must(await db.from('makers').update({ credits: (mk?.credits || 0) + mp.credits }).eq('id', mp.maker_id), 'grant maker credits');
+      await db.from('maker_credit_purchases').update({ status: 'granted', granted_at: new Date().toISOString() }).eq('txn_id', txn.id);
+      await db.from('maker_ledger').insert({ maker_id: mp.maker_id, kind: 'credit_grant', credits_delta: mp.credits, amount_usd: mp.amount_usd, note: `bought ${mp.pack} pack` });
+      console.log(`[cut-local] granted ${mp.credits} credits to maker ${mp.maker_id} (txn ${txn.id})`);
+    }
+    return; // credit purchases create no order/entitlements
+  }
+
   // Paddle's webhook payload only embeds customer_id (not the full customer
   // record). Fetch the customer separately so we have the email + name for
   // the order row and the transactional receipt.

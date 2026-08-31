@@ -47,7 +47,7 @@ const outOfTime = () => Date.now() - RUN_STARTED_AT.t > timeBudgetMs();
 // daily quota is exhausted they are skipped with a visible 'deferred' marker —
 // no doomed API calls, no wasted seconds, and tomorrow they run first thing.
 // (Non-email steps like fx / bundle-of-week / send-time learning still run.)
-const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout']);
+const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits']);
 async function step(stats: Record<string, any>, key: string, fn: () => Promise<void>) {
   if (outOfTime()) { stats[key] = 'skipped: time budget (runs next time)'; return; }
   if (EMAIL_STEPS.has(key) && isQuotaExhausted()) { stats[key] = 'deferred: Resend daily quota reached (runs tomorrow)'; return; }
@@ -957,6 +957,63 @@ ${ideasHtml}
       } catch (e: any) { stats.designScout = `failed: ${e?.message}`; }
     }
   });
+
+  // ── Cut Local maker automations (gated) ──────────────────────────────
+  // Nudge makers who have unquoted open jobs near them (max once/20h each),
+  // and remind low-credit makers to top up (max once/7d each).
+  stats.makerJobsNudge = 'off';
+  stats.makerLowCredits = 'off';
+  if (g.maker_automations_enabled) {
+    const { matchMakers } = await import('./marketplace');
+    await step(stats, 'makerJobsNudge', async () => {
+      const s: any = { sent: 0, failed: 0 };
+      const { data: openReqs } = await db.from('maker_requests').select('*').eq('status', 'open').gte('created_at', daysAgo(30)).limit(500);
+      if (!openReqs?.length) { stats.makerJobsNudge = 'no open jobs'; return; }
+      const cutoff = new Date(Date.now() - 20 * 3600000).toISOString();
+      const { data: makers } = await db.from('makers').select('*').eq('status', 'approved').or(`jobs_nudged_at.is.null,jobs_nudged_at.lt.${cutoff}`).limit(1000);
+      for (const m of makers || []) {
+        if (outOfTime()) break;
+        // count open jobs this maker matches but hasn't quoted
+        const matched = openReqs.filter((r: any) => {
+          const mc = (m.country || '').toLowerCase(), rc = (r.country || '').toLowerCase();
+          return (!rc || rc === mc || m.deliver_intl);
+        });
+        if (!matched.length) continue;
+        const { data: quoted } = await db.from('maker_quotes').select('request_id').eq('maker_id', m.id).in('request_id', matched.map((r: any) => r.id));
+        const already = new Set((quoted || []).map((q: any) => q.request_id));
+        const fresh = matched.filter((r: any) => !already.has(r.id));
+        if (!fresh.length) continue;
+        try {
+          const link = `${SITE}/maker?t=${encodeURIComponent((await import('./marketplace-token')).signMakerToken(m.email))}`;
+          const r = await sendEmail({ to: m.email, subject: `${fresh.length} Cut Local job${fresh.length > 1 ? 's are' : ' is'} waiting for your quote`,
+            html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#2a241d;"><p>You have <b>${fresh.length} open job${fresh.length > 1 ? 's' : ''}</b> near you waiting for a quote on Cut Local. First to quote often wins.</p><p style="margin:18px 0;"><a href="${link}" style="background:#854F0B;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:bold;">View &amp; quote →</a></p></div>`,
+            text: `${fresh.length} Cut Local jobs are waiting for your quote: ${link}`, idempotencyKey: `maker-nudge:${m.id}:${new Date().toISOString().slice(0, 10)}`, tags: [{ name: 'kind', value: 'marketplace' }] });
+          if (r.ok && !r.skipped) { s.sent++; await db.from('makers').update({ jobs_nudged_at: new Date().toISOString() }).eq('id', m.id); }
+          else if (r.quota) { stats.makerJobsNudge = `deferred (quota) after ${s.sent}`; return; }
+        } catch { s.failed++; }
+      }
+      stats.makerJobsNudge = s;
+    });
+    await step(stats, 'makerLowCredits', async () => {
+      const s: any = { sent: 0 };
+      const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
+      const { data: makers } = await db.from('makers').select('*').eq('status', 'approved').lte('credits', 1)
+        .or(`low_credit_nudged_at.is.null,low_credit_nudged_at.lt.${cutoff}`).limit(500);
+      for (const m of makers || []) {
+        if (outOfTime()) break;
+        // only nudge makers who have shown activity (quoted at least once)
+        const { count: hasQuoted } = await db.from('maker_quotes').select('id', { count: 'exact', head: true }).eq('maker_id', m.id);
+        if (!hasQuoted) continue;
+        try {
+          const link = `${SITE}/maker?t=${encodeURIComponent((await import('./marketplace-token')).signMakerToken(m.email))}`;
+          const r = await sendEmail({ to: m.email, subject: 'You’re low on Cut Local quote credits', html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#2a241d;"><p>You have <b>${m.credits} credit${m.credits === 1 ? '' : 's'}</b> left. Top up so you never miss a job near you.</p><p style="margin:18px 0;"><a href="${link}" style="background:#854F0B;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:bold;">Buy credits →</a></p></div>`, text: `You have ${m.credits} Cut Local credits left. Top up: ${link}`, idempotencyKey: `maker-lowcred:${m.id}:${new Date().toISOString().slice(0, 10)}`, tags: [{ name: 'kind', value: 'marketplace' }] });
+          if (r.ok && !r.skipped) { s.sent++; await db.from('makers').update({ low_credit_nudged_at: new Date().toISOString() }).eq('id', m.id); }
+          else if (r.quota) { stats.makerLowCredits = `deferred (quota) after ${s.sent}`; return; }
+        } catch {}
+      }
+      stats.makerLowCredits = s;
+    });
+  }
 
   return stats;
 }
