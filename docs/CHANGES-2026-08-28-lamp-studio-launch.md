@@ -132,3 +132,4 @@ software products.
 - **Printables (pending owner upload)**: complete listing pack staged at
   `D:\LAMP SHADE OGEE\desktop\printables-upload` (`PRINTABLES-LISTING.md` +
   unpacked STL/PDF/README) — Printables has no upload API.
+- **Price hooks (commit c453796)**: bold $14.99 across /lamp-studio - anchor band with hook + CTA directly below the playground ($19.99 struck through, "less than a spool of filament"), price in the hero button + subline, one-payment line under the Everything Inside checklist, price bullet in facts, anchored price in the final CTA.
