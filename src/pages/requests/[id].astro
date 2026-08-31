@@ -123,6 +123,11 @@ const title = req ? (req.product_title || 'your design').split('|')[0].trim() : 
             <div class="text-sm text-ink-700/70">You rated this maker <span class="text-bronze-600 text-lg align-middle">{stars(review.rating)}</span> — thank you!</div>
           </section>
         )}
+        {req.status !== 'open' && (
+          <div class="mt-6 text-center">
+            <button id="report" class="text-xs text-ink-700/50 hover:text-red-600 underline">Report a problem with this order</button>
+          </div>
+        )}
       </div>
     )}
   </main>
@@ -169,6 +174,14 @@ const title = req ? (req.product_title || 'your design').split('|')[0].trim() : 
         await api('message',{request_id:reqId,maker_id:activeMaker,body:body}); loadMsgs();
       }
       if(awarded){ openChat(awarded, ''); }
+
+      var rep=document.getElementById('report');
+      if(rep) rep.addEventListener('click', async function(){
+        var reason=prompt('What went wrong? We’ll look into it and reach out.');
+        if(!reason) return;
+        var j=await api('report',{request_id:reqId,reason:reason});
+        alert(j.ok?'Thank you — we’ve flagged this for review and will be in touch.':(j.error||'Failed'));
+      });
 
       // complete
       var comp=document.getElementById('complete');

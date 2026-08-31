@@ -27,6 +27,15 @@ const q = Astro.url.searchParams.get('q') ?? '';
 const categories = await getCategories();
 // Live Etsy numbers (refreshed daily by scripts/etsy_stats_sync.mjs)
 const hs = await getSettings();
+// Cut Local nav (shown only when the marketplace is live).
+try {
+  const { supabaseAdmin } = await import('../lib/supabase');
+  const { data: gs } = await supabaseAdmin().from('growth_settings').select('marketplace_enabled').eq('id', 1).maybeSingle();
+  if (gs?.marketplace_enabled) {
+    const at = links.findIndex((n) => n.href === '/free');
+    links.splice(at >= 0 ? at + 1 : links.length, 0, { href: '/makers', label: 'Get it made' } as any);
+  }
+} catch {}
 ---
 <div class="bg-bronze-800 text-cream text-xs text-center py-1.5">
   Instant digital download · Commercial use included · {Number(hs.rating) || 4.9}★ from {Number(hs.reviews_count).toLocaleString()} reviews

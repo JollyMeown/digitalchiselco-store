@@ -54,6 +54,7 @@ export default function Makers() {
         🛠️ <b>Cut Local — maker network · Phase 1 (testing).</b> The application form lives at <code>/become-a-maker</code> (noindex, not linked yet). Recruit subscribers, review + approve applications, and message approved makers as a separate list — all before anything goes live.
       </div>
 
+      <MarketplaceMonitor />
       <MakerAutomationsToggle />
       <RecruitSender />
       <MakerBroadcast />
@@ -145,6 +146,58 @@ export default function Makers() {
 function Field({ k, v }: { k: string; v?: string | null }) {
   if (!v) return null;
   return <div><div className="text-[11px] uppercase text-ink-700/45 font-semibold">{k}</div><div className="text-ink-800 break-words">{v}</div></div>;
+}
+
+// ── Live marketplace monitor — requests, quotes, jobs, fees, disputes ──
+function MarketplaceMonitor() {
+  const [d, setD] = useState<any>(null);
+  const load = async () => {
+    const [{ data: reqs }, { count: open }, { count: completed }, { data: fees }, { data: flagged }] = await Promise.all([
+      supabase.from('maker_requests').select('id, product_title, status, city, region, created_at, agreed_price, flagged').order('created_at', { ascending: false }).limit(12),
+      supabase.from('maker_requests').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+      supabase.from('maker_requests').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
+      supabase.from('maker_ledger').select('amount_usd').eq('kind', 'success_fee'),
+      supabase.from('maker_requests').select('id, product_title, flag_reason, buyer_email').eq('flagged', true).order('flagged_at', { ascending: false }).limit(10),
+    ]);
+    const quoteCounts: Record<string, number> = {};
+    const ids = (reqs || []).map((r: any) => r.id);
+    if (ids.length) { const { data: qs } = await supabase.from('maker_quotes').select('request_id').in('request_id', ids); for (const q of qs || []) quoteCounts[q.request_id] = (quoteCounts[q.request_id] || 0) + 1; }
+    const totalFees = (fees || []).reduce((s: number, f: any) => s + Number(f.amount_usd || 0), 0);
+    setD({ reqs: reqs || [], open: open || 0, completed: completed || 0, totalFees, flagged: flagged || [], quoteCounts });
+  };
+  useEffect(() => { load(); }, []);
+  useLiveRefresh(load, 30000);
+  if (!d) return null;
+  return (
+    <Card>
+      <div className="text-sm font-bold text-ink-900 mb-3">🔨 Live marketplace</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+        <div className="rounded-lg border border-black/10 bg-cream/40 px-3 py-2.5"><div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Open requests</div><div className="text-xl font-bold text-bronze-800">{d.open}</div></div>
+        <div className="rounded-lg border border-black/10 bg-cream/40 px-3 py-2.5"><div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Completed jobs</div><div className="text-xl font-bold text-green-700">{d.completed}</div></div>
+        <div className="rounded-lg border border-black/10 bg-cream/40 px-3 py-2.5"><div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Fees earned (3%)</div><div className="text-xl font-bold text-bronze-800">${d.totalFees.toFixed(2)}</div></div>
+        <div className={`rounded-lg border px-3 py-2.5 ${d.flagged.length ? 'border-red-300 bg-red-50' : 'border-black/10 bg-cream/40'}`}><div className={`text-[10px] uppercase tracking-wide font-medium ${d.flagged.length ? 'text-red-700/70' : 'text-ink-700/50'}`}>Disputes</div><div className={`text-xl font-bold ${d.flagged.length ? 'text-red-700' : 'text-ink-700/60'}`}>{d.flagged.length}</div></div>
+      </div>
+      {d.flagged.length > 0 && (
+        <div className="mb-3 space-y-1">
+          {d.flagged.map((f: any) => <div key={f.id} className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2.5 py-1.5">⚠️ <b>{(f.product_title || '').split('|')[0].trim()}</b> · {f.buyer_email} · {f.flag_reason}</div>)}
+        </div>
+      )}
+      {d.reqs.length === 0 ? <p className="text-xs text-ink-700/50">No requests yet. Recruit + approve makers, then buyers can post jobs.</p> : (
+        <div className="text-sm">
+          {d.reqs.map((r: any) => (
+            <div key={r.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-black/5 last:border-0">
+              <span className="truncate text-ink-800">{(r.product_title || '').split('|')[0].trim()} <span className="text-ink-700/45 text-xs">{[r.city, r.region].filter(Boolean).join(', ')}</span></span>
+              <span className="flex items-center gap-2 shrink-0 text-xs">
+                {d.quoteCounts[r.id] > 0 && <span className="text-ink-700/60">{d.quoteCounts[r.id]} quote{d.quoteCounts[r.id] > 1 ? 's' : ''}</span>}
+                {r.agreed_price && <span className="text-bronze-700 font-medium">${Number(r.agreed_price).toFixed(0)}</span>}
+                <span className={`px-2 py-0.5 rounded-full font-medium ${r.status === 'completed' ? 'bg-green-100 text-green-800' : r.status === 'awarded' ? 'bg-bronze-100 text-bronze-700' : 'bg-cream text-ink-700'}`}>{r.status}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
 }
 
 // ── Maker automation toggle (nightly job nudges + low-credit reminders) ─

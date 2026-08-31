@@ -102,5 +102,19 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ ok: true });
   }
 
+  // ── EITHER: report a problem (dispute) → flags for admin + emails owner ──
+  if (op === 'report') {
+    const request_id = str(b.request_id, 40) || (buyer ? buyer.id : '');
+    const reason = str(b.reason, 800);
+    if (!request_id || !reason) return json({ error: 'Add what went wrong.' }, 400);
+    const { data: req } = await db.from('maker_requests').select('id, buyer_email, product_title').eq('id', request_id).maybeSingle();
+    if (!req) return json({ error: 'Request not found.' }, 404);
+    if (buyer && buyer.id !== request_id) return json({ error: 'Not your request.' }, 403);
+    if (maker) { const { data: m } = await db.from('makers').select('id').eq('email', maker.email).maybeSingle(); if (!m) return json({ error: 'forbidden' }, 403); }
+    await db.from('maker_requests').update({ flagged: true, flag_reason: `${maker ? 'maker' : 'buyer'}: ${reason}`, flagged_at: new Date().toISOString() }).eq('id', request_id);
+    try { const { telegramOwner } = await import('../../../lib/notify'); await telegramOwner(`⚠️ <b>Cut Local dispute</b>\n${(req.product_title || '').slice(0, 60)}\nfrom ${maker ? 'a maker' : req.buyer_email}: ${reason.slice(0, 200)}\nReview in Admin → Makers.`); } catch {}
+    return json({ ok: true });
+  }
+
   return json({ error: 'Unknown action.' }, 400);
 };
