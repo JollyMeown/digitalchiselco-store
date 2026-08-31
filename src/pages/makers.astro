@@ -4,6 +4,19 @@
 // itself works by direct URL for testing.
 import Shell from '../layouts/Shell.astro';
 import MakerMap from '../components/MakerMap.tsx';
+import { supabaseAdmin } from '../lib/supabase';
+// Maker showcase: approved makers with their real work, no contact info —
+// buyers browse, fall in love with the craft, and hire directly from a profile.
+let gallery: any[] = [];
+try {
+  const db = supabaseAdmin();
+  const { data } = await db.from('makers')
+    .select('id, maker_name, city, region, country, rating_avg, rating_count, jobs_completed, machine_types, materials, portfolio_urls')
+    .eq('status', 'approved').order('rating_avg', { ascending: false }).order('jobs_completed', { ascending: false }).limit(24);
+  gallery = data || [];
+} catch {}
+const stars = (n: number) => '★★★★★'.slice(0, Math.round(n || 0)) + '☆☆☆☆☆'.slice(0, 5 - Math.round(n || 0));
+const MACHINE: Record<string, string> = { cnc_router: 'CNC router', cnc_mill: 'CNC mill', laser: 'Laser', fdm: '3D print', resin: 'Resin print' };
 ---
 <Shell title="Find a Maker · Cut Local" description="Meet the CNC, laser and 3D-print makers ready to turn our designs into real pieces — near you." noindex={true}>
   <main class="max-w-5xl mx-auto px-4 sm:px-6 pb-24">
@@ -31,6 +44,43 @@ import MakerMap from '../components/MakerMap.tsx';
         <p class="text-sm text-ink-700/70 mt-1">Pick a maker, they build it, you get a real piece — often local pickup.</p>
       </div>
     </div>
+
+    {gallery.length > 0 && (
+      <section class="mt-10">
+        <h2 class="font-serif text-2xl sm:text-3xl text-bronze-800 text-center">Meet the makers</h2>
+        <p class="text-sm text-ink-700/65 text-center mt-1.5 max-w-lg mx-auto">Real workshops, real work. Open a profile, see every job they've delivered and what customers said, then hire them directly.</p>
+        <div class="grid sm:grid-cols-2 gap-5 mt-6">
+          {gallery.map((m) => (
+            <a href={`/m/${m.id}`} class="group block bg-white border border-black/10 rounded-2xl overflow-hidden hover:shadow-lg hover:border-bronze-600/40 transition">
+              {(m.portfolio_urls || []).length > 0 && (
+                <div class="grid grid-cols-3 gap-0.5 h-36 overflow-hidden">
+                  {(m.portfolio_urls || []).slice(0, 3).map((u: string) => (
+                    <img src={u} loading="lazy" class="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
+                  ))}
+                </div>
+              )}
+              <div class="p-4">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-serif text-lg text-bronze-800">{m.maker_name}</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">✓ Verified</span>
+                </div>
+                <div class="text-xs text-ink-700/60 mt-1">
+                  {m.rating_count > 0
+                    ? <span><span class="text-bronze-600">{stars(m.rating_avg)}</span> {Number(m.rating_avg).toFixed(1)} · {m.jobs_completed || 0} job{m.jobs_completed === 1 ? '' : 's'} delivered</span>
+                    : <span>New maker · founding member</span>}
+                  {' · '}{[m.city, m.country].filter(Boolean).join(', ')}
+                </div>
+                <div class="flex flex-wrap gap-1.5 mt-2.5">
+                  {(m.machine_types || []).slice(0, 3).map((t: string) => <span class="text-[11px] px-2 py-0.5 rounded-full bg-[#2c6a67]/10 text-[#1c4a48] font-medium">{MACHINE[t] || t}</span>)}
+                  {(m.materials || []).slice(0, 3).map((t: string) => <span class="text-[11px] px-2 py-0.5 rounded-full border border-black/10 text-ink-700/60">{t}</span>)}
+                </div>
+                <div class="text-xs font-bold text-bronze-600 mt-3 group-hover:translate-x-0.5 transition-transform">View profile &amp; hire →</div>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
 
     <div class="mt-8 bg-[#2c6a67]/8 border border-[#2c6a67]/25 rounded-2xl p-5 sm:p-6 max-w-2xl mx-auto">
       <div class="flex items-start gap-3">

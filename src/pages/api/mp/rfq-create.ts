@@ -28,8 +28,15 @@ export const POST: APIRoute = async ({ request }) => {
     deadline: str(b.deadline, 80) || null, budget: str(b.budget, 80) || null, notes: str(b.notes, 1500) || null,
     delivery: ['pickup', 'ship', 'either'].includes(b.delivery) ? b.delivery : 'either',
     country: str(b.country, 80) || null, region: str(b.region, 80) || null, city: str(b.city, 80) || null, postal: str(b.postal, 20) || null,
+    preferred_maker_id: null as string | null,
   };
   const db = supabaseAdmin();
+  // buyer picked a specific maker from their profile — verify they exist + are approved
+  let prefMaker: any = null;
+  if (/^[0-9a-f-]{36}$/i.test(String(b.preferred_maker_id || ''))) {
+    const { data: pm } = await db.from('makers').select('*').eq('id', b.preferred_maker_id).eq('status', 'approved').maybeSingle();
+    if (pm) { prefMaker = pm; row.preferred_maker_id = pm.id; }
+  }
   const { data, error } = await db.from('maker_requests').insert(row).select('*').single();
   if (error) { console.error('[rfq-create]', error.message); return json({ error: 'Could not post your request. Please try again.' }, 500); }
 
@@ -50,7 +57,30 @@ export const POST: APIRoute = async ({ request }) => {
   } catch (e) { console.error('[rfq-buyer-email]', (e as any)?.message); }
   // match + notify makers (best-effort, never blocks the buyer)
   let matched = 0;
-  try { const makers = await matchMakers(db, data); matched = makers.length; await notifyMakersOfJob(makers, data); } catch (e) { console.error('[rfq-match]', (e as any)?.message); }
+  try {
+    let makers = await matchMakers(db, data);
+    // personally-requested maker: always included (even outside the geo match),
+    // and gets a special "the buyer picked YOU" email instead of the broadcast
+    if (prefMaker) {
+      makers = makers.filter((mk: any) => mk.id !== prefMaker.id);
+      try {
+        const { send: sendEmail } = await import('../../../lib/resend');
+        const { signMakerToken } = await import('../../../lib/marketplace-token');
+        const { esc: esc2 } = await import('../../../lib/marketplace');
+        const jt = esc2((row.product_title || 'a design').split('|')[0].trim());
+        const mlink = `${SITE}/maker?t=${encodeURIComponent(signMakerToken(prefMaker.email))}`;
+        await sendEmail({
+          to: prefMaker.email, subject: '⭐ A buyer saw your work and picked YOU',
+          html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#2a241d;"><p style="font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#854F0B;">Cut Local · direct request</p><p>Great news: a buyer browsed your profile, liked your work, and sent their request for <b>${jt}</b> straight to you. Direct requests convert far better than open ones, so quote early while you have the inside track.</p><p style="margin:20px 0;"><a href="${mlink}" style="background:#854F0B;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;">View &amp; quote →</a></p></div>`,
+          text: `A buyer picked you directly for ${row.product_title}. Quote: ${mlink}`,
+          idempotencyKey: `rfq-pref:${data.id}`, tags: [{ name: 'kind', value: 'marketplace' }],
+        });
+        matched++;
+      } catch (e) { console.error('[rfq-pref-email]', (e as any)?.message); }
+    }
+    matched += makers.length;
+    await notifyMakersOfJob(makers, data);
+  } catch (e) { console.error('[rfq-match]', (e as any)?.message); }
   try { const { telegramOwner } = await import('../../../lib/notify'); await telegramOwner(`🔨 <b>New Cut Local request</b>\n${row.product_title}\n${[row.city, row.country].filter(Boolean).join(', ')} · notified ${matched} maker(s)`); } catch {}
 
   return json({ ok: true, id: data.id, matched, link: `${SITE}/requests/${data.id}?t=${encodeURIComponent(token)}` });

@@ -24,7 +24,7 @@ if (auth) {
     feeInvoice = inv?.[0] || null;
     const { data: open } = await db.from('maker_requests').select('*').eq('status', 'open').order('created_at', { ascending: false }).limit(60);
     const mc = (maker.country || '').toLowerCase();
-    openJobs = (open || []).filter((r: any) => !mc || (r.country || '').toLowerCase() === mc || maker.deliver_intl).slice(0, 20);
+    openJobs = (open || []).filter((r: any) => r.preferred_maker_id === maker.id || !mc || (r.country || '').toLowerCase() === mc || maker.deliver_intl).slice(0, 20);
     const { data: mine } = await db.from('maker_quotes').select('request_id').eq('maker_id', maker.id);
     myQuoted = new Set((mine || []).map((x: any) => x.request_id));
     const { data: active } = await db.from('maker_requests').select('*').eq('awarded_maker_id', maker.id).in('status', ['awarded', 'completed']).order('awarded_at', { ascending: false }).limit(20);
@@ -136,7 +136,9 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
               <div class="border border-black/10 rounded-xl p-4 bg-white" data-job={r.id}>
                 <div class="flex justify-between gap-3">
                   <div>
-                    <div class="font-medium text-ink-900">{jtitle(r)}</div>
+                    <div class="font-medium text-ink-900">{jtitle(r)}
+                      {r.preferred_maker_id === maker.id && <span class="ml-1.5 text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold align-middle">⭐ Buyer picked YOU</span>}
+                    </div>
                     <div class="text-xs text-ink-700/60 mt-0.5">{[r.material, r.size, r.finish].filter(Boolean).join(' · ') || 'any material'} · qty {r.quantity}</div>
                     <div class="text-xs text-ink-700/55 mt-0.5">{[r.city, r.region, r.country].filter(Boolean).join(', ')} · by {r.deadline || 'flexible'} · budget {r.budget || 'open'} · {r.delivery}</div>
                     {r.notes && <p class="text-sm text-ink-700/75 mt-1.5">{r.notes}</p>}

@@ -22,6 +22,12 @@ const image = (Array.isArray(p.gallery) && p.gallery[0]) || p.image_url || '';
       </div>
     </div>
 
+    <div id="prefmaker" class="hidden mb-5 flex items-center gap-2.5 bg-[#2c6a67]/10 border border-[#2c6a67]/30 rounded-xl px-4 py-3">
+      <span class="text-lg">⭐</span>
+      <span class="text-sm text-ink-800">Going <b>directly to <span id="prefname"></span></b> first — you chose them from their profile. Other makers can still quote.</span>
+      <button type="button" id="prefclear" class="ml-auto text-xs text-ink-700/50 hover:text-red-600 underline">remove</button>
+    </div>
+
     <form id="rfq" class="space-y-6"
       data-slug={p.slug} data-pid={p.id} data-title={title} data-image={image}>
       <div class="grid sm:grid-cols-2 gap-4">
@@ -81,6 +87,24 @@ const image = (Array.isArray(p.gallery) && p.gallery[0]) || p.image_url || '';
   <script is:inline>
     (function(){
       try{ var e=localStorage.getItem('buyer_email')||localStorage.getItem('dcc_email'); if(e) document.getElementById('bemail').value=e; }catch(_){}
+      // preferred maker: carried from a maker profile's "Hire" button
+      // (localStorage) or an explicit ?maker= link
+      var prefMaker=null;
+      try{
+        var qm=new URLSearchParams(location.search).get('maker');
+        var st=JSON.parse(localStorage.getItem('dcc_pref_maker')||'null');
+        if(qm && st && st.id===qm) prefMaker=st;
+        else if(st && !qm) prefMaker=st;
+        else if(qm) prefMaker={id:qm,name:'your chosen maker'};
+      }catch(_){}
+      if(prefMaker){
+        document.getElementById('prefname').textContent=prefMaker.name;
+        document.getElementById('prefmaker').classList.remove('hidden');
+        document.getElementById('prefclear').addEventListener('click',function(){
+          prefMaker=null; document.getElementById('prefmaker').classList.add('hidden');
+          try{ localStorage.removeItem('dcc_pref_maker'); }catch(_){}
+        });
+      }
       var delivery='either';
       document.querySelectorAll('.chipset[data-single]').forEach(function(cs){
         cs.querySelectorAll('button').forEach(function(b){ b.addEventListener('click',function(){
@@ -96,12 +120,14 @@ const image = (Array.isArray(p.gallery) && p.gallery[0]) || p.image_url || '';
         fd.forEach(function(v,k){ body[k]=v; });
         body.delivery=delivery;
         body.product_slug=form.dataset.slug; body.product_id=form.dataset.pid; body.product_title=form.dataset.title; body.product_image=form.dataset.image;
+        if(prefMaker) body.preferred_maker_id=prefMaker.id;
         try{ localStorage.setItem('buyer_email', body.buyer_email||''); }catch(_){}
         var go=document.getElementById('go'); go.disabled=true; go.textContent='Sending…';
         try{
           var r=await fetch('/api/mp/rfq-create',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
           var j=await r.json();
           if(j.ok){
+            try{ localStorage.removeItem('dcc_pref_maker'); }catch(_){}
             form.classList.add('hidden');
             document.getElementById('done-msg').textContent = j.matched>0 ? ('We notified '+j.matched+' maker'+(j.matched>1?'s':'')+' who can make this. Quotes will arrive by email — and here.') : 'Your request is posted. We’ll alert makers as they join your area.';
             document.getElementById('done-link').href=j.link;

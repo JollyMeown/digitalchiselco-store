@@ -75,9 +75,9 @@ const MACHINE: Record<string, string> = { cnc_router: 'CNC router', cnc_mill: 'C
           {m.machine_models && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Machines</span><div class="text-ink-800">{m.machine_models}</div></div>}
           {m.max_size && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Max size</span><div class="text-ink-800">{m.max_size}</div></div>}
           {m.finishes?.length > 0 && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Finishes</span><div class="text-ink-800">{label(m.finishes)}</div></div>}
-          {m.min_lead_days && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Typical lead time</span><div class="text-ink-800">from {m.min_lead_days} days</div></div>}
-          {m.years_experience && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Experience</span><div class="text-ink-800">{m.years_experience} years</div></div>}
-          {(m.etsy_url || m.website_url || m.instagram_url) && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Links</span><div class="text-bronze-600 break-words">{[m.etsy_url, m.website_url, m.instagram_url].filter(Boolean).join('  ·  ')}</div></div>}
+          {m.min_lead_days > 0 && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Typical lead time</span><div class="text-ink-800">from {m.min_lead_days} days</div></div>}
+          {m.years_experience > 0 && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Experience</span><div class="text-ink-800">{m.years_experience} years</div></div>}
+          {(m.etsy_url || m.website_url || m.instagram_url) && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Verified presence</span><div class="text-ink-800 flex flex-wrap gap-1.5 mt-0.5">{m.etsy_url && <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">✓ Etsy shop</span>}{m.website_url && <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">✓ Website</span>}{m.instagram_url && <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">✓ Instagram</span>}</div></div>}
         </div>
 
         {jobs.length > 0 && (
@@ -106,10 +106,17 @@ const MACHINE: Record<string, string> = { cnc_router: 'CNC router', cnc_mill: 'C
           </section>
         )}
 
-        <div class="text-center bg-cream/50 border border-bronze-600/20 rounded-2xl p-6">
-          <p class="text-ink-700/80">Want {m.maker_name} to make something for you?</p>
-          <a href="/catalog" class="inline-block mt-3 bg-bronze-600 text-cream px-6 py-3 rounded-lg font-medium hover:bg-bronze-700 transition">Pick a design &amp; request a quote →</a>
+        <div class="text-center rounded-2xl p-6 sm:p-8 relative overflow-hidden" style="background:linear-gradient(135deg,#14100a 0%,#1a2321 55%,#14100a 100%)">
+          <p class="font-serif text-2xl text-white">Like {(m.maker_name || '').split(' ')[0]}’s work?</p>
+          <p class="text-cream/70 text-sm mt-1.5 max-w-md mx-auto">Pick any design and your request goes <b class="text-white">straight to {(m.maker_name || '').split(' ')[0]}</b> first. Other makers can still quote, so you always have options.</p>
+          <a href={`/catalog?maker=${m.id}`} id="hire-cta" class="inline-block mt-4 bg-white text-[#1c4a48] font-bold px-6 py-3 rounded-xl hover:shadow-lg transition">⭐ Hire {(m.maker_name || '').split(' ')[0]} · pick a design →</a>
+          <p class="text-[11px] text-cream/50 mt-3">Free to request · you pay the maker directly · we never hold your money</p>
         </div>
+        <script is:inline define:vars={{ PM: { id: m.id, name: m.maker_name } }}>
+          document.getElementById('hire-cta').addEventListener('click', function () {
+            try { localStorage.setItem('dcc_pref_maker', JSON.stringify(PM)); } catch (e) {}
+          });
+        </script>
       </div>
     )}
   </main>

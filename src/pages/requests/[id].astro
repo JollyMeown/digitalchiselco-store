@@ -69,6 +69,7 @@ const title = req ? (req.product_title || 'your design').split('|')[0].trim() : 
                   <div class="flex items-start justify-between gap-3">
                     <div>
                       <a href={`/m/${q.maker_id}`} target="_blank" class="font-medium text-ink-900 hover:text-bronze-700 hover:underline">{q.makers?.maker_name} ↗</a>
+                      {req.preferred_maker_id === q.maker_id && <span class="ml-1.5 text-[11px] px-2 py-0.5 rounded-full bg-[#2c6a67]/12 text-[#1c4a48] font-bold align-middle">⭐ Your pick</span>}
                       <div class="text-sm mt-0.5">
                         {q.makers?.rating_count > 0
                           ? <span><span class="text-bronze-600 tracking-wide">{stars(q.makers.rating_avg)}</span> <span class="text-ink-700/60">{Number(q.makers.rating_avg).toFixed(1)} · {q.makers.rating_count} review{q.makers.rating_count > 1 ? 's' : ''} · {q.makers.jobs_completed || 0} jobs</span></span>
