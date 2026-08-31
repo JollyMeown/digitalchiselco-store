@@ -6,6 +6,7 @@ import Categories from './tabs/Categories';
 import CategoryManager from './tabs/CategoryManager';
 import Orders from './tabs/Orders';
 import Subscribers from './tabs/Subscribers';
+import Makers from './tabs/Makers';
 import Media from './tabs/Media';
 import Settings from './tabs/Settings';
 import Links from './tabs/Links';
@@ -59,6 +60,7 @@ const TABS: Tab[] = [
   { key: 'reviews',     label: 'Reviews',      icon: '★', Component: Reviews },
   { key: 'faqs',        label: 'FAQs',         icon: '?', Component: Faqs },
   { key: 'subscribers', label: 'Subscribers',  icon: '✉', Component: Subscribers },
+  { key: 'makers',      label: 'Makers',       icon: '🛠', Component: Makers },
   { key: 'media',       label: 'Media & Hero', icon: '◰', Component: Media },
   { key: 'settings',    label: 'Settings',     icon: '⚙', Component: Settings },
   { key: 'links',       label: 'Download Links', icon: '↗', Component: Links },

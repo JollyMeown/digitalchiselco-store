@@ -583,3 +583,28 @@ export function portalGuideEmail(): { subject: string; html: string; text: strin
   const text = 'Thank you for being part of DigitalChiselCo. Every purchase includes lifetime access to your customer portal: re-download every file you have bought (free, forever), see all orders, collect loyalty points (10 per $1), and share your give 15% get 15% referral link. How to sign in: go to digitalchiselco.com, click Account in the top menu, enter the email this message was sent to, then click the sign-in link we email you. No password needed. The attached PDF shows it with pictures. Questions? Just reply. Jolly, DigitalChiselCo';
   return { subject, html, text };
 }
+
+// ── Maker recruitment (sent from Admin → Makers to subscribers) ───────
+// Invites the existing audience to apply as a fabricator. Links to the gated
+// /become-a-maker form with ?email= prefill. `applyUrl` lets the admin point
+// at a preview/staging link during testing.
+export function makerRecruitEmail(opts: { email: string; applyUrl?: string } = { email: '' }): { subject: string; html: string; text: string } {
+  const base = 'https://digitalchiselco.com/become-a-maker';
+  const url = (opts.applyUrl || base) + (opts.email ? (`${(opts.applyUrl || base).includes('?') ? '&' : '?'}email=${encodeURIComponent(opts.email)}`) : '');
+  const subject = 'Own a CNC or 3D printer? Get paid to build our designs';
+  const html = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#2a241d;">
+<p>Hi,</p>
+<p>Quick question: <strong>do you own a CNC router, laser, or 3D printer?</strong></p>
+<p>We're opening a <strong>maker network</strong> at DigitalChiselCo. Every day, people fall in love with our designs but have no machine to make them. We want to send those ready-to-cut jobs to makers like you, with the design file already in hand.</p>
+<ul style="line-height:1.7;">
+<li><strong>Paid work near you</strong> — buyers request a piece, you quote on your terms</li>
+<li><strong>You keep 97%+</strong> — buyers pay you directly; we take just a 3% success fee on completed jobs</li>
+<li><strong>Free to join</strong>, and founding makers get free starter credits + top placement</li>
+<li><strong>Build your reputation</strong> on a network that already has the designs, the buyers and the traffic</li>
+</ul>
+<p style="margin:22px 0;"><a href="${url}" style="background:#854F0B;color:#fff;text-decoration:none;padding:13px 24px;border-radius:8px;font-weight:bold;">Apply to become a Maker →</a></p>
+<p>It takes about 5 minutes. We review every maker by hand, so you'll be part of a trusted, quality network from day one.</p>
+<p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`;
+  const text = `Do you own a CNC router, laser, or 3D printer? We're opening a maker network at DigitalChiselCo. Get paid work near you: buyers request a piece, you quote on your terms, they pay you directly, and we take just a 3% success fee on completed jobs. Free to join; founding makers get free starter credits. Apply (about 5 minutes): ${url}  — Jolly, DigitalChiselCo`;
+  return { subject, html, text };
+}

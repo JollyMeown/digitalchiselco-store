@@ -1,0 +1,274 @@
+---
+// Maker application form. GATED for Phase-1 testing: noindex + not linked in
+// nav/sitemap. Reachable only by the recruit email's link until launch.
+import Shell from '../layouts/Shell.astro';
+const FEE_SUCCESS = 3;   // % success fee, per owner (credit-to-quote + 3%)
+---
+<Shell
+  title="Become a Maker · DigitalChiselCo"
+  description="Get paid to turn our best-selling designs into real, physical pieces. Apply to join the DigitalChiselCo maker network."
+  noindex={true}
+>
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 pb-24">
+
+    <!-- HERO -->
+    <header class="text-center pt-6 pb-8">
+      <p class="text-xs tracking-[0.2em] uppercase text-bronze-600 mb-3">DigitalChiselCo · Maker Network</p>
+      <h1 class="font-serif text-4xl sm:text-5xl text-bronze-800 leading-tight">Get paid to make it real</h1>
+      <p class="mt-4 text-ink-700/80 max-w-xl mx-auto">
+        You own the machine. We have the designs, the buyers and the traffic. Join our maker network and
+        receive ready-to-cut jobs from customers near you — with the design file already in hand.
+      </p>
+    </header>
+
+    <!-- HOW IT WORKS & FEES -->
+    <section class="bg-cream/60 border border-bronze-600/20 rounded-2xl p-6 sm:p-7 mb-6">
+      <h2 class="font-serif text-2xl text-bronze-800">How it works &amp; what it costs</h2>
+      <div class="grid sm:grid-cols-2 gap-4 mt-4 text-sm">
+        <div class="bg-white rounded-xl border border-black/5 p-4">
+          <div class="text-bronze-700 font-semibold mb-1">1 · Free to join</div>
+          <p class="text-ink-700/75">Applying and getting listed is free. We verify every maker before they go live, so buyers trust the network.</p>
+        </div>
+        <div class="bg-white rounded-xl border border-black/5 p-4">
+          <div class="text-bronze-700 font-semibold mb-1">2 · Small credit to quote</div>
+          <p class="text-ink-700/75">You spend one low-cost credit to send a quote on a job. Founding makers get a free starter pack. Credits keep quotes serious and spam out.</p>
+        </div>
+        <div class="bg-white rounded-xl border border-black/5 p-4">
+          <div class="text-bronze-700 font-semibold mb-1">3 · You’re paid directly</div>
+          <p class="text-ink-700/75">When you win, the buyer pays <b>you</b> directly (your PayPal, Wise, bank or local method). We never hold your money.</p>
+        </div>
+        <div class="bg-white rounded-xl border border-black/5 p-4">
+          <div class="text-bronze-700 font-semibold mb-1">4 · {FEE_SUCCESS}% success fee</div>
+          <p class="text-ink-700/75">Only when a job completes, we bill a <b>{FEE_SUCCESS}% success fee</b> on the job value through our processor (Paddle). No win, no fee. You keep {100 - FEE_SUCCESS}%+.</p>
+        </div>
+      </div>
+      <p class="text-xs text-ink-700/55 mt-4">
+        In short: <b>free to apply</b> → <b>credits to quote</b> → <b>buyer pays you directly</b> → we bill <b>only {FEE_SUCCESS}% on completed jobs</b>.
+        You never pay us out of pocket beyond credits + the success fee on money you’ve already earned.
+      </p>
+    </section>
+
+    <!-- COMPLIANCE -->
+    <section class="border border-bronze-600/15 rounded-2xl p-5 mb-8">
+      <h2 class="font-serif text-xl text-bronze-800">Our maker standards (please read)</h2>
+      <ul class="mt-3 space-y-1.5 text-sm text-ink-700/80 list-disc pl-5">
+        <li>You <b>own and operate</b> the machines you list, and the work photos you upload are <b>your own</b>.</li>
+        <li>You deliver what you quote — the agreed piece, quality and lead time — and reply to buyers within 24 hours.</li>
+        <li>You hold any business/tax registration your country requires, and represent your capabilities honestly.</li>
+        <li>Each won job gives you a <b>license to make that one physical piece</b> from our design for that buyer. You may not resell or share the digital file, or mass-produce beyond the job.</li>
+        <li>You keep deals on the platform — taking a matched buyer off-platform to avoid fees means removal.</li>
+        <li>We may verify your identity and suspend accounts that break these rules or receive repeated complaints.</li>
+      </ul>
+    </section>
+
+    <!-- FORM -->
+    <form id="maker-form" class="space-y-8">
+      <input type="text" name="website2" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true" />
+
+      <!-- A: you & workshop -->
+      <fieldset class="space-y-4">
+        <legend class="font-serif text-xl text-bronze-800 mb-1">Your workshop</legend>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <label class="block"><span class="lbl">Maker / business name *</span><input required name="maker_name" class="fld" placeholder="Timberline Woodworks" /></label>
+          <label class="block"><span class="lbl">Your name</span><input name="contact_name" class="fld" placeholder="Sam Reeves" /></label>
+          <label class="block"><span class="lbl">Email *</span><input required type="email" name="email" id="email" class="fld" placeholder="you@email.com" /></label>
+          <label class="block"><span class="lbl">Phone / WhatsApp</span><input name="phone" class="fld" placeholder="optional" /></label>
+          <label class="block"><span class="lbl">Country *</span><input required name="country" class="fld" placeholder="United States" /></label>
+          <label class="block"><span class="lbl">City</span><input name="city" class="fld" placeholder="Dallas" /></label>
+          <label class="block"><span class="lbl">State / region</span><input name="region" class="fld" placeholder="TX" /></label>
+          <label class="block"><span class="lbl">Postal / ZIP <span class="text-ink-700/40">(for matching buyers near you)</span></span><input name="postal" class="fld" placeholder="75201" /></label>
+        </div>
+      </fieldset>
+
+      <!-- B: delivery reach -->
+      <fieldset class="space-y-4">
+        <legend class="font-serif text-xl text-bronze-800 mb-1">How far you deliver</legend>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <label class="block"><span class="lbl">Local pickup / delivery radius (km) within your country</span><input name="deliver_radius_km" type="number" min="0" class="fld" placeholder="e.g. 40" /></label>
+          <div class="flex flex-col justify-end gap-2 text-sm">
+            <label class="flex items-center gap-2"><input type="checkbox" name="deliver_domestic_ship" /> I ship anywhere in my country</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="deliver_intl" id="intl" /> I ship internationally</label>
+          </div>
+          <label class="block sm:col-span-2 hidden" id="intl-notes-wrap"><span class="lbl">Where do you ship internationally, and how?</span><input name="deliver_intl_notes" class="fld" placeholder="e.g. US, Canada, UK — via FedEx, buyer pays shipping" /></label>
+        </div>
+      </fieldset>
+
+      <!-- C: machines & capabilities -->
+      <fieldset class="space-y-4">
+        <legend class="font-serif text-xl text-bronze-800 mb-1">Machines &amp; capabilities</legend>
+        <div>
+          <span class="lbl">Machine types * <span class="text-ink-700/40">(tap all you own)</span></span>
+          <div class="chipset" data-name="machine_types">
+            <button type="button" data-v="cnc_router">CNC router</button>
+            <button type="button" data-v="cnc_mill">CNC mill</button>
+            <button type="button" data-v="laser">Laser</button>
+            <button type="button" data-v="fdm">3D printer (FDM)</button>
+            <button type="button" data-v="resin">3D printer (resin)</button>
+          </div>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <label class="block"><span class="lbl">How many machines?</span><input name="machine_count" type="number" min="1" class="fld" placeholder="2" /></label>
+          <label class="block"><span class="lbl">Largest piece you can make</span><input name="max_size" class="fld" placeholder='48 × 96 in' /></label>
+          <label class="block sm:col-span-2"><span class="lbl">Machine makes &amp; models</span><input name="machine_models" class="fld" placeholder="ShopBot PRSalpha 96×48, Onefinity Journeyman, xTool P2 laser" /></label>
+        </div>
+        <div>
+          <span class="lbl">Materials you work in</span>
+          <div class="chipset" data-name="materials">
+            <button type="button" data-v="walnut">Walnut</button><button type="button" data-v="oak">Oak</button>
+            <button type="button" data-v="maple">Maple</button><button type="button" data-v="pine">Pine</button>
+            <button type="button" data-v="mdf">MDF</button><button type="button" data-v="plywood">Plywood</button>
+            <button type="button" data-v="acrylic">Acrylic</button><button type="button" data-v="aluminum">Aluminum</button>
+            <button type="button" data-v="corian">Corian</button><button type="button" data-v="foam">HDU / foam</button>
+          </div>
+        </div>
+        <div>
+          <span class="lbl">Finishes you offer</span>
+          <div class="chipset" data-name="finishes">
+            <button type="button" data-v="sanded">Sanded raw</button><button type="button" data-v="oiled">Oil</button>
+            <button type="button" data-v="stained">Stain</button><button type="button" data-v="painted">Paint</button>
+            <button type="button" data-v="epoxy">Epoxy</button><button type="button" data-v="lacquer">Lacquer</button>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- D: how you work -->
+      <fieldset class="space-y-4">
+        <legend class="font-serif text-xl text-bronze-800 mb-1">How you work</legend>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <label class="block"><span class="lbl">Minimum lead time (days)</span><input name="min_lead_days" type="number" min="0" class="fld" placeholder="14" /></label>
+          <label class="block"><span class="lbl">Roughly how many jobs a week?</span><input name="capacity_per_week" type="number" min="0" class="fld" placeholder="3" /></label>
+        </div>
+        <div>
+          <span class="lbl">How can buyers pay you? <span class="text-ink-700/40">(you’re paid directly — pick all you accept)</span></span>
+          <div class="chipset" data-name="payment_methods">
+            <button type="button" data-v="paypal">PayPal</button><button type="button" data-v="wise">Wise</button>
+            <button type="button" data-v="venmo">Venmo / CashApp</button><button type="button" data-v="bank">Bank transfer</button>
+            <button type="button" data-v="cash">Cash on pickup</button><button type="button" data-v="other">Other</button>
+          </div>
+        </div>
+        <label class="block"><span class="lbl">Deposit policy</span><input name="deposit_policy" class="fld" placeholder="e.g. 50% up front, balance on completion" /></label>
+      </fieldset>
+
+      <!-- E: show your work -->
+      <fieldset class="space-y-4">
+        <legend class="font-serif text-xl text-bronze-800 mb-1">Show your work</legend>
+        <div>
+          <span class="lbl">Photos of pieces you’ve made * <span class="text-ink-700/40">(3–8 images, JPG/PNG/WebP, your own work)</span></span>
+          <div id="gallery" class="flex flex-wrap gap-3 mt-1"></div>
+          <label class="inline-flex items-center gap-2 mt-2 cursor-pointer text-sm text-bronze-700 border border-bronze-600/40 rounded-lg px-3 py-2 hover:bg-cream">
+            <input type="file" id="photos" accept="image/jpeg,image/png,image/webp" multiple class="hidden" /> ＋ Add photos
+          </label>
+          <p id="upnote" class="text-xs text-ink-700/50 mt-1"></p>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-4">
+          <label class="block"><span class="lbl">Etsy shop</span><input name="etsy_url" class="fld" placeholder="etsy.com/shop/…" /></label>
+          <label class="block"><span class="lbl">Website</span><input name="website_url" class="fld" placeholder="optional" /></label>
+          <label class="block"><span class="lbl">Instagram</span><input name="instagram_url" class="fld" placeholder="@handle" /></label>
+        </div>
+        <div class="grid sm:grid-cols-[140px_1fr] gap-4">
+          <label class="block"><span class="lbl">Years of experience</span><input name="years_experience" type="number" min="0" class="fld" placeholder="6" /></label>
+          <label class="block"><span class="lbl">Short pitch to buyers</span><textarea name="bio" rows="3" class="fld" placeholder="What you love making, what makes your work special…"></textarea></label>
+        </div>
+      </fieldset>
+
+      <!-- F: agreements -->
+      <fieldset class="space-y-3 bg-cream/50 border border-bronze-600/20 rounded-2xl p-5">
+        <legend class="font-serif text-xl text-bronze-800 mb-1 px-1">Agreements</legend>
+        <label class="flex items-start gap-3 text-sm"><input type="checkbox" name="agreed_owns_machines" class="mt-1" /> <span>I confirm I <b>own and operate</b> the machines listed, and the photos are my own work.</span></label>
+        <label class="flex items-start gap-3 text-sm"><input type="checkbox" name="agreed_fees" class="mt-1" /> <span>I understand the fees: <b>credits to quote</b> and a <b>{FEE_SUCCESS}% success fee</b> on completed jobs, and that buyers pay me directly.</span></label>
+        <label class="flex items-start gap-3 text-sm"><input type="checkbox" name="agreed_terms" class="mt-1" /> <span>I agree to the <b>maker standards</b> above, including the per-job design license and keeping deals on-platform.</span></label>
+      </fieldset>
+
+      <div id="err" class="hidden text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3"></div>
+      <button id="submit" type="submit" class="w-full bg-bronze-600 text-cream font-medium rounded-xl py-4 hover:bg-bronze-700 transition disabled:opacity-50">
+        Submit my application
+      </button>
+      <p class="text-xs text-center text-ink-700/50">We review every application by hand. You’ll hear from us by email within a few days.</p>
+    </form>
+
+    <!-- SUCCESS -->
+    <div id="done" class="hidden text-center py-16">
+      <div class="text-5xl mb-4">🛠️</div>
+      <h2 class="font-serif text-3xl text-bronze-800">Application received!</h2>
+      <p class="mt-3 text-ink-700/75 max-w-md mx-auto">Thank you. We review each maker by hand and will email you within a few days. Founding makers get free starter credits and top placement.</p>
+    </div>
+  </main>
+
+  <style>
+    .lbl{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#6f6151;margin-bottom:5px}
+    .fld{width:100%;border:1px solid rgba(133,79,11,.25);border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;color:#2b1d10}
+    .fld:focus{outline:none;border-color:#854F0B}
+    .chipset{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+    .chipset button{font-size:13px;padding:7px 13px;border-radius:100px;border:1px solid rgba(133,79,11,.25);background:#fff;color:#3a2a1a;cursor:pointer}
+    .chipset button[aria-pressed="true"]{background:#854F0B;color:#fff;border-color:#854F0B}
+    #gallery .g{width:84px;height:84px;border-radius:10px;object-fit:cover;border:1px solid rgba(0,0,0,.1);position:relative}
+    #gallery .wrap{position:relative}
+    #gallery .rm{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#b23b3b;color:#fff;border:0;font-size:12px;cursor:pointer;line-height:1}
+  </style>
+
+  <script is:inline>
+    (function(){
+      // prefill email from ?email= (the recruit link) or stored buyer email
+      try{
+        var u=new URLSearchParams(location.search).get('email');
+        if(u) document.getElementById('email').value=u;
+      }catch(e){}
+      // multi-select chips
+      var chosen={};
+      document.querySelectorAll('.chipset').forEach(function(cs){
+        var name=cs.dataset.name; chosen[name]=[];
+        cs.querySelectorAll('button').forEach(function(b){
+          b.addEventListener('click',function(){
+            var on=b.getAttribute('aria-pressed')==='true';
+            b.setAttribute('aria-pressed', on?'false':'true');
+            chosen[name]=[].slice.call(cs.querySelectorAll('[aria-pressed="true"]')).map(function(x){return x.dataset.v;});
+          });
+        });
+      });
+      // intl notes toggle
+      var intl=document.getElementById('intl'), inw=document.getElementById('intl-notes-wrap');
+      intl.addEventListener('change',function(){ inw.classList.toggle('hidden', !intl.checked); });
+      // photo uploads
+      var urls=[], gal=document.getElementById('gallery'), note=document.getElementById('upnote');
+      document.getElementById('photos').addEventListener('change', async function(e){
+        var files=[].slice.call(e.target.files||[]);
+        for(var i=0;i<files.length;i++){
+          if(urls.length>=8){ note.textContent='Max 8 photos.'; break; }
+          var f=files[i]; note.textContent='Uploading '+f.name+'…';
+          var fd=new FormData(); fd.append('file',f);
+          try{
+            var r=await fetch('/api/maker-upload',{method:'POST',body:fd}); var j=await r.json();
+            if(j.url){ urls.push(j.url); addThumb(j.url); note.textContent=urls.length+' photo'+(urls.length>1?'s':'')+' added'; }
+            else note.textContent=j.error||'Upload failed';
+          }catch(err){ note.textContent='Upload failed — try again'; }
+        }
+        e.target.value='';
+      });
+      function addThumb(url){
+        var w=document.createElement('div'); w.className='wrap';
+        var img=document.createElement('img'); img.src=url; img.className='g';
+        var rm=document.createElement('button'); rm.type='button'; rm.className='rm'; rm.textContent='×';
+        rm.onclick=function(){ urls=urls.filter(function(x){return x!==url;}); w.remove(); note.textContent=urls.length+' photos'; };
+        w.appendChild(img); w.appendChild(rm); gal.appendChild(w);
+      }
+      // submit
+      var form=document.getElementById('maker-form');
+      form.addEventListener('submit', async function(e){
+        e.preventDefault();
+        var err=document.getElementById('err'); err.classList.add('hidden');
+        var fd=new FormData(form), body={};
+        fd.forEach(function(v,k){ body[k]=v; });
+        ['deliver_domestic_ship','deliver_intl','agreed_owns_machines','agreed_fees','agreed_terms'].forEach(function(k){ body[k]=!!form.querySelector('[name="'+k+'"]').checked; });
+        Object.keys(chosen).forEach(function(k){ body[k]=chosen[k]; });
+        body.portfolio_urls=urls;
+        var btn=document.getElementById('submit'); btn.disabled=true; btn.textContent='Submitting…';
+        try{
+          var r=await fetch('/api/maker-apply',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+          var j=await r.json();
+          if(j.ok){ form.classList.add('hidden'); document.getElementById('done').classList.remove('hidden'); window.scrollTo({top:0,behavior:'smooth'}); }
+          else{ err.textContent=j.error||'Something went wrong.'; err.classList.remove('hidden'); btn.disabled=false; btn.textContent='Submit my application'; }
+        }catch(e2){ err.textContent='Network error — please try again.'; err.classList.remove('hidden'); btn.disabled=false; btn.textContent='Submit my application'; }
+      });
+    })();
+  </script>
+</Shell>
