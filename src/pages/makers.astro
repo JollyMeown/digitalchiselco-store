@@ -1,0 +1,40 @@
+---
+// Public Cut Local maker directory + animated map. Gated/noindex until launch
+// (flip growth_settings.marketplace_enabled to feature it in nav). The map
+// itself works by direct URL for testing.
+import Shell from '../layouts/Shell.astro';
+import MakerMap from '../components/MakerMap.tsx';
+---
+<Shell title="Find a Maker · Cut Local" description="Meet the CNC, laser and 3D-print makers ready to turn our designs into real pieces — near you." noindex={true}>
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 pb-24">
+    <header class="text-center pt-6 pb-7">
+      <p class="text-xs tracking-[0.2em] uppercase text-bronze-600 mb-3">Cut Local · the maker network</p>
+      <h1 class="font-serif text-4xl sm:text-5xl text-bronze-800 leading-tight">Made by a maker near you</h1>
+      <p class="mt-4 text-ink-700/80 max-w-xl mx-auto">Every glowing dot is a real workshop ready to build. Find any design you love, request it, and let a trusted local maker bring it to life.</p>
+    </header>
+
+    <div class="rounded-2xl overflow-hidden border border-bronze-600/25 shadow-lg" style="background:#0e0a04">
+      <MakerMap client:load />
+    </div>
+
+    <div class="grid sm:grid-cols-3 gap-4 mt-8 text-center">
+      <div class="bg-cream/50 border border-bronze-600/15 rounded-xl p-5">
+        <div class="text-2xl mb-1">🔎</div><div class="font-serif text-lg text-bronze-800">Find a design</div>
+        <p class="text-sm text-ink-700/70 mt-1">Browse 1,500+ designs and pick the one you want made.</p>
+      </div>
+      <div class="bg-cream/50 border border-bronze-600/15 rounded-xl p-5">
+        <div class="text-2xl mb-1">💬</div><div class="font-serif text-lg text-bronze-800">Get local quotes</div>
+        <p class="text-sm text-ink-700/70 mt-1">Makers near you quote and chat. Compare price, speed and star ratings.</p>
+      </div>
+      <div class="bg-cream/50 border border-bronze-600/15 rounded-xl p-5">
+        <div class="text-2xl mb-1">🪵</div><div class="font-serif text-lg text-bronze-800">Hold it in your hands</div>
+        <p class="text-sm text-ink-700/70 mt-1">Pick a maker, they build it, you get a real piece — often local pickup.</p>
+      </div>
+    </div>
+
+    <div class="text-center mt-10">
+      <a href="/catalog" class="inline-block bg-bronze-600 text-cream px-8 py-3.5 rounded-lg font-medium hover:bg-bronze-700 transition">Find a design to get made →</a>
+      <p class="text-xs text-ink-700/50 mt-3">Are you a maker? <a href="/become-a-maker" class="text-bronze-600 underline">Join Cut Local →</a></p>
+    </div>
+  </main>
+</Shell>
