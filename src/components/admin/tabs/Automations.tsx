@@ -937,6 +937,111 @@ const inZone = (d: Date, tz: string) =>
   new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(d);
 const hour12 = (h: number) => `${h % 12 === 0 ? 12 : h % 12}:00 ${h < 12 ? 'AM' : 'PM'}`;
 
+// ── When Americans actually visit AND buy, by hour ───────────────────
+// Ranks by BUYING INTENT (add-to-cart / buy-now / wishlist / checkout), not
+// raw pageviews: a 00:00-01:00 ET spike of 228 visits produced ZERO cart adds
+// (scraper-like), while 09:00-10:00 ET produced 8 from far fewer visits.
+// Ranking on views alone would have scheduled the daily send for 1 AM.
+// Falls back to unique visitors only while intent data is still sparse, and
+// never recommends outside a sane 6 AM - 10 PM send window.
+type PeakRow = { hour: number; visitors: number; visits: number; actions: number };
+const RANGES: [string, number][] = [['7 days', 7], ['30 days', 30], ['90 days', 90], ['1 year', 365]];
+const SEND_WINDOW = [6, 22] as const;   // never suggest the middle of the night
+
+function UsPeakHours({ tz, scheduledHour, onApply }: { tz: string; scheduledHour: number; onApply: (h: number) => void }) {
+  const [days, setDays] = useState(30);
+  const [rows, setRows] = useState<PeakRow[] | null>(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let dead = false;
+    setRows(null); setErr('');
+    supabase.rpc('us_visit_hours', { p_days: days, p_tz: tz }).then(({ data, error }) => {
+      if (dead) return;
+      if (error) { setErr(error.message); setRows([]); return; }
+      const byHour = new Map<number, PeakRow>((data || []).map((d: any) => [Number(d.hour), {
+        hour: Number(d.hour), visitors: Number(d.visitors) || 0, visits: Number(d.visits) || 0, actions: Number(d.actions) || 0,
+      }]));
+      setRows(Array.from({ length: 24 }, (_, h) => byHour.get(h) || { hour: h, visitors: 0, visits: 0, actions: 0 }));
+    });
+    return () => { dead = true; };
+  }, [days, tz]);
+
+  if (!rows) return <div className="mt-3 text-xs text-ink-700/50">Loading US activity…</div>;
+
+  const totalActions = rows.reduce((s, r) => s + r.actions, 0);
+  const usingIntent = totalActions >= 8;             // enough signal to trust
+  const score = (r: PeakRow) => (usingIntent ? r.actions : r.visitors);
+  // 3-hour smoothing: people open mail over a window, and it stops one freak
+  // hour from winning.
+  const smooth = rows.map((_, i) =>
+    score(rows[(i + 23) % 24]) * 0.5 + score(rows[i]) + score(rows[(i + 1) % 24]) * 0.5);
+  let best = -1, bestScore = -1;
+  for (let h = SEND_WINDOW[0]; h <= SEND_WINDOW[1]; h++) {
+    if (smooth[h] > bestScore) { bestScore = smooth[h]; best = h; }
+  }
+  const maxV = Math.max(1, ...rows.map((r) => r.visitors));
+  const maxA = Math.max(1, ...rows.map((r) => r.actions));
+  const bestAt = best >= 0 ? instantFor(tz, best) : null;
+  const hasData = rows.some((r) => r.visitors > 0);
+
+  return (
+    <div className="mt-4 rounded-lg border border-bronze-600/15 bg-white/60 px-3 py-3">
+      <div className="flex items-baseline gap-2 flex-wrap mb-2">
+        <div className="text-xs font-bold text-ink-900">📊 When Americans visit and buy</div>
+        <span className="text-[11px] text-ink-700/50">hours shown in {US_ZONES.find(([z]) => z === tz)?.[1] || tz}</span>
+        <div className="ml-auto flex gap-1">
+          {RANGES.map(([label, d]) => (
+            <button key={d} onClick={() => setDays(d)}
+              className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${days === d ? 'bg-bronze-600 text-cream' : 'bg-cream text-ink-700 hover:bg-bronze-600/10'}`}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {err && <div className="text-[11px] text-red-700 mb-2">Could not load activity: {err}</div>}
+      {!hasData && !err && <div className="text-[11px] text-ink-700/50 mb-2">No US visits recorded in this range yet.</div>}
+
+      {/* 24-hour chart: pale bar = visitors, solid bar = buying actions */}
+      <div className="flex items-end gap-[3px] h-24">
+        {rows.map((r) => {
+          const isBest = r.hour === best;
+          const isNow = r.hour === scheduledHour;
+          return (
+            <div key={r.hour} className="flex-1 flex flex-col justify-end items-center h-full group relative"
+              title={`${hour12(r.hour)} · ${r.visitors} visitors · ${r.actions} cart/wishlist actions`}>
+              <div className="w-full flex flex-col justify-end items-center h-full">
+                <div className="w-full rounded-t-sm bg-bronze-600/20" style={{ height: `${(r.visitors / maxV) * 70}%` }} />
+                <div className={`w-full ${isBest ? 'bg-green-600' : 'bg-bronze-700'}`} style={{ height: `${(r.actions / maxA) * 30}%` }} />
+              </div>
+              <div className={`text-[8px] mt-0.5 leading-none ${isBest ? 'text-green-700 font-bold' : isNow ? 'text-bronze-700 font-bold' : 'text-ink-700/40'}`}>
+                {r.hour % 3 === 0 ? r.hour : ''}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-ink-700/55 mt-1.5">
+        <span><span className="inline-block w-2 h-2 rounded-sm bg-bronze-600/20 align-middle" /> visitors</span>
+        <span><span className="inline-block w-2 h-2 rounded-sm bg-bronze-700 align-middle" /> cart / wishlist actions</span>
+        <span><span className="inline-block w-2 h-2 rounded-sm bg-green-600 align-middle" /> suggested hour</span>
+        <span className="text-ink-700/40">hour labels are 24-hour, every 3rd shown</span>
+      </div>
+
+      {best >= 0 && bestAt && hasData && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs border-t border-black/5 pt-2.5">
+          <span>
+            Best in this range: <b className="text-green-700">{hour12(best)}</b>
+            <span className="text-ink-700/50"> ({inZone(bestAt, PK_ZONE)} Pakistan)</span>
+            <span className="text-ink-700/45"> · ranked by {usingIntent ? `buying actions (${totalActions} in range)` : 'unique visitors (too few cart actions yet)'}</span>
+          </span>
+          {best !== scheduledHour
+            ? <button className={btnGhost + ' ml-auto'} onClick={() => onApply(best)}>Use {hour12(best)} →</button>
+            : <span className="ml-auto text-green-700 font-medium">✓ already scheduled</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CronSchedule() {
   const [tz, setTz] = useState('America/New_York');
   const [hour, setHour] = useState(10);
@@ -987,6 +1092,7 @@ function CronSchedule() {
           {busy ? 'Saving…' : dirty ? 'Save time' : 'Saved'}
         </button>
       </div>
+      <UsPeakHours tz={tz} scheduledHour={hour} onApply={(h) => setHour(h)} />
       <div className="mt-3 rounded-lg border border-bronze-600/15 bg-cream/40 px-3 py-2.5 text-sm">
         <div className="flex flex-wrap gap-x-6 gap-y-1">
           <span>🇺🇸 <b className="text-bronze-800">{inZone(at, tz)}</b> <span className="text-[11px] text-ink-700/50">{US_ZONES.find(([z]) => z === tz)?.[1]}</span></span>
