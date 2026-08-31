@@ -595,7 +595,7 @@ export function makerRecruitEmail(opts: { email: string; applyUrl?: string } = {
   const html = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#2a241d;">
 <p>Hi,</p>
 <p>Quick question: <strong>do you own a CNC router, laser, or 3D printer?</strong></p>
-<p>We're opening a <strong>maker network</strong> at DigitalChiselCo. Every day, people fall in love with our designs but have no machine to make them. We want to send those ready-to-cut jobs to makers like you, with the design file already in hand.</p>
+<p>We're opening <strong>Cut Local</strong> — our new maker network at DigitalChiselCo. Every day, people fall in love with our designs but have no machine to make them. We want to send those ready-to-cut jobs to makers like you, with the design file already in hand.</p>
 <ul style="line-height:1.7;">
 <li><strong>Paid work near you</strong> — buyers request a piece, you quote on your terms</li>
 <li><strong>You keep 97%+</strong> — buyers pay you directly; we take just a 3% success fee on completed jobs</li>
@@ -605,6 +605,21 @@ export function makerRecruitEmail(opts: { email: string; applyUrl?: string } = {
 <p style="margin:22px 0;"><a href="${url}" style="background:#854F0B;color:#fff;text-decoration:none;padding:13px 24px;border-radius:8px;font-weight:bold;">Apply to become a Maker →</a></p>
 <p>It takes about 5 minutes. We review every maker by hand, so you'll be part of a trusted, quality network from day one.</p>
 <p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`;
-  const text = `Do you own a CNC router, laser, or 3D printer? We're opening a maker network at DigitalChiselCo. Get paid work near you: buyers request a piece, you quote on your terms, they pay you directly, and we take just a 3% success fee on completed jobs. Free to join; founding makers get free starter credits. Apply (about 5 minutes): ${url}  — Jolly, DigitalChiselCo`;
+  const text = `Do you own a CNC router, laser, or 3D printer? We're opening Cut Local, our new maker network at DigitalChiselCo. Get paid work near you: buyers request a piece, you quote on your terms, they pay you directly, and we take just a 3% success fee on completed jobs. Free to join; founding makers get free starter credits. Apply (about 5 minutes): ${url}  — Jolly, DigitalChiselCo`;
   return { subject, html, text };
+}
+
+// ── Maker broadcast (announcements to APPROVED makers, from Admin → Makers)
+// A distinct audience from subscribers. Wraps the owner's message in a
+// branded Cut Local shell. Operational comms to opted-in makers → no unsub
+// footer (kind 'makerNews' is transactional-styled but still budget-capped).
+export function makerNewsEmail(opts: { subject: string; message: string }): { subject: string; html: string; text: string } {
+  const paras = String(opts.message || '').trim().split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px;">${p.replace(/\n/g, '<br/>').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`).join('');
+  const html = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#2a241d;">
+<p style="font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#854F0B;margin:0 0 6px;">Cut Local · Maker Network</p>
+${paras}
+<p style="margin:18px 0 0;">Happy making,<br/>Jolly · DigitalChiselCo</p>
+<p style="margin:22px 0 0;font-size:12px;color:#9a8b76;">You're receiving this as an approved Cut Local maker.</p></div>`;
+  const text = `${opts.message}\n\nHappy making,\nJolly · DigitalChiselCo\n\nYou're receiving this as an approved Cut Local maker.`;
+  return { subject: opts.subject, html, text };
 }

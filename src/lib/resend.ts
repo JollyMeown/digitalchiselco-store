@@ -44,7 +44,7 @@ type SendOptions = {
 // Transactional kinds carry no unsubscribe header (order receipts, gift
 // delivery, alerts to the owner). Everything else tagged with a kind is
 // marketing and MUST advertise one-click unsubscribe (Gmail/Yahoo rules).
-const TRANSACTIONAL_KINDS = new Set(['order', 'gift', 'ownerReport', 'designScout', 'resendLibrary', 'cartSave', 'payRecovery', 'picks', 'portalGuide', 'auth', 'optin']);
+const TRANSACTIONAL_KINDS = new Set(['order', 'gift', 'ownerReport', 'designScout', 'resendLibrary', 'cartSave', 'payRecovery', 'picks', 'portalGuide', 'auth', 'optin', 'makerNews']);
 function marketingHeadersFor(to: string, tags?: { name: string; value: string }[]): Record<string, string> {
   const kind = tags?.find((t) => t.name === 'kind')?.value;
   if (!kind || TRANSACTIONAL_KINDS.has(kind)) return {};

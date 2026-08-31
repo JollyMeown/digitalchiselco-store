@@ -47,10 +47,11 @@ export default function Makers() {
   return (
     <div className="space-y-4">
       <div className="text-xs text-ink-700/70 bg-cream/40 border border-bronze-600/15 rounded-lg px-3 py-2">
-        🛠️ <b>Maker network — Phase 1 (testing).</b> The application form lives at <code>/become-a-maker</code> (noindex, not linked yet). Recruit subscribers below, then review + approve applications here before anything goes live.
+        🛠️ <b>Cut Local — maker network · Phase 1 (testing).</b> The application form lives at <code>/become-a-maker</code> (noindex, not linked yet). Recruit subscribers, review + approve applications, and message approved makers as a separate list — all before anything goes live.
       </div>
 
       <RecruitSender />
+      <MakerBroadcast />
 
       {/* funnel */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -139,6 +140,54 @@ export default function Makers() {
 function Field({ k, v }: { k: string; v?: string | null }) {
   if (!v) return null;
   return <div><div className="text-[11px] uppercase text-ink-700/45 font-semibold">{k}</div><div className="text-ink-800 break-words">{v}</div></div>;
+}
+
+// ── Broadcast to approved makers — the maker mailing list ─────────────
+function MakerBroadcast() {
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [count, setCount] = useState<number | null>(null);
+  const [busy, setBusy] = useState('');
+  const [results, setResults] = useState<any[] | null>(null);
+  useEffect(() => { supabase.from('makers').select('id', { count: 'exact', head: true }).eq('status', 'approved').then(({ count }) => setCount(count || 0)); }, []);
+
+  async function call(extra: any) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin/email-makers', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ subject, message, ...extra }) });
+    return res.json();
+  }
+  async function preview() {
+    if (!subject || !message) { alert('Add a subject and message first.'); return; }
+    setBusy('preview');
+    try { const j = await call({ preview: true }); if (j.ok) { const u = URL.createObjectURL(new Blob([`<title>${j.subject}</title>` + j.html], { type: 'text/html' })); window.open(u, '_blank'); setTimeout(() => URL.revokeObjectURL(u), 60000); } else alert(j.error); } catch (e: any) { alert(String(e?.message || e)); }
+    setBusy('');
+  }
+  async function sendTest() { if (!subject || !message) { alert('Add a subject and message first.'); return; } setBusy('test'); try { const j = await call({ test: true }); alert(j.ok ? 'Test sent to your inbox.' : 'Failed: ' + (j.results?.[0]?.error || '')); } catch (e: any) { alert(String(e?.message || e)); } setBusy(''); }
+  async function sendAll() {
+    if (!subject || !message) { alert('Add a subject and message first.'); return; }
+    if (!confirm(`Send this to all ${count} approved maker(s)?`)) return;
+    setBusy('send'); setResults(null);
+    try { const j = await call({ audience: 'approved' }); setResults(j.results || []); if (j.ok) { setSubject(''); setMessage(''); } } catch (e: any) { alert(String(e?.message || e)); }
+    setBusy('');
+  }
+
+  return (
+    <Card title="✉️ Email your makers (approved list)">
+      <p className="text-xs text-ink-700/60 mb-3">
+        A separate audience from subscribers. Announcements, new features, tips — goes to your <b>{count ?? '…'} approved maker{count === 1 ? '' : 's'}</b>. Preview and test before sending.
+      </p>
+      <div className="grid gap-2 max-w-2xl">
+        <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject — e.g. Cut Local is now open in your area" className={inputCls} />
+        <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} placeholder={"Write your message. Blank lines start new paragraphs.\n\nWe sign it 'Jolly · DigitalChiselCo' for you."} className={inputCls} />
+      </div>
+      <div className="flex flex-wrap gap-2 mt-3">
+        <button className={btnPrimary} disabled={!!busy || !count} onClick={sendAll}>{busy === 'send' ? 'Sending…' : `✉️ Send to ${count ?? 0} makers`}</button>
+        <button className={btnGhost} disabled={!!busy} onClick={preview}>{busy === 'preview' ? 'Building…' : '👁 Preview'}</button>
+        <button className={btnGhost} disabled={!!busy} onClick={sendTest}>{busy === 'test' ? 'Sending…' : 'Send test to me'}</button>
+      </div>
+      {results && <div className="mt-3 text-xs space-y-0.5">{results.map((r) => <div key={r.email} className={r.ok ? 'text-green-700' : 'text-red-700'}>{r.ok ? '✓' : '✗'} {r.email}{r.error ? ` · ${r.error}` : ''}</div>)}</div>}
+    </Card>
+  );
 }
 
 // ── Recruit-email sender (mirrors the portal-guide sender) ────────────
