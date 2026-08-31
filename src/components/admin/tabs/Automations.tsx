@@ -270,6 +270,7 @@ export default function Automations() {
   return (
     <div className="space-y-4">
       <CronHealth />
+      <CronSchedule />
       <TodayEmailStats />
       <div className="text-xs text-ink-700/70 bg-cream/40 border border-bronze-600/15 rounded-lg px-3 py-2">
         🛡 <b>Review-first:</b> each system starts OFF — a <b>green</b> toggle means it's <b>ON</b>. Preview each email (right) and test-send it to yourself before enabling. The daily cron (08:00 UTC) does the actual sending, so the counters below stay at <b>0</b> until it next runs and there's activity to report — that's normal, not "off".
@@ -905,6 +906,97 @@ function TodayEmailStats() {
           ))}
         </div>
       )}
+    </Card>
+  );
+}
+
+// ── Nightly automation firing time (admin-controlled) ────────────────
+// Netlify bakes a scheduled function's cron into code, so daily-drop.mjs
+// ticks hourly and fires only when the hour in cron_tz equals
+// cron_local_hour. Storing a LOCAL hour + zone (not a UTC hour) keeps
+// "10am New York" correct across US daylight-saving changes.
+const US_ZONES: [string, string][] = [
+  ['America/New_York', 'US Eastern (New York)'],
+  ['America/Chicago', 'US Central (Chicago)'],
+  ['America/Denver', 'US Mountain (Denver)'],
+  ['America/Los_Angeles', 'US Pacific (Los Angeles)'],
+];
+const PK_ZONE = 'Asia/Karachi';
+// The UTC instant of today's <hour> in <tz>, so we can translate to any zone.
+function instantFor(tz: string, hour: number): Date {
+  const probe = new Date();
+  probe.setUTCMinutes(0, 0, 0);
+  for (let h = 0; h < 48; h++) {
+    const cand = new Date(probe.getTime() + (h - 24) * 3600000);
+    const there = Number(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hour12: false }).format(cand));
+    if (there === hour) return cand;
+  }
+  return probe;
+}
+const inZone = (d: Date, tz: string) =>
+  new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(d);
+const hour12 = (h: number) => `${h % 12 === 0 ? 12 : h % 12}:00 ${h < 12 ? 'AM' : 'PM'}`;
+
+function CronSchedule() {
+  const [tz, setTz] = useState('America/New_York');
+  const [hour, setHour] = useState(10);
+  const [saved, setSaved] = useState<{ tz: string; hour: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    supabase.from('growth_settings').select('cron_tz, cron_local_hour').eq('id', 1).maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        const z = data.cron_tz || 'America/New_York';
+        const h = Number.isFinite(Number(data.cron_local_hour)) ? Number(data.cron_local_hour) : 10;
+        setTz(z); setHour(h); setSaved({ tz: z, hour: h });
+      });
+  }, []);
+  if (!saved) return null;
+  const at = instantFor(tz, hour);
+  const dirty = tz !== saved.tz || hour !== saved.hour;
+  async function save() {
+    setBusy(true);
+    await supabase.from('growth_settings').update({ cron_tz: tz, cron_local_hour: hour }).eq('id', 1);
+    setSaved({ tz, hour }); setBusy(false);
+  }
+  return (
+    <Card>
+      <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+        <div className="text-sm font-bold text-ink-900">⏰ When automations run each day</div>
+        <span className="text-[11px] text-ink-700/50">emails go out at this time · change takes effect the same day</span>
+      </div>
+      <p className="text-[11px] text-ink-700/60 mb-3">
+        Pick the time in <b>US time</b> (most of your visitors and buyers are American). The matching
+        <b> Pakistan time</b> is shown so you know when to expect it. Daylight-saving is handled
+        automatically, so your US send time never drifts.
+      </p>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">US time zone</span>
+          <select value={tz} onChange={(e) => setTz(e.target.value)} className={inputCls + ' w-56'}>
+            {US_ZONES.map(([z, label]) => <option key={z} value={z}>{label}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Hour</span>
+          <select value={hour} onChange={(e) => setHour(Number(e.target.value))} className={inputCls + ' w-32'}>
+            {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{hour12(h)}</option>)}
+          </select>
+        </label>
+        <button className={dirty ? btnPrimary : btnGhost} disabled={busy || !dirty} onClick={save}>
+          {busy ? 'Saving…' : dirty ? 'Save time' : 'Saved'}
+        </button>
+      </div>
+      <div className="mt-3 rounded-lg border border-bronze-600/15 bg-cream/40 px-3 py-2.5 text-sm">
+        <div className="flex flex-wrap gap-x-6 gap-y-1">
+          <span>🇺🇸 <b className="text-bronze-800">{inZone(at, tz)}</b> <span className="text-[11px] text-ink-700/50">{US_ZONES.find(([z]) => z === tz)?.[1]}</span></span>
+          <span>🇵🇰 <b className="text-bronze-800">{inZone(at, PK_ZONE)}</b> <span className="text-[11px] text-ink-700/50">Pakistan</span></span>
+          <span className="text-ink-700/60">= {String(at.getUTCHours()).padStart(2, '0')}:00 UTC</span>
+        </div>
+        <div className="text-[11px] text-ink-700/50 mt-1.5">
+          Other US zones then: {US_ZONES.filter(([z]) => z !== tz).map(([z, l]) => `${inZone(at, z)} ${l.replace(/^US /, '').replace(/ \(.*\)$/, '')}`).join(' · ')}
+        </div>
+      </div>
     </Card>
   );
 }
