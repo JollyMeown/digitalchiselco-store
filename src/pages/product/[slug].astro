@@ -15,6 +15,14 @@ if (!p) return Astro.rewrite('/404');
 
 const settings = await getSettings();
 const { price, original, percent } = pricing(p.price_usd, settings.discount_percent);
+// Cut Local "Make it real" — gated by growth_settings.marketplace_enabled so it
+// stays hidden from customers until launch.
+let marketplaceOn = false;
+try {
+  const { supabaseAdmin } = await import('../../lib/supabase');
+  const { data: gs } = await supabaseAdmin().from('growth_settings').select('marketplace_enabled').eq('id', 1).maybeSingle();
+  marketplaceOn = !!gs?.marketplace_enabled;
+} catch {}
 const cats = (p.product_categories ?? []).map((pc: any) => pc.categories).filter(Boolean);
 const cat = cats[0];
 const cleanTitle = p.title.split('|')[0].trim();
@@ -193,6 +201,11 @@ const breadcrumbLd = {
         data-wish-id={p.id} data-wish-slug={p.slug} data-wish-title={cleanTitle} data-wish-price={price} data-wish-img={gallery[0] || ''}>
         <span class="wish-icon">🤍</span> Save to favorites
       </button>
+      {marketplaceOn && (
+        <a href={`/make/${p.slug}`} class="mt-2 w-full block text-center border border-bronze-600/50 text-bronze-700 py-2.5 rounded-md text-sm font-medium hover:bg-cream transition">
+          ⚙️ No machine? Get it made by a maker near you →
+        </a>
+      )}
 
       {soldCount >= 5 && (
         <p class="mt-3 text-sm text-green-700 flex items-center gap-1.5">

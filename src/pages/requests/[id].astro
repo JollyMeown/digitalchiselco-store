@@ -1,0 +1,191 @@
+---
+// Buyer's private view of their request: compare quotes (with maker STAR
+// RATINGS for trust), choose a maker, chat, mark received, leave a rating.
+// Auth: ?t=<request token> (emailed to the buyer). Noindex.
+import Shell from '../../layouts/Shell.astro';
+import { supabaseAdmin } from '../../lib/supabase';
+import { verifyRequestToken, signRequestToken } from '../../lib/marketplace-token';
+
+const { id } = Astro.params;
+const t = Astro.url.searchParams.get('t') || '';
+const auth = verifyRequestToken(t);
+const db = supabaseAdmin();
+let req: any = null, quotes: any[] = [], awardedMaker: any = null, review: any = null;
+if (auth && auth.id === id) {
+  const { data } = await db.from('maker_requests').select('*').eq('id', id).eq('buyer_email', auth.email).maybeSingle();
+  req = data;
+  if (req) {
+    const { data: qs } = await db.from('maker_quotes').select('*, makers(id, maker_name, city, region, country, rating_avg, rating_count, jobs_completed, machine_types, portfolio_urls, etsy_url)').eq('request_id', id).order('price');
+    quotes = qs || [];
+    if (req.awarded_maker_id) awardedMaker = quotes.find((q) => q.maker_id === req.awarded_maker_id)?.makers || null;
+    const { data: rv } = await db.from('maker_reviews').select('*').eq('request_id', id).maybeSingle();
+    review = rv;
+  }
+}
+const token = auth ? signRequestToken(id!, auth.email) : '';
+const stars = (n: number) => '★★★★★☆☆☆☆☆'.slice(5 - Math.round(n || 0), 10 - Math.round(n || 0));
+const title = req ? (req.product_title || 'your design').split('|')[0].trim() : '';
+---
+<Shell title={req ? `Your request · ${title}` : 'Request'} noindex={true}>
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 pb-24">
+    {!req ? (
+      <div class="text-center py-24">
+        <h1 class="font-serif text-2xl text-bronze-800">Link expired or invalid</h1>
+        <p class="text-ink-700/70 mt-2">Please open the link from your email again.</p>
+      </div>
+    ) : (
+      <div id="app" data-token={token} data-req={req.id} data-awarded={req.awarded_maker_id || ''} data-status={req.status}>
+        <p class="text-xs tracking-[0.2em] uppercase text-bronze-600 mt-4">Cut Local · your request</p>
+        <div class="flex items-center gap-4 mt-2 mb-6">
+          {req.product_image && <img src={req.product_image} class="w-16 h-16 rounded-lg object-cover border border-black/10" />}
+          <div>
+            <h1 class="font-serif text-2xl text-bronze-800 leading-tight">{title}</h1>
+            <p class="text-sm text-ink-700/70 mt-0.5">
+              {[req.material, req.size, req.finish].filter(Boolean).join(' · ') || 'Any material'}
+              {req.quantity > 1 ? ` · ×${req.quantity}` : ''}
+            </p>
+          </div>
+          <span class="ml-auto text-xs px-2.5 py-1 rounded-full font-medium bg-cream text-bronze-700">{req.status}</span>
+        </div>
+
+        {/* AWARDED / COMPLETED banner */}
+        {req.status !== 'open' && awardedMaker && (
+          <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
+            <div class="text-sm text-green-800">You chose <b>{awardedMaker.maker_name}</b>{req.agreed_price ? ` · $${Number(req.agreed_price).toFixed(2)}` : ''}. Arrange the details and payment in chat below.</div>
+          </div>
+        )}
+
+        {/* QUOTES */}
+        {req.status === 'open' && (
+          <section class="mb-8">
+            <h2 class="font-serif text-xl text-bronze-800 mb-3">{quotes.length ? `${quotes.length} quote${quotes.length > 1 ? 's' : ''}` : 'Waiting for quotes'}</h2>
+            {quotes.length === 0 && <p class="text-sm text-ink-700/60 bg-cream/50 border border-bronze-600/15 rounded-lg p-4">Makers near you have been notified. Quotes usually arrive within a day — we’ll email you, and they’ll appear here.</p>}
+            <div class="space-y-3">
+              {quotes.map((q) => (
+                <div class="border border-black/10 rounded-xl p-4 bg-white">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <div class="font-medium text-ink-900">{q.makers?.maker_name}</div>
+                      <div class="text-sm mt-0.5">
+                        {q.makers?.rating_count > 0
+                          ? <span><span class="text-bronze-600 tracking-wide">{stars(q.makers.rating_avg)}</span> <span class="text-ink-700/60">{Number(q.makers.rating_avg).toFixed(1)} · {q.makers.rating_count} review{q.makers.rating_count > 1 ? 's' : ''} · {q.makers.jobs_completed || 0} jobs</span></span>
+                          : <span class="text-ink-700/50 text-xs">New maker · no reviews yet</span>}
+                      </div>
+                      <div class="text-xs text-ink-700/55 mt-1">{[q.makers?.city, q.makers?.region].filter(Boolean).join(', ')}{q.makers?.etsy_url ? ' · Etsy verified' : ''}</div>
+                      {q.message && <p class="text-sm text-ink-700/80 mt-2">{q.message}</p>}
+                    </div>
+                    <div class="text-right shrink-0">
+                      <div class="font-serif text-2xl text-bronze-800">${Number(q.price).toFixed(2)}</div>
+                      {q.lead_days && <div class="text-xs text-ink-700/60">ready in {q.lead_days} days</div>}
+                    </div>
+                  </div>
+                  {(q.makers?.portfolio_urls || []).length > 0 && (
+                    <div class="flex gap-2 mt-3">{(q.makers.portfolio_urls || []).slice(0, 4).map((u: string) => <img src={u} class="w-14 h-14 rounded object-cover border border-black/10" />)}</div>
+                  )}
+                  <div class="flex gap-2 mt-3">
+                    <button class="choose bg-bronze-600 text-cream text-sm px-4 py-2 rounded-lg hover:bg-bronze-700" data-q={q.id} data-name={q.makers?.maker_name}>Choose this maker</button>
+                    <button class="chatwith border border-bronze-600/40 text-bronze-700 text-sm px-4 py-2 rounded-lg hover:bg-cream" data-maker={q.maker_id} data-name={q.makers?.maker_name}>Ask a question</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* CHAT */}
+        <section id="chat-wrap" class={req.status === 'open' ? 'hidden' : ''}>
+          <h2 class="font-serif text-xl text-bronze-800 mb-2">Chat <span id="chat-with" class="text-sm text-ink-700/60"></span></h2>
+          <div id="msgs" class="border border-black/10 rounded-xl p-3 bg-white h-72 overflow-y-auto space-y-2 text-sm"></div>
+          <div class="flex gap-2 mt-2">
+            <input id="msg" class="flex-1 border border-black/15 rounded-lg px-3 py-2 text-sm" placeholder="Type a message…" />
+            <button id="send" class="bg-bronze-600 text-cream px-4 rounded-lg text-sm">Send</button>
+          </div>
+        </section>
+
+        {/* COMPLETE + REVIEW */}
+        {req.status === 'awarded' && (
+          <section class="mt-6 border-t border-black/10 pt-5">
+            <button id="complete" class="bg-green-700 text-white text-sm px-5 py-2.5 rounded-lg hover:bg-green-800">✓ I received my piece — mark complete</button>
+            <p class="text-xs text-ink-700/50 mt-2">Only mark complete once you have your finished piece in hand.</p>
+          </section>
+        )}
+        {req.status === 'completed' && !review && (
+          <section id="review-box" class="mt-6 border-t border-black/10 pt-5">
+            <h2 class="font-serif text-xl text-bronze-800">Rate {awardedMaker?.maker_name}</h2>
+            <p class="text-sm text-ink-700/60 mb-2">Your star rating helps other buyers trust great makers.</p>
+            <div id="stars" class="text-3xl text-bronze-300 cursor-pointer select-none">★★★★★</div>
+            <textarea id="rc" rows="2" class="w-full border border-black/15 rounded-lg px-3 py-2 text-sm mt-2" placeholder="A line about your experience (optional)"></textarea>
+            <button id="review" class="mt-2 bg-bronze-600 text-cream text-sm px-5 py-2.5 rounded-lg">Submit rating</button>
+          </section>
+        )}
+        {review && (
+          <section class="mt-6 border-t border-black/10 pt-5">
+            <div class="text-sm text-ink-700/70">You rated this maker <span class="text-bronze-600 text-lg align-middle">{stars(review.rating)}</span> — thank you!</div>
+          </section>
+        )}
+      </div>
+    )}
+  </main>
+
+  <script is:inline>
+    (function(){
+      var app=document.getElementById('app'); if(!app) return;
+      var token=app.dataset.token, reqId=app.dataset.req, awarded=app.dataset.awarded, status=app.dataset.status;
+      var api=function(op,extra){ return fetch('/api/mp/action',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({op:op,token:token},extra))}).then(function(r){return r.json();}); };
+
+      // choose a maker
+      document.querySelectorAll('.choose').forEach(function(b){ b.addEventListener('click', async function(){
+        if(!confirm('Choose '+b.dataset.name+' for this job?')) return;
+        b.disabled=true; var j=await api('award',{quote_id:b.dataset.q});
+        if(j.ok) location.reload(); else { alert(j.error||'Failed'); b.disabled=false; }
+      });});
+
+      // chat
+      var activeMaker = awarded || null, lastId=0, poll=null;
+      var chatWrap=document.getElementById('chat-wrap'), msgs=document.getElementById('msgs'), chatWith=document.getElementById('chat-with');
+      function openChat(makerId,name){
+        activeMaker=makerId; lastId=0; msgs.innerHTML=''; chatWith.textContent=name?('with '+name):'';
+        chatWrap.classList.remove('hidden'); chatWrap.scrollIntoView({behavior:'smooth'});
+        loadMsgs(); if(poll) clearInterval(poll); poll=setInterval(loadMsgs, 5000);
+      }
+      document.querySelectorAll('.chatwith').forEach(function(b){ b.addEventListener('click',function(){ openChat(b.dataset.maker,b.dataset.name); });});
+      async function loadMsgs(){
+        if(!activeMaker) return;
+        var r=await fetch('/api/mp/thread?t='+encodeURIComponent(token)+'&request_id='+reqId+'&maker_id='+activeMaker+'&since='+lastId);
+        var j=await r.json(); if(!j.ok) return;
+        j.messages.forEach(function(m){ lastId=m.id; addBubble(m); });
+        if(j.messages.length) msgs.scrollTop=msgs.scrollHeight;
+      }
+      function addBubble(m){
+        var d=document.createElement('div'); var mine=m.sender==='buyer';
+        d.style.cssText='max-width:80%;padding:8px 11px;border-radius:12px;'+(mine?'margin-left:auto;background:#854F0B;color:#fff;border-bottom-right-radius:3px;':'background:#f3ead9;color:#2b1d10;border-bottom-left-radius:3px;');
+        d.textContent=m.body||''; msgs.appendChild(d);
+        (m.attachments||[]).forEach(function(u){ var im=document.createElement('img'); im.src=u; im.style.cssText='max-width:160px;border-radius:8px;margin-top:4px;'+(mine?'margin-left:auto;display:block;':''); msgs.appendChild(im); });
+      }
+      var sendBtn=document.getElementById('send'), msgIn=document.getElementById('msg');
+      if(sendBtn){ sendBtn.addEventListener('click', send); msgIn.addEventListener('keydown',function(e){ if(e.key==='Enter') send(); }); }
+      async function send(){
+        var body=msgIn.value.trim(); if(!body||!activeMaker) return; msgIn.value='';
+        await api('message',{request_id:reqId,maker_id:activeMaker,body:body}); loadMsgs();
+      }
+      if(awarded){ openChat(awarded, ''); }
+
+      // complete
+      var comp=document.getElementById('complete');
+      if(comp) comp.addEventListener('click', async function(){ if(!confirm('Confirm you received your finished piece?')) return; var j=await api('complete',{}); if(j.ok) location.reload(); else alert(j.error||'Failed'); });
+
+      // review stars
+      var starEl=document.getElementById('stars'), picked=0;
+      if(starEl){
+        starEl.addEventListener('mousemove',function(e){ var x=e.offsetX/starEl.offsetWidth; paint(Math.ceil(x*5)); });
+        starEl.addEventListener('mouseleave',function(){ paint(picked); });
+        starEl.addEventListener('click',function(e){ var x=e.offsetX/starEl.offsetWidth; picked=Math.max(1,Math.ceil(x*5)); paint(picked); });
+        function paint(n){ starEl.innerHTML=''; for(var i=1;i<=5;i++){ var s=document.createElement('span'); s.textContent='★'; s.style.color=i<=n?'#854F0B':'#e6d5b8'; starEl.appendChild(s); } }
+        document.getElementById('review').addEventListener('click', async function(){
+          if(!picked){ alert('Pick a star rating first.'); return; }
+          var j=await api('review',{rating:picked,comment:document.getElementById('rc').value}); if(j.ok) location.reload(); else alert(j.error||'Failed');
+        });
+      }
+    })();
+  </script>
+</Shell>

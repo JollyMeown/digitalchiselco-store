@@ -591,7 +591,7 @@ export function portalGuideEmail(): { subject: string; html: string; text: strin
 export function makerRecruitEmail(opts: { email: string; applyUrl?: string } = { email: '' }): { subject: string; html: string; text: string } {
   const base = 'https://digitalchiselco.com/become-a-maker';
   const url = (opts.applyUrl || base) + (opts.email ? (`${(opts.applyUrl || base).includes('?') ? '&' : '?'}email=${encodeURIComponent(opts.email)}`) : '');
-  const subject = 'Own a CNC or 3D printer? Get paid to build our designs';
+  const subject = 'Join Cut Local: Get CNC & 3D Printing RFQs';
   const html = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#2a241d;">
 <p>Hi,</p>
 <p>Quick question: <strong>do you own a CNC router, laser, or 3D printer?</strong></p>

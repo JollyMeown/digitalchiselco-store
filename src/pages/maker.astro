@@ -1,0 +1,191 @@
+---
+// Cut Local maker dashboard. Without a token: a sign-in form (emails a link to
+// approved makers). With ?t=<maker token>: nearby open jobs to quote on, active
+// jobs with buyer chat, credits and rating. Noindex.
+import Shell from '../layouts/Shell.astro';
+import { supabaseAdmin } from '../lib/supabase';
+import { verifyMakerToken, signMakerToken } from '../lib/marketplace-token';
+
+const t = Astro.url.searchParams.get('t') || '';
+const auth = verifyMakerToken(t);
+const db = supabaseAdmin();
+let maker: any = null, openJobs: any[] = [], myQuoted: Set<string> = new Set(), activeJobs: any[] = [];
+if (auth) {
+  const { data } = await db.from('makers').select('*').eq('email', auth.email).eq('status', 'approved').maybeSingle();
+  maker = data;
+  if (maker) {
+    const { data: open } = await db.from('maker_requests').select('*').eq('status', 'open').order('created_at', { ascending: false }).limit(60);
+    const mc = (maker.country || '').toLowerCase();
+    openJobs = (open || []).filter((r: any) => !mc || (r.country || '').toLowerCase() === mc || maker.deliver_intl).slice(0, 20);
+    const { data: mine } = await db.from('maker_quotes').select('request_id').eq('maker_id', maker.id);
+    myQuoted = new Set((mine || []).map((x: any) => x.request_id));
+    const { data: active } = await db.from('maker_requests').select('*').eq('awarded_maker_id', maker.id).in('status', ['awarded', 'completed']).order('awarded_at', { ascending: false }).limit(20);
+    activeJobs = active || [];
+  }
+}
+const token = maker ? signMakerToken(maker.email) : '';
+const stars = (n: number) => '★★★★★☆☆☆☆☆'.slice(5 - Math.round(n || 0), 10 - Math.round(n || 0));
+const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
+---
+<Shell title="Cut Local · Maker dashboard" noindex={true}>
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 pb-24">
+    {!maker ? (
+      <div class="max-w-md mx-auto py-16 text-center">
+        <p class="text-xs tracking-[0.2em] uppercase text-bronze-600 mb-2">Cut Local · Makers</p>
+        <h1 class="font-serif text-3xl text-bronze-800">Maker sign-in</h1>
+        <p class="text-ink-700/70 mt-2 text-sm">Approved makers: enter your email and we’ll send a sign-in link.</p>
+        <form id="login" class="mt-5 flex gap-2">
+          <input required type="email" name="email" class="flex-1 border border-bronze-600/30 rounded-lg px-3 py-2.5" placeholder="you@email.com" />
+          <button class="bg-bronze-600 text-cream px-5 rounded-lg">Send link</button>
+        </form>
+        <p id="lmsg" class="text-sm text-green-700 mt-3 hidden">Check your email for the sign-in link.</p>
+        <p class="text-xs text-ink-700/50 mt-6">Not a maker yet? <a href="/become-a-maker" class="text-bronze-600 underline">Apply to join →</a></p>
+      </div>
+    ) : (
+      <div id="app" data-token={token}>
+        <div class="flex items-center justify-between gap-3 pt-4 mb-5">
+          <div>
+            <p class="text-xs tracking-[0.2em] uppercase text-bronze-600">Cut Local · Maker</p>
+            <h1 class="font-serif text-2xl text-bronze-800 leading-tight">{maker.maker_name}</h1>
+          </div>
+          <div class="text-right text-sm">
+            <div><b id="credits" class="text-bronze-800">{maker.credits}</b> <span class="text-ink-700/60">credits</span></div>
+            <div class="text-ink-700/70">{maker.rating_count > 0 ? <span><span class="text-bronze-600">{stars(maker.rating_avg)}</span> {Number(maker.rating_avg).toFixed(1)} ({maker.rating_count})</span> : <span class="text-ink-700/45 text-xs">no reviews yet</span>}</div>
+          </div>
+        </div>
+
+        {/* ACTIVE JOBS */}
+        {activeJobs.length > 0 && (
+          <section class="mb-8">
+            <h2 class="font-serif text-xl text-bronze-800 mb-3">Your active jobs</h2>
+            <div class="space-y-3">
+              {activeJobs.map((r) => (
+                <div class="border border-green-200 bg-green-50/50 rounded-xl p-4" data-active-req={r.id}>
+                  <div class="flex justify-between gap-3">
+                    <div>
+                      <div class="font-medium text-ink-900">{jtitle(r)} <span class="text-xs px-2 py-0.5 rounded-full bg-white text-green-700 ml-1">{r.status}</span></div>
+                      <div class="text-xs text-ink-700/60 mt-0.5">{[r.material, r.size].filter(Boolean).join(' · ')} · {[r.city, r.region].filter(Boolean).join(', ')} · buyer: {r.buyer_name || r.buyer_email}</div>
+                    </div>
+                    <div class="text-right"><div class="font-serif text-xl text-bronze-800">${Number(r.agreed_price || 0).toFixed(2)}</div></div>
+                  </div>
+                  <button class="openchat mt-3 text-sm border border-bronze-600/40 text-bronze-700 px-4 py-1.5 rounded-lg hover:bg-cream" data-req={r.id}>Open chat &amp; post progress</button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* CHAT PANEL (hidden until opened) */}
+        <section id="chat-wrap" class="hidden mb-8">
+          <h2 class="font-serif text-xl text-bronze-800 mb-2">Chat with buyer <span id="chat-job" class="text-sm text-ink-700/60"></span></h2>
+          <div id="msgs" class="border border-black/10 rounded-xl p-3 bg-white h-64 overflow-y-auto space-y-2 text-sm"></div>
+          <div class="flex gap-2 mt-2">
+            <label class="border border-bronze-600/40 rounded-lg px-3 py-2 text-sm text-bronze-700 cursor-pointer">📷<input type="file" id="photo" accept="image/*" class="hidden" /></label>
+            <input id="msg" class="flex-1 border border-black/15 rounded-lg px-3 py-2 text-sm" placeholder="Message or post a progress photo…" />
+            <button id="send" class="bg-bronze-600 text-cream px-4 rounded-lg text-sm">Send</button>
+          </div>
+        </section>
+
+        {/* NEARBY OPEN JOBS */}
+        <section>
+          <h2 class="font-serif text-xl text-bronze-800 mb-3">Jobs near you <span class="text-sm text-ink-700/50">({openJobs.length})</span></h2>
+          {openJobs.length === 0 && <p class="text-sm text-ink-700/60 bg-cream/50 rounded-lg p-4">No open jobs right now. We’ll email you when a buyer near you posts one.</p>}
+          <div class="space-y-3">
+            {openJobs.map((r) => (
+              <div class="border border-black/10 rounded-xl p-4 bg-white" data-job={r.id}>
+                <div class="flex justify-between gap-3">
+                  <div>
+                    <div class="font-medium text-ink-900">{jtitle(r)}</div>
+                    <div class="text-xs text-ink-700/60 mt-0.5">{[r.material, r.size, r.finish].filter(Boolean).join(' · ') || 'any material'} · qty {r.quantity}</div>
+                    <div class="text-xs text-ink-700/55 mt-0.5">{[r.city, r.region, r.country].filter(Boolean).join(', ')} · by {r.deadline || 'flexible'} · budget {r.budget || 'open'} · {r.delivery}</div>
+                    {r.notes && <p class="text-sm text-ink-700/75 mt-1.5">{r.notes}</p>}
+                  </div>
+                </div>
+                {myQuoted.has(r.id)
+                  ? <div class="mt-2 text-sm text-green-700">✓ You’ve quoted this job</div>
+                  : (
+                    <div class="quoteform mt-3 flex flex-wrap gap-2 items-end" data-req={r.id}>
+                      <label class="text-xs text-ink-700/60">Price $<input type="number" class="q-price w-24 border border-black/15 rounded px-2 py-1.5 ml-1" placeholder="165" /></label>
+                      <label class="text-xs text-ink-700/60">Days<input type="number" class="q-days w-16 border border-black/15 rounded px-2 py-1.5 ml-1" placeholder="18" /></label>
+                      <input class="q-msg flex-1 min-w-[160px] border border-black/15 rounded px-2 py-1.5 text-sm" placeholder="Note to buyer (material, etc.)" />
+                      <button class="q-send bg-bronze-600 text-cream text-sm px-4 py-1.5 rounded-lg">Send quote · 1 credit</button>
+                    </div>
+                  )}
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    )}
+  </main>
+
+  <script is:inline>
+    (function(){
+      var login=document.getElementById('login');
+      if(login){ login.addEventListener('submit', async function(e){ e.preventDefault();
+        var email=login.querySelector('[name=email]').value;
+        await fetch('/api/mp/maker-login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:email})});
+        document.getElementById('lmsg').classList.remove('hidden'); login.classList.add('hidden');
+      }); return; }
+
+      var app=document.getElementById('app'); if(!app) return;
+      var token=app.dataset.token;
+      var api=function(op,extra){ return fetch('/api/mp/action',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({op:op,token:token},extra))}).then(function(r){return r.json();}); };
+
+      // submit quotes
+      document.querySelectorAll('.quoteform').forEach(function(f){
+        f.querySelector('.q-send').addEventListener('click', async function(){
+          var price=f.querySelector('.q-price').value, days=f.querySelector('.q-days').value, msg=f.querySelector('.q-msg').value;
+          if(!(Number(price)>0)){ alert('Enter a price.'); return; }
+          var b=f.querySelector('.q-send'); b.disabled=true; b.textContent='Sending…';
+          var j=await api('quote',{request_id:f.dataset.req,price:price,lead_days:days,message:msg});
+          if(j.ok){ f.innerHTML='<div class="text-sm text-green-700">✓ Quote sent</div>'; if(j.credits!=null) document.getElementById('credits').textContent=j.credits; }
+          else if(j.error==='no_credits'){ alert('You’re out of quote credits. (Buying credits arrives with launch — for testing, ask the admin to grant some.)'); b.disabled=false; b.textContent='Send quote · 1 credit'; }
+          else { alert(j.error||'Failed'); b.disabled=false; b.textContent='Send quote · 1 credit'; }
+        });
+      });
+
+      // chat
+      var activeReq=null, activeMaker=null, lastId=0, poll=null;
+      var chatWrap=document.getElementById('chat-wrap'), msgs=document.getElementById('msgs'), chatJob=document.getElementById('chat-job');
+      // maker_id: read from token isn't available client-side; the server resolves it from the token,
+      // but thread GET needs maker_id. We fetch it via a lightweight call: reuse the first active req's awarded maker = us.
+      var MY_MAKER_ID=null;
+      document.querySelectorAll('.openchat').forEach(function(b){ b.addEventListener('click', function(){ openChat(b.dataset.req); }); });
+      async function ensureMakerId(){
+        if(MY_MAKER_ID) return MY_MAKER_ID;
+        // ask the server who we are via a no-op thread call that returns our messages once we pass maker_id;
+        // instead, derive from active job cards (awarded_maker_id = us) is not exposed. Use a tiny endpoint:
+        var r=await fetch('/api/mp/whoami?t='+encodeURIComponent(token)); var j=await r.json(); MY_MAKER_ID=j.maker_id; return MY_MAKER_ID;
+      }
+      async function openChat(reqId){
+        activeReq=reqId; activeMaker=await ensureMakerId(); lastId=0; msgs.innerHTML='';
+        chatJob.textContent=''; chatWrap.classList.remove('hidden'); chatWrap.scrollIntoView({behavior:'smooth'});
+        loadMsgs(); if(poll) clearInterval(poll); poll=setInterval(loadMsgs,5000);
+      }
+      async function loadMsgs(){
+        if(!activeReq||!activeMaker) return;
+        var r=await fetch('/api/mp/thread?t='+encodeURIComponent(token)+'&request_id='+activeReq+'&maker_id='+activeMaker+'&since='+lastId);
+        var j=await r.json(); if(!j.ok) return;
+        j.messages.forEach(function(m){ lastId=m.id; addBubble(m); });
+        if(j.messages.length) msgs.scrollTop=msgs.scrollHeight;
+      }
+      function addBubble(m){
+        var d=document.createElement('div'); var mine=m.sender==='maker';
+        d.style.cssText='max-width:80%;padding:8px 11px;border-radius:12px;'+(mine?'margin-left:auto;background:#854F0B;color:#fff;':'background:#f3ead9;color:#2b1d10;');
+        d.textContent=m.body||''; if(m.body) msgs.appendChild(d);
+        (m.attachments||[]).forEach(function(u){ var im=document.createElement('img'); im.src=u; im.style.cssText='max-width:170px;border-radius:8px;margin-top:4px;'+(mine?'margin-left:auto;display:block;':''); msgs.appendChild(im); });
+      }
+      document.getElementById('send').addEventListener('click', send);
+      document.getElementById('msg').addEventListener('keydown', function(e){ if(e.key==='Enter') send(); });
+      async function send(){ var i=document.getElementById('msg'); var body=i.value.trim(); if(!body||!activeReq) return; i.value=''; await api('message',{request_id:activeReq,maker_id:activeMaker,body:body}); loadMsgs(); }
+      // progress photo
+      document.getElementById('photo').addEventListener('change', async function(e){
+        var f=e.target.files[0]; if(!f||!activeReq) return; var fd=new FormData(); fd.append('file',f);
+        var r=await fetch('/api/maker-upload',{method:'POST',body:fd}); var j=await r.json();
+        if(j.url){ await api('message',{request_id:activeReq,maker_id:activeMaker,body:'',attachments:[j.url]}); loadMsgs(); }
+        e.target.value='';
+      });
+    })();
+  </script>
+</Shell>

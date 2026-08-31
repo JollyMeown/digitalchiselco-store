@@ -1,0 +1,115 @@
+---
+// Buyer RFQ form — "Make it real" for one design. Reachable by direct URL for
+// testing; the button that links here on product pages is gated by
+// growth_settings.marketplace_enabled until launch.
+import Shell from '../../layouts/Shell.astro';
+import { getProductBySlug } from '../../lib/queries';
+const { slug } = Astro.params;
+const p = await getProductBySlug(slug!);
+if (!p) return Astro.redirect('/catalog');
+const title = p.title.split('|')[0].trim();
+const image = (Array.isArray(p.gallery) && p.gallery[0]) || p.image_url || '';
+---
+<Shell title={`Get "${title}" made · Cut Local`} description="Request a local maker to turn this design into a real piece." noindex={true}>
+  <main class="max-w-2xl mx-auto px-4 sm:px-6 pb-24">
+    <a href={`/product/${p.slug}`} class="text-sm text-bronze-600 hover:underline">← back to the design</a>
+    <div class="flex items-center gap-4 mt-3 mb-6">
+      {image && <img src={image} alt={title} class="w-20 h-20 rounded-lg object-cover border border-black/10" />}
+      <div>
+        <p class="text-xs tracking-[0.2em] uppercase text-bronze-600">Cut Local · request</p>
+        <h1 class="font-serif text-2xl sm:text-3xl text-bronze-800 leading-tight">Get this made</h1>
+        <p class="text-sm text-ink-700/70 mt-1">{title}</p>
+      </div>
+    </div>
+
+    <form id="rfq" class="space-y-6"
+      data-slug={p.slug} data-pid={p.id} data-title={title} data-image={image}>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <label class="block"><span class="lbl">Material</span>
+          <select name="material" class="fld"><option value="">No preference</option>
+            <option>Walnut</option><option>Oak</option><option>Maple</option><option>Pine</option><option>MDF</option><option>Plywood</option><option>Acrylic</option><option>Aluminum</option></select></label>
+        <label class="block"><span class="lbl">Finished size</span><input name="size" class="fld" placeholder='e.g. 24 × 18 in' /></label>
+        <label class="block"><span class="lbl">Finish</span>
+          <select name="finish" class="fld"><option value="">No preference</option><option>Sanded raw</option><option>Oiled</option><option>Stained</option><option>Painted</option><option>Epoxy</option></select></label>
+        <label class="block"><span class="lbl">Quantity</span><input name="quantity" type="number" min="1" value="1" class="fld" /></label>
+        <label class="block"><span class="lbl">Need it by</span>
+          <select name="deadline" class="fld"><option value="">Flexible</option><option>Within 1 week</option><option>In 2–3 weeks</option><option>In 3–4 weeks</option><option>In 1–2 months</option></select></label>
+        <label class="block"><span class="lbl">Budget (optional)</span><input name="budget" class="fld" placeholder="$120 – $200" /></label>
+      </div>
+
+      <div>
+        <span class="lbl">Delivery</span>
+        <div class="chipset" data-name="delivery" data-single="1">
+          <button type="button" data-v="pickup">Local pickup near me</button>
+          <button type="button" data-v="ship">Ship to me</button>
+          <button type="button" data-v="either" aria-pressed="true">Either is fine</button>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <label class="block"><span class="lbl">Your email *</span><input required type="email" name="buyer_email" id="bemail" class="fld" placeholder="you@email.com" /></label>
+        <label class="block"><span class="lbl">Your name</span><input name="buyer_name" class="fld" placeholder="optional" /></label>
+        <label class="block"><span class="lbl">Country</span><input name="country" class="fld" placeholder="United States" /></label>
+        <label class="block"><span class="lbl">City</span><input name="city" class="fld" placeholder="Dallas" /></label>
+        <label class="block"><span class="lbl">State / region</span><input name="region" class="fld" placeholder="TX" /></label>
+        <label class="block"><span class="lbl">ZIP / postal <span class="text-ink-700/40">(finds makers near you)</span></span><input name="postal" class="fld" placeholder="75201" /></label>
+      </div>
+      <label class="block"><span class="lbl">Notes to makers</span><textarea name="notes" rows="3" class="fld" placeholder="Anything that helps — a gift, a wood tone, a deadline reason…"></textarea></label>
+
+      <div id="err" class="hidden text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3"></div>
+      <button id="go" type="submit" class="w-full bg-bronze-600 text-cream font-medium rounded-xl py-4 hover:bg-bronze-700 transition disabled:opacity-50">Get free quotes from makers</button>
+      <p class="text-xs text-center text-ink-700/50">Posting is free. You only ever pay the maker you choose — never us.</p>
+    </form>
+
+    <div id="done" class="hidden text-center py-14">
+      <div class="text-5xl mb-3">🔨</div>
+      <h2 class="font-serif text-3xl text-bronze-800">Request sent!</h2>
+      <p id="done-msg" class="mt-3 text-ink-700/75 max-w-md mx-auto"></p>
+      <a id="done-link" href="#" class="inline-block mt-5 bg-bronze-600 text-cream px-6 py-3 rounded-lg">See your request &amp; quotes →</a>
+    </div>
+  </main>
+
+  <style>
+    .lbl{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#6f6151;margin-bottom:5px}
+    .fld{width:100%;border:1px solid rgba(133,79,11,.25);border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;color:#2b1d10}
+    .fld:focus{outline:none;border-color:#854F0B}
+    .chipset{display:flex;flex-wrap:wrap;gap:8px}
+    .chipset button{font-size:13px;padding:8px 14px;border-radius:100px;border:1px solid rgba(133,79,11,.25);background:#fff;color:#3a2a1a;cursor:pointer}
+    .chipset button[aria-pressed="true"]{background:#854F0B;color:#fff;border-color:#854F0B}
+  </style>
+
+  <script is:inline>
+    (function(){
+      try{ var e=localStorage.getItem('buyer_email')||localStorage.getItem('dcc_email'); if(e) document.getElementById('bemail').value=e; }catch(_){}
+      var delivery='either';
+      document.querySelectorAll('.chipset[data-single]').forEach(function(cs){
+        cs.querySelectorAll('button').forEach(function(b){ b.addEventListener('click',function(){
+          cs.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed','false');});
+          b.setAttribute('aria-pressed','true'); delivery=b.dataset.v;
+        });});
+      });
+      var form=document.getElementById('rfq');
+      form.addEventListener('submit', async function(ev){
+        ev.preventDefault();
+        var err=document.getElementById('err'); err.classList.add('hidden');
+        var fd=new FormData(form), body={};
+        fd.forEach(function(v,k){ body[k]=v; });
+        body.delivery=delivery;
+        body.product_slug=form.dataset.slug; body.product_id=form.dataset.pid; body.product_title=form.dataset.title; body.product_image=form.dataset.image;
+        try{ localStorage.setItem('buyer_email', body.buyer_email||''); }catch(_){}
+        var go=document.getElementById('go'); go.disabled=true; go.textContent='Sending…';
+        try{
+          var r=await fetch('/api/mp/rfq-create',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+          var j=await r.json();
+          if(j.ok){
+            form.classList.add('hidden');
+            document.getElementById('done-msg').textContent = j.matched>0 ? ('We notified '+j.matched+' maker'+(j.matched>1?'s':'')+' who can make this. Quotes will arrive by email — and here.') : 'Your request is posted. We’ll alert makers as they join your area.';
+            document.getElementById('done-link').href=j.link;
+            document.getElementById('done').classList.remove('hidden');
+            window.scrollTo({top:0,behavior:'smooth'});
+          } else { err.textContent=j.error||'Something went wrong.'; err.classList.remove('hidden'); go.disabled=false; go.textContent='Get free quotes from makers'; }
+        }catch(e2){ err.textContent='Network error — please try again.'; err.classList.remove('hidden'); go.disabled=false; go.textContent='Get free quotes from makers'; }
+      });
+    })();
+  </script>
+</Shell>
