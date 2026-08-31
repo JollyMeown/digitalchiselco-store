@@ -16,17 +16,22 @@ try {
 } catch {}
 ---
 {on && (
-  <a href="/makers" class="cls-wrap group block relative overflow-hidden rounded-2xl border border-white/10 shadow-md my-6" aria-label="Cut Local: get any design made by a maker near you">
+  <div class="cls-wrap relative overflow-hidden rounded-2xl border border-white/10 shadow-md my-6">
     <div class="cls-glow" aria-hidden="true"></div>
-    <div class="relative flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3.5 flex-wrap sm:flex-nowrap">
+    <div class="relative flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3.5 flex-wrap">
       <span class="cls-dot flex-shrink-0" aria-hidden="true"></span>
       <span class="text-[13px] sm:text-sm text-white font-semibold whitespace-nowrap">New · Cut Local</span>
       <span class="text-[12.5px] sm:text-[13px] text-cream/75 leading-snug flex-1 min-w-[180px]">
         Don’t own a machine? Any design here can be <b class="text-white">built by a vetted maker near you</b>. You compare quotes, they carve it.
       </span>
       {makers > 0 && <span class="hidden md:inline text-[12px] text-[#9fe0d9] whitespace-nowrap">{makers} maker{makers === 1 ? '' : 's'} ready</span>}
-      <span class="cls-cta flex-shrink-0 inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#1c4a48] bg-white rounded-lg px-3.5 py-2 group-hover:shadow transition">
-        See makers <span class="group-hover:translate-x-0.5 transition-transform">→</span>
+      <span class="flex items-center gap-2 flex-shrink-0">
+        <a href="/makers" class="cls-cta group inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#1c4a48] bg-white rounded-lg px-3.5 py-2 hover:shadow transition">
+          See makers <span class="group-hover:translate-x-0.5 transition-transform">→</span>
+        </a>
+        <a href="/become-a-maker" class="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-cream border border-cream/40 rounded-lg px-3.5 py-2 hover:bg-white/10 transition whitespace-nowrap" title="Own a CNC, laser or 3D printer? Get paid to build for local customers">
+          🛠️ Own a machine? Get paid to build
+        </a>
       </span>
     </div>
     <style>
@@ -40,5 +45,5 @@ try {
       @keyframes clsPing{0%{box-shadow:0 0 0 0 rgba(57,217,138,.5)}70%{box-shadow:0 0 0 8px rgba(57,217,138,0)}100%{box-shadow:0 0 0 0 rgba(57,217,138,0)}}
       @media (prefers-reduced-motion:reduce){.cls-glow,.cls-dot{animation:none}}
     </style>
-  </a>
+  </div>
 )}
