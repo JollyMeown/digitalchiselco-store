@@ -179,10 +179,42 @@ export default function AdminApp() {
             <h1 className="font-serif text-2xl text-ink-800">{TABS.find((t) => t.key === tab)?.label}</h1>
             <a href="/" className="text-sm text-bronze-600 hover:underline">View storefront ↗</a>
           </div>
+          <PendingModerationBanner goProducts={() => { try { sessionStorage.setItem('products_filter', 'pending'); } catch {} setTab('products'); }} />
           <Active />
         </div>
       </main>
       <OrderSoundListener />
+    </div>
+  );
+}
+
+// 🟠 items uploaded from OTHER shops' BRS studios await the admin's moderation —
+// shown on every admin page while any are pending, refreshed each minute.
+function PendingModerationBanner({ goProducts }: { goProducts: () => void }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const { count } = await supabase.from('products')
+          .select('id', { count: 'exact', head: true }).eq('pending_review', true);
+        if (alive) setN(count || 0);
+      } catch {}
+    };
+    load();
+    const t = setInterval(load, 60000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  if (!n) return null;
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+      <span className="text-lg">🟠</span>
+      <span className="flex-1 min-w-[220px]">
+        <b>{n} new item{n === 1 ? '' : 's'}</b> uploaded from your shops await moderation — review each one, assign the right category &amp; price, then approve.
+      </span>
+      <button onClick={goProducts} className="rounded bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700">
+        Review now →
+      </button>
     </div>
   );
 }

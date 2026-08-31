@@ -20,7 +20,11 @@ export default function Products() {
   const [cats, setCats] = useState<Cat[]>([]);
   const [q, setQ] = useState('');
   const [catFilter, setCatFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>(() => {
+    // the 🟠 moderation banner's "Review now" jumps here pre-filtered to pending
+    try { if (sessionStorage.getItem('products_filter') === 'pending') { sessionStorage.removeItem('products_filter'); return 'pending'; } } catch {}
+    return 'all';
+  });
   const [bestsellerOnly, setBestsellerOnly] = useState(false);
   // "Newly added" filter — show only products created within the chosen window,
   // sorted newest-first, with their added date visible.
@@ -53,7 +57,7 @@ export default function Products() {
   async function load() {
     const myReq = ++reqIdRef.current;
     setLoading(true);
-    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,is_latest_pick,created_at,product_downloads(id,verified_at,audit_status)';
+    const baseSelect = 'id,title,slug,price_usd,image_url,link_status,active,is_bundle,is_bestseller,is_latest_pick,pending_review,submitted_by,created_at,product_downloads(id,verified_at,audit_status)';
     function buildQb() {
       let qb = catFilter
         ? supabase.from('products')
@@ -67,6 +71,7 @@ export default function Products() {
       if (search) qb = qb.ilike('title', `%${search}%`);
       if (statusFilter === 'active') qb = qb.eq('active', true);
       if (statusFilter === 'inactive') qb = qb.eq('active', false);
+      if (statusFilter === 'pending') qb = qb.eq('pending_review', true);
       if (bestsellerOnly) qb = qb.eq('is_bestseller', true);
       if (newOnly) {
         if (newRange === 'custom') {
@@ -99,6 +104,15 @@ export default function Products() {
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) return alert('Delete failed: ' + error.message);
     setRows((r) => r.filter((x) => x.id !== id));
+  }
+
+  // 🟠 moderation: publish a pending item live (after the admin checked
+  // category/price via Edit). Clears the pending flag + activates it.
+  async function approve(id: string) {
+    if (!confirm('Publish this item live on the storefront? Make sure its category and price are right (Edit) first.')) return;
+    const { error } = await supabase.from('products').update({ pending_review: false, active: true }).eq('id', id);
+    if (error) return alert('Approve failed: ' + error.message);
+    setRows((r) => r.map((x) => (x.id === id ? { ...x, active: true, pending_review: false } as any : x)));
   }
 
   // Inline flag toggles for the Best seller / Latest pick homepage rows.
@@ -144,6 +158,7 @@ export default function Products() {
             <option value="all">All status</option>
             <option value="active">Active only</option>
             <option value="inactive">Inactive only</option>
+            <option value="pending">🟠 Pending moderation</option>
           </select>
           <select value={badgeFilter} onChange={(e) => setBadgeFilter(e.target.value as any)} className={inputCls + ' max-w-xs'} title="Filter by download-link verification badge">
             <option value="all">All badges</option>
@@ -204,6 +219,9 @@ export default function Products() {
                   <td className="p-2">
                     {(r as any).is_bestseller && <span className="text-yellow-500 mr-1" title="Best seller">★</span>}
                     <a href={`/product/${r.slug}`} target="_blank" className="text-ink-800 hover:text-bronze-600">{r.title.slice(0, 60)}</a>
+                    {(r as any).pending_review && (
+                      <span className="ml-2 text-[10px] bg-amber-100 text-amber-800 border border-amber-400 rounded px-1.5 py-0.5 whitespace-nowrap" title="Uploaded from another shop's BRS — review, set category & price, then approve">🟠 pending{(r as any).submitted_by ? ' · ' + (r as any).submitted_by : ''}</span>
+                    )}
                     {newOnly && (r as any).created_at && (
                       <span className="ml-2 text-[10px] bg-cream text-bronze-700 border border-bronze-600/20 rounded px-1.5 py-0.5 whitespace-nowrap">added {String((r as any).created_at).slice(0, 10)}</span>
                     )}
@@ -228,6 +246,9 @@ export default function Products() {
                   </td>
                   <td className="p-2">{r.active ? '✓' : '—'}</td>
                   <td className="p-2 text-right space-x-1">
+                    {(r as any).pending_review && (
+                      <button className="text-xs rounded bg-green-600 text-white px-2 py-1 hover:bg-green-700" title="Publish this item live (clears moderation)" onClick={() => approve(r.id)}>✅ Approve</button>
+                    )}
                     <button className={btnGhost} onClick={() => setEditing(r)}>Edit</button>
                     <button className={btnDanger} onClick={() => remove(r.id)}>Delete</button>
                   </td>
@@ -352,6 +373,8 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
       price_usd: Number(f.price_usd) || 0, image_url: f.image_url || null,
       gallery, is_bundle: !!f.is_bundle, is_bestseller: !!f.is_bestseller, is_latest_pick: !!f.is_latest_pick, is_customizable: !!f.is_customizable, active: !!f.active,
       link_status: f.link_status, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
+      // activating a moderated item from the editor clears its pending flag
+      ...(f.active ? { pending_review: false } : {}),
     };
     let id = existing?.id;
     if (existing) {
