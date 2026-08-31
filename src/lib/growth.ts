@@ -47,7 +47,7 @@ const outOfTime = () => Date.now() - RUN_STARTED_AT.t > timeBudgetMs();
 // daily quota is exhausted they are skipped with a visible 'deferred' marker —
 // no doomed API calls, no wasted seconds, and tomorrow they run first thing.
 // (Non-email steps like fx / bundle-of-week / send-time learning still run.)
-const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits']);
+const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits', 'makerRecruitDrip']);
 async function step(stats: Record<string, any>, key: string, fn: () => Promise<void>) {
   if (outOfTime()) { stats[key] = 'skipped: time budget (runs next time)'; return; }
   if (EMAIL_STEPS.has(key) && isQuotaExhausted()) { stats[key] = 'deferred: Resend daily quota reached (runs tomorrow)'; return; }
@@ -279,6 +279,52 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     }
     stats.weekly = s;
   });
+
+  // ── Maker-recruit drip: at least 20 invites/day to grow the maker side ─
+  // Owner directive (2026-09-01): every day invite at least 20 subscribers
+  // who have not yet been invited to become a maker; send more when the
+  // email budget allows. Runs AFTER the weekly digest (which has priority)
+  // but BEFORE lower-value marketing, keeping ~40 budget for drips/carts.
+  stats.makerRecruitDrip = 'off';
+  if (g.maker_recruit_drip_enabled) {
+    await step(stats, 'makerRecruitDrip', async () => {
+      const { marketingBudgetRemaining } = await import('./resend');
+      const { makerRecruitEmail } = await import('./marketing-emails');
+      const budget = await marketingBudgetRemaining();
+      // target: at least 20; above that, use surplus budget but leave ~40
+      // for the remaining marketing steps.
+      const target = budget <= 20 ? budget : Math.max(20, budget - 40);
+      if (target <= 0) { stats.makerRecruitDrip = 'deferred: no budget today'; return; }
+      // subscribers not yet invited and not unsubscribed
+      const { data: invited } = await db.from('maker_invites').select('email').limit(20000);
+      const invitedSet = new Set((invited || []).map((r: any) => String(r.email).toLowerCase()));
+      const pool: string[] = [];
+      for (let from = 0; from < 20000 && pool.length < target + 50; from += 1000) {
+        const { data: subs } = await db.from('subscribers').select('email').order('created_at').range(from, from + 999);
+        if (!subs?.length) break;
+        for (const srow of subs) {
+          const em = String(srow.email || '').toLowerCase().trim();
+          if (em && !invitedSet.has(em) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) pool.push(em);
+        }
+        if (subs.length < 1000) break;
+      }
+      const s: any = { sent: 0, failed: 0, poolLeft: Math.max(0, pool.length - target) };
+      if (!pool.length) { stats.makerRecruitDrip = 'pool empty: every subscriber has been invited'; return; }
+      for (const em of pool.slice(0, target)) {
+        if (outOfTime()) break;
+        try {
+          if (await isUnsubscribed(db, em)) { invitedSet.add(em); await db.from('maker_invites').upsert({ email: em, source: 'drip-skip-unsub' }, { onConflict: 'email', ignoreDuplicates: true }); continue; }
+          const { subject, html, text } = makerRecruitEmail({ email: em });
+          const r2 = await sendEmail({ to: em, subject, html, text, idempotencyKey: 'maker-recruit:' + em, tags: [{ name: 'kind', value: 'makerRecruit' }] });
+          if (r2.ok && !r2.skipped) { s.sent++; await db.from('maker_invites').upsert({ email: em, source: 'drip' }, { onConflict: 'email', ignoreDuplicates: true }); }
+          else if (r2.quota) { stats.makerRecruitDrip = { ...s, note: 'stopped: daily budget reached' }; return; }
+          else s.failed++;
+        } catch { s.failed++; }
+      }
+      stats.makerRecruitDrip = s;
+    });
+  }
+
 
   // ── 1. nurture drip ─────────────────────────────────────────────────
   await step(stats, 'drip', async () => {

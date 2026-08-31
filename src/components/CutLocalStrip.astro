@@ -1,0 +1,44 @@
+---
+// Slim Cut Local banner — a one-line animated strip for secondary pages
+// (Free files, etc.). Different treatment from the homepage hero: compact,
+// horizontal, same dark teal/bronze world. Gated by marketplace_enabled.
+let on = false;
+let makers = 0;
+try {
+  const { supabaseAdmin } = await import('../lib/supabase');
+  const db = supabaseAdmin();
+  const { data: gs } = await db.from('growth_settings').select('marketplace_enabled').eq('id', 1).maybeSingle();
+  on = !!gs?.marketplace_enabled;
+  if (on) {
+    const { count } = await db.from('makers').select('id', { count: 'exact', head: true }).eq('status', 'approved');
+    makers = count || 0;
+  }
+} catch {}
+---
+{on && (
+  <a href="/makers" class="cls-wrap group block relative overflow-hidden rounded-2xl border border-white/10 shadow-md my-6" aria-label="Cut Local: get any design made by a maker near you">
+    <div class="cls-glow" aria-hidden="true"></div>
+    <div class="relative flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3.5 flex-wrap sm:flex-nowrap">
+      <span class="cls-dot flex-shrink-0" aria-hidden="true"></span>
+      <span class="text-[13px] sm:text-sm text-white font-semibold whitespace-nowrap">New · Cut Local</span>
+      <span class="text-[12.5px] sm:text-[13px] text-cream/75 leading-snug flex-1 min-w-[180px]">
+        Don’t own a machine? Any design here can be <b class="text-white">built by a vetted maker near you</b>. You compare quotes, they carve it.
+      </span>
+      {makers > 0 && <span class="hidden md:inline text-[12px] text-[#9fe0d9] whitespace-nowrap">{makers} maker{makers === 1 ? '' : 's'} ready</span>}
+      <span class="cls-cta flex-shrink-0 inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#1c4a48] bg-white rounded-lg px-3.5 py-2 group-hover:shadow transition">
+        See makers <span class="group-hover:translate-x-0.5 transition-transform">→</span>
+      </span>
+    </div>
+    <style>
+      .cls-wrap{background:linear-gradient(100deg,#161d1b 0%,#1e2a27 45%,#231a0e 100%)}
+      .cls-glow{position:absolute;inset:-40%;background:
+        radial-gradient(30% 90% at 15% 50%, rgba(44,106,103,.5), transparent 60%),
+        radial-gradient(26% 80% at 85% 50%, rgba(133,79,11,.45), transparent 60%);
+        animation:clsSweep 12s ease-in-out infinite alternate}
+      @keyframes clsSweep{from{transform:translateX(-4%)}to{transform:translateX(4%)}}
+      .cls-dot{width:9px;height:9px;border-radius:50%;background:#39d98a;box-shadow:0 0 0 0 rgba(57,217,138,.55);animation:clsPing 2s infinite}
+      @keyframes clsPing{0%{box-shadow:0 0 0 0 rgba(57,217,138,.5)}70%{box-shadow:0 0 0 8px rgba(57,217,138,0)}100%{box-shadow:0 0 0 0 rgba(57,217,138,0)}}
+      @media (prefers-reduced-motion:reduce){.cls-glow,.cls-dot{animation:none}}
+    </style>
+  </a>
+)}

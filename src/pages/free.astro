@@ -1,5 +1,6 @@
 ---
 import Shell from '../layouts/Shell.astro';
+import CutLocalStrip from '../components/CutLocalStrip.astro';
 ---
 <Shell title="Get 5 Free Premium STL Files | DigitalChiselCo" description="Join our list and get 5 premium bas-relief STL files free, plus the CNC woodcarving guide. For CNC routers, 3D printers and laser engravers." scrollPastBanner={true}>
   <main class="bg-cream rounded-lg">
@@ -23,6 +24,8 @@ import Shell from '../layouts/Shell.astro';
         <li>✅ Tested in Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360</li>
         <li>✅ No spam — unsubscribe anytime</li>
       </ul>
+
+      <div class="text-left"><CutLocalStrip /></div>
     </section>
   </main>
   <script is:inline>

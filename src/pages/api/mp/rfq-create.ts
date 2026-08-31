@@ -34,6 +34,20 @@ export const POST: APIRoute = async ({ request }) => {
   if (error) { console.error('[rfq-create]', error.message); return json({ error: 'Could not post your request. Please try again.' }, 500); }
 
   const token = signRequestToken(data.id, buyer_email);
+  const buyerLink = `${SITE}/requests/${data.id}?t=${encodeURIComponent(token)}`;
+  // Email the buyer their private link so they never lose it (buyer-critical).
+  try {
+    const { send: sendEmail } = await import('../../../lib/resend');
+    const { esc } = await import('../../../lib/marketplace');
+    // product_title arrives from the browser → escape before HTML interpolation
+    const title = esc((row.product_title || 'your design').split('|')[0].trim());
+    await sendEmail({
+      to: buyer_email, subject: `Your Cut Local request is posted: ${title}`,
+      html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#2a241d;"><p style="font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#854F0B;">Cut Local · request received</p><p>Thanks! Your request to have <b>${title}</b> made is live, and makers near you have been notified. Quotes will arrive here:</p><p style="margin:20px 0;"><a href="${buyerLink}" style="background:#854F0B;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;">View my request &amp; quotes →</a></p><p style="font-size:13px;color:#6b5d4a;">Keep this email — it's your private link. You compare quotes and star ratings, pick a maker, and pay them directly. We only take 3% when the job completes.</p><p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`,
+      text: `Your Cut Local request for ${title} is posted. View quotes: ${buyerLink}`,
+      idempotencyKey: `rfq-buyer:${data.id}`, tags: [{ name: 'kind', value: 'order' }],
+    });
+  } catch (e) { console.error('[rfq-buyer-email]', (e as any)?.message); }
   // match + notify makers (best-effort, never blocks the buyer)
   let matched = 0;
   try { const makers = await matchMakers(db, data); matched = makers.length; await notifyMakersOfJob(makers, data); } catch (e) { console.error('[rfq-match]', (e as any)?.message); }

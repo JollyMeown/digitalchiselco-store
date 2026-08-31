@@ -1,0 +1,87 @@
+---
+// Public Cut Local maker profile: portfolio, star rating, reviews, machines,
+// location. Builds buyer trust; linked from the map and from quotes. Noindex
+// while the marketplace is in early launch.
+import Shell from '../../layouts/Shell.astro';
+import { supabaseAdmin } from '../../lib/supabase';
+const { id } = Astro.params;
+const db = supabaseAdmin();
+const { data: m } = await db.from('makers').select('id, maker_name, city, region, country, rating_avg, rating_count, jobs_completed, machine_types, materials, finishes, machine_models, max_size, min_lead_days, years_experience, bio, portfolio_urls, etsy_url, website_url, instagram_url, deliver_radius_km, deliver_domestic_ship, deliver_intl, status')
+  .eq('id', id).eq('status', 'approved').maybeSingle();
+let reviews: any[] = [];
+if (m) { const { data: rv } = await db.from('maker_reviews').select('rating, comment, created_at, buyer_email').eq('maker_id', id).order('created_at', { ascending: false }).limit(20); reviews = rv || []; }
+const stars = (n: number) => '★★★★★'.slice(0, Math.round(n || 0)) + '☆☆☆☆☆'.slice(0, 5 - Math.round(n || 0));
+const firstName = (e: string) => (e || '').split('@')[0].replace(/[._].*$/, '').replace(/^\w/, (c) => c.toUpperCase()) || 'Verified buyer';
+const label = (a?: string[]) => (a || []).join(' · ');
+const MACHINE: Record<string, string> = { cnc_router: 'CNC router', cnc_mill: 'CNC mill', laser: 'Laser', fdm: '3D print (FDM)', resin: '3D print (resin)' };
+---
+<Shell title={m ? `${m.maker_name} · Cut Local maker` : 'Maker'} noindex={true}>
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 pb-24">
+    {!m ? (
+      <div class="text-center py-24"><h1 class="font-serif text-2xl text-bronze-800">Maker not found</h1><a href="/makers" class="text-bronze-600 underline mt-2 inline-block">See all makers →</a></div>
+    ) : (
+      <div>
+        <a href="/makers" class="text-sm text-bronze-600 hover:underline mt-4 inline-block">← all makers</a>
+        <header class="flex items-start gap-4 mt-3 mb-6">
+          <div class="w-16 h-16 rounded-full grid place-items-center text-white font-serif text-xl flex-shrink-0" style="background:linear-gradient(135deg,#2c6a67,#1c4a48)">{(m.maker_name || 'M').slice(0, 2).toUpperCase()}</div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h1 class="font-serif text-3xl text-bronze-800 leading-tight">{m.maker_name}</h1>
+              <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">✓ Verified</span>
+            </div>
+            <div class="mt-1 text-sm text-ink-700/70">
+              {m.rating_count > 0
+                ? <span><span class="text-bronze-600 text-base align-middle">{stars(m.rating_avg)}</span> <b>{Number(m.rating_avg).toFixed(1)}</b> · {m.rating_count} review{m.rating_count === 1 ? '' : 's'} · {m.jobs_completed || 0} jobs completed</span>
+                : <span class="text-ink-700/50">New maker · no reviews yet</span>}
+            </div>
+            <div class="text-xs text-ink-700/55 mt-1">{[m.city, m.region, m.country].filter(Boolean).join(', ')}{m.deliver_domestic_ship ? ' · ships domestically' : ''}{m.deliver_intl ? ' · ships worldwide' : ''}</div>
+          </div>
+        </header>
+
+        <div class="flex flex-wrap gap-2 mb-5">
+          {(m.machine_types || []).map((t: string) => <span class="text-xs px-2.5 py-1 rounded-full bg-[#2c6a67]/12 text-[#1c4a48] font-medium">{MACHINE[t] || t}</span>)}
+          {(m.materials || []).map((t: string) => <span class="text-xs px-2.5 py-1 rounded-full border border-black/10 text-ink-700/70">{t}</span>)}
+        </div>
+
+        {m.bio && <p class="text-ink-700/85 mb-6 leading-relaxed">{m.bio}</p>}
+
+        {(m.portfolio_urls || []).length > 0 && (
+          <section class="mb-8">
+            <h2 class="font-serif text-xl text-bronze-800 mb-3">Recent work</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {(m.portfolio_urls || []).map((u: string) => <a href={u} target="_blank" rel="noreferrer"><img src={u} loading="lazy" class="w-full aspect-square object-cover rounded-xl border border-black/10 hover:shadow-md transition" /></a>)}
+            </div>
+          </section>
+        )}
+
+        <div class="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm border-t border-black/10 pt-5 mb-8">
+          {m.machine_models && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Machines</span><div class="text-ink-800">{m.machine_models}</div></div>}
+          {m.max_size && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Max size</span><div class="text-ink-800">{m.max_size}</div></div>}
+          {m.finishes?.length > 0 && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Finishes</span><div class="text-ink-800">{label(m.finishes)}</div></div>}
+          {m.min_lead_days && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Typical lead time</span><div class="text-ink-800">from {m.min_lead_days} days</div></div>}
+          {m.years_experience && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Experience</span><div class="text-ink-800">{m.years_experience} years</div></div>}
+          {(m.etsy_url || m.website_url || m.instagram_url) && <div><span class="text-[11px] uppercase text-ink-700/45 font-semibold">Links</span><div class="text-bronze-600 break-words">{[m.etsy_url, m.website_url, m.instagram_url].filter(Boolean).join('  ·  ')}</div></div>}
+        </div>
+
+        {reviews.length > 0 && (
+          <section class="mb-8">
+            <h2 class="font-serif text-xl text-bronze-800 mb-3">Reviews</h2>
+            <div class="space-y-3">
+              {reviews.map((r) => (
+                <div class="border border-black/10 rounded-xl p-4">
+                  <div class="flex items-center gap-2"><span class="text-bronze-600">{stars(r.rating)}</span> <span class="text-xs text-ink-700/50">{firstName(r.buyer_email)} · {new Date(r.created_at).toLocaleDateString()}</span></div>
+                  {r.comment && <p class="text-sm text-ink-700/80 mt-1.5">{r.comment}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div class="text-center bg-cream/50 border border-bronze-600/20 rounded-2xl p-6">
+          <p class="text-ink-700/80">Want {m.maker_name} to make something for you?</p>
+          <a href="/catalog" class="inline-block mt-3 bg-bronze-600 text-cream px-6 py-3 rounded-lg font-medium hover:bg-bronze-700 transition">Pick a design &amp; request a quote →</a>
+        </div>
+      </div>
+    )}
+  </main>
+</Shell>

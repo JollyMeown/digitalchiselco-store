@@ -35,7 +35,7 @@ const SPHERE = path({ type: 'Sphere' } as any) || '';
 const LAND = path(feature(land110 as any, (land110 as any).objects.land) as any) || '';
 const BORDERS = (feature(countries110 as any, (countries110 as any).objects.countries) as any).features as any[];
 
-type Maker = { name: string; city?: string; region?: string; country?: string; rating: number; reviews: number; jobs: number; machines: string[]; photo?: string | null };
+type Maker = { id?: string; name: string; city?: string; region?: string; country?: string; rating: number; reviews: number; jobs: number; machines: string[]; photo?: string | null };
 function hash(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
 
 export default function MakerMap() {
@@ -98,7 +98,8 @@ export default function MakerMap() {
         {/* maker dots — glowing, pulsing, staggered (pure artwork) */}
         {dots.map((d) => (
           <g key={d.i} transform={`translate(${d.x} ${d.y})`}
-            onMouseEnter={() => setHover({ m: d.m, x: d.x, y: d.y })} onMouseLeave={() => setHover(null)} style={{ cursor: 'pointer' }}>
+            onMouseEnter={() => setHover({ m: d.m, x: d.x, y: d.y })} onMouseLeave={() => setHover(null)}
+            onClick={() => { if (d.m.id) window.location.href = `/m/${d.m.id}`; }} style={{ cursor: 'pointer' }}>
             <circle r="16" fill="url(#glow)" className="mm-glow" style={{ animationDelay: `${(d.i % 12) * 0.25}s` }} />
             <circle r="5" fill="none" stroke="#f6b25a" strokeWidth="1.2" className="mm-ring" style={{ animationDelay: `${(d.i % 12) * 0.25}s` }} />
             <circle r="2.6" fill="#ffd9a0" />
@@ -115,6 +116,7 @@ export default function MakerMap() {
           </div>
           <div style={{ fontSize: 11.5, color: '#b9a88f', marginTop: 2 }}>{[hover.m.city, hover.m.region].filter(Boolean).join(', ')}</div>
           <div style={{ fontSize: 10.5, color: '#8a7a63', marginTop: 3, fontFamily: 'monospace' }}>{(hover.m.machines || []).join(' · ')}</div>
+          <div style={{ fontSize: 10.5, color: '#e0b876', marginTop: 4 }}>click to view profile →</div>
         </div>
       )}
 
