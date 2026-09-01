@@ -147,6 +147,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
       await db.from('maker_credit_purchases').update({ status: 'granted', granted_at: new Date().toISOString() }).eq('txn_id', txn.id);
       await db.from('maker_ledger').insert({ maker_id: mp.maker_id, kind: 'credit_grant', credits_delta: mp.credits, amount_usd: mp.amount_usd, note: `bought ${mp.pack} pack` });
       console.log(`[cut-local] granted ${mp.credits} credits to maker ${mp.maker_id} (txn ${txn.id})`);
+      try { await telegramOwner(`💳 <b>Cut Local: credit pack sold!</b>\n${mp.credits} credits · $${Number(mp.amount_usd).toFixed(2)}\nMaker payments are working 🎉`); } catch {}
     }
     return; // credit purchases create no order/entitlements
   }
@@ -160,6 +161,7 @@ async function handleTransactionCompleted(db: any, txn: any) {
       must(await db.from('maker_fee_invoices').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', inv.id), 'settle fee invoice');
       await db.from('maker_ledger').insert({ maker_id: inv.maker_id, kind: 'fee_paid', amount_usd: inv.amount_usd, note: `invoice ${inv.id} settled` });
       console.log(`[cut-local] fee invoice ${inv.id} paid: $${inv.amount_usd} (txn ${txn.id})`);
+      try { await telegramOwner(`💰 <b>Cut Local: success fees COLLECTED</b>\n$${Number(inv.amount_usd).toFixed(2)} paid by a maker — that's your 3% in the bank.`); } catch {}
     }
     return; // fee payments create no order/entitlements
   }

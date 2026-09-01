@@ -41,6 +41,7 @@ export const POST: APIRoute = async ({ request }) => {
       await db.from('makers').update({ credits: (m.credits || 0) - 1 }).eq('id', m.id);
       await db.from('maker_ledger').insert({ maker_id: m.id, kind: 'quote_spend', credits_delta: -1, request_id: req.id, note: 'quote submitted' });
       try { await notifyBuyerNewQuote(req, m, quote, `${SITE}/requests/${req.id}?buyer=1`); } catch {}
+      try { const { telegramOwner } = await import('../../../lib/notify'); await telegramOwner(`💬 <b>Cut Local: new quote</b>\n${m.maker_name} quoted $${price}${q.lead_days ? ` · ${q.lead_days}d` : ''}\non "${(req.product_title || '').split('|')[0].trim().slice(0, 60)}"`); } catch {}
     }
     return json({ ok: true, credits: (m.credits || 0) - (existing ? 0 : 1) });
   }
@@ -56,6 +57,7 @@ export const POST: APIRoute = async ({ request }) => {
     await db.from('maker_quotes').update({ status: 'won' }).eq('id', quote.id);
     await db.from('maker_quotes').update({ status: 'lost' }).eq('request_id', req.id).neq('id', quote.id);
     try { const { data: m } = await db.from('makers').select('*').eq('id', quote.maker_id).maybeSingle(); if (m) await notifyMakerWon(req, m); } catch {}
+    try { const { telegramOwner } = await import('../../../lib/notify'); await telegramOwner(`🤝 <b>Cut Local: job awarded</b>\n"${(req.product_title || '').split('|')[0].trim().slice(0, 60)}" → $${quote.price}\nYour 3% on completion: $${(quote.price * 0.03).toFixed(2)}`); } catch {}
     return json({ ok: true });
   }
 
@@ -89,6 +91,7 @@ export const POST: APIRoute = async ({ request }) => {
       await db.from('makers').update({ jobs_completed: count || 1 }).eq('id', req.awarded_maker_id);
       await db.from('maker_ledger').insert({ maker_id: req.awarded_maker_id, kind: 'success_fee', amount_usd: fee, request_id: req.id, note: `${SUCCESS_FEE_PCT}% of $${req.agreed_price}` });
     }
+    try { const { telegramOwner } = await import('../../../lib/notify'); await telegramOwner(`✅ <b>Cut Local: job COMPLETED</b>\n"${(req.product_title || '').split('|')[0].trim().slice(0, 60)}" · $${req.agreed_price}\n💰 Your fee earned: $${fee.toFixed(2)} (invoiced automatically)`); } catch {}
     return json({ ok: true, fee });
   }
 
@@ -102,6 +105,7 @@ export const POST: APIRoute = async ({ request }) => {
     const { error } = await db.from('maker_reviews').upsert({ request_id: req.id, maker_id: req.awarded_maker_id, buyer_email: buyer.email, rating, comment: str(b.comment, 1000) || null }, { onConflict: 'request_id' });
     if (error) return json({ error: error.message }, 500);
     await db.rpc('recompute_maker_rating', { p_maker: req.awarded_maker_id });
+    try { const { telegramOwner } = await import('../../../lib/notify'); await telegramOwner(`⭐ <b>Cut Local: new review</b>\n${'★'.repeat(rating)}${'☆'.repeat(5 - rating)} on "${(req.product_title || '').split('|')[0].trim().slice(0, 60)}"${b.comment ? `\n"${str(b.comment, 150)}"` : ''}`); } catch {}
     return json({ ok: true });
   }
 
