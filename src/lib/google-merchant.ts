@@ -63,7 +63,8 @@ export async function fetchMerchantDaily(days = 30): Promise<MerchantDay[]> {
   const out: MerchantDay[] = [];
   let pageToken: string | undefined;
   do {
-    const res = await fetch(`https://merchantapi.googleapis.com/reports/v1beta/accounts/${account}/reports:search`, {
+    // v1beta was discontinued 2026-02-28; v1 is the live version.
+    const res = await fetch(`https://merchantapi.googleapis.com/reports/v1/accounts/${account}/reports:search`, {
       method: 'POST',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ query, pageSize: 1000, ...(pageToken ? { pageToken } : {}) }),
