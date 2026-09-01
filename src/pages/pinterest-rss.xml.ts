@@ -38,6 +38,34 @@ function xmlEscape(v: unknown): string {
 function cdata(v: unknown): string {
   return `<![CDATA[${String(v ?? '').replace(/]]>/g, ']]&gt;')}]]>`;
 }
+
+// --- Pin-sized images -----------------------------------------------------
+// Pinterest rejected the feed ("can't find images") because the stored product
+// images are 794x596, under its minimum for a publishable Pin. Serve them
+// through the Netlify Image CDN at 1200x900 instead: the source ratio (1.332)
+// and 4:3 (1.333) are the same, so this upscales with essentially no crop, and
+// the image is served from our own domain. Requires the [images] remote_images
+// allow-list in netlify.toml.
+const PIN_W = 1200, PIN_H = 900;
+function pinImage(src: string): string {
+  if (!src) return '';
+  return `${SITE}/.netlify/images?url=${encodeURIComponent(src)}&w=${PIN_W}&h=${PIN_H}&fit=cover&fm=jpg&q=82`;
+}
+// Real byte size for <enclosure length>. length="0" declares an EMPTY file,
+// which is why strict parsers ignored the enclosure. Sizes are fetched once
+// per feed build (the response is cached 30 min) and fall back to an estimate
+// if the HEAD request fails, so a slow origin can never break the feed.
+const FALLBACK_BYTES = 180_000;
+async function imageBytes(url: string): Promise<number> {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 3000);
+    const r = await fetch(url, { method: 'HEAD', signal: ctl.signal });
+    clearTimeout(t);
+    const n = Number(r.headers.get('content-length'));
+    return Number.isFinite(n) && n > 0 ? n : FALLBACK_BYTES;
+  } catch { return FALLBACK_BYTES; }
+}
 function clean(s: unknown): string {
   return String(s ?? '').replace(/\s+/g, ' ').trim();
 }
@@ -79,10 +107,15 @@ export async function GET() {
     }
   }
 
-  const itemXml = items.map((p) => {
+  // Byte sizes for every Pin image, resolved in parallel before rendering.
+  const pinUrls = items.map((p) => pinImage(clean(p.image_url)));
+  const pinBytes = await Promise.all(pinUrls.map((u) => (u ? imageBytes(u) : Promise.resolve(FALLBACK_BYTES))));
+
+  const itemXml = items.map((p, idx) => {
     const rawTitle = clean(p.seo_title || (p.title || '').split('|')[0]).slice(0, 100);
     const url = `${SITE}/product/${p.slug}`;
-    const img = clean(p.image_url);
+    const img = pinUrls[idx] || clean(p.image_url);
+    const bytes = pinBytes[idx];
     // Description: SEO copy + a couple of long-tail keyword phrases + free-pack CTA.
     let kws: string[] = [];
     if (Array.isArray(p.seo_keywords)) kws = p.seo_keywords.map((k: any) => clean(k)).filter(Boolean);
@@ -98,9 +131,10 @@ export async function GET() {
       <pubDate>${p._pubDate.toUTCString()}</pubDate>
       <description>${cdata(descHtml)}</description>
       <content:encoded>${cdata(descHtml)}</content:encoded>
-      <enclosure url="${xmlEscape(img)}" type="image/jpeg" length="0" />
-      <media:content url="${xmlEscape(img)}" medium="image" type="image/jpeg" />
-      <media:thumbnail url="${xmlEscape(img)}" />
+      <enclosure url="${xmlEscape(img)}" type="image/jpeg" length="${bytes}" />
+      <media:content url="${xmlEscape(img)}" medium="image" type="image/jpeg" width="${PIN_W}" height="${PIN_H}" fileSize="${bytes}" />
+      <media:thumbnail url="${xmlEscape(img)}" width="${PIN_W}" height="${PIN_H}" />
+      <image>${xmlEscape(img)}</image>
     </item>`;
   }).join('\n');
 

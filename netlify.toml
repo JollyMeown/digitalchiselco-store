@@ -10,6 +10,12 @@
 
 [build.environment]
   NODE_VERSION = "22"
+
+# Netlify Image CDN: allow transforming our Supabase-hosted product images.
+# Used by /pinterest-rss.xml to serve Pin-sized (1200x900) JPEGs from our own
+# domain — Pinterest rejected the raw 794x596 originals as too small.
+[images]
+  remote_images = ["https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/.*"]
   # The anon key is public by design (RLS-protected); service_role runs only in the
   # server function. Tell Netlify's secrets scanner these are intentional so the build
   # doesn't fail. (Without this, Netlify aborts the deploy when it sees the keys.)
