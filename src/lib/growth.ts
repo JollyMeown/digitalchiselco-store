@@ -404,7 +404,8 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         if (res.ok) {
           await db.from('subscriber_drip').update({ stage, last_sent_at: new Date().toISOString(), ...(stage >= 5 ? { status: 'done' } : {}) }).eq('email', r.email);
           s.sent++;
-        } else s.failed++;
+        } else if (res.quota) { (s as any).note = 'stopped: daily budget reached (resumes tomorrow)'; break; }
+        else s.failed++;
       } catch { s.failed++; }
     }
     stats.drip = s;
@@ -440,6 +441,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         const { subject, html, text } = withOvr('cart', cartReminderEmail({ email: c.email, items, subtotal: Number(c.subtotal) || 0 }), c.email);
         const res = await sendEmail({ to: c.email, subject, html, text, idempotencyKey: `cartrem:${c.id}`, tags: [{ name: 'kind', value: 'cart' }] });
         if (res.ok) { await db.from('abandoned_carts').update({ reminded_at: new Date().toISOString() }).eq('id', c.id); s.sent++; }
+        else if (res.quota) { (s as any).note = 'stopped: daily budget reached (resumes tomorrow)'; break; }
         else s.failed++;
       } catch { s.failed++; }
     }
@@ -629,7 +631,9 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         const code = await ensureReferralCode(db, email);
         const { subject, html, text } = withOvr('referralNudge', referralNudgeEmail({ email, code, link: `${SITE}/?ref=${code}` }), email);
         const res = await sendEmail({ to: email, subject, html, text, idempotencyKey: `refnudge:${email}`, tags: [{ name: 'kind', value: 'referral-nudge' }] });
-        if (res.ok) { s.sent++; await db.from('referral_nudge_log').upsert({ email }, { onConflict: 'email', ignoreDuplicates: true }); } else s.failed++;
+        if (res.ok) { s.sent++; await db.from('referral_nudge_log').upsert({ email }, { onConflict: 'email', ignoreDuplicates: true }); }
+        else if (res.quota) { (s as any).note = 'stopped: daily budget reached (resumes tomorrow)'; break; }
+        else s.failed++;
       } catch { s.failed++; }
     }
     stats.referralNudge = s;
@@ -782,6 +786,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           const { subject, html, text } = withOvr('refundWinback', refundWinbackEmail({ email: em, products: show, code: 'COMEBACK15' }), em);
           const res = await sendEmail({ to: em, subject, html, text, idempotencyKey: `refundwb:${em}`, tags: [{ name: 'kind', value: 'refundWinback' }] });
           if (res.ok) { s.sent++; await db.from('refund_winback_log').upsert({ email: em }, { onConflict: 'email', ignoreDuplicates: true }); }
+          else if (res.quota) { (s as any).note = 'stopped: daily budget reached (resumes tomorrow)'; break; }
           else s.failed++;
         } catch { s.failed++; }
       }
@@ -950,7 +955,8 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         if (res.ok) {
           s.sent++; sends++;
           await db.from('wishlist_reminder_log').upsert(prods.map((p: any) => ({ email: em, product_id: p.id })), { onConflict: 'email,product_id', ignoreDuplicates: true });
-        } else s.failed++;
+        } else if (res.quota) { (s as any).note = 'stopped: daily budget reached (resumes tomorrow)'; break; }
+        else s.failed++;
       } catch { s.failed++; }
     }
     stats.wishlistReminder = s;
