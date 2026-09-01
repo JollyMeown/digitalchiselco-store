@@ -111,6 +111,39 @@ export async function fetchMerchantDaily(days = 30): Promise<MerchantDay[]> {
   return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
 }
 
+export type MerchantProduct = { offer_id: string; title: string | null; impressions: number; clicks: number };
+
+// Per-product totals over the window. `offer_id` and `title` are valid
+// SEGMENTS on this view, but only alongside a metric (selecting a segment on
+// its own is rejected), which is why impressions is always included.
+export async function fetchMerchantProducts(days = 30, limit = 200): Promise<MerchantProduct[]> {
+  if (!merchantConfigured()) throw new Error('Google Merchant service account not configured');
+  const account = String(env('GOOGLE_MERCHANT_ID')).replace(/\D/g, '');
+  const token = await accessToken();
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const query = `SELECT offer_id, title, impressions, clicks`
+    + ` FROM product_performance_view`
+    + ` WHERE date BETWEEN '${iso(new Date(Date.now() - days * 86400000))}' AND '${iso(new Date())}'`
+    + ` ORDER BY impressions DESC`;
+  const res = await fetch(`https://merchantapi.googleapis.com/reports/v1/accounts/${account}/reports:search`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ query, pageSize: Math.min(1000, limit) }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`products: ${res.status} ${text.slice(0, 300)}`);
+  const j = JSON.parse(text || '{}');
+  return (j.results || []).map((row: any) => {
+    const p = row.productPerformanceView || row;
+    return {
+      offer_id: String(p.offerId ?? p.offer_id ?? ''),
+      title: p.title ?? null,
+      impressions: Number(p.impressions || 0),
+      clicks: Number(p.clicks || 0),
+    };
+  }).filter((r: MerchantProduct) => r.offer_id);
+}
+
 // Fetch + upsert into merchant_stats_daily. Returns a short status string.
 export async function syncMerchantStats(days = 30): Promise<string> {
   const { supabaseAdmin } = await import('./supabase');
@@ -122,8 +155,19 @@ export async function syncMerchantStats(days = 30): Promise<string> {
         .upsert(rows.map((r) => ({ ...r, fetched_at: new Date().toISOString() })), { onConflict: 'day' });
       if (error) throw new Error(error.message);
     }
+    // per-product breakdown (best effort: a failure here must not lose the
+    // daily totals we just stored)
+    let products = 0;
+    try {
+      const prods = await fetchMerchantProducts(30, 200);
+      if (prods.length) {
+        const { error } = await db.from('merchant_product_stats')
+          .upsert(prods.map((p) => ({ ...p, window_days: 30, fetched_at: new Date().toISOString() })), { onConflict: 'offer_id' });
+        if (!error) products = prods.length;
+      }
+    } catch (e) { console.error('[merchant products]', (e as any)?.message); }
     await db.from('growth_settings').update({ merchant_sync_at: new Date().toISOString(), merchant_sync_error: null }).eq('id', 1);
-    return `synced ${rows.length} day(s)`;
+    return `synced ${rows.length} day(s), ${products} product(s)`;
   } catch (e: any) {
     const msg = String(e?.message || e).slice(0, 300);
     await db.from('growth_settings').update({ merchant_sync_at: new Date().toISOString(), merchant_sync_error: msg }).eq('id', 1);

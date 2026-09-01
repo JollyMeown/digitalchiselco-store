@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { Card } from './ui';
 
 type Row = { day: string; impressions: number; clicks: number; ctr: number; conversions: number; conversion_value: number };
+type Prod = { offer_id: string; title: string | null; impressions: number; clicks: number };
 const RANGES = [7, 30, 90] as const;
 const IMP = '#4285f4', CLK = '#854F0B';
 const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(Math.round(n));
@@ -78,17 +79,21 @@ export default function MerchantStats() {
   const [days, setDays] = useState<number>(30);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [meta, setMeta] = useState<{ at: string | null; err: string | null }>({ at: null, err: null });
+  const [products, setProducts] = useState<Prod[]>([]);
+  const [tab, setTab] = useState<'impressions' | 'clicks'>('impressions');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
 
   const load = async () => {
     const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-    const [{ data }, { data: gs }] = await Promise.all([
+    const [{ data }, { data: gs }, { data: prods }] = await Promise.all([
       supabase.from('merchant_stats_daily').select('*').gte('day', since).order('day'),
       supabase.from('growth_settings').select('merchant_sync_at, merchant_sync_error').eq('id', 1).maybeSingle(),
+      supabase.from('merchant_product_stats').select('offer_id, title, impressions, clicks').order('impressions', { ascending: false }).limit(200),
     ]);
     setRows((data || []) as Row[]);
     setMeta({ at: gs?.merchant_sync_at || null, err: gs?.merchant_sync_error || null });
+    setProducts((prods || []) as Prod[]);
   };
   useEffect(() => { load(); }, [days]);
 
@@ -158,6 +163,38 @@ export default function MerchantStats() {
             <span className="flex items-center gap-1"><span style={{ width: 10, height: 10, borderRadius: 2, background: CLK, display: 'inline-block' }} />Clicks (own scale)</span>
             <span className="ml-auto">{meta.at ? `synced ${new Date(meta.at).toLocaleString()}` : ''}</span>
           </div>
+          {products.length > 0 && (
+            <div className="mt-4 border-t border-black/10 pt-3">
+              <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
+                <div className="text-xs font-bold text-ink-900">Top designs on Google (last 30 days)</div>
+                <div className="flex gap-1">
+                  <button onClick={() => setTab('impressions')} className={`text-[11px] px-2 py-0.5 rounded ${tab === 'impressions' ? 'bg-bronze-600 text-cream' : 'bg-cream text-ink-700'}`}>Most shown</button>
+                  <button onClick={() => setTab('clicks')} className={`text-[11px] px-2 py-0.5 rounded ${tab === 'clicks' ? 'bg-bronze-600 text-cream' : 'bg-cream text-ink-700'}`}>Most clicked</button>
+                </div>
+              </div>
+              <p className="text-[11px] text-ink-700/55 mb-2">
+                {tab === 'impressions'
+                  ? 'Google shows these most. If a design has many impressions and no clicks, the image or title is losing the click.'
+                  : 'These actually earn clicks. Worth studying what they have in common.'}
+              </p>
+              <div className="grid sm:grid-cols-2 gap-x-6">
+                {[...products]
+                  .sort((a, b) => tab === 'clicks' ? (b.clicks - a.clicks) || (b.impressions - a.impressions) : b.impressions - a.impressions)
+                  .slice(0, 10)
+                  .map((p) => (
+                    <div key={p.offer_id} className="flex items-baseline justify-between gap-2 border-b border-black/5 py-1">
+                      <span className="text-[13px] text-ink-800 truncate" title={p.title || p.offer_id}>{p.title || p.offer_id}</span>
+                      <span className="text-[12px] shrink-0 tabular-nums">
+                        <b style={{ color: IMP }}>{p.impressions.toLocaleString()}</b>
+                        <span className="text-ink-700/40"> / </span>
+                        <b style={{ color: p.clicks ? CLK : '#b9b0a1' }}>{p.clicks}</b>
+                      </span>
+                    </div>
+                  ))}
+              </div>
+              <div className="text-[10px] text-ink-700/45 mt-1">impressions / clicks</div>
+            </div>
+          )}
           {meta.err && <div className="mt-2 text-[11px] text-red-700">Last sync error: {meta.err}</div>}
           {msg && <div className="mt-2 text-[11px] text-ink-700/70">{msg}</div>}
         </>
