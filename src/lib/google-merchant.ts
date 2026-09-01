@@ -56,9 +56,12 @@ export async function fetchMerchantDaily(days = 30): Promise<MerchantDay[]> {
   const start = new Date(Date.now() - days * 86400000);
   const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-  const query = `SELECT date, impressions, clicks, clickThroughRate, conversions, conversionValue
-                 FROM ProductPerformanceView
-                 WHERE date BETWEEN '${iso(start)}' AND '${iso(end)}'`;
+  // Verified against the live account: the table is snake_case, and
+  // clickThroughRate / conversions are NOT selectable here (the API rejects
+  // the whole query if they appear). CTR is derived below instead.
+  const query = `SELECT date, impressions, clicks`
+    + ` FROM product_performance_view`
+    + ` WHERE date BETWEEN '${iso(start)}' AND '${iso(end)}'`;
 
   const out: MerchantDay[] = [];
   let pageToken: string | undefined;
@@ -79,11 +82,14 @@ export async function fetchMerchantDaily(days = 30): Promise<MerchantDay[]> {
         ? p.date
         : p.date ? `${p.date.year}-${String(p.date.month).padStart(2, '0')}-${String(p.date.day).padStart(2, '0')}` : '';
       if (!d) continue;
+      // counters come back as STRINGS ("53"), so coerce before arithmetic
+      const impressions = Number(p.impressions || 0);
+      const clicks = Number(p.clicks || 0);
       out.push({
         day: d,
-        impressions: Number(p.impressions || 0),
-        clicks: Number(p.clicks || 0),
-        ctr: Number(p.clickThroughRate || 0),
+        impressions,
+        clicks,
+        ctr: impressions ? clicks / impressions : 0,
         conversions: Number(p.conversions || 0),
         conversion_value: Number(p.conversionValue || 0),
       });
