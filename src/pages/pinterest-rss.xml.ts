@@ -125,6 +125,10 @@ export async function GET() {
   const itemXml = items.map((p, idx) => {
     const rawTitle = clean(p.seo_title || (p.title || '').split('|')[0]).slice(0, 100);
     const url = `${SITE}/product/${p.slug}`;
+    // Tagged link for attribution in the admin Channel panel. <guid> stays the
+    // CLEAN url: it is Pinterest's dedupe key, and changing it would make every
+    // already-published Pin look new and republish.
+    const linkUrl = `${url}?utm_source=pinterest&utm_medium=rss`;
     const img = pinUrls[idx] || clean(p.image_url);
     const bytes = pinBytes[idx];
     // Description: SEO copy + a couple of long-tail keyword phrases + free-pack CTA.
@@ -138,7 +142,7 @@ export async function GET() {
     const descHtml = `<img src="${xmlEscape(img)}" alt="${xmlEscape(rawTitle)}" /><p>${xmlEscape(desc)}</p>`;
     return `    <item>
       <title>${xmlEscape(rawTitle)}</title>
-      <link>${xmlEscape(url)}</link>
+      <link>${xmlEscape(linkUrl)}</link>
       <guid isPermaLink="true">${xmlEscape(url)}</guid>
       <pubDate>${p._pubDate.toUTCString()}</pubDate>
       <description>${cdata(descHtml)}</description>

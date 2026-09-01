@@ -56,7 +56,8 @@ export async function GET() {
           cell(p.id),
           cell(title),
           cell(desc),
-          cell(`${SITE}/product/${p.slug}`),
+          // utm tag so the admin Channel panel can attribute catalogue traffic
+          cell(`${SITE}/product/${p.slug}?utm_source=pinterest&utm_medium=catalog`),
           // Use Supabase's render/image endpoint at 1200px — Pinterest's
           // recommended size, and it returns Cache-Control: max-age=3600
           // (the /object/public/ endpoint returns no-cache, which Pinterest's

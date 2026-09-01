@@ -77,6 +77,12 @@ export const POST: APIRoute = async ({ request }) => {
       }
     } catch { /* ignore bad referrer */ }
 
+    // Never record dev-server traffic: `npm run dev` writes to the SAME
+    // production database, which put 233 phantom "localhost" visits into the
+    // 30-day analytics and skewed every channel percentage.
+    const originHost = (() => { try { return new URL(request.headers.get('origin') || request.headers.get('referer') || '').hostname; } catch { return ''; } })();
+    if (/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(originHost)) return new Response(null, { status: 204 });
+
     const day = new Date().toISOString().slice(0, 10);
     const secret = process.env.ACCOUNT_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'trk';
     const visitor_hash = crypto.createHash('sha256').update(`${ip}|${ua}|${day}|${secret}`).digest('hex').slice(0, 32);
