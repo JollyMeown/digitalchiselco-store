@@ -215,14 +215,27 @@ function buildPayload(p, dlRow, driveMap) {
   const uniqueImages = [...new Set(images)].slice(0, 10);
   // Cults3D caps total tag characters at 300. Budget conservatively (count a
   // 2-char separator per tag, plus margin) and cap the count.
+  // Cults' co-founder (Pierre, 2026-09-01) confirmed AI-labelled designs are
+  // filtered out of DEFAULT search by design and that policy will not change,
+  // so tags/keywords are the main lever left: they drive the "include AI"
+  // search results AND how these listings rank in Google.
   const tags = [];
   let tagChars = 0;
-  for (const raw of (Array.isArray(p.seo_keywords) ? p.seo_keywords : [])) {
-    const t = String(raw).trim();
-    if (!t || t.length > 40) continue;
-    if (tags.length >= MAX_TAGS || tagChars + t.length + 2 > 270) break;
-    tags.push(t); tagChars += t.length + 2;
-  }
+  const seen = new Set();
+  const addTag = (raw) => {
+    const t = String(raw || '').trim();
+    if (!t || t.length > 40) return;
+    const key = t.toLowerCase();
+    if (seen.has(key)) return;
+    if (tags.length >= MAX_TAGS) return;
+    // skip an oversized keyword instead of abandoning the rest: the old
+    // `break` let one long phrase truncate the whole tag list
+    if (tagChars + t.length + 2 > 270) return;
+    tags.push(t); seen.add(key); tagChars += t.length + 2;
+  };
+  for (const raw of (Array.isArray(p.seo_keywords) ? p.seo_keywords : [])) addTag(raw);
+  // Staple discovery terms, added only if the product's own keywords left room.
+  for (const t of ['bas relief', 'cnc', 'stl', '3d print', 'wall art', 'wood carving']) addTag(t);
   const price = PRICE_FLAG ? Number(PRICE_FLAG) : PRICE_OPTIONS[Math.floor(Math.random() * PRICE_OPTIONS.length)];
   const description = (p.description || p.seo_description || '').trim()
     + `\n\nInstant download with commercial use included. Browse the full collection at ${SITE}`;
