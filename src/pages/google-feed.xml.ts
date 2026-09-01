@@ -74,6 +74,15 @@ export async function GET() {
     if (data?.discount_percent != null) discount = Number(data.discount_percent) || 20;
   } catch {}
 
+  // Square-image experiment: only these product ids get /sq/<slug>.jpg, so the
+  // rest of the catalogue stays a clean control group.
+  const squareIds = new Set<string>();
+  try {
+    const { supabaseAdmin } = await import('../lib/supabase');
+    const { data: exp } = await supabaseAdmin().from('image_experiment').select('product_id').eq('variant', 'square');
+    for (const r of exp || []) squareIds.add(String((r as any).product_id));
+  } catch (e) { console.error('[google-feed] experiment lookup failed:', (e as any)?.message); }
+
   const items: string[] = [];
   try {
     for (let from = 0; ; from += 1000) {
@@ -99,7 +108,7 @@ export async function GET() {
           `<title>${xml(title)}</title>` +
           `<description>${xml(desc)}</description>` +
           `<link>${xml(`${SITE}/product/${p.slug}?utm_source=google&utm_medium=shopping`)}</link>` +
-          `<g:image_link>${xml(img(p.image_url, { w: 1200, q: 85 }))}</g:image_link>` +
+          `<g:image_link>${xml(squareIds.has(String(p.id)) ? `${SITE}/sq/${p.slug}.jpg` : img(p.image_url, { w: 1200, q: 85 }))}</g:image_link>` +
           extraImgs +
           `<g:availability>in_stock</g:availability>` +
           `<g:price>${original.toFixed(2)} USD</g:price>` +

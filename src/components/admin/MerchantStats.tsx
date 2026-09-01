@@ -75,6 +75,60 @@ function Chart({ rows }: { rows: Row[] }) {
   );
 }
 
+// Square-image experiment readout. Compares the enrolled products against the
+// rest of the catalogue over the same days, so a site-wide swing (the 1,570
+// approvals landing, say) moves both lines and cannot be mistaken for a win.
+function ImageExperiment() {
+  const [d, setD] = useState<any>(null);
+  useEffect(() => {
+    (async () => {
+      const { data: exp } = await supabase.from('image_experiment').select('offer_id, started_at').eq('variant', 'square');
+      if (!exp?.length) return setD({ none: true });
+      const ids = new Set(exp.map((e: any) => e.offer_id));
+      const started = exp.map((e: any) => e.started_at).sort()[0];
+      const since = new Date(Date.now() - 21 * 86400000).toISOString().slice(0, 10);
+      const { data: rows } = await supabase.from('merchant_product_daily').select('day, offer_id, impressions, clicks').gte('day', since).limit(20000);
+      const startDay = String(started).slice(0, 10);
+      const agg = (test: boolean, after: boolean) => (rows || [])
+        .filter((r: any) => ids.has(r.offer_id) === test && (r.day >= startDay) === after)
+        .reduce((a: any, r: any) => ({ i: a.i + Number(r.impressions), c: a.c + Number(r.clicks) }), { i: 0, c: 0 });
+      setD({
+        startDay, n: exp.length,
+        testBefore: agg(true, false), testAfter: agg(true, true),
+        ctrlBefore: agg(false, false), ctrlAfter: agg(false, true),
+      });
+    })();
+  }, []);
+  if (!d || d.none) return null;
+  const ctr = (x: any) => x.i ? (x.c / x.i) * 100 : 0;
+  const cell = (label: string, b: any, a: any) => (
+    <div className="rounded-lg border border-black/10 bg-cream/40 px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">{label}</div>
+      <div className="text-[13px] text-ink-800 mt-0.5">
+        before <b>{ctr(b).toFixed(2)}%</b> <span className="text-ink-700/40">({b.c}/{b.i})</span>
+      </div>
+      <div className="text-[13px] text-ink-800">
+        after <b>{ctr(a).toFixed(2)}%</b> <span className="text-ink-700/40">({a.c}/{a.i})</span>
+      </div>
+    </div>
+  );
+  const days = Math.max(0, Math.round((Date.now() - Date.parse(d.startDay)) / 86400000));
+  return (
+    <div className="mt-4 border-t border-black/10 pt-3">
+      <div className="text-xs font-bold text-ink-900 mb-1">🧪 Square-image test · {d.n} products · day {days} of 7</div>
+      <p className="text-[11px] text-ink-700/55 mb-2">
+        Those {d.n} products now send Google a square image where the carving fills the tile. Everything else is unchanged and acts as the control.
+        {days < 7 && ' Too early to judge — give it the full week.'}
+      </p>
+      <div className="grid grid-cols-2 gap-2 max-w-md">
+        {cell('Test group CTR', d.testBefore, d.testAfter)}
+        {cell('Control (rest of catalogue)', d.ctrlBefore, d.ctrlAfter)}
+      </div>
+      <div className="text-[10px] text-ink-700/45 mt-1">clicks/impressions in brackets · started {d.startDay}</div>
+    </div>
+  );
+}
+
 export default function MerchantStats() {
   const [days, setDays] = useState<number>(30);
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -195,6 +249,7 @@ export default function MerchantStats() {
               <div className="text-[10px] text-ink-700/45 mt-1">impressions / clicks</div>
             </div>
           )}
+          <ImageExperiment />
           {meta.err && <div className="mt-2 text-[11px] text-red-700">Last sync error: {meta.err}</div>}
           {msg && <div className="mt-2 text-[11px] text-ink-700/70">{msg}</div>}
         </>

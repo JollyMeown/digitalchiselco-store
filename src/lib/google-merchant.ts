@@ -144,6 +144,40 @@ export async function fetchMerchantProducts(days = 30, limit = 200): Promise<Mer
   }).filter((r: MerchantProduct) => r.offer_id);
 }
 
+// Per-product PER-DAY rows, which is what makes a before/after comparison
+// honest: a rolling 30-day total cannot show whether a change moved anything.
+export async function fetchMerchantProductDaily(days = 14): Promise<Array<{ day: string; offer_id: string; title: string | null; impressions: number; clicks: number }>> {
+  if (!merchantConfigured()) throw new Error('Google Merchant service account not configured');
+  const account = String(env('GOOGLE_MERCHANT_ID')).replace(/\D/g, '');
+  const token = await accessToken();
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const query = `SELECT date, offer_id, title, impressions, clicks`
+    + ` FROM product_performance_view`
+    + ` WHERE date BETWEEN '${iso(new Date(Date.now() - days * 86400000))}' AND '${iso(new Date())}'`;
+  const out: Array<any> = [];
+  let pageToken: string | undefined;
+  do {
+    const res = await fetch(`https://merchantapi.googleapis.com/reports/v1/accounts/${account}/reports:search`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ query, pageSize: 1000, ...(pageToken ? { pageToken } : {}) }),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`product daily: ${res.status} ${text.slice(0, 200)}`);
+    const j = JSON.parse(text || '{}');
+    for (const row of j.results || []) {
+      const p = row.productPerformanceView || row;
+      const d = typeof p.date === 'string' ? p.date
+        : `${p.date.year}-${String(p.date.month).padStart(2, '0')}-${String(p.date.day).padStart(2, '0')}`;
+      const offer_id = String(p.offerId ?? p.offer_id ?? '');
+      if (!offer_id) continue;
+      out.push({ day: d, offer_id, title: p.title ?? null, impressions: Number(p.impressions || 0), clicks: Number(p.clicks || 0) });
+    }
+    pageToken = j.nextPageToken;
+  } while (pageToken);
+  return out;
+}
+
 // Fetch + upsert into merchant_stats_daily. Returns a short status string.
 export async function syncMerchantStats(days = 30): Promise<string> {
   const { supabaseAdmin } = await import('./supabase');
@@ -166,8 +200,17 @@ export async function syncMerchantStats(days = 30): Promise<string> {
         if (!error) products = prods.length;
       }
     } catch (e) { console.error('[merchant products]', (e as any)?.message); }
+    // per-product daily history (drives the square-image experiment readout)
+    let daily = 0;
+    try {
+      const dr = await fetchMerchantProductDaily(14);
+      for (let i = 0; i < dr.length; i += 500) {
+        const { error } = await db.from('merchant_product_daily').upsert(dr.slice(i, i + 500), { onConflict: 'day,offer_id' });
+        if (!error) daily += Math.min(500, dr.length - i);
+      }
+    } catch (e) { console.error('[merchant product daily]', (e as any)?.message); }
     await db.from('growth_settings').update({ merchant_sync_at: new Date().toISOString(), merchant_sync_error: null }).eq('id', 1);
-    return `synced ${rows.length} day(s), ${products} product(s)`;
+    return `synced ${rows.length} day(s), ${products} product(s), ${daily} daily row(s)`;
   } catch (e: any) {
     const msg = String(e?.message || e).slice(0, 300);
     await db.from('growth_settings').update({ merchant_sync_at: new Date().toISOString(), merchant_sync_error: msg }).eq('id', 1);
