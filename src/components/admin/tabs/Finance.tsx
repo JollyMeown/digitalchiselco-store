@@ -185,6 +185,55 @@ export default function Finance() {
         <div className="text-sm font-medium text-ink-900 mb-2">Etsy ad spend by {gran}</div>
         {adBuckets.some((b) => b.total > 0) ? <StackedBars buckets={adBuckets.map((b) => ({ ...b, seg: { etsy: b.seg.etsy || 0 } }))} order={['etsy']} /> : <p className="text-xs text-ink-700/50 py-8 text-center">No ad spend recorded in range.</p>}
       </Card>
+
+      <SubscriptionCosts />
     </div>
+  );
+}
+
+// ── Subscription costs — every fixed fee the owner pays, editable ─────
+type SubCost = { name: string; monthly_usd: number; note?: string };
+function SubscriptionCosts() {
+  const [rows, setRows] = useState<SubCost[] | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const load = async () => {
+    const { data } = await supabase.from('growth_settings').select('subscription_costs').eq('id', 1).maybeSingle();
+    setRows(Array.isArray(data?.subscription_costs) ? data!.subscription_costs : []);
+    setDirty(false);
+  };
+  useEffect(() => { load(); }, []);
+  if (!rows) return null;
+  const upd = (i: number, patch: Partial<SubCost>) => { setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r))); setDirty(true); };
+  const save = async () => {
+    setSaving(true);
+    const clean = rows.filter((r) => (r.name || '').trim()).map((r) => ({ name: r.name.trim().slice(0, 80), monthly_usd: Math.max(0, Number(r.monthly_usd) || 0), note: (r.note || '').trim().slice(0, 160) }));
+    await supabase.from('growth_settings').update({ subscription_costs: clean }).eq('id', 1);
+    setRows(clean); setDirty(false); setSaving(false);
+  };
+  const total = rows.reduce((s, r) => s + (Number(r.monthly_usd) || 0), 0);
+  return (
+    <Card>
+      <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
+        <div className="text-sm font-bold text-ink-900">🧾 Subscription costs (what you pay monthly)</div>
+        <div className="text-sm"><b className="text-bronze-800 text-lg">${total.toFixed(2)}</b><span className="text-ink-700/50">/month · ${(total * 12).toFixed(0)}/year</span></div>
+      </div>
+      <p className="text-[11px] text-ink-700/55 mb-3">Edit amounts as your plans change (e.g. set Resend to 20 when you upgrade). Saved instantly to the site settings.</p>
+      <div className="space-y-1.5">
+        {rows.map((r, i) => (
+          <div key={i} className="flex flex-wrap items-center gap-2">
+            <input value={r.name} onChange={(e) => upd(i, { name: e.target.value })} placeholder="Service" className="border border-black/15 rounded px-2 py-1.5 text-sm flex-1 min-w-[140px]" />
+            <span className="text-xs text-ink-700/50">$</span>
+            <input type="number" min={0} step={0.01} value={r.monthly_usd} onChange={(e) => upd(i, { monthly_usd: Number(e.target.value) })} className="border border-black/15 rounded px-2 py-1.5 text-sm w-24" />
+            <input value={r.note || ''} onChange={(e) => upd(i, { note: e.target.value })} placeholder="note" className="border border-black/15 rounded px-2 py-1.5 text-xs flex-[2] min-w-[160px] text-ink-700/70" />
+            <button className="text-xs text-red-500 hover:text-red-700 px-1" title="Remove" onClick={() => { setRows(rows.filter((_, j) => j !== i)); setDirty(true); }}>✕</button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 mt-3">
+        <button className="text-xs border border-black/15 rounded px-3 py-1.5 hover:border-bronze-600" onClick={() => { setRows([...rows, { name: '', monthly_usd: 0, note: '' }]); setDirty(true); }}>+ Add a cost</button>
+        <button className={`text-xs rounded px-3 py-1.5 ${dirty ? 'bg-bronze-600 text-cream hover:bg-bronze-700' : 'border border-black/10 text-ink-700/40'}`} disabled={!dirty || saving} onClick={save}>{saving ? 'Saving…' : dirty ? 'Save costs' : 'Saved'}</button>
+      </div>
+    </Card>
   );
 }

@@ -751,8 +751,9 @@ type Light = { state: 'green' | 'amber' | 'red'; label: string; detail: string }
 function TodayEmailStats() {
   const [rows, setRows] = useState<{ kind: string; sent: number; failed: number }[] | null>(null);
   const [tot, setTot] = useState({ sent: 0, failed: 0, lastFailErr: '' });
-  const [cfg, setCfg] = useState<{ cap: number; reserve: number } | null>(null);
-  const [edit, setEdit] = useState<{ cap: number; reserve: number } | null>(null);
+  const [cfg, setCfg] = useState<{ cap: number; reserve: number; monthCap: number } | null>(null);
+  const [edit, setEdit] = useState<{ cap: number; reserve: number; monthCap: number } | null>(null);
+  const [monthSent, setMonthSent] = useState(0);
   const [saving, setSaving] = useState(false);
   const [lights, setLights] = useState<Light[]>([]);
 
@@ -760,7 +761,7 @@ function TodayEmailStats() {
     const today = new Date().toISOString().slice(0, 10);
     const [{ data: sends }, { data: gs }, { data: runs }, { data: weeks }] = await Promise.all([
       supabase.from('email_send_log').select('kind, status, error, sent_at').gte('sent_at', today + 'T00:00:00Z').limit(20000),
-      supabase.from('growth_settings').select('email_daily_cap, email_daily_reserve').eq('id', 1).maybeSingle(),
+      supabase.from('growth_settings').select('email_daily_cap, email_daily_reserve, email_monthly_cap').eq('id', 1).maybeSingle(),
       supabase.from('cron_runs').select('ran_at, ok, error').order('ran_at', { ascending: false }).limit(1),
       supabase.from('weekly_digest_log').select('week_key, queued_count, last_drain_at').order('week_key', { ascending: false }).limit(1),
     ]);
@@ -776,8 +777,13 @@ function TodayEmailStats() {
     setTot({ sent: s, failed: f, lastFailErr });
     const cap = Number(gs?.email_daily_cap) || 180;
     const reserve = Number(gs?.email_daily_reserve) ?? 20;
-    setCfg({ cap, reserve });
-    setEdit((e) => e || { cap, reserve });
+    const monthCap = Number(gs?.email_monthly_cap) || 3000;
+    setCfg({ cap, reserve, monthCap });
+    setEdit((e) => e || { cap, reserve, monthCap });
+    // month-to-date sends (for the monthly plan-quota light)
+    const monthStart = today.slice(0, 7) + '-01';
+    const { count: mSent } = await supabase.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', monthStart + 'T00:00:00Z');
+    setMonthSent(mSent || 0);
 
     // ── Status lights: catch issues + say what's happening ──
     const L: Light[] = [];
@@ -803,6 +809,12 @@ function TodayEmailStats() {
     // 3. today's budget
     const left = Math.max(0, cap - reserve - s);
     if (left === 0) L.push({ state: 'amber', label: "Today's marketing budget is used up", detail: `Buyer emails still send (the ${reserve} reserve). Marketing resumes at 00:00 UTC.` });
+    // 3b. monthly plan quota
+    {
+      const pct = Math.round(((mSent || 0) / monthCap) * 100);
+      if (pct >= 100) L.push({ state: 'red', label: `Monthly email quota reached (${mSent}/${monthCap})`, detail: 'Marketing is paused until the 1st; buyer emails keep sending. Raise the monthly cap after upgrading Resend.' });
+      else if (pct >= 80) L.push({ state: 'amber', label: `Monthly email quota ${pct}% used (${mSent}/${monthCap})`, detail: 'Approaching the Resend plan limit for this month.' });
+    }
     // 4. nightly cron
     const last = runs?.[0];
     const ageH = last ? (Date.now() - Date.parse(last.ran_at)) / 3600000 : Infinity;
@@ -818,16 +830,17 @@ function TodayEmailStats() {
     if (!edit) return;
     const cap = Math.max(20, Math.round(edit.cap));
     const reserve = Math.min(cap, Math.max(0, Math.round(edit.reserve)));
+    const monthCap = Math.max(100, Math.round(edit.monthCap));
     setSaving(true);
-    await supabase.from('growth_settings').update({ email_daily_cap: cap, email_daily_reserve: reserve }).eq('id', 1);
-    setCfg({ cap, reserve }); setEdit({ cap, reserve }); setSaving(false);
+    await supabase.from('growth_settings').update({ email_daily_cap: cap, email_daily_reserve: reserve, email_monthly_cap: monthCap }).eq('id', 1);
+    setCfg({ cap, reserve, monthCap }); setEdit({ cap, reserve, monthCap }); setSaving(false);
     load();
   }
 
   const marketingLeft = Math.max(0, cfg.cap - cfg.reserve - tot.sent);
   const label = (k: string) => EMAIL_KIND_LABELS[k] || k;
   const dot: Record<string, string> = { green: 'bg-green-500', amber: 'bg-amber-500', red: 'bg-red-500 animate-pulse' };
-  const dirty = edit.cap !== cfg.cap || edit.reserve !== cfg.reserve;
+  const dirty = edit.cap !== cfg.cap || edit.reserve !== cfg.reserve || edit.monthCap !== cfg.monthCap;
   const worst = lights.some((l) => l.state === 'red') ? 'red' : lights.some((l) => l.state === 'amber') ? 'amber' : 'green';
 
   return (
@@ -865,6 +878,10 @@ function TodayEmailStats() {
           <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Marketing budget left today</div>
           <div className="text-2xl font-extrabold text-bronze-800 leading-tight">{marketingLeft}<span className="text-sm font-medium text-ink-700/50"> / {cfg.cap - cfg.reserve}</span></div>
         </div>
+        <div className={`rounded-lg border px-4 py-2.5 min-w-[150px] ${monthSent >= cfg.monthCap ? 'border-red-300 bg-red-50' : 'border-bronze-600/20 bg-cream/40'}`}>
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Sent this month (plan quota)</div>
+          <div className={`text-2xl font-extrabold leading-tight ${monthSent >= cfg.monthCap ? 'text-red-700' : 'text-bronze-800'}`}>{monthSent}<span className="text-sm font-medium text-ink-700/50"> / {cfg.monthCap}</span></div>
+        </div>
       </div>
 
       {/* Admin-editable cap + reserve */}
@@ -873,7 +890,9 @@ function TodayEmailStats() {
         <p className="text-[11px] text-ink-700/60 mb-2.5">
           <b>Daily cap</b> = the most emails the site sends in one day (keep it under your Resend plan's real limit; about 200/day works today).
           <b> Buyer reserve</b> = how many of those to always hold back for order confirmations &amp; sign-in links, so a big newsletter can never block a paying customer.
+          <b> Monthly cap</b> = your Resend plan's monthly quota (free = 3,000; Pro $20 = 50,000) — marketing stops there so you never pay surprise overage; buyer emails still send.
           Everything else (newsletters, drips) shares <b>cap − reserve = {edit.cap - edit.reserve}</b> per day.
+          After upgrading to Resend Pro, set: daily cap ~1,600, monthly cap 50,000.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <label className="block">
@@ -883,6 +902,10 @@ function TodayEmailStats() {
           <label className="block">
             <span className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Buyer reserve</span>
             <input type="number" min={0} max={edit.cap} value={edit.reserve} onChange={(e) => setEdit({ ...edit, reserve: Number(e.target.value) })} className={inputCls + ' w-28'} />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Monthly cap (plan quota)</span>
+            <input type="number" min={100} max={2000000} step={100} value={edit.monthCap} onChange={(e) => setEdit({ ...edit, monthCap: Number(e.target.value) })} className={inputCls + ' w-32'} />
           </label>
           <div className="text-xs text-ink-700/60 pb-2">→ <b className="text-bronze-800">{Math.max(0, edit.cap - edit.reserve)}</b> for newsletters/day</div>
           <button className={dirty ? btnPrimary : btnGhost} disabled={saving || !dirty} onClick={saveThrottle}>{saving ? 'Saving…' : dirty ? 'Save limits' : 'Saved'}</button>
