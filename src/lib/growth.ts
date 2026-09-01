@@ -335,7 +335,10 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     await step(stats, 'makerRecruitDripExtra', async () => {
       const { marketingBudgetRemaining } = await import('./resend');
       const budget = await marketingBudgetRemaining();
-      const target = budget - 40;
+      // cap the top-up at 80 (=> max 100 recruit emails/day with the
+      // guaranteed 20): steady daily volume beats one-day blasts for both
+      // sender reputation and reply-handling
+      const target = Math.min(budget - 40, 80);
       if (target <= 0) { stats.makerRecruitDripExtra = 'no surplus today (guaranteed 20 already sent)'; return; }
       await runRecruitDrip(target, 'makerRecruitDripExtra');
     });
