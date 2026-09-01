@@ -432,6 +432,7 @@ export function ownerWeeklyReport(d: {
   topWished: { title: string; n: number }[];
   topSold: { title: string; n: number }[];
   zeroSearches: string[];
+  extraHtml?: string;   // pre-built sections (email health, Cut Local, SEO checkpoints)
 }): Out {
   const subject = `📊 Your week at DigitalChiselCo: ${d.orders} orders, $${d.revenue.toFixed(2)}`;
   const stat = (label: string, n: string | number) =>
@@ -453,6 +454,7 @@ export function ownerWeeklyReport(d: {
     ${list('✅ Best sellers', d.topSold)}
     ${d.zeroSearches.length ? `<p style="font-size:13px;font-weight:bold;color:#b91c1c;margin:16px 0 4px;">🔍 Searched but NOT found (design ideas!)</p>
       <p style="font-size:13px;color:#555;margin:2px 0;">${d.zeroSearches.map(esc).join(' · ')}</p>` : ''}
+    ${d.extraHtml || ''}
     <p style="text-align:center;margin:18px 0 0;">${btn(SITE + '/admin#traffic', 'Open the full Traffic dashboard')}</p>`;
   const text = `Week ${d.weekLabel}: ${d.pageviews} pageviews, ${d.orders} orders, $${d.revenue.toFixed(2)}.\n` +
     d.actions.map((a) => `${a.label}: ${a.n}`).join(', ');

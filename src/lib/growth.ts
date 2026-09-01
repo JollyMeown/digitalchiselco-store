@@ -917,6 +917,37 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         const soldCount: Record<string, number> = {};
         for (const r of oi || []) { const t = String((r as any).title || '').split('|')[0].trim(); if (t) soldCount[t] = (soldCount[t] || 0) + 1; }
         const revenue = (ords || []).reduce((s: number, o: any) => s + (Number(o.total) || 0), 0);
+        // ── extra pulse sections: email health, Cut Local funnel, traffic
+        //    trend + SEO checkpoints (owner directive: keep stats watched) ──
+        let extraHtml = '';
+        try {
+          const prevSinceDay = daysAgo(14).slice(0, 10);
+          const [{ count: pvPrev }, { data: emailLog }, { count: invitesTotal }, { count: applied }, { count: approved }, { count: openReq }, { count: doneReq }, { data: feeRows }] = await Promise.all([
+            db.from('site_visits').select('id', { count: 'exact', head: true }).gte('day', prevSinceDay).lt('day', sinceDay),
+            db.from('email_send_log').select('kind, status').gte('sent_at', since).limit(20000),
+            db.from('maker_invites').select('email', { count: 'exact', head: true }),
+            db.from('maker_invites').select('email', { count: 'exact', head: true }).not('applied_at', 'is', null),
+            db.from('makers').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
+            db.from('maker_requests').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+            db.from('maker_requests').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
+            db.from('maker_ledger').select('amount_usd').eq('kind', 'success_fee'),
+          ]);
+          const eSent = (emailLog || []).filter((e: any) => e.status === 'sent').length;
+          const eFail = (emailLog || []).filter((e: any) => e.status === 'failed').length;
+          const wow = pvPrev ? Math.round(((pv || 0) - pvPrev) / pvPrev * 100) : 0;
+          const wowTxt = pvPrev ? (wow >= 0 ? `up ${wow}%` : `DOWN ${Math.abs(wow)}%`) : 'no prior week yet';
+          const fees = (feeRows || []).reduce((s2: number, r: any) => s2 + Number(r.amount_usd || 0), 0);
+          const sec = (t: string, rows: string[]) => `<p style="font-size:13px;font-weight:bold;color:#854F0B;margin:16px 0 4px;">${t}</p><p style="font-size:13px;color:#555;margin:2px 0;line-height:1.7;">${rows.join('<br/>')}</p>`;
+          extraHtml =
+            sec('📈 Traffic trend', [`This week vs last: <b${wow < -25 ? ' style="color:#b91c1c"' : ''}>${wowTxt}</b> (${pv || 0} vs ${pvPrev || 0} visits)${wow < -25 ? ' — worth checking Search Console for lost rankings' : ''}`]) +
+            sec('📧 Email engine (7 days)', [`${eSent} delivered · ${eFail} failed${eFail > 0 ? ' — check Admin → Automations lights' : ''}`]) +
+            sec('🔨 Cut Local funnel', [`${invitesTotal || 0} invited → ${applied || 0} applied → ${approved || 0} approved makers`, `${openReq || 0} open request(s) · ${doneReq || 0} completed · $${fees.toFixed(2)} fees earned`]) +
+            sec('🔍 SEO checkpoints (5-min weekly habit)', [
+              `<a href="https://search.google.com/search-console/performance/search-analytics?resource_id=sc-domain%3Adigitalchiselco.com" style="color:#854F0B;">Search Console → Performance</a>: are clicks/impressions growing week over week?`,
+              `<a href="https://search.google.com/search-console/index?resource_id=sc-domain%3Adigitalchiselco.com" style="color:#854F0B;">Search Console → Pages</a>: indexed count should keep climbing (1,613 discovered after the sitemap fix)`,
+              `Any "Searched but NOT found" terms above are free product ideas AND missing SEO pages`,
+            ]);
+        } catch (e) { console.error('[ownerReport extras]', (e as any)?.message); }
         const { subject, html, text } = ownerWeeklyReport({
           email: OPS, weekLabel: week,
           pageviews: pv || 0,
@@ -932,6 +963,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           topWished: await topProd('wishlist_add'),
           topSold: Object.entries(soldCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([title, n]) => ({ title, n })),
           zeroSearches: [...new Set((evs || []).filter((e: any) => e.type === 'search' && e.q && (e.n ?? 0) === 0).map((e: any) => String(e.q)))].slice(0, 12),
+          extraHtml,
         });
         const r = await sendEmail({ to: OPS, subject, html, text, idempotencyKey: `ownerreport:${week}`, tags: [{ name: 'kind', value: 'ownerReport' }] });
         stats.ownerReport = r.ok ? `sent (${week})` : `failed: ${r.error}`;
