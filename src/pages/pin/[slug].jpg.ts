@@ -41,6 +41,17 @@ export const GET: APIRoute = async ({ params }) => {
 
   const title = String(p.seo_title || p.title || '').split('|')[0].trim();
 
+  // Cut Local second door: most of Pinterest does not own a CNC. When the
+  // marketplace is live the Pin also speaks to them, which is the difference
+  // between "not for me" and a click. Gated like every other Cut Local surface.
+  let makerLine = false;
+  try {
+    // growth_settings is RLS-locked to admin, so this needs the service client
+    const { supabaseAdmin } = await import('../../lib/supabase');
+    const { data: gs } = await supabaseAdmin().from('growth_settings').select('marketplace_enabled').eq('id', 1).maybeSingle();
+    makerLine = !!gs?.marketplace_enabled;
+  } catch {}
+
   let sharp: any;
   try { sharp = (await import('sharp')).default; }
   catch { return new Response(null, { status: 302, headers: { location: p.image_url } }); }
@@ -74,7 +85,11 @@ export const GET: APIRoute = async ({ params }) => {
       ${titleSvg}
       <text x="${W / 2}" y="${textTop + lines.length * 62 + 52}" text-anchor="middle" font-family="Georgia, serif" font-size="33" fill="#6b5d4a">Commercial use included</text>
       <text x="${W / 2}" y="${textTop + lines.length * 62 + 100}" text-anchor="middle" font-family="Georgia, serif" font-size="33" fill="#6b5d4a">Aspire · VCarve · Carveco · Fusion 360</text>
-      <text x="${W / 2}" y="${H - 168}" text-anchor="middle" font-family="Georgia, serif" font-size="34" fill="#6b5d4a">3D relief STL for CNC, laser &amp; 3D printing</text>
+      ${makerLine ? `
+      <rect x="${W / 2 - 300}" y="${H - 268}" width="600" height="76" rx="38" fill="#2c6a67"/>
+      <text x="${W / 2}" y="${H - 218}" text-anchor="middle" font-family="Georgia, serif" font-size="33" font-weight="bold" fill="#ffffff">No machine? Get it made for you</text>
+      <text x="${W / 2}" y="${H - 152}" text-anchor="middle" font-family="Georgia, serif" font-size="30" fill="#6b5d4a">Own a CNC, laser or 3D printer?</text>`
+      : `<text x="${W / 2}" y="${H - 168}" text-anchor="middle" font-family="Georgia, serif" font-size="34" fill="#6b5d4a">3D relief STL for CNC, laser &amp; 3D printing</text>`}
       <rect x="${W / 2 - 250}" y="${H - 130}" width="500" height="82" rx="41" fill="#854F0B"/>
       <text x="${W / 2}" y="${H - 76}" text-anchor="middle" font-family="Georgia, serif" font-size="36" font-weight="bold" fill="#ffffff">Instant download</text>
     </svg>`);

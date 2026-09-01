@@ -78,6 +78,14 @@ const FALLBACK = (t: string) =>
 
 export async function GET() {
   const now = Date.now();
+  // Cut Local second door in the Pin text: speaks to pinners with no machine.
+  let makerCta = false;
+  try {
+    // growth_settings is RLS-locked to admin, so this needs the service client
+    const { supabaseAdmin } = await import('../lib/supabase');
+    const { data: gs } = await supabaseAdmin().from('growth_settings').select('marketplace_enabled').eq('id', 1).maybeSingle();
+    makerCta = !!gs?.marketplace_enabled;
+  } catch {}
   const daysSinceStart = Math.floor((now - START_DATE) / DAY_MS); // 0 on the start day, negative before
 
   // Empty (but valid) feed before the rollout starts.
@@ -124,7 +132,8 @@ export async function GET() {
     if (Array.isArray(p.seo_keywords)) kws = p.seo_keywords.map((k: any) => clean(k)).filter(Boolean);
     const base = clean(p.seo_description || (p.description || '').slice(0, 360) || FALLBACK(rawTitle));
     const kwLine = kws.length ? ` Great for ${kws.slice(0, 4).join(', ')}.` : '';
-    const cta = ' Instant download with commercial use. Grab 5 free STL files at digitalchiselco.com/free.';
+    const cta = (makerCta ? ' No CNC or 3D printer? A vetted local maker can build this for you, free to request a quote.' : '')
+      + ' Instant download with commercial use. Grab 5 free STL files at digitalchiselco.com/free.';
     const desc = (base + kwLine + cta).slice(0, 500);
     const descHtml = `<img src="${xmlEscape(img)}" alt="${xmlEscape(rawTitle)}" /><p>${xmlEscape(desc)}</p>`;
     return `    <item>
