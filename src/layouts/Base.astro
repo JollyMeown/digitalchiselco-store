@@ -20,6 +20,10 @@ const site = import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com';
 // GA4 — defaults to the project's measurement ID. Override per-environment via
 // the Netlify env var PUBLIC_GA_MEASUREMENT_ID (e.g. a staging stream).
 const gaId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || 'G-MB5KF3D03Y';
+// Pinterest Tag (conversion tracking for the approved merchant catalog +
+// shopping campaigns). Dormant until PUBLIC_PINTEREST_TAG_ID is set in
+// Netlify: get the id from Pinterest Ads -> Conversions -> Tag manager.
+const pinTagId = import.meta.env.PUBLIC_PINTEREST_TAG_ID || '';
 const canonical = new URL(Astro.url.pathname, site).href;
 const ogImage = image.startsWith('http') ? image : new URL(image, site).href;
 const settings = await getSettings();
@@ -139,6 +143,15 @@ const faviconType = settings.favicon_image_url
           gtag('config', gaId);
         </script>
       </>
+    )}
+    {pinTagId && (
+      <script is:inline define:vars={{ pinTagId }}>
+        /* Pinterest Tag: base + PageVisit. AddToCart and Checkout are fired
+           from the cart/checkout code via window.pintrk when it exists. */
+        !function(e){if(!window.pintrk){window.pintrk=function(){window.pintrk.queue.push(Array.prototype.slice.call(arguments))};var n=window.pintrk;n.queue=[],n.version="3.0";var t=document.createElement("script");t.async=!0,t.src=e;var r=document.getElementsByTagName("script")[0];r.parentNode.insertBefore(t,r)}}("https://s.pinimg.com/ct/core.js");
+        pintrk('load', pinTagId);
+        pintrk('page');
+      </script>
     )}
   </head>
   <body class="overflow-x-clip">

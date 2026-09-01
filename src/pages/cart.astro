@@ -526,6 +526,19 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
           eventCallback: (e) => {
             if (e.name === 'checkout.completed') {
               const txnId = e.data?.transaction_id || e.data?.id;
+              // Pinterest conversion (no-op unless the tag is configured)
+              try {
+                if (window.pintrk) {
+                  const c = JSON.parse(localStorage.getItem('cart') || '[]');
+                  window.pintrk('track', 'checkout', {
+                    value: Number(e.data?.totals?.total ?? e.data?.totals?.grand_total ?? 0) || undefined,
+                    currency: e.data?.currency_code || 'USD',
+                    order_quantity: c.length || 1,
+                    order_id: txnId || undefined,
+                    line_items: c.map((x) => ({ product_id: x.id, product_name: x.title, product_price: Number(x.price) || 0, product_quantity: 1 })),
+                  });
+                }
+              } catch (_) {}
               localStorage.setItem('cart', '[]');
               window.dispatchEvent(new Event('cart-changed'));
               window.location.href = '/checkout/success' + (txnId ? '?txn=' + encodeURIComponent(txnId) : '');
