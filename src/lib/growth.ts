@@ -144,30 +144,54 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   // BEFORE the weekly digest (which can drain the whole day's budget — it
   // did on 8/31 and the drip sent 0), and a top-up pass after the digest
   // that spends surplus budget while leaving ~40 for other marketing.
+  // WAVES (owner directive): everyone is re-invited every RECRUIT_WAVE_DAYS
+  // with a rotating subject, until they apply as a maker or unsubscribe.
+  // Wave cap protects sender reputation; fresh (never-invited) people go first.
+  const RECRUIT_WAVE_DAYS = 10, RECRUIT_MAX_WAVES = 8;
   const runRecruitDrip = async (target: number, statsKey: string) => {
     const { makerRecruitEmail } = await import('./marketing-emails');
     if (target <= 0) { stats[statsKey] = 'deferred: no budget today'; return; }
-    const { data: invited } = await db.from('maker_invites').select('email').limit(20000);
-    const invitedSet = new Set((invited || []).map((r: any) => String(r.email).toLowerCase()));
-    const pool: string[] = [];
-    for (let from = 0; from < 20000 && pool.length < target + 50; from += 1000) {
+    const [{ data: invited }, { data: makerRows }] = await Promise.all([
+      db.from('maker_invites').select('email, last_sent_at, invite_count, applied_at').limit(20000),
+      db.from('makers').select('email').limit(20000),
+    ]);
+    const makerSet = new Set((makerRows || []).map((r: any) => String(r.email).toLowerCase()));
+    const invitedBy = new Map<string, any>();
+    for (const r of invited || []) invitedBy.set(String(r.email).toLowerCase(), r);
+    // fresh pool: subscribers never invited (and not already makers)
+    const fresh: string[] = [];
+    for (let from = 0; from < 20000 && fresh.length < target + 50; from += 1000) {
       const { data: subs } = await db.from('subscribers').select('email').order('created_at').range(from, from + 999);
       if (!subs?.length) break;
       for (const srow of subs) {
         const em = String(srow.email || '').toLowerCase().trim();
-        if (em && !invitedSet.has(em) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) pool.push(em);
+        if (em && !invitedBy.has(em) && !makerSet.has(em) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) fresh.push(em);
       }
       if (subs.length < 1000) break;
     }
-    const s: any = { sent: 0, failed: 0, poolLeft: Math.max(0, pool.length - target) };
-    if (!pool.length) { stats[statsKey] = 'pool empty: every subscriber has been invited'; return; }
+    // re-invite pool: invited before, no application, wave cooldown passed
+    const cutoff = Date.now() - RECRUIT_WAVE_DAYS * 86400000;
+    const again = (invited || [])
+      .filter((r: any) => !r.applied_at && !makerSet.has(String(r.email).toLowerCase())
+        && (r.invite_count || 1) < RECRUIT_MAX_WAVES && Date.parse(r.last_sent_at) < cutoff
+        && !String(r.email).includes('@example.'))
+      .sort((a: any, b: any) => Date.parse(a.last_sent_at) - Date.parse(b.last_sent_at))
+      .map((r: any) => String(r.email).toLowerCase());
+    const pool = [...fresh, ...again];
+    const s: any = { sent: 0, rewaves: 0, failed: 0, poolLeft: Math.max(0, pool.length - target) };
+    if (!pool.length) { stats[statsKey] = 'pool empty: everyone is invited, applied, or inside the 10-day wave cooldown'; return; }
     for (const em of pool.slice(0, target)) {
       if (outOfTime()) break;
       try {
-        if (await isUnsubscribed(db, em)) { invitedSet.add(em); await db.from('maker_invites').upsert({ email: em, source: 'drip-skip-unsub' }, { onConflict: 'email', ignoreDuplicates: true }); continue; }
-        const { subject, html, text } = makerRecruitEmail({ email: em });
-        const r2 = await sendEmail({ to: em, subject, html, text, idempotencyKey: 'maker-recruit:' + em, tags: [{ name: 'kind', value: 'makerRecruit' }] });
-        if (r2.ok && !r2.skipped) { s.sent++; await db.from('maker_invites').upsert({ email: em, source: 'drip' }, { onConflict: 'email', ignoreDuplicates: true }); }
+        const prev = invitedBy.get(em);
+        const wave = prev ? (prev.invite_count || 1) : 0;
+        if (await isUnsubscribed(db, em)) { await db.from('maker_invites').upsert({ email: em, source: 'drip-skip-unsub', invite_count: RECRUIT_MAX_WAVES, last_sent_at: new Date().toISOString() }, { onConflict: 'email' }); continue; }
+        const { subject, html, text } = makerRecruitEmail({ email: em, wave });
+        const r2 = await sendEmail({ to: em, subject, html, text, idempotencyKey: `maker-recruit:${em}:w${wave}`, tags: [{ name: 'kind', value: 'makerRecruit' }] });
+        if (r2.ok && !r2.skipped) {
+          s.sent++; if (prev) s.rewaves++;
+          await db.from('maker_invites').upsert({ email: em, source: prev?.source || 'drip', invite_count: wave + 1, last_sent_at: new Date().toISOString() }, { onConflict: 'email' });
+        }
         else if (r2.quota) { stats[statsKey] = { ...s, note: 'stopped: daily budget reached' }; return; }
         else s.failed++;
       } catch { s.failed++; }

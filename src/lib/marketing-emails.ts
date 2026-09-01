@@ -588,13 +588,25 @@ export function portalGuideEmail(): { subject: string; html: string; text: strin
 // Invites the existing audience to apply as a fabricator. Links to the gated
 // /become-a-maker form with ?email= prefill. `applyUrl` lets the admin point
 // at a preview/staging link during testing.
-export function makerRecruitEmail(opts: { email: string; applyUrl?: string } = { email: '' }): { subject: string; html: string; text: string } {
+// Recruit invites go out in WAVES: the same person is re-invited every ~10
+// days with a DIFFERENT subject + opener (owner directive 2026-09-01) until
+// they apply as a maker or unsubscribe. `wave` picks the variant (cycles).
+const RECRUIT_WAVES: { subject: string; opener: string }[] = [
+  { subject: 'Join Cut Local: Get CNC & 3D Printing RFQs', opener: 'Quick question: <strong>do you own a CNC router, laser, or 3D printer?</strong>' },
+  { subject: 'Own a CNC or 3D printer? Buyers near you need it', opener: 'People keep asking us who can <strong>actually build</strong> our designs near them. If you own a CNC router, laser, or 3D printer, that could be you.' },
+  { subject: 'Turn your workshop hours into paid orders', opener: 'Your machine sits idle some days. Our buyers are looking for someone exactly like you to make the designs they already love.' },
+  { subject: 'Your machine could be earning while you sleep on it', opener: 'Still thinking it over? Fair enough. Here is the short version of why makers join <strong>Cut Local</strong>:' },
+  { subject: 'We send the customers, you make the sawdust', opener: 'The hardest part of selling custom work is finding buyers. We already have them, and they keep asking for finished pieces.' },
+  { subject: 'A buyer near you may be waiting for your quote', opener: 'Every week, more buyers post requests to have our designs built locally. Each one is a job that could be yours.' },
+];
+export function makerRecruitEmail(opts: { email: string; applyUrl?: string; wave?: number } = { email: '' }): { subject: string; html: string; text: string } {
   const base = 'https://digitalchiselco.com/become-a-maker';
   const url = (opts.applyUrl || base) + (opts.email ? (`${(opts.applyUrl || base).includes('?') ? '&' : '?'}email=${encodeURIComponent(opts.email)}`) : '');
-  const subject = 'Join Cut Local: Get CNC & 3D Printing RFQs';
+  const v = RECRUIT_WAVES[Math.abs(Math.round(opts.wave || 0)) % RECRUIT_WAVES.length];
+  const subject = v.subject;
   const html = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#2a241d;">
 <p>Hi,</p>
-<p>Quick question: <strong>do you own a CNC router, laser, or 3D printer?</strong></p>
+<p>${v.opener}</p>
 <p>We're opening <strong>Cut Local</strong> — our new maker network at DigitalChiselCo. Every day, people fall in love with our designs but have no machine to make them. We want to send those ready-to-cut jobs to makers like you, with the design file already in hand.</p>
 <ul style="line-height:1.7;">
 <li><strong>Paid work near you</strong> — buyers request a piece, you quote on your terms</li>
@@ -605,7 +617,7 @@ export function makerRecruitEmail(opts: { email: string; applyUrl?: string } = {
 <p style="margin:22px 0;"><a href="${url}" style="background:#854F0B;color:#fff;text-decoration:none;padding:13px 24px;border-radius:8px;font-weight:bold;">Apply to become a Maker →</a></p>
 <p>It takes about 5 minutes. We review every maker by hand, so you'll be part of a trusted, quality network from day one.</p>
 <p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`;
-  const text = `Do you own a CNC router, laser, or 3D printer? We're opening Cut Local, our new maker network at DigitalChiselCo. Get paid work near you: buyers request a piece, you quote on your terms, they pay you directly, and we take just a 3% success fee on completed jobs. Free to join; founding makers get free starter credits. Apply (about 5 minutes): ${url}  — Jolly, DigitalChiselCo`;
+  const text = `${v.subject}. Cut Local is our maker network at DigitalChiselCo. Get paid work near you: buyers request a piece, you quote on your terms, they pay you directly, and we take just a 3% success fee on completed jobs. Free to join; founding makers get free starter credits. Apply (about 5 minutes): ${url}  — Jolly, DigitalChiselCo`;
   return { subject, html, text };
 }
 
