@@ -46,10 +46,13 @@ function cdata(v: unknown): string {
 // and 4:3 (1.333) are the same, so this upscales with essentially no crop, and
 // the image is served from our own domain. Requires the [images] remote_images
 // allow-list in netlify.toml.
-const PIN_W = 1200, PIN_H = 900;
-function pinImage(src: string): string {
-  if (!src) return '';
-  return `${SITE}/.netlify/images?url=${encodeURIComponent(src)}&w=${PIN_W}&h=${PIN_H}&fit=cover&fm=jpg&q=82`;
+// Pins now use the purpose-built 2:3 vertical art from /pin/<slug>.jpg
+// (branded canvas, full carving, title + CTA) instead of the raw landscape
+// photo, which rendered small in Pinterest's vertical feed.
+const PIN_W = 1000, PIN_H = 1500;
+function pinImage(slug: string): string {
+  if (!slug) return '';
+  return `${SITE}/pin/${encodeURIComponent(slug)}.jpg`;
 }
 // Real byte size for <enclosure length>. length="0" declares an EMPTY file,
 // which is why strict parsers ignored the enclosure. Sizes are fetched once
@@ -108,7 +111,7 @@ export async function GET() {
   }
 
   // Byte sizes for every Pin image, resolved in parallel before rendering.
-  const pinUrls = items.map((p) => pinImage(clean(p.image_url)));
+  const pinUrls = items.map((p) => pinImage(clean(p.slug)));
   const pinBytes = await Promise.all(pinUrls.map((u) => (u ? imageBytes(u) : Promise.resolve(FALLBACK_BYTES))));
 
   const itemXml = items.map((p, idx) => {

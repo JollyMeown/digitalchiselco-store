@@ -61,7 +61,10 @@ export async function GET() {
           // recommended size, and it returns Cache-Control: max-age=3600
           // (the /object/public/ endpoint returns no-cache, which Pinterest's
           // catalog crawler rejects/skips).
-          cell(img(p.image_url, { w: 1200, q: 85 })),
+          // 2:3 vertical Pin art (branded canvas, title + CTA). Pinterest is a
+          // vertical surface; the raw landscape photo renders small and loses
+          // the click. /pin/<slug>.jpg falls back to the original on any error.
+          cell(`${SITE}/pin/${encodeURIComponent(p.slug)}.jpg`),
           cell(`${original.toFixed(2)} USD`),
           cell(percent > 0 ? `${price.toFixed(2)} USD` : ''),
           cell('in stock'),

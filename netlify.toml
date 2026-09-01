@@ -7,6 +7,9 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  # sharp ships native binaries esbuild cannot inline; Netlify installs the
+  # linux build at deploy time. Needed by /pin/<slug>.jpg (Pinterest art).
+  external_node_modules = ["sharp"]
 
 [build.environment]
   NODE_VERSION = "22"
