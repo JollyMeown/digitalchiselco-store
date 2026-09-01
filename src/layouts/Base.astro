@@ -247,6 +247,11 @@ const faviconType = settings.favicon_image_url
           email: settings.admin_email || 'jolly@digitalchiselco.com',
           sameAs: [],
           description: 'Premium bas-relief STL files for CNC routers, laser engravers and 3D printers.',
+          // Payment methods our Paddle checkout actually accepts. Google's Shop
+          // quality scorecard grades "payment options", and these were not
+          // declared anywhere machine-readable.
+          paymentAccepted: 'Credit Card, Debit Card, Visa, Mastercard, American Express, PayPal, Apple Pay, Google Pay',
+          currenciesAccepted: 'USD, EUR, GBP, CAD, AUD',
         },
         {
           '@type': 'WebSite',
