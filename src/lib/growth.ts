@@ -1085,6 +1085,16 @@ ${ideasHtml}
     }
   });
 
+  // ── Google Merchant Center daily stats ───────────────────────────────
+  // Pull impressions/clicks so the admin can graph the channel without
+  // opening Merchant Center. No-op until the service account is configured.
+  stats.merchantStats = 'off';
+  await step(stats, 'merchantStats', async () => {
+    const { merchantConfigured, syncMerchantStats } = await import('./google-merchant');
+    if (!merchantConfigured()) { stats.merchantStats = 'not configured (add GOOGLE_SA_* env)'; return; }
+    stats.merchantStats = await syncMerchantStats(30);
+  });
+
   // ── Cut Local maker automations (gated) ──────────────────────────────
   // Nudge makers who have unquoted open jobs near them (max once/20h each),
   // and remind low-credit makers to top up (max once/7d each).
