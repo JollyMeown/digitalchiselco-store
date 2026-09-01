@@ -115,10 +115,12 @@ function ImageExperiment() {
   const days = Math.max(0, Math.round((Date.now() - Date.parse(d.startDay)) / 86400000));
   return (
     <div className="mt-4 border-t border-black/10 pt-3">
-      <div className="text-xs font-bold text-ink-900 mb-1">🧪 Square-image test · {d.n} products · day {days} of 7</div>
+      <div className="text-xs font-bold text-ink-900 mb-1">🧪 Square-image test · {d.n} products vs control · day {days} of 14</div>
       <p className="text-[11px] text-ink-700/55 mb-2">
-        Those {d.n} products now send Google a square image where the carving fills the tile. Everything else is unchanged and acts as the control.
-        {days < 7 && ' Too early to judge — give it the full week.'}
+        Half the catalogue ({d.n} products) sends Google a square image where the carving fills the tile; the other half is unchanged.
+        {days < 14
+          ? ' Too early to judge. Compare the two CTRs, not the raw click counts, and remember both halves rise together as products get approved.'
+          : ' Ready to read: if the test CTR clearly beats control, roll square images out to the rest.'}
       </p>
       <div className="grid grid-cols-2 gap-2 max-w-md">
         {cell('Test group CTR', d.testBefore, d.testAfter)}
