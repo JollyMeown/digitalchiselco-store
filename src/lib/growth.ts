@@ -151,6 +151,10 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   const runRecruitDrip = async (target: number, statsKey: string) => {
     const { makerRecruitEmail } = await import('./marketing-emails');
     if (target <= 0) { stats[statsKey] = 'deferred: no budget today'; return; }
+    // Founding credits are an admin setting: the invite must promise what is
+    // actually granted on approval, not a number baked in at build time.
+    const { data: gsF } = await db.from('growth_settings').select('founding_credits').eq('id', 1).maybeSingle();
+    const founding = gsF?.founding_credits ?? undefined;
     const [{ data: invited }, { data: makerRows }] = await Promise.all([
       db.from('maker_invites').select('email, last_sent_at, invite_count, applied_at').limit(20000),
       db.from('makers').select('email').limit(20000),
@@ -186,7 +190,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         const prev = invitedBy.get(em);
         const wave = prev ? (prev.invite_count || 1) : 0;
         if (await isUnsubscribed(db, em)) { await db.from('maker_invites').upsert({ email: em, source: 'drip-skip-unsub', invite_count: RECRUIT_MAX_WAVES, last_sent_at: new Date().toISOString() }, { onConflict: 'email' }); continue; }
-        const { subject, html, text } = makerRecruitEmail({ email: em, wave });
+        const { subject, html, text } = makerRecruitEmail({ email: em, wave, founding });
         const r2 = await sendEmail({ to: em, subject, html, text, idempotencyKey: `maker-recruit:${em}:w${wave}`, tags: [{ name: 'kind', value: 'makerRecruit' }] });
         if (r2.ok && !r2.skipped) {
           s.sent++; if (prev) s.rewaves++;

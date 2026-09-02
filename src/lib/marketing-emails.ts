@@ -599,8 +599,8 @@ export function portalGuideEmail(): { subject: string; html: string; text: strin
 // had to email and ask what credits cost, which is a question the invite itself
 // should never leave open.
 const RECRUIT_FEE_PCT = SUCCESS_FEE_PCT;
-const RECRUIT_FOUNDING_CREDITS = FOUNDING_CREDITS;
-const FAQ_URL = `${SITE}/maker-faq`;
+const RECRUIT_FOUNDING_DEFAULT = FOUNDING_CREDITS;   // fallback when the caller has not read the setting
+const FAQ_URL = `${SITE}/faq?for=makers`;
 const RECRUIT_PACK_LINE = packLine();
 const RECRUIT_WAVES: { subject: string; opener: string }[] = [
   { subject: 'Join Cut Local: Get CNC & 3D Printing RFQs', opener: 'Quick question: <strong>do you own a CNC router, laser, or 3D printer?</strong>' },
@@ -610,7 +610,10 @@ const RECRUIT_WAVES: { subject: string; opener: string }[] = [
   { subject: 'We send the customers, you make the sawdust', opener: 'The hardest part of selling custom work is finding buyers. We already have them, and they keep asking for finished pieces.' },
   { subject: 'A buyer near you may be waiting for your quote', opener: 'Every week, more buyers post requests to have our designs built locally. Each one is a job that could be yours.' },
 ];
-export function makerRecruitEmail(opts: { email: string; applyUrl?: string; wave?: number } = { email: '' }): { subject: string; html: string; text: string } {
+export function makerRecruitEmail(opts: { email: string; applyUrl?: string; wave?: number; founding?: number } = { email: '' }): { subject: string; html: string; text: string } {
+  // The founding grant is an admin setting (Admin -> Makers). The caller passes
+  // the live value so the invite never promises fewer credits than are given.
+  const RECRUIT_FOUNDING_CREDITS = Number(opts.founding ?? RECRUIT_FOUNDING_DEFAULT);
   const base = 'https://digitalchiselco.com/become-a-maker';
   const url = (opts.applyUrl || base) + (opts.email ? (`${(opts.applyUrl || base).includes('?') ? '&' : '?'}email=${encodeURIComponent(opts.email)}`) : '');
   const v = RECRUIT_WAVES[Math.abs(Math.round(opts.wave || 0)) % RECRUIT_WAVES.length];

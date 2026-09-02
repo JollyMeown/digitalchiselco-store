@@ -1,0 +1,283 @@
+---
+// The site's FAQ hub, in two halves: BUYERS (default) and MAKERS.
+//
+// Two audiences ask completely different questions, but they share one URL so
+// there is a single "FAQ" button to point at from the banner, the nav and the
+// footer, and so a buyer curious about Cut Local can cross over in one click.
+// Both halves are in the DOM at all times, so search engines index every answer
+// and #makers / ?for=makers deep-links straight to the maker half.
+//
+// Every price and fee is read from marketplace-pricing.ts, the same module the
+// app charges from, so an answer here can never drift from what is charged.
+import Shell from '../layouts/Shell.astro';
+import {
+  FOUNDING_CREDITS as FOUNDING_DEFAULT, SUCCESS_FEE_PCT as FEE, FEE_INVOICE_MIN_USD as FEE_MIN,
+  FEE_INVOICE_DAYS as FEE_DAYS, FEE_TERMS_DAYS as FEE_TERMS, creditPacks, perQuote, quotePriceRange,
+} from '../lib/marketplace-pricing';
+import { supabaseAdmin } from '../lib/supabase';
+
+const packs = creditPacks();
+const [cheapest, dearest] = quotePriceRange();
+
+// The maker half is only advertised while Cut Local is live, and the founding
+// grant is an admin setting, so read BOTH: promising 5 free credits while the
+// admin grants 10 is exactly the drift this page exists to prevent.
+let live = false;
+let FOUNDING_CREDITS = FOUNDING_DEFAULT;
+try {
+  const { data } = await supabaseAdmin().from('growth_settings').select('marketplace_enabled, founding_credits').eq('id', 1).maybeSingle();
+  live = !!data?.marketplace_enabled;
+  if (data?.founding_credits != null) FOUNDING_CREDITS = Number(data.founding_credits);
+} catch {}
+
+type QA = { q: string; a: string; group: string };
+
+// ── BUYERS ────────────────────────────────────────────────────────────
+// Answers follow the published Terms and Refund Policy exactly. If either
+// document changes, change these with it.
+const BUYER: QA[] = [
+  { group: 'What you are buying', q: 'What do I actually receive?',
+    a: 'A digital STL file that you download. Nothing is posted to you. The design is finished and ready to machine, so there is no modelling work left for you to do.' },
+  { group: 'What you are buying', q: 'Which machines can use these files?',
+    a: 'CNC routers, laser engravers and 3D printers. The reliefs are sculpted for clean carving, and they open in Vectric Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360 and any other package that imports STL.' },
+  { group: 'What you are buying', q: 'Can I resize a design for my project?',
+    a: 'Yes. Scale it in your CAM software to the size and depth your material and machine allow. Most buyers scale a relief to fit the blank they already have.' },
+  { group: 'What you are buying', q: 'Will it carve on my machine?',
+    a: 'If your machine cuts 3D toolpaths from an STL, yes. Detail depends on your bit and your material rather than on the file, so a smaller ball nose on a finish pass gives the crispest result.' },
+  { group: 'What you are buying', q: 'I love a design but I have no machine. What then?',
+    a: 'Use Cut Local. Tell us what you want made and makers near you send quotes with their price and lead time. You choose one and pay them directly, and the finished piece is real wood, not a file.' },
+
+  { group: 'Paying', q: 'Who charges my card?',
+    a: 'Paddle. They are our authorised reseller and merchant of record, which means they are the seller for tax and consumer-protection purposes, they issue your receipt, and they handle billing and card security. We never see or store card numbers.' },
+  { group: 'Paying', q: 'What currency am I charged in, and is tax included?',
+    a: 'Prices are shown in US dollars and the site can display them converted for you. Checkout charges natively in EUR, GBP, CAD and AUD, and everything else in USD. Any sales tax, VAT or GST is calculated and collected by Paddle at checkout based on your billing country.' },
+  { group: 'Paying', q: 'Do I need an account?',
+    a: 'No. You can buy as a guest. An account is still worth having because it keeps every file you have ever bought in one place, ready to download again at any time.' },
+
+  { group: 'Getting your files', q: 'How do I get the file after paying?',
+    a: 'Straight away. A download link is emailed to you the moment payment goes through, and the same file appears in your account dashboard.' },
+  { group: 'Getting your files', q: 'I lost my file, or my email vanished. Can I get it again?',
+    a: 'Yes, and it is free forever. Sign in to your account and download it again, or use the "Resend my downloads" page and we will email your links back to you. Keep your own backup too.' },
+  { group: 'Getting your files', q: 'How long do my download links last?',
+    a: 'Indefinitely. Your purchases stay in your account, and re-downloading never costs anything.' },
+
+  { group: 'What you may do with it', q: 'Can I sell what I carve?',
+    a: 'Yes. Commercial use is included with every design. Carve, print or engrave it and sell the finished physical pieces, with no extra licence and no royalty.' },
+  { group: 'What you may do with it', q: 'What is not allowed?',
+    a: 'Sharing, reselling or redistributing the digital file itself, in any form, including a modified version. The licence covers the physical things you make, not the file. Your download access is personal and cannot be passed on.' },
+
+  { group: 'Refunds and help', q: 'Can I get a refund on a digital file?',
+    a: 'Yes. You have 14 days from purchase to cancel for a full refund, for any reason, and you do not have to explain why. Once a refund is issued your licence ends and you agree to delete any copies you downloaded.' },
+  { group: 'Refunds and help', q: 'How do I request one?',
+    a: 'Email jolly@digitalchiselco.com within 14 days with your order number or the email you used at checkout, or contact Paddle using the receipt they sent you. Refunds are usually processed within two business days and take 5 to 10 business days to appear on your statement.' },
+  { group: 'Refunds and help', q: 'Something is wrong with my order. Who do I talk to?',
+    a: 'Reply to your order email or write to jolly@digitalchiselco.com. A real person reads every message, and a direct fix is nearly always faster than a bank chargeback.' },
+
+  { group: 'Ways to save', q: 'Is there anything free?',
+    a: 'Yes. The free files page has a starter pack you can download without paying, so you can test how our reliefs carve on your own machine before you spend anything.' },
+  { group: 'Ways to save', q: 'What are the bundles and the membership?',
+    a: 'The bundle builder lets you pick 5 designs from $25. The membership is a single one-time payment that delivers a set number of files each month for the length of the plan. It never renews automatically and you are never charged again.' },
+  { group: 'Ways to save', q: 'Can you make a design that does not exist yet?',
+    a: 'Ask on the request page. If several people want the same subject it moves up the queue, and requested designs are released to the whole catalogue.' },
+];
+
+// ── MAKERS (Cut Local) ────────────────────────────────────────────────
+const MAKER: QA[] = [
+  { group: 'What it costs', q: 'What does it cost to join Cut Local?',
+    a: 'Nothing. Applying, being listed in the maker directory and having a public profile are all free. There is no joining fee, no monthly fee and no subscription.' },
+  { group: 'What it costs', q: 'What is a credit, and when is one spent?',
+    a: `A credit is spent only when you send a quote on a job. One quote costs one credit. Browsing jobs, reading the buyer's brief, messaging a buyer after you are awarded, and completing the work all cost nothing. Editing a quote you have already sent on the same job is also free.` },
+  { group: 'What it costs', q: 'How much does a credit cost?',
+    a: `${packs.map((p) => `${p.credits} credits for $${p.price}`).join(', ')}. That works out between ${cheapest} and ${dearest} per quote, and the bigger packs are cheaper per quote. Credits never expire.` },
+  { group: 'What it costs', q: 'Do I have to buy credits before I can start?',
+    a: `No. Approved founding makers start with ${FOUNDING_CREDITS} free credits, so your first ${FOUNDING_CREDITS} quotes cost you nothing. You only buy more once you have seen the jobs for yourself.` },
+  { group: 'What it costs', q: 'Why charge for quoting at all?',
+    a: 'To keep quoting serious. A buyer who posts a job should get two or three considered quotes from makers who genuinely want the work, not twenty copy-paste replies. The credit is deliberately small: it costs a spammer real money, and it costs you less than a coffee to win a job worth hundreds.' },
+  { group: 'What it costs', q: 'Do I get the credit back if the buyer picks someone else?',
+    a: 'No. The credit pays for the quote, not the outcome, so quote the jobs that genuinely suit your shop rather than every job on the board. If a job is cancelled by us or turns out to be fraudulent, we refund the credits of everyone who quoted it.' },
+
+  { group: 'Getting paid', q: 'How do I get paid for a job?',
+    a: 'The buyer pays you directly, on the terms the two of you agree, by whatever method suits you both: PayPal, Wise, bank transfer or a local method. We are not in the middle of that payment and we never hold your money.' },
+  { group: 'Getting paid', q: `What is the ${FEE}% success fee?`,
+    a: `When a job is marked complete, we charge ${FEE}% of the job value. That is the only cut we take, and it applies only to work you actually won and completed. No win, no fee. You keep ${100 - FEE}% of every job, minus whatever your own payment provider charges you.` },
+  { group: 'Getting paid', q: 'When and how do I pay the success fee?',
+    a: `Fees accumulate on your account. We raise an invoice once they reach $${FEE_MIN}, or every ${FEE_DAYS} days, whichever comes first, and you have ${FEE_TERMS} days to pay it from your maker dashboard by card. Small jobs therefore do not generate a payment request each time. If an invoice goes overdue, quoting pauses until it is settled, and nothing else about your account changes.` },
+  { group: 'Getting paid', q: 'What happens if a buyer does not pay me?',
+    a: 'Tell us before you mark the job complete. We do not charge a success fee on money you never received, and we act on the buyer. Agreeing a deposit before you start is the surest protection, and most makers ask for one on larger pieces.' },
+  { group: 'Getting paid', q: 'Can you show me the maths on a real job?',
+    a: `Say you quote a $300 carving. The quote costs one credit, about ${cheapest} to ${dearest}. You win, and the buyer pays you $300 directly. Our fee is $${(300 * FEE / 100).toFixed(0)}. Your total cost for that job is under $10.` },
+
+  { group: 'The jobs', q: 'Where do the jobs come from?',
+    a: 'From our own buyers. People find a design here, love it, and have no machine to make it, so they ask for it to be built locally. The design file is already in hand, which means no design work, no revisions on artwork, and no chasing files.' },
+  { group: 'The jobs', q: 'Which jobs do I see?',
+    a: 'Jobs near you, matched on the machines and materials you listed, plus any job where a buyer has picked you specifically after seeing your profile. You choose which to quote and you are never obliged to quote anything.' },
+  { group: 'The jobs', q: 'Can a buyer hire me directly?',
+    a: 'Yes, and this is the part worth building toward. Every completed job appears on your public profile with the buyer review, and buyers can send a request straight to you from there. Those direct requests still cost one credit to quote, and good reviews are what earn them.' },
+  { group: 'The jobs', q: 'What am I allowed to do with the design file?',
+    a: 'Each won job gives you a licence to make that one physical piece for that one buyer. You may not resell or share the digital file, and you may not mass-produce beyond the job. That rule is what makes buyers comfortable handing you the file at all.' },
+  { group: 'The jobs', q: 'Can I take a buyer off the platform?',
+    a: `No. Taking a matched buyer off-platform to avoid the fee means removal from the network. The fee is only ${FEE}% and there is nothing else to pay, so it costs far less than the reputation and repeat work you would be giving up.` },
+
+  { group: 'Joining', q: 'Who can join?',
+    a: 'Anyone who owns and operates their own CNC router, CNC mill, laser or 3D printer, and whose work photos are genuinely their own. You should hold whatever business or tax registration your country requires, and describe your capabilities honestly.' },
+  { group: 'Joining', q: 'Which countries are covered?',
+    a: 'Any. The network is worldwide and buyers are matched to makers by distance, so the more makers in a region, the more local jobs get posted there. Early makers in a country tend to see the most work.' },
+  { group: 'Joining', q: 'How long does approval take?',
+    a: 'A few days. We review every application by hand, check the workshop photos, and email you a dashboard link when you are approved, with your founding credits already added.' },
+  { group: 'Joining', q: 'What do buyers see on my profile?',
+    a: 'Your workshop name, city and country, your machines and materials, your star rating, your finished-work photos, and a record of every job you have completed with its review. They never see your email, phone number or address. Contact happens through the platform.' },
+  { group: 'Joining', q: 'Can I leave, or pause?',
+    a: 'Any time, and just reply to any email from us. There is no notice period and no contract. Unused credits stay on your account if you come back, and any invoice already raised for work you completed stays payable.' },
+];
+
+const buyerGroups = [...new Set(BUYER.map((x) => x.group))];
+const makerGroups = [...new Set(MAKER.map((x) => x.group))];
+const faqLd = {
+  '@context': 'https://schema.org', '@type': 'FAQPage',
+  mainEntity: [...BUYER, ...(live ? MAKER : [])].map((x) => ({
+    '@type': 'Question', name: x.q, acceptedAnswer: { '@type': 'Answer', text: x.a },
+  })),
+};
+---
+<Shell
+  title="Questions & answers"
+  description="Everything about buying our STL designs: what you receive, which machines they suit, commercial use, refunds and downloads. Plus how Cut Local works for makers."
+>
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 pb-24">
+
+    <header class="text-center pt-6 pb-6">
+      <h1 class="font-serif text-4xl sm:text-5xl text-bronze-800 leading-tight">Questions, answered</h1>
+      <p class="mt-3 text-ink-700/80 max-w-xl mx-auto">
+        Straight answers about buying our designs{live ? ', and about getting paid to build them' : ''}. If yours is not here, write to us and a real person will reply.
+      </p>
+    </header>
+
+    {live && (
+      <div class="flex justify-center mb-8">
+        <div class="inline-flex bg-cream/70 border border-bronze-600/20 rounded-full p-1" role="tablist">
+          <button id="tab-buyers" role="tab" class="faq-tab px-5 py-2 rounded-full text-sm font-bold transition">🛒 I am buying a design</button>
+          <button id="tab-makers" role="tab" class="faq-tab px-5 py-2 rounded-full text-sm font-bold transition">🛠️ I own a machine</button>
+        </div>
+      </div>
+    )}
+
+    <!-- ── BUYERS ─────────────────────────────────────────────────── -->
+    <div id="faq-buyers">
+      {buyerGroups.map((g) => (
+        <section class="mb-8">
+          <h2 class="font-serif text-2xl text-bronze-800 mb-3">{g}</h2>
+          <div class="space-y-2">
+            {BUYER.filter((x) => x.group === g).map((x) => (
+              <details class="group bg-cream/40 border border-bronze-600/15 rounded-xl px-4 py-3 open:bg-cream/70 transition-colors">
+                <summary class="cursor-pointer list-none flex items-start justify-between gap-3 font-semibold text-ink-900 text-[15px]">
+                  <span>{x.q}</span>
+                  <span class="text-bronze-600 shrink-0 mt-0.5 transition-transform group-open:rotate-45 text-xl leading-none">+</span>
+                </summary>
+                <p class="mt-2.5 text-sm text-ink-700/85 leading-relaxed">{x.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      <section class="text-center bg-cream/60 border border-bronze-600/20 rounded-2xl p-6">
+        <h2 class="font-serif text-xl text-bronze-800">Still stuck?</h2>
+        <p class="text-sm text-ink-700/75 mt-1.5 max-w-md mx-auto">Write to jolly@digitalchiselco.com or use the contact page. Every message is read by a person, not a bot.</p>
+        <div class="mt-4 flex flex-wrap gap-2 justify-center">
+          <a href="/contact" class="bg-bronze-600 hover:bg-bronze-700 transition text-cream font-bold rounded-lg px-5 py-2.5 text-sm">Contact us</a>
+          <a href="/resend-downloads" class="border border-bronze-600/30 hover:bg-cream transition text-bronze-700 font-bold rounded-lg px-5 py-2.5 text-sm">Resend my downloads</a>
+          <a href="/free" class="border border-bronze-600/30 hover:bg-cream transition text-bronze-700 font-bold rounded-lg px-5 py-2.5 text-sm">Free files</a>
+        </div>
+      </section>
+    </div>
+
+    <!-- ── MAKERS ─────────────────────────────────────────────────── -->
+    {live && (
+      <div id="faq-makers" hidden>
+        <div class="bg-[#1c4a48] text-cream rounded-2xl p-5 sm:p-6 mb-7">
+          <p class="text-[11px] tracking-[0.2em] uppercase text-cream/70">Cut Local · the maker network</p>
+          <h2 class="font-serif text-2xl mt-1">Get paid to build our designs</h2>
+          <div class="grid sm:grid-cols-3 gap-3 mt-4">
+            <div class="bg-white/10 rounded-xl p-3.5 text-center">
+              <div class="font-serif text-2xl">$0</div><div class="text-xs font-semibold mt-0.5">To join and be listed</div>
+              <p class="text-[11px] text-cream/70 mt-1">No monthly fee, ever.</p>
+            </div>
+            <div class="bg-white/10 rounded-xl p-3.5 text-center">
+              <div class="font-serif text-2xl">{cheapest}–{dearest}</div><div class="text-xs font-semibold mt-0.5">Per quote you send</div>
+              <p class="text-[11px] text-cream/70 mt-1">First {FOUNDING_CREDITS} are free.</p>
+            </div>
+            <div class="bg-white/10 rounded-xl p-3.5 text-center">
+              <div class="font-serif text-2xl">{FEE}%</div><div class="text-xs font-semibold mt-0.5">On completed jobs only</div>
+              <p class="text-[11px] text-cream/70 mt-1">Buyer pays you directly.</p>
+            </div>
+          </div>
+        </div>
+
+        <section class="border border-bronze-600/20 rounded-2xl p-5 mb-8">
+          <h3 class="font-serif text-xl text-bronze-800">Credit packs</h3>
+          <p class="text-sm text-ink-700/70 mt-1">Bought from your dashboard whenever you run low. Credits never expire.</p>
+          <div class="grid sm:grid-cols-3 gap-3 mt-3">
+            {packs.map((p) => (
+              <div class="bg-cream/50 rounded-xl border border-black/5 p-3.5">
+                <div class="font-serif text-xl text-bronze-800">{p.credits} credits</div>
+                <div class="text-sm text-ink-700/75 mt-0.5">${p.price}</div>
+                <div class="text-xs text-ink-700/55 mt-0.5">{perQuote(p)} per quote</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {makerGroups.map((g) => (
+          <section class="mb-8">
+            <h2 class="font-serif text-2xl text-bronze-800 mb-3">{g}</h2>
+            <div class="space-y-2">
+              {MAKER.filter((x) => x.group === g).map((x) => (
+                <details class="group bg-cream/40 border border-bronze-600/15 rounded-xl px-4 py-3 open:bg-cream/70 transition-colors">
+                  <summary class="cursor-pointer list-none flex items-start justify-between gap-3 font-semibold text-ink-900 text-[15px]">
+                    <span>{x.q}</span>
+                    <span class="text-bronze-600 shrink-0 mt-0.5 transition-transform group-open:rotate-45 text-xl leading-none">+</span>
+                  </summary>
+                  <p class="mt-2.5 text-sm text-ink-700/85 leading-relaxed">{x.a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+        ))}
+
+        <section class="text-center bg-[#1c4a48] text-cream rounded-2xl p-7">
+          <h2 class="font-serif text-2xl">Ready to take work?</h2>
+          <p class="text-cream/80 text-sm mt-2 max-w-md mx-auto">Applying takes about five minutes. We review every maker by hand and reply within a few days.</p>
+          <div class="mt-5 flex flex-wrap gap-3 justify-center">
+            <a href="/become-a-maker" class="bg-bronze-600 hover:bg-bronze-700 transition text-cream font-bold rounded-lg px-6 py-3">Apply to become a Maker →</a>
+            <a href="/makers" class="border border-cream/40 hover:bg-white/10 transition text-cream font-bold rounded-lg px-6 py-3">See the maker network</a>
+          </div>
+        </section>
+      </div>
+    )}
+
+  </main>
+
+  <script type="application/ld+json" set:html={JSON.stringify(faqLd)} />
+
+  <script is:inline>
+    (function () {
+      var tabs = { buyers: document.getElementById('tab-buyers'), makers: document.getElementById('tab-makers') };
+      var panes = { buyers: document.getElementById('faq-buyers'), makers: document.getElementById('faq-makers') };
+      if (!tabs.makers || !panes.makers) return;   // marketplace off: buyers only
+      var ON = 'bg-bronze-600 text-cream', OFF = 'text-ink-700 hover:text-bronze-700';
+      function show(which, push) {
+        for (var k in panes) panes[k].hidden = k !== which;
+        for (var t in tabs) {
+          tabs[t].className = 'faq-tab px-5 py-2 rounded-full text-sm font-bold transition ' + (t === which ? ON : OFF);
+          tabs[t].setAttribute('aria-selected', String(t === which));
+        }
+        if (push) history.replaceState(null, '', which === 'makers' ? '#makers' : location.pathname);
+      }
+      // ?for=makers keeps the old /maker-faq links working; #makers is shareable.
+      var want = (new URLSearchParams(location.search).get('for') === 'makers' || location.hash === '#makers') ? 'makers' : 'buyers';
+      show(want, false);
+      tabs.buyers.addEventListener('click', function () { show('buyers', true); });
+      tabs.makers.addEventListener('click', function () { show('makers', true); });
+    })();
+  </script>
+</Shell>

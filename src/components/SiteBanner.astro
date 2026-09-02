@@ -2,6 +2,14 @@
 import { getSettings } from '../lib/queries';
 const s = await getSettings();
 if (!s.banner_image_url) return null;
+// Cut Local exists only when the marketplace is live, so the maker shortcut
+// under the banner appears with it.
+let live = false;
+try {
+  const { supabaseAdmin } = await import('../lib/supabase');
+  const { data } = await supabaseAdmin().from('growth_settings').select('marketplace_enabled').eq('id', 1).maybeSingle();
+  live = !!data?.marketplace_enabled;
+} catch {}
 ---
 <div id="site-banner" class="bg-cream/40 border-b border-black/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 md:py-5">
@@ -18,5 +26,18 @@ if (!s.banner_image_url) return null;
         />
       </picture>
     </a>
+    <!-- Help shortcuts: the FAQ is the first thing a hesitant buyer looks for,
+         so it sits under the banner on every page rather than in the footer. -->
+    <div class="flex flex-wrap items-center justify-center gap-2 mt-3">
+      <a href="/faq" class="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-bronze-700 bg-white border border-bronze-600/25 rounded-full px-4 py-1.5 hover:border-bronze-600 hover:shadow-sm transition">
+        <span aria-hidden="true">❓</span> FAQ
+      </a>
+      {live && (
+        <a href="/faq?for=makers" class="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#1c4a48] bg-white border border-[#1c4a48]/25 rounded-full px-4 py-1.5 hover:border-[#1c4a48] hover:shadow-sm transition" title="Own a CNC, laser or 3D printer? See how Cut Local pays makers">
+          <span aria-hidden="true">🛠️</span> Maker FAQ
+        </a>
+      )}
+      <a href="/contact" class="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-ink-700/70 hover:text-bronze-700 px-2 py-1.5 transition">Contact</a>
+    </div>
   </div>
 </div>

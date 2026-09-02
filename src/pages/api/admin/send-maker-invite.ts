@@ -32,14 +32,18 @@ export const POST: APIRoute = async ({ request }) => {
   if (!(await isCallerAdmin(request))) return json({ error: 'Admin authentication required.' }, 401);
   const body = await request.json().catch(() => ({}));
   const applyUrl = typeof body?.applyUrl === 'string' && /^https?:\/\//.test(body.applyUrl) ? body.applyUrl : undefined;
+  // Founding credits are an admin setting, so the invite promises the number
+  // that approval actually grants rather than one baked in at build time.
+  const { data: gsF } = await supabaseAdmin().from('growth_settings').select('founding_credits').eq('id', 1).maybeSingle();
+  const founding: number | undefined = gsF?.founding_credits ?? undefined;
 
   if (body?.preview) {
-    const { subject, html } = makerRecruitEmail({ email: 'you@email.com', applyUrl });
+    const { subject, html } = makerRecruitEmail({ email: 'you@email.com', applyUrl, founding });
     return json({ ok: true, subject, html });
   }
   const db = supabaseAdmin();
   if (body?.test) {
-    const { subject, html, text } = makerRecruitEmail({ email: OPS_INBOX, applyUrl });
+    const { subject, html, text } = makerRecruitEmail({ email: OPS_INBOX, applyUrl, founding });
     const r = await sendEmail({ to: OPS_INBOX, subject: 'TEST: ' + subject, html, text, idempotencyKey: 'maker-recruit-test-' + Date.now(), tags: [{ name: 'kind', value: 'makerRecruit' }] });
     return json({ ok: r.ok, results: [{ email: OPS_INBOX, ok: r.ok, error: r.error }] });
   }
@@ -52,7 +56,7 @@ export const POST: APIRoute = async ({ request }) => {
   const day = new Date().toISOString().slice(0, 10);
   const results: { email: string; ok: boolean; error?: string }[] = [];
   for (const to of emails) {
-    const { subject, html, text } = makerRecruitEmail({ email: to, applyUrl });
+    const { subject, html, text } = makerRecruitEmail({ email: to, applyUrl, founding });
     const r = await sendEmail({ to, subject, html, text, idempotencyKey: `maker-recruit:${to}:${day}`, tags: [{ name: 'kind', value: 'makerRecruit' }] });
     const ok = !!(r.ok && !r.skipped);
     results.push({ email: to, ok, error: r.error });

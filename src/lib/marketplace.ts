@@ -108,7 +108,7 @@ export async function sendMakerCreditsGranted(o: { email: string; maker_name?: s
 ${o.reason ? `<p style="color:#6b5d4a;">${esc(o.reason)}</p>` : ''}
 <p>Your balance is now <b>${o.balance} credit${o.balance === 1 ? '' : 's'}</b>. One credit sends one quote, and credits never expire.</p>
 <p style="margin:20px 0;"><a href="${link}" style="background:#854F0B;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;">See jobs and quote →</a></p>
-<p style="font-size:13px;color:#6b5d4a;">Buyers pay you directly, and we only take ${SUCCESS_FEE_PCT}% when a job completes. Questions: <a href="${SITE}/maker-faq" style="color:#854F0B;">${SITE.replace('https://', '')}/maker-faq</a></p>
+<p style="font-size:13px;color:#6b5d4a;">Buyers pay you directly, and we only take ${SUCCESS_FEE_PCT}% when a job completes. Questions: <a href="${SITE}/faq?for=makers" style="color:#854F0B;">${SITE.replace('https://', '')}/faq</a></p>
 <p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`,
     text: `We added ${o.credits} free quote credits to your Cut Local account. Balance: ${o.balance}. ${o.reason || ''} See jobs and quote: ${link}`,
     idempotencyKey: `maker-credits:${o.email}:${Date.now()}`,
@@ -128,7 +128,7 @@ export async function sendMakerWelcome(maker: { email: string; maker_name?: stri
 <p>You’re listed as a Cut Local maker and can start quoting jobs now. We’ve added <b>${maker.credits ?? 5} founding credits</b> to get you going (one credit per quote).</p>
 <p style="margin:20px 0;"><a href="${link}" style="background:#854F0B;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;">Open my maker dashboard →</a></p>
 <p style="font-size:13px;color:#6b5d4a;">Reminder: buyers pay you directly, and we take just a ${SUCCESS_FEE_PCT}% success fee on completed jobs. Keep your profile photos fresh — they win work.</p>
-<p style="font-size:13px;color:#6b5d4a;">Every question about credits, fees and payments is answered here: <a href="${SITE}/maker-faq" style="color:#854F0B;">${SITE.replace('https://', '')}/maker-faq</a></p>
+<p style="font-size:13px;color:#6b5d4a;">Every question about credits, fees and payments is answered here: <a href="${SITE}/faq?for=makers" style="color:#854F0B;">${SITE.replace('https://', '')}/faq</a></p>
 <p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`,
     text: `You're approved as a Cut Local maker! ${maker.credits ?? 5} founding credits added. Open your dashboard: ${link}`,
     idempotencyKey: `maker-welcome:${maker.email}`,

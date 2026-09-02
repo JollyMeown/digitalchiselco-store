@@ -23,6 +23,7 @@ const STATIC_PATHS: Array<{ path: string; priority: number; changefreq: string }
   { path: '/bundle-of-week', priority: 0.7, changefreq: 'weekly' },
   { path: '/quiz',         priority: 0.5, changefreq: 'monthly' },
   { path: '/free',        priority: 0.6, changefreq: 'monthly' },
+  { path: '/faq',         priority: 0.6, changefreq: 'monthly' },
   { path: '/about',       priority: 0.5, changefreq: 'monthly' },
   { path: '/blog',        priority: 0.6, changefreq: 'weekly' },
   { path: '/terms',       priority: 0.2, changefreq: 'yearly' },

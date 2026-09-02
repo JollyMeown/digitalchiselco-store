@@ -5,9 +5,16 @@ import Shell from '../layouts/Shell.astro';
 import { signUploadToken } from '../lib/marketplace-token';
 // Real prices, straight from the billing table: the first maker had to email
 // and ask what a credit costs, so no page may say "low-cost" without a number.
-import { SUCCESS_FEE_PCT as FEE_SUCCESS, FOUNDING_CREDITS, creditPacks, quotePriceRange } from '../lib/marketplace-pricing';
+import { SUCCESS_FEE_PCT as FEE_SUCCESS, FOUNDING_CREDITS as FOUNDING_DEFAULT, creditPacks, quotePriceRange } from '../lib/marketplace-pricing';
 const packs = creditPacks();
 const [cheapest, dearest] = quotePriceRange();
+// The founding grant is an admin setting, so the promise here follows it.
+let FOUNDING_CREDITS = FOUNDING_DEFAULT;
+try {
+  const { supabaseAdmin } = await import('../lib/supabase');
+  const { data } = await supabaseAdmin().from('growth_settings').select('founding_credits').eq('id', 1).maybeSingle();
+  if (data?.founding_credits != null) FOUNDING_CREDITS = Number(data.founding_credits);
+} catch {}
 const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
 ---
 <Shell
@@ -55,7 +62,7 @@ const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
         In short: <b>free to apply</b> → <b>credits to quote</b> → <b>buyer pays you directly</b> → we bill <b>only {FEE_SUCCESS}% on completed jobs</b>.
         You never pay us out of pocket beyond credits + the success fee on money you’ve already earned.
         Example: a $300 job costs you one credit to quote and a ${(300 * FEE_SUCCESS / 100).toFixed(0)} fee when it completes.
-        <a href="/maker-faq" class="text-bronze-700 font-semibold hover:underline">Read every question answered →</a>
+        <a href="/faq?for=makers" class="text-bronze-700 font-semibold hover:underline">Read every question answered →</a>
       </p>
     </section>
 
