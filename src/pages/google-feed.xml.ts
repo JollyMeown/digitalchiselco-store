@@ -90,6 +90,10 @@ export async function GET() {
         .from('products')
         .select('id, title, slug, price_usd, image_url, gallery, seo_description, description, product_categories(categories(name))')
         .eq('active', true)
+        // Google's weapons policy will never approve our rifle/scope hunting
+        // scenes, so sending them only accrues violations. Excluded here only;
+        // they stay live on the site, Etsy, Cults and Pinterest.
+        .eq('google_feed_excluded', false)
         .not('image_url', 'is', null)
         .order('slug')
         .range(from, from + 999);
