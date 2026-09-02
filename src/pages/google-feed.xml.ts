@@ -31,6 +31,21 @@ function xml(v: unknown): string {
     .replace(/'/g, '&apos;');
 }
 
+// Google rejects emoji outright: editing a product in Merchant Center shows
+// "Input should not contain emoji characters" and "Customers won't see this
+// product until you've fixed the errors". 336 of our 1,582 descriptions (21%)
+// carry them, so a fifth of the catalogue was being held back by decoration.
+// Stripped for GOOGLE ONLY — emoji stay on the website, Etsy and Pinterest,
+// where they read well and are allowed.
+function stripEmoji(s: string): string {
+  return String(s || '')
+    // pictographs, symbols, dingbats, arrows, variation selectors, ZWJ, skin tones
+    .replace(/[\u{1F000}-\u{1FAFF}\u{1F900}-\u{1F9FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{25A0}-\u{25FF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '')
+    .replace(/[ \t]{2,}/g, ' ')      // tidy the gaps the emoji leave behind
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .trim();
+}
+
 // Shopping-optimised product title.
 //
 // Diagnosis behind this: 5,387 impressions produced 7 clicks (0.13%), and the
@@ -101,7 +116,7 @@ export async function GET() {
       const batch = data || [];
       for (const p of batch as any[]) {
         const title = shoppingTitle(String(p.title || ''));
-        const desc = (p.seo_description || (p.description || '').slice(0, 4800) || FALLBACK(title)).slice(0, 5000);
+        const desc = stripEmoji((p.seo_description || (p.description || '').slice(0, 4800) || FALLBACK(title))).slice(0, 5000);
         const { price, original, percent } = pricing(p.price_usd, discount);
         const cats = (p.product_categories || []).map((pc: any) => pc.categories?.name).filter(Boolean).join(' > ');
         const gallery: string[] = Array.isArray(p.gallery) ? p.gallery.filter(Boolean) : [];
