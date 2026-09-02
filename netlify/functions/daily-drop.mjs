@@ -57,9 +57,18 @@ export default async () => {
   // second time. A successful run inside the last 20 h means today is covered.
   if (db) {
     try {
-      const { data: recent } = await db.from('cron_runs').select('ran_at')
-        .eq('ok', true).gte('ran_at', new Date(Date.now() - 20 * 3600000).toISOString()).limit(1);
-      if (recent?.length) return new Response('already ran in the last 20h', { status: 200 });
+      const { data: recent } = await db.from('cron_runs').select('ran_at, summary')
+        .eq('ok', true).gte('ran_at', new Date(Date.now() - 20 * 3600000).toISOString())
+        .order('ran_at', { ascending: false }).limit(1);
+      // A DEGRADED run must not count as "today is covered". When the SSR
+      // fallback is used it only gets a ~20 s budget, so most steps report
+      // "skipped: time budget" and wait a whole day — while ok:true made the
+      // guard block every retry. Seen on 2026-09-01: 17 steps skipped, then
+      // nothing ran again for 20 h. If the last run was degraded, run again.
+      const growth = recent?.[0]?.summary?.growth || {};
+      const starved = Object.values(growth).filter((v) => typeof v === 'string' && /time budget/i.test(v)).length;
+      if (recent?.length && starved <= 3) return new Response('already ran in the last 20h', { status: 200 });
+      if (recent?.length) console.warn(`[daily-drop] last run was degraded (${starved} steps starved) — running again`);
     } catch { /* if the check fails, prefer running over skipping */ }
   }
   console.log('[daily-drop] firing —', why);
@@ -93,7 +102,7 @@ export default async () => {
       const body = await res.text().catch(() => '');
       console.log('[daily-drop] SSR fallback →', res.status, body.slice(0, 300));
       if (res.status !== 200) await notify(`🔴 <b>Nightly run failed on BOTH paths</b>\nBackground: no heartbeat · SSR: HTTP ${res.status}`);
-      else await notify(`🟡 <b>Nightly run used the fallback path</b>\nBackground runner gave no heartbeat; SSR route completed. Worth a look at the Netlify function logs.`);
+      else await notify(`🟡 <b>Nightly run was DEGRADED</b>\nThe background runner gave no heartbeat, so the SSR fallback ran. That path only has a ~20s budget, so most automations (drips, carts, follow-ups, maker nudges, fee settlement) were skipped, not completed.\nThe next hourly tick will retry automatically. If this repeats, check the daily-run-background function logs in Netlify.`);
     } catch (e) {
       console.error('[daily-drop] SSR fallback failed', e?.message);
       await notify(`🔴 <b>Nightly run failed on BOTH paths</b>\n${String(e?.message || e).slice(0, 200)}`);
