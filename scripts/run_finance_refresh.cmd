@@ -16,6 +16,8 @@ echo --- pull etsy videos for new products (missing only) --- >> finance-refresh
 "C:\Program Files\nodejs\node.exe" scripts\pull_etsy_videos.mjs >> finance-refresh.log 2>&1
 echo --- etsy per-listing stats (views/favorers for Design Scout) --- >> finance-refresh.log
 "C:\Program Files\nodejs\node.exe" scripts\etsy_listing_stats_sync.mjs >> finance-refresh.log 2>&1
+echo --- etsy SEO rewrite: after-snapshot (views/favs/sales per rewritten listing) --- >> finance-refresh.log
+"C:\Program Files\nodejs\node.exe" scripts\etsy_seo\etsy_seo_progress.mjs >> finance-refresh.log 2>&1
 echo --- finance ledger refresh --- >> finance-refresh.log
 "C:\Program Files\nodejs\node.exe" scripts\finance_refresh.mjs --months 13 >> finance-refresh.log 2>&1
 echo --- done %time% --- >> finance-refresh.log
