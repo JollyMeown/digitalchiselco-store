@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useLiveRefresh } from '../useLiveRefresh';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls } from '../ui';
+import EtsySeoExperiment from '../EtsySeoExperiment';
 
 type Row = {
   id: string; title: string; slug: string; image_url: string | null;
@@ -93,6 +94,7 @@ export default function Seo() {
 
   return (
     <div className="space-y-4">
+      <EtsySeoExperiment />
       <Card>
         <p className="text-sm text-ink-700/80">
           AI-generated titles and descriptions land here for your review. Generate more from the terminal with
