@@ -403,7 +403,10 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
   <!-- FAQ -->
   {faqs.length > 0 && (
     <section class="max-w-3xl mx-auto px-4 sm:px-6 py-14">
-      <h2 class="font-serif text-2xl text-center mb-8">Frequently asked questions</h2>
+      <h2 class="font-serif text-2xl text-center mb-2">Frequently asked questions</h2>
+      <p class="text-center text-sm text-ink-700/60 mb-8">
+        The four we are asked most. <a href="/faq" class="text-bronze-700 font-medium hover:underline">See every question answered →</a>
+      </p>
       <div class="space-y-3">
         {faqs.map((f) => (
           <details class="dcc-faq border border-black/10 rounded-lg overflow-hidden bg-white">

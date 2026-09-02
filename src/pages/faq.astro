@@ -15,6 +15,7 @@ import {
   FEE_INVOICE_DAYS as FEE_DAYS, FEE_TERMS_DAYS as FEE_TERMS, creditPacks, perQuote, quotePriceRange,
 } from '../lib/marketplace-pricing';
 import { supabaseAdmin } from '../lib/supabase';
+import { PADDLE_ENTITIES, PADDLE_URL, PADDLE_BUYER_TERMS } from '../lib/paddle-entity';
 
 const packs = creditPacks();
 const [cheapest, dearest] = quotePriceRange();
@@ -48,7 +49,11 @@ const BUYER: QA[] = [
     a: 'Use Cut Local. Tell us what you want made and makers near you send quotes with their price and lead time. You choose one and pay them directly, and the finished piece is real wood, not a file.' },
 
   { group: 'Paying', q: 'Who charges my card?',
-    a: 'Paddle. They are our authorised reseller and merchant of record, which means they are the seller for tax and consumer-protection purposes, they issue your receipt, and they handle billing and card security. We never see or store card numbers.' },
+    a: 'Paddle, at paddle.com. They are our authorised reseller and merchant of record, which means they are the seller for tax and consumer-protection purposes, they issue your receipt, and they handle billing and card security. We never see or store card numbers.' },
+  { group: 'Paying', q: 'Which company am I actually buying from?',
+    a: `A Paddle company, and which one depends on where you are. ${PADDLE_ENTITIES.map((e) => `${e.where}: ${e.name}, ${e.detail}, at ${e.address}`).join('. ')}. So a buyer in the United States is contracting with a New York company, and a buyer in Canada with a Toronto one. You can check any of them on Paddle's own buyer terms.` },
+  { group: 'Paying', q: 'Is my payment secure?',
+    a: 'Card details are entered on Paddle, never on our site, and we never see or store a card number. Paddle is an established payment company that handles billing, fraud checks and tax for thousands of software and digital sellers.' },
   { group: 'Paying', q: 'What currency am I charged in, and is tax included?',
     a: 'Prices are shown in US dollars and the site can display them converted for you. Checkout charges natively in EUR, GBP, CAD and AUD, and everything else in USD. Any sales tax, VAT or GST is calculated and collected by Paddle at checkout based on your billing country.' },
   { group: 'Paying', q: 'Do I need an account?',
@@ -179,6 +184,28 @@ const faqLd = {
           </div>
         </section>
       ))}
+
+      <!-- Who the buyer is contracting with: verifiable, and stronger than any
+           badge we could draw ourselves. -->
+      <section class="border border-bronze-600/20 rounded-2xl p-5 mb-6">
+        <h2 class="font-serif text-xl text-bronze-800">Who you are buying from</h2>
+        <p class="text-sm text-ink-700/75 mt-1.5">
+          Every order is sold by <a href={PADDLE_URL} rel="noopener" target="_blank" class="text-bronze-700 font-semibold hover:underline">Paddle</a>, our merchant of record, so your receipt, your tax and your refund rights all sit with a registered company you can look up.
+        </p>
+        <div class="grid sm:grid-cols-3 gap-3 mt-4">
+          {PADDLE_ENTITIES.map((e) => (
+            <div class="bg-cream/50 rounded-xl border border-black/5 p-3.5">
+              <div class="text-[10px] uppercase tracking-wide text-ink-700/50 font-semibold">{e.where}</div>
+              <div class="font-semibold text-ink-900 text-sm mt-0.5">{e.name}</div>
+              <div class="text-[11px] text-ink-700/60 mt-1">{e.detail}</div>
+              <div class="text-[11px] text-ink-700/55 mt-1">{e.address}</div>
+            </div>
+          ))}
+        </div>
+        <p class="text-[11px] text-ink-700/50 mt-3">
+          Verify any of these in <a href={PADDLE_BUYER_TERMS} rel="noopener" target="_blank" class="text-bronze-700 hover:underline">Paddle's buyer terms</a>.
+        </p>
+      </section>
 
       <section class="text-center bg-cream/60 border border-bronze-600/20 rounded-2xl p-6">
         <h2 class="font-serif text-xl text-bronze-800">Still stuck?</h2>

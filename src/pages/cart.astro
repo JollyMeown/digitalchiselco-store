@@ -149,6 +149,13 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         <span class="px-1.5 py-0.5 rounded bg-[#003087] text-white font-medium leading-none">PayPal</span>
       </div>
       <p class="text-xs text-ink-700/60 mt-2 text-center">Secure checkout · instant download links emailed after purchase</p>
+      <!-- Naming the seller, with a link a buyer can check, does more for
+           confidence at the pay button than any badge we could draw. -->
+      <p class="text-[11px] text-ink-700/50 mt-1.5 text-center">
+        Sold by <a href="https://www.paddle.com" rel="noopener" target="_blank" class="text-bronze-600 hover:underline">Paddle</a>, our merchant of record:
+        Paddle.com Inc. (USA), Paddle.com (Canada) Ltd. (Canada), or Paddle.com Market Limited, London (UK).
+        <a href="/faq" class="text-bronze-600 hover:underline">More in the FAQ</a>
+      </p>
       <div class="mt-4"><TrustBadges compact={true} /></div>
     </div>
   </main>
