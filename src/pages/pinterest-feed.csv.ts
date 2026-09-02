@@ -65,7 +65,7 @@ export async function GET() {
           // 2:3 vertical Pin art (branded canvas, title + CTA). Pinterest is a
           // vertical surface; the raw landscape photo renders small and loses
           // the click. /pin/<slug>.jpg falls back to the original on any error.
-          cell(`${SITE}/pin/${encodeURIComponent(p.slug)}.jpg`),
+          cell(`${SITE}/pin/${encodeURIComponent(p.slug)}.jpg?v=2`),
           cell(`${original.toFixed(2)} USD`),
           cell(percent > 0 ? `${price.toFixed(2)} USD` : ''),
           cell('in stock'),

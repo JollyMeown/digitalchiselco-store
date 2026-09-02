@@ -52,7 +52,9 @@ function cdata(v: unknown): string {
 const PIN_W = 1000, PIN_H = 1500;
 function pinImage(slug: string): string {
   if (!slug) return '';
-  return `${SITE}/pin/${encodeURIComponent(slug)}.jpg`;
+  // ?v= busts the 30-day edge cache AND makes Pinterest re-fetch after a
+  // template change (v2: text drawn as paths, the v1 art showed tofu boxes)
+  return `${SITE}/pin/${encodeURIComponent(slug)}.jpg?v=2`;
 }
 // Real byte size for <enclosure length>. length="0" declares an EMPTY file,
 // which is why strict parsers ignored the enclosure. Sizes are fetched once

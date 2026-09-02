@@ -6,34 +6,66 @@
 // recommends) with the design name and a call to action, so nothing is cropped
 // and the Pin fills the slot.
 //
+// TEXT IS DRAWN AS PATHS, NOT <text>. Netlify functions ship with no system
+// fonts, so librsvg renders every <text> glyph as a "missing glyph" box (seen
+// live on Pinterest 2026-09-02). opentype.js turns each string into outline
+// path data from the bundled OFL Lora font, which needs no fontconfig at all.
+//
 // Generated on demand and cached hard at the edge, so there is no storage cost
 // and no batch job to re-run when products change.
 import type { APIRoute } from 'astro';
+import opentype from 'opentype.js';
 import { supabase } from '../../lib/supabase';
 
 export const prerender = false;
 
-const W = 1000, H = 1500;
-const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const W = 1000, H = 1500, MAX_TEXT_W = 880;
 
-// Wrap a title into at most 3 lines that fit the canvas width.
-function wrap(title: string, perLine = 22, maxLines = 3): string[] {
+// Fonts are static files in public/fonts, fetched once per function instance.
+let fontsP: Promise<{ reg: opentype.Font; bold: opentype.Font }> | null = null;
+function loadFonts(origin: string) {
+  if (!fontsP) {
+    fontsP = (async () => {
+      const [reg, bold] = await Promise.all(['Lora-Regular', 'Lora-Bold'].map(async (n) => {
+        const r = await fetch(`${origin}/fonts/${n}.ttf`);
+        if (!r.ok) throw new Error(`font ${n} ${r.status}`);
+        return opentype.parse(await r.arrayBuffer());
+      }));
+      return { reg, bold };
+    })().catch((e) => { fontsP = null; throw e; });
+  }
+  return fontsP;
+}
+
+type Opts = { letterSpacing?: number };
+const width = (f: opentype.Font, s: string, size: number, o: Opts = {}) => f.getAdvanceWidth(s, size, o as any);
+// Centred text as a filled path. y is the baseline, like SVG <text>.
+const text = (f: opentype.Font, s: string, y: number, size: number, fill: string, o: Opts = {}) => {
+  const w = width(f, s, size, o);
+  return `<path d="${f.getPath(s, W / 2 - w / 2, y, size, o as any).toPathData(2)}" fill="${fill}"/>`;
+};
+
+// Wrap a title into at most 3 lines that fit the canvas width, measured with
+// the real font instead of a character count.
+function wrap(f: opentype.Font, title: string, size: number, maxLines = 3): string[] {
   const words = title.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let cur = '';
   for (const w of words) {
     if (!cur) { cur = w; continue; }
-    if ((cur + ' ' + w).length <= perLine) cur += ' ' + w;
+    if (width(f, cur + ' ' + w, size) <= MAX_TEXT_W) cur += ' ' + w;
     else { lines.push(cur); cur = w; if (lines.length === maxLines) break; }
   }
   if (cur && lines.length < maxLines) lines.push(cur);
   if (lines.length === maxLines && words.join(' ').length > lines.join(' ').length) {
-    lines[maxLines - 1] = lines[maxLines - 1].replace(/[\s.,]+$/, '') + '…';
+    let last = lines[maxLines - 1].replace(/[\s.,]+$/, '');
+    while (last && width(f, last + '…', size) > MAX_TEXT_W) last = last.replace(/\s*\S+$/, '');
+    lines[maxLines - 1] = last + '…';
   }
   return lines;
 }
 
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, request }) => {
   const slug = String(params.slug || '');
   const { data: p } = await supabase
     .from('products').select('title, seo_title, image_url').eq('slug', slug).eq('active', true).maybeSingle();
@@ -57,7 +89,8 @@ export const GET: APIRoute = async ({ params }) => {
   catch { return new Response(null, { status: 302, headers: { location: p.image_url } }); }
 
   try {
-    const res = await fetch(p.image_url);
+    const origin = new URL(request.url).origin;
+    const [{ reg, bold }, res] = await Promise.all([loadFonts(origin), fetch(p.image_url)]);
     if (!res.ok) throw new Error('source image ' + res.status);
     const src = Buffer.from(await res.arrayBuffer());
 
@@ -68,11 +101,10 @@ export const GET: APIRoute = async ({ params }) => {
     const photoH = pMeta.height || 751;
     const photoTop = 120;
 
-    const lines = wrap(title);
+    const lines = wrap(bold, title, 52);
     const textTop = photoTop + photoH + 78;
-    const titleSvg = lines.map((l, i) =>
-      `<text x="${W / 2}" y="${textTop + i * 62}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="52" font-weight="bold" fill="#2a1d10">${esc(l)}</text>`
-    ).join('');
+    const titleSvg = lines.map((l, i) => text(bold, l, textTop + i * 62, 52, '#2a1d10')).join('');
+    const subY = textTop + lines.length * 62;
 
     const overlay = Buffer.from(`<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -81,17 +113,17 @@ export const GET: APIRoute = async ({ params }) => {
         </linearGradient>
       </defs>
       <rect width="${W}" height="${H}" fill="url(#bg)"/>
-      <text x="${W / 2}" y="86" text-anchor="middle" font-family="Georgia, serif" font-size="30" letter-spacing="6" fill="#854F0B">DIGITALCHISELCO</text>
+      ${text(reg, 'DIGITALCHISELCO', 86, 30, '#854F0B', { letterSpacing: 0.2 })}
       ${titleSvg}
-      <text x="${W / 2}" y="${textTop + lines.length * 62 + 52}" text-anchor="middle" font-family="Georgia, serif" font-size="33" fill="#6b5d4a">Commercial use included</text>
-      <text x="${W / 2}" y="${textTop + lines.length * 62 + 100}" text-anchor="middle" font-family="Georgia, serif" font-size="33" fill="#6b5d4a">Aspire · VCarve · Carveco · Fusion 360</text>
+      ${text(reg, 'Commercial use included', subY + 52, 33, '#6b5d4a')}
+      ${text(reg, 'Aspire · VCarve · Carveco · Fusion 360', subY + 100, 33, '#6b5d4a')}
       ${makerLine ? `
       <rect x="${W / 2 - 300}" y="${H - 268}" width="600" height="76" rx="38" fill="#2c6a67"/>
-      <text x="${W / 2}" y="${H - 218}" text-anchor="middle" font-family="Georgia, serif" font-size="33" font-weight="bold" fill="#ffffff">No machine? Get it made for you</text>
-      <text x="${W / 2}" y="${H - 152}" text-anchor="middle" font-family="Georgia, serif" font-size="30" fill="#6b5d4a">Own a CNC, laser or 3D printer?</text>`
-      : `<text x="${W / 2}" y="${H - 168}" text-anchor="middle" font-family="Georgia, serif" font-size="34" fill="#6b5d4a">3D relief STL for CNC, laser &amp; 3D printing</text>`}
+      ${text(bold, 'No machine? Get it made for you', H - 218, 33, '#ffffff')}
+      ${text(reg, 'Own a CNC, laser or 3D printer?', H - 152, 30, '#6b5d4a')}`
+      : text(reg, '3D relief STL for CNC, laser & 3D printing', H - 168, 34, '#6b5d4a')}
       <rect x="${W / 2 - 250}" y="${H - 130}" width="500" height="82" rx="41" fill="#854F0B"/>
-      <text x="${W / 2}" y="${H - 76}" text-anchor="middle" font-family="Georgia, serif" font-size="36" font-weight="bold" fill="#ffffff">Instant download</text>
+      ${text(bold, 'Instant download', H - 76, 36, '#ffffff')}
     </svg>`);
 
     const out = await sharp(overlay)
