@@ -3,7 +3,11 @@
 // nav/sitemap. Reachable only by the recruit email's link until launch.
 import Shell from '../layouts/Shell.astro';
 import { signUploadToken } from '../lib/marketplace-token';
-const FEE_SUCCESS = 3;   // % success fee, per owner (credit-to-quote + 3%)
+// Real prices, straight from the billing table: the first maker had to email
+// and ask what a credit costs, so no page may say "low-cost" without a number.
+import { SUCCESS_FEE_PCT as FEE_SUCCESS, FOUNDING_CREDITS, creditPacks, quotePriceRange } from '../lib/marketplace-pricing';
+const packs = creditPacks();
+const [cheapest, dearest] = quotePriceRange();
 const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
 ---
 <Shell
@@ -32,8 +36,11 @@ const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
           <p class="text-ink-700/75">Applying and getting listed is free. We verify every maker before they go live, so buyers trust the network.</p>
         </div>
         <div class="bg-white rounded-xl border border-black/5 p-4">
-          <div class="text-bronze-700 font-semibold mb-1">2 · Small credit to quote</div>
-          <p class="text-ink-700/75">You spend one low-cost credit to send a quote on a job. Founding makers get a free starter pack. Credits keep quotes serious and spam out.</p>
+          <div class="text-bronze-700 font-semibold mb-1">2 · {cheapest}–{dearest} per quote</div>
+          <p class="text-ink-700/75">
+            One credit sends a quote. Packs are {packs.map((p) => `${p.credits} for $${p.price}`).join(', ')}, and credits never expire.
+            Your first <b>{FOUNDING_CREDITS} quotes are free</b>. Credits keep quotes serious and spam out.
+          </p>
         </div>
         <div class="bg-white rounded-xl border border-black/5 p-4">
           <div class="text-bronze-700 font-semibold mb-1">3 · You’re paid directly</div>
@@ -47,6 +54,8 @@ const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
       <p class="text-xs text-ink-700/55 mt-4">
         In short: <b>free to apply</b> → <b>credits to quote</b> → <b>buyer pays you directly</b> → we bill <b>only {FEE_SUCCESS}% on completed jobs</b>.
         You never pay us out of pocket beyond credits + the success fee on money you’ve already earned.
+        Example: a $300 job costs you one credit to quote and a ${(300 * FEE_SUCCESS / 100).toFixed(0)} fee when it completes.
+        <a href="/maker-faq" class="text-bronze-700 font-semibold hover:underline">Read every question answered →</a>
       </p>
     </section>
 

@@ -5,6 +5,7 @@
 // has previewed and enabled each system.
 
 import crypto from 'node:crypto';
+import { FOUNDING_CREDITS, SUCCESS_FEE_PCT, packLine } from './marketplace-pricing';
 
 const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
 const BRONZE = '#854F0B', BRONZE_DARK = '#5E380A', CREAM = '#F5EFE3', INK = '#2A1A0E';
@@ -593,6 +594,14 @@ export function portalGuideEmail(): { subject: string; html: string; text: strin
 // Recruit invites go out in WAVES: the same person is re-invited every ~10
 // days with a DIFFERENT subject + opener (owner directive 2026-09-01) until
 // they apply as a maker or unsubscribe. `wave` picks the variant (cycles).
+// Pricing shown in the invite comes from the SAME table the app charges from,
+// so the email can never quote a stale price. The first real maker (2026-09-03)
+// had to email and ask what credits cost, which is a question the invite itself
+// should never leave open.
+const RECRUIT_FEE_PCT = SUCCESS_FEE_PCT;
+const RECRUIT_FOUNDING_CREDITS = FOUNDING_CREDITS;
+const FAQ_URL = `${SITE}/maker-faq`;
+const RECRUIT_PACK_LINE = packLine();
 const RECRUIT_WAVES: { subject: string; opener: string }[] = [
   { subject: 'Join Cut Local: Get CNC & 3D Printing RFQs', opener: 'Quick question: <strong>do you own a CNC router, laser, or 3D printer?</strong>' },
   { subject: 'Own a CNC or 3D printer? Buyers near you need it', opener: 'People keep asking us who can <strong>actually build</strong> our designs near them. If you own a CNC router, laser, or 3D printer, that could be you.' },
@@ -612,14 +621,21 @@ export function makerRecruitEmail(opts: { email: string; applyUrl?: string; wave
 <p>We're opening <strong>Cut Local</strong> — our new maker network at DigitalChiselCo. Every day, people fall in love with our designs but have no machine to make them. We want to send those ready-to-cut jobs to makers like you, with the design file already in hand.</p>
 <ul style="line-height:1.7;">
 <li><strong>Paid work near you</strong> — buyers request a piece, you quote on your terms</li>
-<li><strong>You keep 97%+</strong> — buyers pay you directly; we take just a 3% success fee on completed jobs</li>
-<li><strong>Free to join</strong>, and founding makers get free starter credits + top placement</li>
+<li><strong>You keep ${100 - RECRUIT_FEE_PCT}%</strong> — buyers pay you directly; we take just a ${RECRUIT_FEE_PCT}% success fee on completed jobs</li>
+<li><strong>Free to join</strong>, and founding makers get ${RECRUIT_FOUNDING_CREDITS} free quote credits + top placement</li>
 <li><strong>Build your reputation</strong> on a network that already has the designs, the buyers and the traffic</li>
 </ul>
+<div style="background:#f7f2e8;border:1px solid #e0d3bb;border-radius:10px;padding:14px 16px;margin:20px 0;">
+<p style="margin:0 0 8px;font-weight:bold;color:#854F0B;">What it costs, in plain numbers</p>
+<p style="margin:0 0 6px;font-size:14px;line-height:1.6;">Joining and being listed: <strong>free</strong>, with no monthly fee.</p>
+<p style="margin:0 0 6px;font-size:14px;line-height:1.6;">Sending a quote: <strong>one credit</strong>, and credits run ${RECRUIT_PACK_LINE}. Your first ${RECRUIT_FOUNDING_CREDITS} quotes are free.</p>
+<p style="margin:0;font-size:14px;line-height:1.6;">When you win: the buyer pays <strong>you</strong> directly, and we bill <strong>${RECRUIT_FEE_PCT}%</strong> of the job once it is complete. On a $300 job that is $9.</p>
+</div>
 <p style="margin:22px 0;"><a href="${url}" style="background:#854F0B;color:#fff;text-decoration:none;padding:13px 24px;border-radius:8px;font-weight:bold;">Apply to become a Maker →</a></p>
 <p>It takes about 5 minutes. We review every maker by hand, so you'll be part of a trusted, quality network from day one.</p>
+<p style="font-size:14px;">Want the full detail first? Every question makers ask is answered here: <a href="${FAQ_URL}" style="color:#854F0B;">${FAQ_URL.replace('https://', '')}</a></p>
 <p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`;
-  const text = `${v.subject}. Cut Local is our maker network at DigitalChiselCo. Get paid work near you: buyers request a piece, you quote on your terms, they pay you directly, and we take just a 3% success fee on completed jobs. Free to join; founding makers get free starter credits. Apply (about 5 minutes): ${url}  — Jolly, DigitalChiselCo`;
+  const text = `${v.subject}. Cut Local is our maker network at DigitalChiselCo. Get paid work near you: buyers request a piece, you quote on your terms, they pay you directly, and we take just a ${RECRUIT_FEE_PCT}% success fee on completed jobs. What it costs: joining is free with no monthly fee; sending a quote costs one credit (${RECRUIT_PACK_LINE}) and your first ${RECRUIT_FOUNDING_CREDITS} quotes are free; on a $300 job our fee is $9. Full answers: ${FAQ_URL}. Apply (about 5 minutes): ${url}  — Jolly, DigitalChiselCo`;
   return { subject, html, text };
 }
 

@@ -5,7 +5,10 @@ import { send as sendEmail } from './resend';
 import { signMakerToken } from './marketplace-token';
 
 const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
-export const SUCCESS_FEE_PCT = 3;
+// Prices/fees live in marketplace-pricing.ts (no imports of its own) so email
+// templates can read them without an import cycle through the mailer.
+export { SUCCESS_FEE_PCT, CREDIT_PACKS, FOUNDING_CREDITS } from './marketplace-pricing';
+import { SUCCESS_FEE_PCT } from './marketplace-pricing';
 
 // Find approved makers who can plausibly do this job. Lenient by design — it's
 // better to notify a few extra than to miss a maker. Ranked: same city, then
@@ -90,13 +93,6 @@ export function esc(s: unknown): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// Credit packs makers can buy via Paddle. Keep prices whole-dollar-ish.
-export const CREDIT_PACKS: Record<string, { credits: number; price: number; label: string }> = {
-  starter: { credits: 10, price: 8, label: '10 credits' },
-  pro: { credits: 30, price: 21, label: '30 credits' },
-  bulk: { credits: 75, price: 45, label: '75 credits' },
-};
-
 // Welcome email when a maker is approved (dashboard link + founding credits).
 export async function sendMakerWelcome(maker: { email: string; maker_name?: string | null; credits?: number }) {
   const link = `${SITE}/maker?t=${encodeURIComponent(signMakerToken(maker.email))}`;
@@ -109,6 +105,7 @@ export async function sendMakerWelcome(maker: { email: string; maker_name?: stri
 <p>You’re listed as a Cut Local maker and can start quoting jobs now. We’ve added <b>${maker.credits ?? 5} founding credits</b> to get you going (one credit per quote).</p>
 <p style="margin:20px 0;"><a href="${link}" style="background:#854F0B;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;">Open my maker dashboard →</a></p>
 <p style="font-size:13px;color:#6b5d4a;">Reminder: buyers pay you directly, and we take just a ${SUCCESS_FEE_PCT}% success fee on completed jobs. Keep your profile photos fresh — they win work.</p>
+<p style="font-size:13px;color:#6b5d4a;">Every question about credits, fees and payments is answered here: <a href="${SITE}/maker-faq" style="color:#854F0B;">${SITE.replace('https://', '')}/maker-faq</a></p>
 <p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`,
     text: `You're approved as a Cut Local maker! ${maker.credits ?? 5} founding credits added. Open your dashboard: ${link}`,
     idempotencyKey: `maker-welcome:${maker.email}`,
