@@ -47,6 +47,22 @@ export default function Makers() {
   async function saveNote(id: string, note: string) {
     await supabase.from('makers').update({ admin_note: note }).eq('id', id);
   }
+  // Give one maker free quote credits. Recorded in maker_ledger and (unless
+  // muted) emailed, because a gift the maker never hears about buys nothing.
+  async function grant(id: string, credits: number, reason: string, notify: boolean) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin/maker-credits', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ id, credits, reason, notify }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || j.error) { alert(j.error || 'Could not add credits.'); return null; }
+    const balance = j.results?.[0]?.balance;
+    setOpen((o: Maker) => (o && o.id === id ? { ...o, credits: balance } : o));
+    load(true);
+    return balance;
+  }
 
   return (
     <div className="space-y-4">
@@ -56,6 +72,7 @@ export default function Makers() {
 
       <MarketplaceMonitor />
       <MakerAutomationsToggle />
+      <CreditGifts onDone={() => load(true)} />
       <RecruitSender />
       <MakerBroadcast />
 
@@ -126,6 +143,9 @@ export default function Makers() {
               </div>
             )}
             <div className="text-xs text-ink-700/60">✓ owns machines · ✓ agreed fees · ✓ agreed terms{open.ip ? ` · ${open.ip}` : ''}</div>
+
+            <GrantCredits maker={open} onGrant={grant} />
+
             <div>
               <div className="text-[11px] uppercase text-ink-700/50 font-semibold mb-1">Internal note</div>
               <textarea defaultValue={open.admin_note || ''} onBlur={(e) => saveNote(open.id, e.target.value)} rows={2} className={inputCls} placeholder="Notes for your team…" />
@@ -139,6 +159,119 @@ export default function Makers() {
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+// ── Free credits: the founding grant + a gift to every approved maker ──
+// Credits are the only thing a maker pays before earning, so being able to
+// hand them out is the cheapest goodwill lever in the whole marketplace.
+function CreditGifts({ onDone }: { onDone: () => void }) {
+  const [founding, setFounding] = useState<number | null>(null);
+  const [savedFounding, setSavedFounding] = useState<number | null>(null);
+  const [approved, setApproved] = useState(0);
+  const [bulk, setBulk] = useState(5);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    supabase.from('growth_settings').select('founding_credits').eq('id', 1).maybeSingle()
+      .then(({ data }) => { const v = Number(data?.founding_credits ?? 5); setFounding(v); setSavedFounding(v); });
+    supabase.from('makers').select('id', { count: 'exact', head: true }).eq('status', 'approved').then(({ count }) => setApproved(count || 0));
+  }, []);
+
+  async function call(body: any) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin/maker-credits', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify(body) });
+    return res.json().catch(() => ({}));
+  }
+  async function saveFounding() {
+    setBusy('founding'); setMsg('');
+    const j = await call({ founding });
+    setBusy('');
+    if (j.ok) { setSavedFounding(j.founding_credits); setMsg(`New makers will now start with ${j.founding_credits} free credits.`); }
+    else alert(j.error || 'Could not save.');
+  }
+  async function giftAll() {
+    if (!approved) { alert('No approved makers yet.'); return; }
+    if (!confirm(`Give ${bulk} free credits to all ${approved} approved maker(s)? They will each get an email.`)) return;
+    setBusy('bulk'); setMsg('');
+    const j = await call({ audience: 'approved', credits: bulk, reason: reason.trim() });
+    setBusy('');
+    if (j.ok) { setMsg(`✓ ${bulk} credits given to ${j.granted} maker(s), each emailed.`); setReason(''); onDone(); }
+    else alert(j.error || 'Could not gift credits.');
+  }
+
+  if (founding === null) return null;
+  return (
+    <Card title="🎁 Free credits">
+      <p className="text-xs text-ink-700/60 mb-3">
+        A credit is what a maker spends to send one quote. Giving credits costs you nothing and is the fastest way to get a new maker quoting, apologise for a bad job, or run a launch push. Every grant is recorded and the maker is emailed.
+      </p>
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="rounded-lg border border-black/10 bg-cream/40 p-3">
+          <div className="text-[13px] font-bold text-ink-900 mb-1">Founding credits for new makers</div>
+          <p className="text-[11px] text-ink-700/60 mb-2">Given automatically when you approve an application, and named in the welcome email.</p>
+          <div className="flex items-center gap-2">
+            <input type="number" min={0} max={200} value={founding} onChange={(e) => setFounding(Math.max(0, Math.round(Number(e.target.value) || 0)))} className="w-24 text-sm px-2.5 py-1.5 rounded-lg border border-black/15" />
+            <button className={btnPrimary} disabled={busy === 'founding' || founding === savedFounding} onClick={saveFounding}>{busy === 'founding' ? 'Saving…' : 'Save'}</button>
+            {founding !== savedFounding && <span className="text-[11px] text-amber-700">unsaved</span>}
+          </div>
+        </div>
+        <div className="rounded-lg border border-black/10 bg-cream/40 p-3">
+          <div className="text-[13px] font-bold text-ink-900 mb-1">Gift every approved maker</div>
+          <p className="text-[11px] text-ink-700/60 mb-2">Goes to all <b>{approved}</b> approved maker{approved === 1 ? '' : 's'} at once.</p>
+          <div className="flex items-center gap-2">
+            <input type="number" min={1} max={500} value={bulk} onChange={(e) => setBulk(Math.max(1, Math.round(Number(e.target.value) || 0)))} className="w-24 text-sm px-2.5 py-1.5 rounded-lg border border-black/15" />
+            <button className={btnPrimary} disabled={busy === 'bulk' || !approved} onClick={giftAll}>{busy === 'bulk' ? 'Sending…' : `Give ${bulk} to all`}</button>
+          </div>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason they will see, e.g. Thank you for joining early" className="mt-2 w-full text-xs px-2.5 py-1.5 rounded-lg border border-black/15" />
+        </div>
+      </div>
+      {msg && <div className="mt-3 text-xs text-green-700">{msg}</div>}
+      <p className="mt-2 text-[11px] text-ink-700/50">To give credits to one maker only, open their card below and use the credits box in their profile.</p>
+    </Card>
+  );
+}
+
+// ── Free credits for ONE maker (inside the profile modal) ─────────────
+function GrantCredits({ maker, onGrant }: { maker: any; onGrant: (id: string, c: number, r: string, n: boolean) => Promise<number | null> }) {
+  const [n, setN] = useState(5);
+  const [reason, setReason] = useState('');
+  const [notify, setNotify] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<number | null>(null);
+  const balance = Number(maker.credits) || 0;
+
+  async function give(amount: number) {
+    setBusy(true); setDone(null);
+    const bal = await onGrant(maker.id, amount, reason.trim(), notify);
+    setBusy(false);
+    if (bal != null) { setDone(bal); setReason(''); }
+  }
+
+  return (
+    <div className="rounded-lg border border-bronze-600/20 bg-cream/40 p-3">
+      <div className="flex items-baseline justify-between gap-2 mb-2">
+        <div className="text-[13px] font-bold text-ink-900">🎁 Free quote credits</div>
+        <div className="text-xs text-ink-700/60">balance <b className="text-bronze-800">{balance}</b> · 1 credit = 1 quote</div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {[5, 10, 25].map((v) => (
+          <button key={v} disabled={busy} className="text-xs font-medium px-2.5 py-1.5 rounded-lg bg-white border border-bronze-600/25 hover:border-bronze-600 disabled:opacity-50" onClick={() => give(v)}>+{v}</button>
+        ))}
+        <span className="text-ink-700/30">|</span>
+        <input type="number" value={n} onChange={(e) => setN(Math.round(Number(e.target.value) || 0))} className="w-20 text-xs px-2 py-1.5 rounded-lg border border-black/15" />
+        <button disabled={busy || !n} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-bronze-600 text-cream hover:bg-bronze-700 disabled:opacity-50" onClick={() => give(n)}>{busy ? 'Adding…' : 'Add'}</button>
+      </div>
+      <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason the maker will see, e.g. Welcome gift for our founding makers" className="mt-2 w-full text-xs px-2.5 py-1.5 rounded-lg border border-black/15" />
+      <label className="flex items-center gap-2 mt-2 text-[11px] text-ink-700/70 cursor-pointer">
+        <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+        Email the maker so they know (recommended)
+      </label>
+      {done != null && <div className="mt-2 text-xs text-green-700">✓ Added. New balance: <b>{done}</b> credits{notify ? ' · maker emailed' : ''}.</div>}
+      <p className="mt-2 text-[11px] text-ink-700/50">Use a negative number to correct a mistake. Every grant is recorded in the ledger.</p>
     </div>
   );
 }

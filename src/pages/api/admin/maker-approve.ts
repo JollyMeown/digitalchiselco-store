@@ -34,9 +34,23 @@ export const POST: APIRoute = async ({ request }) => {
   await db.from('makers').update({ status, reviewed_at: new Date().toISOString() }).eq('id', id);
 
   let welcomed = false;
+  let credits = Number(m.credits) || 0;
   if (status === 'approved' && !m.welcomed_at) {
-    try { await sendMakerWelcome({ email: m.email, maker_name: m.maker_name, credits: m.credits ?? 5 }); await db.from('makers').update({ welcomed_at: new Date().toISOString() }).eq('id', id); welcomed = true; }
+    // Founding grant is a setting (Admin → Makers), so a recruitment push can be
+    // made more generous without a deploy. Applications land with the column
+    // default, so top up to the configured amount and record the difference.
+    try {
+      const { data: gs } = await db.from('growth_settings').select('founding_credits').eq('id', 1).maybeSingle();
+      const founding = Math.max(0, Number(gs?.founding_credits ?? 5));
+      if (founding > credits) {
+        const delta = founding - credits;
+        await db.from('makers').update({ credits: founding }).eq('id', id);
+        await db.from('maker_ledger').insert({ maker_id: id, kind: 'credit_grant', credits_delta: delta, note: 'founding credits on approval' });
+        credits = founding;
+      }
+    } catch (e) { console.error('[maker-approve] founding credits failed:', (e as any)?.message); }
+    try { await sendMakerWelcome({ email: m.email, maker_name: m.maker_name, credits }); await db.from('makers').update({ welcomed_at: new Date().toISOString() }).eq('id', id); welcomed = true; }
     catch (e) { console.error('[maker-approve] welcome failed:', (e as any)?.message); }
   }
-  return json({ ok: true, welcomed });
+  return json({ ok: true, welcomed, credits });
 };

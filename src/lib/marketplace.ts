@@ -93,6 +93,29 @@ export function esc(s: unknown): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// "We added free credits to your account" — sent when the owner gifts credits
+// from Admin → Makers. A gift is only worth giving if the maker knows about it,
+// so the email says what it is for and links straight to the jobs board.
+export async function sendMakerCreditsGranted(o: { email: string; maker_name?: string | null; credits: number; balance: number; reason?: string }) {
+  const link = `${SITE}/maker?t=${encodeURIComponent(signMakerToken(o.email))}`;
+  const quotes = o.credits === 1 ? 'one more quote' : `${o.credits} more quotes`;
+  await sendEmail({
+    to: o.email,
+    subject: `🎁 ${o.credits} free quote credit${o.credits === 1 ? '' : 's'} added to your Cut Local account`,
+    html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#2a241d;">
+<p style="font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#854F0B;">Cut Local · free credits</p>
+<p>Hi ${esc(o.maker_name || '')}, we have just added <b>${o.credits} free quote credit${o.credits === 1 ? '' : 's'}</b> to your account. That is ${quotes} on us.</p>
+${o.reason ? `<p style="color:#6b5d4a;">${esc(o.reason)}</p>` : ''}
+<p>Your balance is now <b>${o.balance} credit${o.balance === 1 ? '' : 's'}</b>. One credit sends one quote, and credits never expire.</p>
+<p style="margin:20px 0;"><a href="${link}" style="background:#854F0B;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;">See jobs and quote →</a></p>
+<p style="font-size:13px;color:#6b5d4a;">Buyers pay you directly, and we only take ${SUCCESS_FEE_PCT}% when a job completes. Questions: <a href="${SITE}/maker-faq" style="color:#854F0B;">${SITE.replace('https://', '')}/maker-faq</a></p>
+<p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`,
+    text: `We added ${o.credits} free quote credits to your Cut Local account. Balance: ${o.balance}. ${o.reason || ''} See jobs and quote: ${link}`,
+    idempotencyKey: `maker-credits:${o.email}:${Date.now()}`,
+    tags: [{ name: 'kind', value: 'makerNews' }],
+  });
+}
+
 // Welcome email when a maker is approved (dashboard link + founding credits).
 export async function sendMakerWelcome(maker: { email: string; maker_name?: string | null; credits?: number }) {
   const link = `${SITE}/maker?t=${encodeURIComponent(signMakerToken(maker.email))}`;
