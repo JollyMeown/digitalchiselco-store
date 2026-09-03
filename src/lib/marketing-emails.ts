@@ -606,17 +606,24 @@ export function filmEmail(opts: {
   runtime?: string;          // e.g. "31 seconds"
   blurb?: string;            // one line under the title
   subject?: string;          // override the generated subject line
+  intro?: string;            // the opening line, written for THIS film
 }): { subject: string; html: string; text: string } {
-  const runtime = opts.runtime || '31 seconds';
+  // No runtime claim unless we actually know it: this used to default to the
+  // Highland cow's "31 seconds" and state it for every other film.
+  const runtime = opts.runtime || '';
   // "a 31 seconds film" reads wrong in a subject line; the adjective form does.
   const runtimeAdj = runtime.replace(/^(\d+)\s*seconds?$/i, '$1-second').replace(/^(\d+)\s*minutes?$/i, '$1-minute');
   const link = opts.productUrl.includes('?')
     ? `${opts.productUrl}&utm_source=email&utm_medium=film&utm_campaign=sawdust-cinema`
     : `${opts.productUrl}?utm_source=email&utm_medium=film&utm_campaign=sawdust-cinema`;
-  const subject = opts.subject || `🎬 ${opts.filmTitle} — our new ${runtimeAdj} film`;
+  const subject = opts.subject
+    || (runtimeAdj ? `🎬 ${opts.filmTitle} — our new ${runtimeAdj} film`
+                   : `🎬 ${opts.filmTitle} — a new short film`);
   const priceLine = opts.price ? ` — $${Number(opts.price).toFixed(2)}` : '';
+  // The opener belongs to the FILM, never to the template.
+  const intro = opts.intro || `We made a new film${runtime ? `, ${runtime}` : ''}. No sales pitch, just the design and the wood it is cut from.`;
   const body = `
-<p style="margin:0 0 14px;font-size:15px;line-height:1.6;">We made a little film. ${runtime}, no sales pitch, just a Highland cow, a lot of oak and one very patient wife.</p>
+<p style="margin:0 0 14px;font-size:15px;line-height:1.6;">${esc(intro)}</p>
 <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">Tap the picture to watch it, then the design is right underneath.</p>
 
 <!-- the poster IS the play button: one tap target, full width on a phone -->
@@ -628,7 +635,7 @@ export function filmEmail(opts: {
     </a>
   </td></tr>
 </table>
-<p style="margin:6px 0 20px;text-align:center;font-size:12px;color:#8a7a68;">▶ ${runtime} · tap the picture to watch</p>
+<p style="margin:6px 0 20px;text-align:center;font-size:12px;color:#8a7a68;">▶ ${runtime ? esc(runtime) + ' · ' : ''}tap the picture to watch</p>
 
 ${btn(link, `Get the ${esc(opts.productTitle)}${priceLine}`)}
 
@@ -639,7 +646,9 @@ ${btn(link, `Get the ${esc(opts.productTitle)}${priceLine}`)}
 <p style="margin:16px 0 0;font-size:14px;">Happy carving,<br/>Jolly · DigitalChiselCo</p>`;
 
   const html = shell(subject, opts.filmTitle, body, opts.email);
-  const text = `${opts.filmTitle} — our new ${runtimeAdj} film.
+  const text = `${opts.filmTitle}${runtimeAdj ? ` — our new ${runtimeAdj} film` : ' — a new short film'}.
+
+${intro}
 
 Watch it and see the designs: ${link}
 

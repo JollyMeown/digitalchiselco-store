@@ -36,12 +36,18 @@ async function isCallerAdmin(request: Request): Promise<boolean> {
 
 /** The film to mail: the one asked for, else the first active one. */
 async function loadFilm(db: any, id?: string) {
-  let q = db.from('showcase_videos')
-    .select('id, video_url, poster_url, title, caption, products(slug, title, price_usd)')
-    .eq('active', true);
-  q = id ? q.eq('id', id) : q.order('sort_order').limit(1);
-  const { data } = await q.maybeSingle();
-  return data;
+  // The per-film email columns arrive in migration 093. Fall back to the base
+  // columns so this endpoint keeps working whichever lands first.
+  const BASE = 'id, video_url, poster_url, title, caption, products(slug, title, price_usd)';
+  const FULL = `id, video_url, poster_url, title, caption, email_intro, email_subject, runtime_seconds, products(slug, title, price_usd)`;
+  for (const cols of [FULL, BASE]) {
+    let q = db.from('showcase_videos').select(cols).eq('active', true);
+    q = id ? q.eq('id', id) : q.order('sort_order').limit(1);
+    const { data, error } = await q.maybeSingle();
+    if (!error) return data;
+    if (cols === BASE) return null;
+  }
+  return null;
 }
 
 function build(film: any, email: string, subject?: string) {
@@ -57,7 +63,10 @@ function build(film: any, email: string, subject?: string) {
     productTitle: (p?.title || '').split('|')[0].trim() || 'the collection',
     price: p?.price_usd ?? null,
     blurb: film.caption || undefined,
-    subject,
+    // the opener, the runtime and the subject belong to THIS film, not the template
+    intro: film.email_intro || undefined,
+    runtime: film.runtime_seconds ? `${film.runtime_seconds} seconds` : undefined,
+    subject: subject || film.email_subject || undefined,
   });
 }
 
