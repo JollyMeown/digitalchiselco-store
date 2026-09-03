@@ -75,10 +75,14 @@ export const POST: APIRoute = async ({ request }) => {
     const status = ['pending', 'approved', 'rejected'].includes(b?.status) ? b.status : 'pending';
     const [{ data: cats }, { data: prods }, { count: pendingP }, { count: approvedP }, { count: totalP }, { count: withMockup }] = await Promise.all([
       db.from('categories').select('id, name, slug, mockup_url, mockup_status, mockup_scene').not('mockup_url', 'is', null).eq('mockup_status', status).order('name'),
-      db.from('products').select('id, title, slug, image_url, mockup_url, mockup_status, mockup_scene, etsy_sales_365')
-        .not('mockup_url', 'is', null).eq('mockup_status', status).order('etsy_sales_365', { ascending: false }).limit(60),
-      db.from('products').select('id', { count: 'exact', head: true }).not('mockup_url', 'is', null).eq('mockup_status', 'pending'),
-      db.from('products').select('id', { count: 'exact', head: true }).not('mockup_url', 'is', null).eq('mockup_status', 'approved'),
+      db.from('products')
+        .select('id, title, slug, image_url, mockup_url, mockup_status, mockup_style, mockup_b_url, mockup_b_status, mockup_b_style, mockup_scene, etsy_sales_365')
+        .or(`and(mockup_url.not.is.null,mockup_status.eq.${status}),and(mockup_b_url.not.is.null,mockup_b_status.eq.${status})`)
+        .order('etsy_sales_365', { ascending: false }).limit(80),
+      db.from('products').select('id', { count: 'exact', head: true })
+        .or('and(mockup_url.not.is.null,mockup_status.eq.pending),and(mockup_b_url.not.is.null,mockup_b_status.eq.pending)'),
+      db.from('products').select('id', { count: 'exact', head: true })
+        .or('and(mockup_url.not.is.null,mockup_status.eq.approved),and(mockup_b_url.not.is.null,mockup_b_status.eq.approved)'),
       db.from('products').select('id', { count: 'exact', head: true }).eq('active', true),
       db.from('products').select('id', { count: 'exact', head: true }).not('mockup_url', 'is', null),
     ]);
@@ -104,13 +108,19 @@ export const POST: APIRoute = async ({ request }) => {
     const status = action === 'approve_many' ? 'approved' : 'rejected';
     const items: { id: string; kind?: string }[] = Array.isArray(b?.items) ? b.items.slice(0, 500) : [];
     if (!items.length) return json({ error: 'no items' }, 400);
-    const prodIds = items.filter((i) => i.kind !== 'category').map((i) => String(i.id));
+    const aIds = items.filter((i) => i.kind !== 'category' && (i as any).variant !== 'b').map((i) => String(i.id));
+    const bIds = items.filter((i) => i.kind !== 'category' && (i as any).variant === 'b').map((i) => String(i.id));
     const catIds = items.filter((i) => i.kind === 'category').map((i) => String(i.id));
     let done = 0;
-    if (prodIds.length) {
-      const { error, count } = await db.from('products').update({ mockup_status: status }, { count: 'exact' }).in('id', prodIds);
+    if (aIds.length) {
+      const { error, count } = await db.from('products').update({ mockup_status: status }, { count: 'exact' }).in('id', aIds);
       if (error) return json({ error: error.message }, 500);
-      done += count || prodIds.length;
+      done += count || aIds.length;
+    }
+    if (bIds.length) {
+      const { error, count } = await db.from('products').update({ mockup_b_status: status }, { count: 'exact' }).in('id', bIds);
+      if (error) return json({ error: error.message }, 500);
+      done += count || bIds.length;
     }
     if (catIds.length) {
       const { error, count } = await db.from('categories').update({ mockup_status: status }, { count: 'exact' }).in('id', catIds);
@@ -122,21 +132,27 @@ export const POST: APIRoute = async ({ request }) => {
 
   // Approve everything still waiting, in one call.
   if (action === 'approve_all_pending') {
-    const [{ count: pc }, { count: cc }] = await Promise.all([
+    const [{ count: pa }, { count: pb }, { count: cc }] = await Promise.all([
       db.from('products').update({ mockup_status: 'approved' }, { count: 'exact' }).eq('mockup_status', 'pending').not('mockup_url', 'is', null),
+      db.from('products').update({ mockup_b_status: 'approved' }, { count: 'exact' }).eq('mockup_b_status', 'pending').not('mockup_b_url', 'is', null),
       db.from('categories').update({ mockup_status: 'approved' }, { count: 'exact' }).eq('mockup_status', 'pending').not('mockup_url', 'is', null),
     ]);
-    return json({ ok: true, done: (pc || 0) + (cc || 0) });
+    return json({ ok: true, done: (pa || 0) + (pb || 0) + (cc || 0) });
   }
 
   const kind = b?.kind === 'category' ? 'categories' : 'products';
   const id = String(b?.id || '');
+  // Which staging variant this action targets: 'a' is the gift box, 'b' the
+  // second staging. Collections only ever have one image.
+  const slot = kind === 'products' && b?.variant === 'b' ? 'b' : 'a';
+  const statusCol = slot === 'b' ? 'mockup_b_status' : 'mockup_status';
+  const urlCol = slot === 'b' ? 'mockup_b_url' : 'mockup_url';
   if (!id) return json({ error: 'id required' }, 400);
 
   // ── approve / reject ────────────────────────────────────────────────
   if (action === 'approve' || action === 'reject') {
     const status = action === 'approve' ? 'approved' : 'rejected';
-    const { error } = await db.from(kind).update({ mockup_status: status }).eq('id', id);
+    const { error } = await db.from(kind).update({ [statusCol]: status }).eq('id', id);
     if (error) return json({ error: error.message }, 500);
     return json({ ok: true, status });
   }
@@ -167,12 +183,16 @@ export const POST: APIRoute = async ({ request }) => {
       if (!p?.image_url) return json({ error: 'product not found' }, 404);
       const { data: pc } = await db.from('product_categories').select('categories(slug)').eq('product_id', id).limit(1);
       const catSlug = (pc?.[0] as any)?.categories?.slug || '';
-      const room = scene || sceneForCategory(catSlug, isFlatProduct(p.title));
+      const flat = isFlatProduct(p.title);
+      const styleKey = slot === 'b' ? (flat ? 'food' : 'stand') : 'gift_box';
       const ref = await fetchRef(p.image_url);
-      const out = await generate(mockupPrompt(room), [ref]);
+      const out = await generate(mockupPrompt(styleKey, { flat, seed: p.slug, extra: scene }), [ref]);
       if (!out) return json({ error: 'no image returned' }, 502);
-      const url = await store(`mockups/${p.slug}.jpg`, out);
-      await db.from('products').update({ mockup_url: `${url}?v=${Date.now()}`, mockup_scene: room, mockup_status: 'pending' }).eq('id', id);
+      const url = await store(`mockups/${p.slug}${slot === 'b' ? '-b' : ''}.jpg`, out);
+      await db.from('products').update({
+        [urlCol]: `${url}?v=${Date.now()}`, mockup_scene: scene || null,
+        [statusCol]: 'pending', [slot === 'b' ? 'mockup_b_style' : 'mockup_style']: styleKey,
+      }).eq('id', id);
       return json({ ok: true, url: `${url}?v=${Date.now()}` });
     } catch (e: any) {
       return json({ error: String(e?.message || e).slice(0, 300) }, 500);

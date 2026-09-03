@@ -10,6 +10,9 @@ import { Card, btnPrimary, btnGhost, inputCls } from './ui';
 
 type Item = {
   id: string; kind: 'product' | 'category';
+  key: string;                       // id + variant, so both slots can be listed
+  variant?: 'a' | 'b';
+  style?: string | null;
   name: string; slug: string;
   url: string; scene: string | null; sales?: number;
 };
@@ -41,12 +44,22 @@ export default function MarketingImages() {
     const j = await call({ action: 'list', status });
     if (j?.ok) {
       const cats: Item[] = (j.categories || []).map((c: any) => ({
-        id: c.id, kind: 'category', name: c.name, slug: c.slug, url: c.mockup_url, scene: c.mockup_scene,
+        id: c.id, key: c.id, kind: 'category', name: c.name, slug: c.slug, url: c.mockup_url, scene: c.mockup_scene,
       }));
-      const prods: Item[] = (j.products || []).map((p: any) => ({
-        id: p.id, kind: 'product', name: String(p.title || '').split('|')[0].trim(), slug: p.slug,
-        url: p.mockup_url, scene: p.mockup_scene, sales: p.etsy_sales_365,
-      }));
+      // A product can have BOTH staging variants waiting, so each is its own card.
+      const prods: Item[] = [];
+      for (const p of j.products || []) {
+        const base = {
+          id: p.id, kind: 'product' as const, name: String(p.title || '').split('|')[0].trim(),
+          slug: p.slug, scene: p.mockup_scene, sales: p.etsy_sales_365,
+        };
+        if (p.mockup_url && p.mockup_status === status) {
+          prods.push({ ...base, key: `${p.id}:a`, variant: 'a', style: p.mockup_style, url: p.mockup_url });
+        }
+        if (p.mockup_b_url && p.mockup_b_status === status) {
+          prods.push({ ...base, key: `${p.id}:b`, variant: 'b', style: p.mockup_b_style, url: p.mockup_b_url });
+        }
+      }
       setItems([...cats, ...prods]);
       setPicked(new Set());
       setStats(j.stats);
@@ -58,18 +71,18 @@ export default function MarketingImages() {
   useEffect(() => { load(tab); }, [tab, load]);
 
   async function act(it: Item, action: 'approve' | 'reject' | 'regenerate') {
-    setBusy(it.id + action); setNote('');
+    setBusy(it.key + action); setNote('');
     const j = await call({
-      action, id: it.id, kind: it.kind,
-      ...(action === 'regenerate' ? { scene: scenes[it.id] ?? it.scene ?? '' } : {}),
+      action, id: it.id, kind: it.kind, variant: it.variant,
+      ...(action === 'regenerate' ? { scene: scenes[it.key] ?? it.scene ?? '' } : {}),
     });
     setBusy('');
     if (j?.error) { setNote(`${it.name}: ${j.error}`); return; }
     if (action === 'regenerate') {
       setNote(`${it.name}: regenerated, review the new image below.`);
-      setItems((list) => list.map((x) => (x.id === it.id ? { ...x, url: j.url } : x)));
+      setItems((list) => list.map((x) => (x.key === it.key ? { ...x, url: j.url } : x)));
     } else {
-      setItems((list) => list.filter((x) => x.id !== it.id));
+      setItems((list) => list.filter((x) => x.key !== it.key));
       load(tab);
     }
   }
@@ -90,7 +103,7 @@ export default function MarketingImages() {
       : `Approve ALL ${n} pending image(s) without reviewing the rest? They go live on Pinterest and the site.`)) return;
     setBusy('bulk'); setNote('');
     const body = kind === 'selected'
-      ? { action: 'approve_many', items: items.filter((i) => picked.has(i.id)).map((i) => ({ id: i.id, kind: i.kind })) }
+      ? { action: 'approve_many', items: items.filter((i) => picked.has(i.key)).map((i) => ({ id: i.id, kind: i.kind, variant: i.variant })) }
       : { action: 'approve_all_pending' };
     const j = await call(body);
     setBusy('');
@@ -151,7 +164,7 @@ export default function MarketingImages() {
         <div className="flex flex-wrap items-center gap-2 mb-3 p-2.5 rounded-lg bg-cream/60 border border-bronze-600/15">
           <label className="flex items-center gap-2 text-xs font-medium text-ink-800 cursor-pointer">
             <input type="checkbox" checked={allPicked}
-              onChange={() => setPicked(allPicked ? new Set() : new Set(items.map((i) => i.id)))} />
+              onChange={() => setPicked(allPicked ? new Set() : new Set(items.map((i) => i.key)))} />
             Select all ({items.length})
           </label>
           <span className="text-[11px] text-ink-700/50">{picked.size} selected</span>
@@ -175,14 +188,14 @@ export default function MarketingImages() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {items.map((it) => (
-              <div key={it.id} className={`rounded-xl border bg-white overflow-hidden flex flex-col ${picked.has(it.id) ? 'border-bronze-600 ring-2 ring-bronze-600/30' : 'border-black/10'}`}>
+              <div key={it.key} className={`rounded-xl border bg-white overflow-hidden flex flex-col ${picked.has(it.key) ? 'border-bronze-600 ring-2 ring-bronze-600/30' : 'border-black/10'}`}>
                 <div className="relative">
                   <a href={it.url} target="_blank" rel="noreferrer" className="block bg-cream/50">
                     <img src={it.url} alt={it.name} loading="lazy" className="w-full h-56 object-contain" />
                   </a>
                   {tab === 'pending' && (
                     <label className="absolute top-2 left-2 flex items-center gap-1.5 bg-white/95 rounded-md px-2 py-1 shadow cursor-pointer text-[11px] font-medium">
-                      <input type="checkbox" checked={picked.has(it.id)} onChange={() => toggle(it.id)} />
+                      <input type="checkbox" checked={picked.has(it.key)} onChange={() => toggle(it.key)} />
                       select
                     </label>
                   )}
@@ -190,7 +203,9 @@ export default function MarketingImages() {
                 <div className="p-3 flex flex-col gap-2 flex-1">
                   <div>
                     <div className="text-[10px] uppercase tracking-wide font-semibold text-bronze-700">
-                      {it.kind === 'category' ? 'Collection' : 'Product'}{typeof it.sales === 'number' && it.sales > 0 ? ` · ${it.sales} sales` : ''}
+                      {it.kind === 'category' ? 'Collection' : (it.variant === 'b' ? 'Variant B' : 'Variant A')}
+                      {it.style ? ` · ${it.style.replace('_', ' ')}` : ''}
+                      {typeof it.sales === 'number' && it.sales > 0 ? ` · ${it.sales} sales` : ''}
                     </div>
                     <div className="text-[13px] font-semibold text-ink-900 leading-snug line-clamp-2">{it.name}</div>
                   </div>
@@ -198,21 +213,21 @@ export default function MarketingImages() {
                     className={inputCls + ' text-[11px] leading-snug'}
                     rows={3}
                     placeholder="Scene: describe the room you want. Leave as-is to reuse it."
-                    value={scenes[it.id] ?? it.scene ?? ''}
-                    onChange={(e) => setScenes((s) => ({ ...s, [it.id]: e.target.value }))}
+                    value={scenes[it.key] ?? it.scene ?? ''}
+                    onChange={(e) => setScenes((s) => ({ ...s, [it.key]: e.target.value }))}
                   />
                   <div className="flex flex-wrap gap-1.5 mt-auto">
                     {tab !== 'approved' && (
                       <button className={btnPrimary + ' text-xs px-3 py-1.5'} disabled={!!busy} onClick={() => act(it, 'approve')}>
-                        {busy === it.id + 'approve' ? '…' : '✓ Approve'}
+                        {busy === it.key + 'approve' ? '…' : '✓ Approve'}
                       </button>
                     )}
                     <button className={btnGhost + ' text-xs px-3 py-1.5'} disabled={!!busy || !canRegen} onClick={() => act(it, 'regenerate')}>
-                      {busy === it.id + 'regenerate' ? 'Generating…' : '↻ Regenerate'}
+                      {busy === it.key + 'regenerate' ? 'Generating…' : '↻ Regenerate'}
                     </button>
                     {tab !== 'rejected' && (
                       <button className={btnGhost + ' text-xs px-3 py-1.5'} disabled={!!busy} onClick={() => act(it, 'reject')}>
-                        {busy === it.id + 'reject' ? '…' : '✕ Reject'}
+                        {busy === it.key + 'reject' ? '…' : '✕ Reject'}
                       </button>
                     )}
                   </div>
