@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import opentype from 'opentype.js';
 import { supabase } from '../../../lib/supabase';
+import { cropToSubject } from '../../../lib/subject-crop';
 
 export const prerender = false;
 
@@ -67,17 +68,17 @@ const cleanName = (n: string) => String(n || '')
 
 export const GET: APIRoute = async ({ params, request }) => {
   const slug = String(params.slug || '');
-  const { data: cat } = await supabase.from('categories').select('id, name, slug').eq('slug', slug).maybeSingle();
+  const { data: cat } = await supabase.from('categories').select('id, name, slug, mockup_url, mockup_status').eq('slug', slug).maybeSingle();
   if (!cat) return new Response('Not found', { status: 404 });
 
   // Category membership lives in the product_categories join table.
   const { data: prods, count } = await supabase
     .from('products')
-    .select('title, image_url, product_categories!inner(category_id)', { count: 'exact' })
+    .select('title, image_url, mockup_url, mockup_status, etsy_sales_365, product_categories!inner(category_id)', { count: 'exact' })
     .eq('active', true).eq('product_categories.category_id', cat.id)
     .not('image_url', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(24);
+    .order('etsy_sales_365', { ascending: false })
+    .limit(60);
   const pool = (prods || []).filter((p: any) => p.image_url);
   if (pool.length < 2) return new Response('Not enough designs', { status: 404 });
 
@@ -96,7 +97,32 @@ export const GET: APIRoute = async ({ params, request }) => {
       for (let i = 0; i < n && arr.length; i++) out.push(arr[(seed * (i + 3) + i * 7) % arr.length]);
       return out;
     };
-    const chosen = pick(pool, 4);
+    // Categories are broad: "Vintage & WWII Planes" also holds hot rods and
+    // tractors, so taking whatever is newest published a plane-titled Pin full
+    // of trucks. Prefer designs whose own title echoes the theme name, then the
+    // best sellers, and only then anything else in the category.
+    const stop = new Set(['and', 'the', 'stl', '3d', 'art', 'wall', 'decor', 'files', 'file', 'series', 'carvings', 'carving']);
+    const themeWords = cleanName(cat.name).toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 2 && !stop.has(w));
+    // The LAST word of a category name is the specific one ("Vintage & WWII
+    // Planes"), so weight it heavily: otherwise a hot rod scores on "vintage"
+    // just as highly as a bomber scores on "planes".
+    const key = themeWords[themeWords.length - 1] || '';
+    const sing = (w: string) => (w.endsWith('s') ? w.slice(0, -1) : w);
+    const scored = pool.map((p: any) => {
+      const t = String(p.title || '').toLowerCase();
+      let hits = themeWords.filter((w) => t.includes(sing(w))).length;
+      if (key && t.includes(sing(key))) hits += 3;
+      return { p, hits, sales: Number(p.etsy_sales_365) || 0 };
+    }).sort((a, b) => (b.hits - a.hits) || (b.sales - a.sales));
+    // Rotate daily through the best-matching dozen so the Pin stays fresh
+    // without ever dropping to an off-theme design.
+    // If the category holds four or more designs that actually name the theme,
+    // the collage is built only from those: a Pin titled "Planes" must not
+    // rotate a motorcycle in tomorrow.
+    const onTheme = scored.filter((x) => x.hits >= 3);
+    const bench = onTheme.length >= 4 ? onTheme : scored;
+    const shortlist = bench.slice(0, Math.max(4, Math.min(12, bench.length))).map((x) => x.p);
+    const chosen = pick(shortlist, 4);
     const scene = SCENES[seed % SCENES.length];
 
     // Backdrop
@@ -110,13 +136,19 @@ export const GET: APIRoute = async ({ params, request }) => {
     const gridLeft = Math.round((W - (CW * 2 + GAP)) / 2), gridTop = 470;
     const tiles = await Promise.all(chosen.map(async (p: any, i: number) => {
       try {
-        const r = await fetch(p.image_url);
+        const useMockup = p.mockup_status === 'approved' && p.mockup_url;
+        const r = await fetch(useMockup || p.image_url);
         if (!r.ok) return null;
+        // Trim the studio cloth so four heroes read as one considered grid
+        // rather than four different amounts of fabric. Room mockups are left
+        // alone: their surroundings ARE the picture.
+        const raw = Buffer.from(await r.arrayBuffer());
+        const src = useMockup ? raw : await cropToSubject(sharp, raw);
         // NEVER crop a hero. The catalogue mixes 4:3 and 1:1 (and future art may
         // be portrait), and cropping to a fixed tile silently cuts elements off
         // the design a pinner is being sold. Fit the whole image inside the tile
         // and letterbox it on a warm card instead.
-        const img = await sharp(Buffer.from(await r.arrayBuffer()))
+        const img = await sharp(src)
           .resize(CW - 16, CH - 16, { fit: 'inside', withoutEnlargement: false })
           .toBuffer();
         const meta = await sharp(img).metadata();

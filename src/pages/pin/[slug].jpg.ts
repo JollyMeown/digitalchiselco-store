@@ -68,12 +68,13 @@ function wrap(f: opentype.Font, title: string, size: number, maxLines = 3): stri
 export const GET: APIRoute = async ({ params, request }) => {
   const slug = String(params.slug || '');
   const { data: p } = await supabase
-    .from('products').select('title, seo_title, image_url, mockup_url').eq('slug', slug).eq('active', true).maybeSingle();
+    .from('products').select('title, seo_title, image_url, mockup_url, mockup_status').eq('slug', slug).eq('active', true).maybeSingle();
   if (!p?.image_url) return new Response('Not found', { status: 404 });
   // Prefer the room mockup when one exists: a carving hanging on a real wall is
   // what Pinterest rewards, and the hero's studio cloth reads as a catalogue
   // photo. Falls back to the hero, so a product without a mockup still pins.
-  const art = p.mockup_url || p.image_url;
+  // Only art the owner has approved in Admin > SEO > Marketing images.
+  const art = (p.mockup_status === 'approved' && p.mockup_url) ? p.mockup_url : p.image_url;
 
   // SEO titles are built for search and run long; a Pin needs the subject only.
   // Trim to the first clause and cut on a word boundary, never mid-word.

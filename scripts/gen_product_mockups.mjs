@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { mockupPrompt, macroPrompt, styleForProduct, STYLES } from '../src/lib/marketing-prompts.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -45,63 +46,9 @@ const FORCE = args.includes('--force');
 const COLUMN = KIND === 'macro' ? 'macro_url' : 'mockup_url';
 
 // ── prompts (verbatim from BRS marketing prompts) ──────────────────────────
-const MOCKUP_PROMPT = (envLine) =>
-  'You are a world-top product photographer and advertising art director creating a photorealistic '
-  + 'PRODUCT DISPLAY shot for a premium marketplace listing.\n'
-  + 'THIS IS COMPOSITING, NOT ILLUSTRATION: the attached image shows the actual physical product, a '
-  + 'wooden CNC-carved piece. Place THIS EXACT object into a new scene. Do NOT redraw, reinterpret, '
-  + 'restyle, simplify or "improve" it in any way. The carving\'s composition, every individual element '
-  + 'AND its count (figures, motifs, screws, hinges, weave rows, border repeats), the frame shape, '
-  + 'proportions, aspect ratio, relief depth, wood tone and grain must match the reference 1:1, as if the '
-  + 'product were cut out of the reference photo and photographed again in the new environment. Only the '
-  + 'surroundings, lighting and shadows may change.\n'
-  + `SCENE: ${envLine}\n`
-  + 'FRAMING (hard rules): the ENTIRE product is fully visible, no edge may be cropped or touch the frame '
-  + 'border. Keep at least 10-12% of the frame as environment margin on EVERY side. The product occupies '
-  + 'roughly 55-70% of the frame height, tack sharp, the unmistakable hero of the shot. Respect the '
-  + "reference's own orientation: if it is landscape keep it landscape, if it is square keep it square.\n"
-  + 'TRUE SCALE: render the product at its believable real-world size (a wall plaque is roughly 40-60 cm) '
-  + 'relative to every prop, wall and surface. Props must never dwarf or exaggerate it, and perspective '
-  + 'must keep its true proportions.\n'
-  + 'CAMERA: full-frame, 50mm at f/4, ISO 100, natural directional light with soft realistic shadows.\n'
-  + 'No people, no text, no watermark, no logos.';
 
-const MACRO_PROMPT =
-  'You are a world-class macro product photographer shooting a premium advertising campaign. Analyze the '
-  + 'attached image of a carved wooden product, then create an extreme close-up macro photograph of ITS OWN '
-  + 'surface: same carving, same details, nothing invented.\n'
-  + 'CAMERA & OPTICS: full-frame body with a 100mm f/2.8 macro lens at 1:1 magnification, f/5.6 for a '
-  + 'razor-thin but usable depth of field, ISO 100, tripod-locked, focus stacked on the most beautiful '
-  + 'carved detail so the tool marks and wood grain are tack sharp while the background melts into creamy '
-  + 'bokeh.\n'
-  + 'LIGHTING: dramatic and moody, one low raking key light skimming across the relief at about 15 degrees '
-  + 'to carve deep micro-shadows into every chisel mark, a very soft warm fill from the opposite side, and '
-  + 'a faint cool rim to separate the piece from the darkness. Dark, minimalist background with a slight '
-  + 'atmospheric haze and gentle vignette.\n'
-  + 'MOOD: luxurious, tactile, heirloom quality, the viewer should almost feel the wood. Professional '
-  + 'advertising finish, physically accurate grain, zero plastic look, no text, no watermark.';
 
-// Environment per theme, so the mockup sells the room the buyer imagines.
-const THEME_SCENE = {
-  'hunting-lodge-decor': 'a warm log hunting lodge with a stone fireplace, antler details and firelight, the piece hung on the log wall',
-  'fish-fly-fishing-stl': 'a lakeside cabin porch with fly rods, a landing net and morning light on the water beyond',
-  'flying-ducks-owl-birds': 'a rustic country study with a leather chair, brass lamp and a duck decoy on the shelf',
-  'pet-lover-carvings': 'a bright family living room with a dog bed, soft throw and plants, the piece on the wall above',
-  'cowboy-western': 'a western ranch room with worn leather, a saddle blanket and warm late-afternoon light',
-  'bald-eagle-patriotic': 'a patriotic den with dark wood panelling, a folded flag in a case and warm lamp light',
-  'religious-christian': 'a serene chapel-like corner with a candle, linen and soft daylight through a window',
-  'wildlife-wall-art-stl': 'a modern mountain lodge living room with big windows, pine and soft daylight',
-  'farmhouse-country': 'a farmhouse kitchen with open shelving, enamelware and white shiplap',
-  'native-american': 'a southwestern room with woven textiles, terracotta pottery and warm desert light',
-  'gothic-skull-art': 'a moody dark study with candles, old books and deep shadow',
-  'floral-botanical': 'a light-filled sunroom with trailing plants, rattan and pale linen',
-  'coastal-nautical': 'a coastal cottage hallway with rope, driftwood and cool sea light',
-  'memorial-tribute': 'a quiet hallway with a console table, fresh flowers and soft window light',
-  'vintage-wwii-planes': 'an aviation-themed office with a propeller, vintage maps and warm lamp light',
-  'funny-animal-series': 'a cheerful family kitchen nook with bright colour and morning light',
-  'pet-lover': 'a bright family living room with a dog bed and soft throw',
-};
-const DEFAULT_SCENE = 'a warm modern living room with a sofa, plants and soft natural light, the piece hung on the wall above';
+
 
 // ── Gemini ─────────────────────────────────────────────────────────────────
 async function gemini(prompt, refBuf, aspect) {
@@ -162,12 +109,13 @@ if (PREVIEW) fs.mkdirSync(OUT_DIR, { recursive: true });
 
 let ok = 0, failed = 0;
 for (const p of products) {
-  const catSlug = p.product_categories?.[0]?.categories?.slug || '';
-  const scene = THEME_SCENE[catSlug] || DEFAULT_SCENE;
-  process.stdout.write(`. ${p.slug.slice(0, 46)} [${catSlug || 'no category'}] … `);
+  // Style comes from the product itself: trays are staged on the CNC bed or
+  // filled with food, panels in a gift box or on a golden stand.
+  const styleKey = String(flag('style', '')) || styleForProduct(p.title, p.slug);
+  process.stdout.write(`. ${p.slug.slice(0, 42)} [${STYLES[styleKey]?.label || styleKey}] … `);
   try {
     const hero = Buffer.from(await (await fetch(p.image_url)).arrayBuffer());
-    const prompt = KIND === 'macro' ? MACRO_PROMPT : MOCKUP_PROMPT(scene);
+    const prompt = KIND === 'macro' ? macroPrompt() : mockupPrompt(styleKey);
     // Let the model keep the hero's own shape: forcing an aspect is what crops
     // a landscape carving into a square.
     const raw = await gemini(prompt, hero, undefined);
