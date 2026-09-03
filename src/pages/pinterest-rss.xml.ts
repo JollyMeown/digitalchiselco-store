@@ -156,6 +156,62 @@ export async function GET() {
     </item>`;
   }).join('\n');
 
+  // ── Mockup Pins for designs already published ───────────────────────
+  // Pinterest never repaints a Pin it has already made, so the top sellers that
+  // went out months ago would never show the new room mockups. These are fresh
+  // items with their own guid: one Pin per approved staging variant, paced so
+  // the board is not flooded, tagged so the click data says which staging sells.
+  const MOCKUPS_PER_DAY = 6;
+  let mockupXml = '';
+  try {
+    const { supabaseAdmin } = await import('../lib/supabase');
+    const { data: mk } = await supabaseAdmin().from('products')
+      .select('slug, title, seo_title, mockup_status, mockup_b_status, etsy_sales_365')
+      .eq('active', true)
+      .or('mockup_status.eq.approved,mockup_b_status.eq.approved')
+      .order('etsy_sales_365', { ascending: false }).limit(400);
+    const rows = mk || [];
+    const variants: { slug: string; title: string; v: 'a' | 'b' }[] = [];
+    for (const r of rows) {
+      const t = clean(r.seo_title || String(r.title || '').split('|')[0]).slice(0, 100);
+      if (r.mockup_status === 'approved') variants.push({ slug: r.slug, title: t, v: 'a' });
+      if (r.mockup_b_status === 'approved') variants.push({ slug: r.slug, title: t, v: 'b' });
+    }
+    // Deterministic daily slice: the same day always offers the same batch.
+    const day = Math.floor(now / DAY_MS);
+    const take: typeof variants = [];
+    for (let i = 0; i < MOCKUPS_PER_DAY * WINDOW_DAYS && variants.length; i++) {
+      take.push(variants[((day - Math.floor(i / MOCKUPS_PER_DAY)) * MOCKUPS_PER_DAY + (i % MOCKUPS_PER_DAY)) % variants.length]);
+    }
+    const seen = new Set<string>();
+    mockupXml = take.filter((x) => {
+      const k = `${x.slug}:${x.v}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    }).map((x) => {
+      const img = `${SITE}/pin/${encodeURIComponent(x.slug)}.jpg?variant=${x.v}`;
+      const link = `${SITE}/product/${x.slug}?utm_source=pinterest&utm_medium=rss&utm_content=mockup-${x.v}`;
+      const desc = `${x.title}. Bas-relief STL for CNC routers, laser engravers and 3D printers. Instant download, `
+        + 'commercial use included.' + (makerCta ? ' No CNC or 3D printer? A vetted local maker can build it for you.' : '')
+        + ' Grab 5 free STL files at digitalchiselco.com/free.';
+      return `    <item>
+      <title>${xmlEscape(x.title)}</title>
+      <link>${xmlEscape(link)}</link>
+      <guid isPermaLink="false">${xmlEscape(`${SITE}/product/${x.slug}#mockup-${x.v}`)}</guid>
+      <pubDate>${new Date(now).toUTCString()}</pubDate>
+      <description>${cdata(desc)}</description>
+      <content:encoded>${cdata(`<img src="${img}" alt="${xmlEscape(x.title)}" /><p>${xmlEscape(desc)}</p>`)}</content:encoded>
+      <enclosure url="${xmlEscape(img)}" type="image/jpeg" length="${FALLBACK_BYTES}" />
+      <media:content url="${xmlEscape(img)}" medium="image" type="image/jpeg" width="${PIN_W}" height="${PIN_H}" fileSize="${FALLBACK_BYTES}" />
+      <media:thumbnail url="${xmlEscape(img)}" width="${PIN_W}" height="${PIN_H}" />
+      <image>${xmlEscape(img)}</image>
+    </item>`;
+    }).join('\n');
+  } catch (e) {
+    console.error('pinterest-rss mockup pins failed:', e);
+  }
+
   // ── Promotional Pins ────────────────────────────────────────────────
   // The shop's own Pinterest numbers say designed "hook" Pins earn ~22x the
   // impressions per Pin that catalogue product Pins do. These three sell the
@@ -199,6 +255,7 @@ export async function GET() {
     <language>en-us</language>
     <lastBuildDate>${new Date(now).toUTCString()}</lastBuildDate>
 ${promoXml}
+${mockupXml}
 ${itemXml}
   </channel>
 </rss>`;
