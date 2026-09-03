@@ -68,10 +68,22 @@ function wrap(f: opentype.Font, title: string, size: number, maxLines = 3): stri
 export const GET: APIRoute = async ({ params, request }) => {
   const slug = String(params.slug || '');
   const { data: p } = await supabase
-    .from('products').select('title, seo_title, image_url').eq('slug', slug).eq('active', true).maybeSingle();
+    .from('products').select('title, seo_title, image_url, mockup_url').eq('slug', slug).eq('active', true).maybeSingle();
   if (!p?.image_url) return new Response('Not found', { status: 404 });
+  // Prefer the room mockup when one exists: a carving hanging on a real wall is
+  // what Pinterest rewards, and the hero's studio cloth reads as a catalogue
+  // photo. Falls back to the hero, so a product without a mockup still pins.
+  const art = p.mockup_url || p.image_url;
 
-  const title = String(p.seo_title || p.title || '').split('|')[0].trim();
+  // SEO titles are built for search and run long; a Pin needs the subject only.
+  // Trim to the first clause and cut on a word boundary, never mid-word.
+  // Use the full product title: many seo_title values are stored truncated
+  // (e.g. "… CNC Relief S"), which would print a cut-off word on the Pin.
+  const title = String(p.title || p.seo_title || '')
+    .split('|')[0]
+    .replace(/(cnc relief stl|3d relief stl|bas-?relief stl|relief stl|stl file).*$/i, '')
+    .replace(/[\s,\-–]+$/, '')
+    .trim();
 
   // Cut Local second door: most of Pinterest does not own a CNC. When the
   // marketplace is live the Pin also speaks to them, which is the difference
@@ -90,19 +102,29 @@ export const GET: APIRoute = async ({ params, request }) => {
 
   try {
     const origin = new URL(request.url).origin;
-    const [{ reg, bold }, res] = await Promise.all([loadFonts(origin), fetch(p.image_url)]);
+    const [{ reg, bold }, res] = await Promise.all([loadFonts(origin), fetch(art)]);
     if (!res.ok) throw new Error('source image ' + res.status);
     const src = Buffer.from(await res.arrayBuffer());
 
-    // The carving runs full-bleed across the upper half, nothing cropped.
-    const PHOTO_W = W;
-    const photo = await sharp(src).resize(PHOTO_W, null, { fit: 'inside', withoutEnlargement: false }).toBuffer();
+    // Nothing is ever cropped, but the image is capped in height: room mockups
+    // come back square or portrait, and a full-width square left no room for the
+    // copy, which then printed over the buttons. Fitting inside a box keeps the
+    // whole design visible and guarantees space below it.
+    const PHOTO_W = W, PHOTO_MAX_H = 760;
+    const photo = await sharp(src).resize(PHOTO_W, PHOTO_MAX_H, { fit: 'inside', withoutEnlargement: false }).toBuffer();
     const pMeta = await sharp(photo).metadata();
     const photoH = pMeta.height || 751;
     const photoTop = 120;
 
     const lines = wrap(bold, title, 52);
-    const textTop = photoTop + photoH + 78;
+    // Vertical space between the image and the first CTA, so the copy sits in
+    // the middle of it whatever the image's shape.
+    const ctaTop = makerLine ? H - 300 : H - 210;
+    const blockH = lines.length * 62 + 100;
+    const textTop = Math.max(
+      photoTop + photoH + 70,
+      photoTop + photoH + Math.round(((ctaTop - (photoTop + photoH)) - blockH) / 2) + 52,
+    );
     const titleSvg = lines.map((l, i) => text(bold, l, textTop + i * 62, 52, '#2a1d10')).join('');
     const subY = textTop + lines.length * 62;
 
@@ -127,7 +149,7 @@ export const GET: APIRoute = async ({ params, request }) => {
     </svg>`);
 
     const out = await sharp(overlay)
-      .composite([{ input: photo, top: photoTop, left: Math.round((W - PHOTO_W) / 2) }])
+      .composite([{ input: photo, top: photoTop, left: Math.round((W - (pMeta.width || PHOTO_W)) / 2) }])
       .jpeg({ quality: 86, mozjpeg: true })
       .toBuffer();
 
