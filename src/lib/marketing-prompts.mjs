@@ -69,6 +69,20 @@ export const STYLES = {
       + 'reveal the carving depth, warm neutral palette of kraft brown, cream and sage. Calm, tactile, '
       + 'artisanal, the feeling of a beautiful handmade gift about to be given. Shallow depth of field so '
       + 'the props soften while the carving stays sharp.\n',
+    // Boxed TRAYS get the shiny packing cloth the owner asked for: satin. Panels
+    // keep the tissue-and-linen styling that was already approved.
+    flatText:
+      'SETTING: the piece lies inside an open natural kraft gift box sized to it, the box LINED WITH '
+      + 'LUSTROUS SATIN: ivory and soft champagne silk-satin fabric with a gentle sheen, arranged in soft '
+      + 'folds that catch the light and spill slightly over the box edge, the kind of shiny lining used in '
+      + 'luxury gift packaging. Photographed CLOSE IN from directly above at a slight angle so the piece '
+      + 'dominates the frame and its carved detail is large and legible. The box sits on a crumpled oatmeal '
+      + 'linen cloth. At the EDGES of the frame, partly cropped: a closed kraft box with a soft olive satin '
+      + 'ribbon and a small round kraft tag reading "Handmade" with a little heart, and a few sprigs of dried '
+      + "baby's breath. Nothing competes with the carving.\n"
+      + 'LIGHT: soft diffused natural daylight from a window to one side, with delicate specular highlights '
+      + 'running along the satin folds so the fabric reads as silky and expensive, while the wood stays warm '
+      + 'and matte. Calm, tactile, luxurious, the feeling of an heirloom gift about to be given.\n',
   },
   stand: {
     label: 'Golden stand',
@@ -138,7 +152,9 @@ export function mockupPrompt(styleKey, opts = {}) {
   return 'You are a world-top product photographer shooting a premium handmade wooden product for a '
     + 'marketplace listing and Pinterest.\n'
     + FIDELITY
-    + style.text
+    // Some styles read differently for a flat piece: a boxed tray gets the satin
+    // lining, a panel keeps the tissue-and-linen styling.
+    + (flat && style.flatText ? style.flatText : style.text)
     + (flat ? '' : NO_FRAMES)
     + framing(style.fill)
     + (extra ? `EXTRA DIRECTION: ${extra}\n` : '')
