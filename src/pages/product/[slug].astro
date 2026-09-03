@@ -156,6 +156,17 @@ const breadcrumbLd = {
           <p class="text-cream/50 text-xs mt-3">Press play, then scroll down for the designs.</p>
         </div>
       </div>
+      <style>
+        /* On a phone the film fills the screen, and the floating social-proof
+           toast and chat bubble used to sit on top of its captions. Stand them
+           down here only: CSS beats the script race (SocialProof renders in the
+           header, before this section exists). */
+        @media (max-width: 767px) {
+          #dcc-proof { display: none !important; }
+          /* the help button keeps its place but stops shouting over the film */
+          #cc-fab { opacity: .45; }
+        }
+      </style>
       <script is:inline>
         document.querySelectorAll('.pf-player').forEach(function (box) {
           var btn = box.querySelector('.pf-play');
