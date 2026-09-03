@@ -54,13 +54,13 @@ const framing = (fill = '55-70%') =>
 
 const hash = (s) => [...String(s || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
 
-// Satin colourways for the boxed pieces. The owner supplied both: warm ivory
-// and a deep emerald green. Chosen per product so a board of Pins alternates.
-export const SATINS = [
-  'ivory and soft champagne silk-satin with a warm pearl sheen',
-  'deep emerald green silk-satin with a rich jewel-like sheen and darker shadowed folds',
-];
-export const satinFor = (seed) => SATINS[Math.abs(hash(seed)) % SATINS.length];
+// Satin lining for the boxed pieces. LOCKED to deep emerald green by the owner
+// on 2026-09-03 ("lock this satin color"): every boxed tray uses this one, so
+// the board reads as a single deliberate brand look. Do not reintroduce the
+// ivory variant or add colours without the owner asking.
+export const SATIN = 'deep emerald green silk-satin with a rich jewel-like sheen and darker shadowed folds';
+export const SATINS = [SATIN];
+export const satinFor = () => SATIN;
 
 // ── the four owner-specified styles ────────────────────────────────────────
 export const STYLES = {
