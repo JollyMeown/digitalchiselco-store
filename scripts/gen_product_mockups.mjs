@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { mockupPrompt, macroPrompt, styleForProduct, STYLES } from '../src/lib/marketing-prompts.mjs';
+import { mockupPrompt, macroPrompt, styleForProduct, isFlatProduct, STYLES } from '../src/lib/marketing-prompts.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -115,7 +115,7 @@ for (const p of products) {
   process.stdout.write(`. ${p.slug.slice(0, 42)} [${STYLES[styleKey]?.label || styleKey}] … `);
   try {
     const hero = Buffer.from(await (await fetch(p.image_url)).arrayBuffer());
-    const prompt = KIND === 'macro' ? macroPrompt() : mockupPrompt(styleKey);
+    const prompt = KIND === 'macro' ? macroPrompt() : mockupPrompt(styleKey, { flat: isFlatProduct(p.title) });
     // Let the model keep the hero's own shape: forcing an aspect is what crops
     // a landscape carving into a square.
     const raw = await gemini(prompt, hero, undefined);

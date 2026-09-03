@@ -19,6 +19,8 @@
 //                fresh sawdust on the spoilboard.
 //     food     : the tray filled with chocolates, nuts, cheese and dried fruit,
 //                styled with a dark gift box, gold ribbon and a gift card.
+//     gift_box : trays may ALSO use the gift box above (owner, 2026-09-03), a
+//                boxed tray reads instantly as a present.
 //
 // Fidelity rules that never relax: compositing not illustration, the reference
 // carving reproduced 1:1 element for element, nothing cropped or hidden, and
@@ -52,9 +54,9 @@ const FRAMING =
 export const STYLES = {
   gift_box: {
     label: 'Gift box',
-    forFlat: false,
+    forFlat: 'both',        // panels AND trays: a boxed piece reads as a gift
     text:
-      'SETTING: the piece lies inside an open natural kraft gift box lined with soft crumpled white tissue '
+      'SETTING: the piece lies inside an open natural kraft gift box sized to it, lined with soft crumpled white tissue '
       + 'paper, photographed from directly above at a slight angle. The box sits on a crumpled oatmeal linen '
       + 'cloth. Beside it: a closed kraft gift box with a soft olive-green satin ribbon tied in a bow and a '
       + 'small round kraft tag reading "Handmade" with a little heart, sprigs of dried baby\'s breath and a '
@@ -116,18 +118,21 @@ const hash = (s) => [...String(s || '')].reduce((a, c) => (a * 31 + c.charCodeAt
  */
 export function styleForProduct(title, slug) {
   const flat = isFlatProduct(title);
-  const pair = flat ? ['cnc_bed', 'food'] : ['gift_box', 'stand'];
-  return pair[Math.abs(hash(slug || title)) % 2];
+  // Trays rotate through the workshop shot, the food styling and the gift box;
+  // panels alternate between the gift box and the golden stand.
+  const options = flat ? ['cnc_bed', 'food', 'gift_box'] : ['gift_box', 'stand'];
+  return options[Math.abs(hash(slug || title)) % options.length];
 }
 
 /** One product, staged in the owner's chosen style. */
-export function mockupPrompt(styleKey, extra = '') {
+export function mockupPrompt(styleKey, opts = {}) {
+  const { flat = false, extra = '' } = typeof opts === 'string' ? { extra: opts } : opts;
   const style = STYLES[styleKey] || STYLES.gift_box;
   return 'You are a world-top product photographer shooting a premium handmade wooden product for a '
     + 'marketplace listing and Pinterest.\n'
     + FIDELITY
     + style.text
-    + (style.forFlat ? '' : NO_FRAMES)
+    + (flat ? '' : NO_FRAMES)
     + FRAMING
     + (extra ? `EXTRA DIRECTION: ${extra}\n` : '')
     + 'Square 1:1 composition, photorealistic, magazine quality.';
