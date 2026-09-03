@@ -15,6 +15,13 @@
   </div>
 </div>
 <script is:inline>
+  // A page showing a film has its own call to action low down; the toast used to
+  // sit on top of it on a phone, so it stands down there.
+  if (document.querySelector('[data-has-film]') && window.matchMedia('(max-width: 767px)').matches) {
+    var _p = document.getElementById('dcc-proof');
+    if (_p) _p.remove();
+  }
+
   (function () {
     if (sessionStorage.getItem('dcc_proof_off')) return;
     var box = document.getElementById('dcc-proof');

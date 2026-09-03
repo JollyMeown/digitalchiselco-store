@@ -139,9 +139,9 @@ const breadcrumbLd = {
 
   {film && (
     <!-- Sawdust Cinema: the film email links here, so it plays first -->
-    <section class="mb-8 rounded-2xl overflow-hidden border border-black/10" style="background:linear-gradient(140deg,#141009,#1a2321)">
+    <section data-has-film class="mb-8 rounded-2xl overflow-hidden border border-black/10" style="background:linear-gradient(140deg,#141009,#1a2321)">
       <div class="grid md:grid-cols-[minmax(0,340px)_1fr] gap-0">
-        <div class="pf-player relative bg-black aspect-[9/16] md:aspect-auto md:min-h-[420px]" data-video={film.video_url}>
+        <div class="pf-player relative bg-black aspect-[4/5] max-h-[58vh] md:max-h-none md:aspect-auto md:min-h-[420px]" data-video={film.video_url}>
           {film.poster_url && <img src={film.poster_url} alt={film.title || cleanTitle} class="absolute inset-0 w-full h-full object-cover" loading="lazy" />}
           <button type="button" class="pf-play absolute inset-0 grid place-items-center bg-black/25 hover:bg-black/10 transition" aria-label="Play the film">
             <span class="w-16 h-16 rounded-full bg-white/95 text-[#1c4a48] grid place-items-center shadow-lg">
@@ -166,7 +166,7 @@ const breadcrumbLd = {
             var v = document.createElement('video');
             v.src = box.getAttribute('data-video');
             v.controls = true; v.autoplay = true; v.playsInline = true; v.preload = 'auto';
-            v.className = 'absolute inset-0 w-full h-full object-cover bg-black';
+            v.className = 'absolute inset-0 w-full h-full object-contain bg-black';
             box.appendChild(v); btn.remove();
             v.play().catch(function () {});
           });

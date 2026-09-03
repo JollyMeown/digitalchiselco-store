@@ -90,6 +90,36 @@ export default function SawdustCinemaAdmin() {
     await supabase.from('showcase_videos').update(fields).eq('id', id);
     load();
   }
+  // ── mail a film to subscribers ──────────────────────────────────────
+  const [subCount, setSubCount] = useState<number | null>(null);
+  const [mailSubject, setMailSubject] = useState('');
+  useEffect(() => {
+    supabase.from('subscribers').select('id', { count: 'exact', head: true })
+      .is('unsubscribed_at', null).is('suppressed_at', null)
+      .then(({ count }) => setSubCount(count ?? 0));
+  }, []);
+
+  async function mail(kind: 'preview' | 'test' | 'all', filmId: string) {
+    setBusy('mail-' + kind); setNote('');
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin/send-film', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ filmId, subject: mailSubject.trim() || undefined, ...(kind === 'preview' ? { preview: true } : kind === 'test' ? { test: true } : { audience: 'all' }) }),
+    });
+    const j = await res.json().catch(() => ({ error: 'bad response' }));
+    setBusy('');
+    if (j?.error) { setNote(j.error); return; }
+    if (kind === 'preview') {
+      const url = URL.createObjectURL(new Blob([`<title>${j.subject}</title>` + j.html], { type: 'text/html' }));
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setNote(`Preview opened. Subject: ${j.subject}`);
+      return;
+    }
+    setNote(kind === 'test' ? 'Test sent to jolly@digitalchiselco.com.' : `Sent to ${j.sent} of ${j.total} subscribers.`);
+  }
+
   async function remove(id: string) {
     if (!confirm('Remove this film from the homepage? The file stays in storage.')) return;
     await supabase.from('showcase_videos').delete().eq('id', id);
@@ -152,6 +182,17 @@ export default function SawdustCinemaAdmin() {
         {note && <div className="text-[11px] text-ink-800 mt-2">{note}</div>}
       </div>
 
+      {films.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-3 p-2.5 rounded-lg bg-cream/60 border border-bronze-600/15">
+          <span className="text-[11px] font-medium text-ink-800">Email subject (optional)</span>
+          <input value={mailSubject} onChange={(e) => setMailSubject(e.target.value)}
+            placeholder="Leave blank for the generated subject line" className={inputCls + ' text-xs flex-1 min-w-[220px]'} />
+          <span className="text-[11px] text-ink-700/55">
+            Video cannot play inside email, so subscribers get a tall clickable poster that opens the film on the design's page.
+          </span>
+        </div>
+      )}
+
       {films.length === 0 ? (
         <p className="text-sm text-ink-700/60">No films yet. The homepage section stays hidden until you add one.</p>
       ) : (
@@ -170,6 +211,12 @@ export default function SawdustCinemaAdmin() {
                 <input type="checkbox" checked={f.active} onChange={() => patch(f.id, { active: !f.active })} /> live
               </label>
               <div className="flex items-center gap-1">
+                <button className={btnGhost + ' text-xs px-2 py-1'} title="Preview the email" disabled={!!busy} onClick={() => mail('preview', f.id)}>👁</button>
+                <button className={btnGhost + ' text-xs px-2 py-1'} title="Send a test to your inbox" disabled={!!busy} onClick={() => mail('test', f.id)}>✉ test</button>
+                <button className={btnPrimary + ' text-xs px-2 py-1'} title={`Email ${subCount ?? '…'} subscribers`} disabled={!!busy}
+                  onClick={() => { if (confirm(`Email this film to all ${subCount ?? 0} subscribers? Each person receives it once.`)) mail('all', f.id); }}>
+                  📣 {subCount ?? '…'}
+                </button>
                 <button className={btnGhost + ' text-xs px-2 py-1'} disabled={i === 0} onClick={() => patch(f.id, { sort_order: f.sort_order - 1 })}>↑</button>
                 <button className={btnGhost + ' text-xs px-2 py-1'} disabled={i === films.length - 1} onClick={() => patch(f.id, { sort_order: f.sort_order + 1 })}>↓</button>
                 <button className={btnGhost + ' text-xs px-2 py-1'} onClick={() => remove(f.id)}>✕</button>
