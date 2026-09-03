@@ -67,26 +67,26 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
 
   <!-- Stats row (moved up — sits right below the announcement + nav, above the hero) -->
   <div class="bg-white border-b border-black/5">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+    <div class="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-6 grid grid-cols-3 md:grid-cols-5 gap-x-2 gap-y-3 sm:gap-4 text-center">
       <div>
-        <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.sales_count).toLocaleString()}+</div>
-        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">STL Files Sold</div>
+        <div class="font-serif text-[19px] sm:text-2xl md:text-3xl text-bronze-700 leading-tight">{Number(s.sales_count).toLocaleString()}+</div>
+        <div class="text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest text-ink-700/70 mt-0.5 sm:mt-1 leading-tight">STL Files Sold</div>
       </div>
       <div>
-        <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.rating)} <span class="text-yellow-500">★</span></div>
-        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Avg. Rating · {s.reviews_count}+ Reviews</div>
+        <div class="font-serif text-[19px] sm:text-2xl md:text-3xl text-bronze-700 leading-tight">{Number(s.rating)} <span class="text-yellow-500">★</span></div>
+        <div class="text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest text-ink-700/70 mt-0.5 sm:mt-1 leading-tight">Avg. Rating · {s.reviews_count}+ Reviews</div>
       </div>
       <div>
-        <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.admirers_count).toLocaleString()}+</div>
-        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Design Favorites</div>
+        <div class="font-serif text-[19px] sm:text-2xl md:text-3xl text-bronze-700 leading-tight">{Number(s.admirers_count).toLocaleString()}+</div>
+        <div class="text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest text-ink-700/70 mt-0.5 sm:mt-1 leading-tight">Design Favorites</div>
       </div>
       <div>
-        <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.products_count).toLocaleString()}+</div>
-        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Unique Designs</div>
+        <div class="font-serif text-[19px] sm:text-2xl md:text-3xl text-bronze-700 leading-tight">{Number(s.products_count).toLocaleString()}+</div>
+        <div class="text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest text-ink-700/70 mt-0.5 sm:mt-1 leading-tight">Unique Designs</div>
       </div>
       <div>
-        <div class="font-serif text-2xl md:text-3xl text-bronze-700">{Number(s.experience_years)}+</div>
-        <div class="text-[11px] uppercase tracking-widest text-ink-700/70 mt-1">Years of Craftsmanship</div>
+        <div class="font-serif text-[19px] sm:text-2xl md:text-3xl text-bronze-700 leading-tight">{Number(s.experience_years)}+</div>
+        <div class="text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest text-ink-700/70 mt-0.5 sm:mt-1 leading-tight">Years of Craftsmanship</div>
       </div>
     </div>
     {(s as any).etsy_link_enabled && (s as any).etsy_store_url && (

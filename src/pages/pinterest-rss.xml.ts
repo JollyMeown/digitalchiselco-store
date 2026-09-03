@@ -156,6 +156,40 @@ export async function GET() {
     </item>`;
   }).join('\n');
 
+  // ── Promotional Pins ────────────────────────────────────────────────
+  // The shop's own Pinterest numbers say designed "hook" Pins earn ~22x the
+  // impressions per Pin that catalogue product Pins do. These three sell the
+  // offers rather than a single design, and each carries its own link.
+  // The guid holds the month, so each promo republishes once a month rather
+  // than once ever, without duplicating on every poll.
+  const month = new Date(now).toISOString().slice(0, 7);            // YYYY-MM
+  const promos = [
+    { key: 'cut-local', title: 'Love a design? Get it made near you', to: '/makers',
+      desc: 'No CNC or 3D printer? Post any design and a vetted maker near you builds it, ready for local pickup. Compare quotes and star ratings, they do the making. Free to request.' },
+    { key: 'get-paid', title: 'Own a CNC, laser or 3D printer? Get paid to build', to: '/become-a-maker',
+      desc: 'Paid jobs near you with the design file already in hand. Free to join, the buyer pays you directly, and we take just 3% on completed jobs.' },
+    { key: 'free-files', title: 'Five bas-relief STL files, free', to: '/free',
+      desc: 'Test how our reliefs carve on your own machine before you spend anything. Ready for CNC routers, laser engravers and 3D printers, commercial use included.' },
+  ];
+  const promoXml = (await Promise.all(promos.map(async (pr) => {
+    const img = `${SITE}/pin/promo/${pr.key}.jpg?m=${month}`;
+    const link = `${SITE}${pr.to}?utm_source=pinterest&utm_medium=social&utm_campaign=promo-${pr.key}`;
+    const bytes = await imageBytes(img);
+    if (!bytes) return '';                                          // gated promo: skip
+    return `    <item>
+      <title>${xmlEscape(pr.title)}</title>
+      <link>${xmlEscape(link)}</link>
+      <guid isPermaLink="false">${xmlEscape(`${SITE}/promo/${pr.key}/${month}`)}</guid>
+      <pubDate>${new Date(now).toUTCString()}</pubDate>
+      <description>${cdata(pr.desc)}</description>
+      <content:encoded>${cdata(pr.desc)}</content:encoded>
+      <enclosure url="${xmlEscape(img)}" type="image/jpeg" length="${bytes}" />
+      <media:content url="${xmlEscape(img)}" medium="image" type="image/jpeg" width="${PIN_W}" height="${PIN_H}" fileSize="${bytes}" />
+      <media:thumbnail url="${xmlEscape(img)}" width="${PIN_W}" height="${PIN_H}" />
+      <image>${xmlEscape(img)}</image>
+    </item>`;
+  }))).filter(Boolean).join('\n');
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
@@ -164,6 +198,7 @@ export async function GET() {
     <description>Fresh bas-relief STL files for CNC routers, laser engravers and 3D printers, released daily.</description>
     <language>en-us</language>
     <lastBuildDate>${new Date(now).toUTCString()}</lastBuildDate>
+${promoXml}
 ${itemXml}
   </channel>
 </rss>`;
