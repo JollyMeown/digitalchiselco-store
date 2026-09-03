@@ -130,6 +130,15 @@ optgroup { color: var(--dim); }
 .step-body::-webkit-scrollbar-track { background: transparent; }
 
 @media (max-width: 820px) {
-  #app { grid-template-columns: 1fr; grid-template-rows: 56px 44vh 1fr; grid-template-areas: "head" "view" "panel"; }
+  /* Header row is auto-height: on phones the demo badge + buy link wrap to a
+   * second line instead of overflowing the fixed 56px row. The decorative
+   * "vase-mode · print-ready" pill is hidden — it collided with the title. */
+  #app { grid-template-columns: 1fr; grid-template-rows: auto 44vh 1fr; grid-template-areas: "head" "view" "panel"; }
   #panel { border-right: 0; border-top: 1px solid var(--line); }
+  header { padding: 8px 12px; gap: 10px; }
+  header h1 { font-size: 13.5px; white-space: nowrap; }
+  .logo { font-size: 18px; }
+  .pill { display: none; }
+  .brand { gap: 8px; }
+  .hintbar { font-size: 11px; line-height: 1.4; text-align: right; }
 }
