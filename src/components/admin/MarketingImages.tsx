@@ -16,7 +16,7 @@ type Item = {
   name: string; slug: string;
   url: string; scene: string | null; sales?: number;
 };
-type Stats = { pending: number; approved: number; total: number; withMockup: number; topDone: number; topTotal: number };
+type Stats = { pending: number; approved: number; total: number; withMockup: number; withMockupB: number; topDone: number; topDoneB: number; topTotal: number };
 
 export default function MarketingImages() {
   const [tab, setTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
@@ -69,6 +69,12 @@ export default function MarketingImages() {
   }, [call, tab]);
 
   useEffect(() => { load(tab); }, [tab, load]);
+  // A batch keeps producing images while this screen is open, so the counts
+  // refresh on their own rather than looking stuck.
+  useEffect(() => {
+    const t = setInterval(() => { if (!busy) load(tab); }, 30000);
+    return () => clearInterval(t);
+  }, [tab, load, busy]);
 
   async function act(it: Item, action: 'approve' | 'reject' | 'regenerate') {
     setBusy(it.key + action); setNote('');
@@ -129,11 +135,12 @@ export default function MarketingImages() {
             <div className="mt-1 h-1.5 rounded-full bg-black/10 overflow-hidden">
               <div className="h-full bg-bronze-600" style={{ width: `${stats.topTotal ? (stats.topDone / stats.topTotal) * 100 : 0}%` }} />
             </div>
+            <div className="text-[10px] text-ink-700/50 mt-1">variant A · B: {stats.topDoneB}/{stats.topTotal}</div>
           </div>
           <div className="rounded-lg border border-black/10 bg-cream/40 px-3 py-2">
             <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Whole catalogue</div>
             <div className="text-xl font-extrabold text-bronze-800">{stats.withMockup}<span className="text-sm text-ink-700/45">/{stats.total}</span></div>
-            <div className="text-[10px] text-ink-700/50">{pct}% have a mockup</div>
+            <div className="text-[10px] text-ink-700/50">{pct}% have a mockup · {stats.withMockup + stats.withMockupB} images total</div>
           </div>
           <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
             <div className="text-[10px] uppercase tracking-wide text-amber-700/70 font-medium">Waiting for you</div>
