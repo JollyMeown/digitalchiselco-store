@@ -41,10 +41,12 @@ const NO_FRAMES =
   'NO PICTURE FRAME: the piece is a bare carved wooden panel. Do NOT add a picture frame, mat, mount or '
   + 'glass around it, and do not paint or stain it. Its own carved edge is the only border.\n';
 
-const FRAMING =
+// How much of the frame the product fills is style-specific: the gift box is a
+// close-up of the boxed piece, not a wide table scene (owner, 2026-09-03).
+const framing = (fill = '55-70%') =>
   'FRAMING (hard rules): the ENTIRE product is fully visible, no edge, corner or carved detail cut off by '
   + 'the image border or hidden behind a prop. Keep a clear margin of setting on every side. The product is '
-  + 'the unmistakable hero, tack sharp, filling roughly 55-70% of the frame. Respect the reference\'s own '
+  + `the unmistakable hero, tack sharp, filling roughly ${fill} of the frame. Respect the reference's own `
   + 'orientation: landscape stays landscape, square stays square, portrait stays portrait.\n'
   + 'TRUE SCALE: believable real-world size (a wall plaque is roughly 25-45 cm, a serving tray 30-40 cm '
   + 'across) against every prop and surface.\n'
@@ -55,12 +57,14 @@ export const STYLES = {
   gift_box: {
     label: 'Gift box',
     forFlat: 'both',        // panels AND trays: a boxed piece reads as a gift
+    fill: '75-85%',         // a close-up of the boxed piece, not a wide table scene
     text:
       'SETTING: the piece lies inside an open natural kraft gift box sized to it, lined with soft crumpled white tissue '
-      + 'paper, photographed from directly above at a slight angle. The box sits on a crumpled oatmeal linen '
+      + 'paper, photographed CLOSE IN from directly above at a slight angle so the boxed piece dominates the '+ 'frame and its carved detail is large and legible. The box sits on a crumpled oatmeal linen '
       + 'cloth. Beside it: a closed kraft gift box with a soft olive-green satin ribbon tied in a bow and a '
       + 'small round kraft tag reading "Handmade" with a little heart, sprigs of dried baby\'s breath and a '
-      + 'few dried pale roses.\n'
+      + 'few dried pale roses. Keep the props at the EDGES of the frame, partly cropped, so nothing competes '
+      + 'with the carving: the second box and the flowers are supporting detail, not the subject.\n'
       + 'LIGHT: soft diffused natural daylight from a window to one side, gentle directional shadows that '
       + 'reveal the carving depth, warm neutral palette of kraft brown, cream and sage. Calm, tactile, '
       + 'artisanal, the feeling of a beautiful handmade gift about to be given. Shallow depth of field so '
@@ -69,6 +73,7 @@ export const STYLES = {
   stand: {
     label: 'Golden stand',
     forFlat: false,
+    fill: '65-75%',
     text:
       'SETTING: the piece stands upright on an ornate antique-gold wire easel display stand with fine '
       + 'scrollwork, on a rustic dark wooden table, seen straight on at eye level. Behind and to the sides: '
@@ -80,6 +85,7 @@ export const STYLES = {
   cnc_bed: {
     label: 'On the CNC bed',
     forFlat: true,
+    fill: '65-75%',
     text:
       'SETTING: the piece is shown still clamped on the bed of a CNC router, just finished. The machine '
       + 'spindle and cutting bit are directly above it, black cam clamps hold the workpiece at the corners, '
@@ -91,6 +97,7 @@ export const STYLES = {
   food: {
     label: 'Styled with food',
     forFlat: true,
+    fill: '70-80%',
     text:
       'SETTING: the piece is a serving tray on a dark wooden table, its compartments filled generously and '
       + 'neatly: assorted chocolate truffles in one, mixed nuts and dried cranberries in another, cubed '
@@ -133,7 +140,7 @@ export function mockupPrompt(styleKey, opts = {}) {
     + FIDELITY
     + style.text
     + (flat ? '' : NO_FRAMES)
-    + FRAMING
+    + framing(style.fill)
     + (extra ? `EXTRA DIRECTION: ${extra}\n` : '')
     + 'Square 1:1 composition, photorealistic, magazine quality.';
 }
