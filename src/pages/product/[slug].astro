@@ -26,7 +26,15 @@ try {
 const cats = (p.product_categories ?? []).map((pc: any) => pc.categories).filter(Boolean);
 const cat = cats[0];
 const cleanTitle = p.title.split('|')[0].trim();
-const gallery: string[] = (Array.isArray(p.gallery) && p.gallery.length ? p.gallery : [p.image_url]).filter(Boolean);
+// The hero stays the product render: it is what buyers recognise and what the
+// listings were approved on. Approved room mockups follow it in the gallery, so
+// the money already spent generating them works on the site as well.
+const baseGallery: string[] = (Array.isArray(p.gallery) && p.gallery.length ? p.gallery : [p.image_url]).filter(Boolean);
+const mockups: string[] = [
+  p.mockup_status === 'approved' ? p.mockup_url : null,
+  p.mockup_b_status === 'approved' ? p.mockup_b_url : null,
+].filter(Boolean) as string[];
+const gallery: string[] = [baseGallery[0], ...mockups, ...baseGallery.slice(1)].filter(Boolean);
 const related = await getRelatedProducts(p.id, 5);
 const soldCount = await getSoldCount(p.id);
 

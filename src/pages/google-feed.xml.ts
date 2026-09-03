@@ -103,7 +103,7 @@ export async function GET() {
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase
         .from('products')
-        .select('id, title, slug, price_usd, image_url, gallery, seo_description, description, product_categories(categories(name))')
+        .select('id, title, slug, price_usd, image_url, gallery, mockup_url, mockup_status, mockup_b_url, mockup_b_status, seo_description, description, product_categories(categories(name))')
         .eq('active', true)
         // Google's weapons policy will never approve our rifle/scope hunting
         // scenes, so sending them only accrues violations. Excluded here only;
@@ -120,7 +120,18 @@ export async function GET() {
         const { price, original, percent } = pricing(p.price_usd, discount);
         const cats = (p.product_categories || []).map((pc: any) => pc.categories?.name).filter(Boolean).join(' > ');
         const gallery: string[] = Array.isArray(p.gallery) ? p.gallery.filter(Boolean) : [];
-        const extraImgs = gallery.slice(1, 11).map((g) => `<g:additional_image_link>${xml(img(g, { w: 1200, q: 85 }))}</g:additional_image_link>`).join('');
+        // Approved room mockups ride along as ADDITIONAL images, never as the
+        // main one: Google judges the main image against the product itself, and
+        // a styled scene with props risks reading as "includes items not for
+        // sale". Additional images are exactly where lifestyle shots belong, and
+        // they cannot affect the listing's approval.
+        const lifestyle = [
+          p.mockup_status === 'approved' ? p.mockup_url : null,
+          p.mockup_b_status === 'approved' ? p.mockup_b_url : null,
+        ].filter(Boolean) as string[];
+        const extraImgs = [...lifestyle, ...gallery.slice(1)]
+          .slice(0, 10)
+          .map((g) => `<g:additional_image_link>${xml(img(g, { w: 1200, q: 85 }))}</g:additional_image_link>`).join('');
         items.push(
           `<item>` +
           `<g:id>${xml(p.id)}</g:id>` +
