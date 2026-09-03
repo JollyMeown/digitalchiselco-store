@@ -3,6 +3,7 @@
 // and produce a plain-text fallback for poor renderers.
 
 import { money } from './pricing';
+import { SUCCESS_FEE_PCT } from './marketplace-pricing';
 
 const SITE = process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com';
 const BRAND_NAME = 'DigitalChiselCo';
@@ -51,6 +52,11 @@ export type OrderEmailData = {
   crossSells?: { title: string; slug: string; image_url: string | null; price_usd: number }[];
   // Gift orders: this email goes to the RECIPIENT; banner shows who sent it + note.
   gift?: { fromName?: string | null; note?: string | null } | null;
+  // Cut Local invitation. Everyone who buys a relief STL owns a machine, which
+  // makes buyers the best-qualified maker recruits we have. Kept to one quiet
+  // card near the bottom so the email stays a receipt first, and only passed
+  // when the marketplace is live and this buyer is not already a maker.
+  makerInvite?: boolean;
 };
 
 /**
@@ -294,6 +300,23 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
             </td>
           </tr>
 
+          ${d.makerInvite ? `
+          <!-- Cut Local: this buyer owns a machine, so the offer is relevant -->
+          <tr>
+            <td style="padding:0 28px 24px;">
+              <div style="background:#1c4a48;color:#F5EFE3;padding:18px 22px;border-radius:8px;">
+                <div style="font-size:11px;letter-spacing:2px;color:#9fe0d9;text-transform:uppercase;margin-bottom:5px;">Cut Local · maker network</div>
+                <div style="font-family:Georgia,'Times New Roman',serif;font-size:17px;margin-bottom:6px;">Your machine could be earning between projects</div>
+                <p style="margin:0 0 12px;font-size:13px;line-height:1.6;color:#dce8e6;">
+                  Plenty of people love these designs and own no CNC, so they ask us who can build one near them. We send those jobs, design file included, to makers like you. Free to join, the buyer pays you directly, and we take ${SUCCESS_FEE_PCT}% only when a job completes.
+                </p>
+                <a href="${SITE}/faq?for=makers" style="display:inline-block;background:#FAC775;color:#5E380A;text-decoration:none;padding:9px 20px;border-radius:6px;font-size:13px;font-weight:600;">
+                  🛠️ See how Cut Local works
+                </a>
+              </div>
+            </td>
+          </tr>` : ''}
+
           <!-- Support / footer -->
           <tr>
             <td style="padding:0 28px 28px;">
@@ -361,7 +384,9 @@ ${invoiceLink}
 These links don't expire — keep this email for future re-downloads, or sign into your account at ${SITE}/account anytime.
 
 Need help? Reply to this email and a real person will help within 24 hours.
-
+${d.makerInvite ? `
+Own a CNC, laser or 3D printer? Cut Local sends paid local jobs to makers like you, with the design file included. Free to join, the buyer pays you directly, and we take ${SUCCESS_FEE_PCT}% only on completed jobs: ${SITE}/faq?for=makers
+` : ''}
 — The DigitalChiselCo team
 ${SITE}
 `;

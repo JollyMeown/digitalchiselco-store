@@ -93,8 +93,21 @@ export async function buildOrderConfirmationForOrder(
     } catch { /* receipt extras are optional */ }
   }
 
+  // Cut Local invite: every buyer of a relief STL owns a machine, so this is the
+  // best-qualified maker audience we have. Only when the marketplace is live,
+  // and never to someone who has already applied or been approved.
+  let makerInvite = false;
+  try {
+    const [{ data: gs }, { data: alreadyMaker }] = await Promise.all([
+      db.from('growth_settings').select('marketplace_enabled').eq('id', 1).maybeSingle(),
+      db.from('makers').select('id').eq('email', String(order.email || '').toLowerCase()).maybeSingle(),
+    ]);
+    makerInvite = !!gs?.marketplace_enabled && !alreadyMaker;
+  } catch { /* the receipt matters more than the invite */ }
+
   const built = orderConfirmation({
     email: order.email,
+    makerInvite,
     customerName: order.customer_name || null,
     gift: null,
     crossSells: [],
