@@ -115,7 +115,7 @@ for (const p of products) {
   process.stdout.write(`. ${p.slug.slice(0, 42)} [${STYLES[styleKey]?.label || styleKey}] … `);
   try {
     const hero = Buffer.from(await (await fetch(p.image_url)).arrayBuffer());
-    const prompt = KIND === 'macro' ? macroPrompt() : mockupPrompt(styleKey, { flat: isFlatProduct(p.title) });
+    const prompt = KIND === 'macro' ? macroPrompt() : mockupPrompt(styleKey, { flat: isFlatProduct(p.title), seed: String(flag('satin', '')) || p.slug });
     // Let the model keep the hero's own shape: forcing an aspect is what crops
     // a landscape carving into a square.
     const raw = await gemini(prompt, hero, undefined);

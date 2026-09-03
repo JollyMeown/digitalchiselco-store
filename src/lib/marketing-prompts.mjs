@@ -52,6 +52,16 @@ const framing = (fill = '55-70%') =>
   + 'across) against every prop and surface.\n'
   + 'No people, no text on the product, no watermark, no logos.\n';
 
+const hash = (s) => [...String(s || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
+
+// Satin colourways for the boxed pieces. The owner supplied both: warm ivory
+// and a deep emerald green. Chosen per product so a board of Pins alternates.
+export const SATINS = [
+  'ivory and soft champagne silk-satin with a warm pearl sheen',
+  'deep emerald green silk-satin with a rich jewel-like sheen and darker shadowed folds',
+];
+export const satinFor = (seed) => SATINS[Math.abs(hash(seed)) % SATINS.length];
+
 // ── the four owner-specified styles ────────────────────────────────────────
 export const STYLES = {
   gift_box: {
@@ -71,9 +81,9 @@ export const STYLES = {
       + 'the props soften while the carving stays sharp.\n',
     // Boxed TRAYS get the shiny packing cloth the owner asked for: satin. Panels
     // keep the tissue-and-linen styling that was already approved.
-    flatText:
+    flatText: (satin = SATINS[0]) =>
       'SETTING: the piece lies inside an open natural kraft gift box sized to it, the box LINED WITH '
-      + 'LUSTROUS SATIN: ivory and soft champagne silk-satin fabric with a gentle sheen, arranged in soft '
+      + `LUSTROUS SATIN: ${satin}, arranged in soft `
       + 'folds that catch the light and spill slightly over the box edge, the kind of shiny lining used in '
       + 'luxury gift packaging. Photographed CLOSE IN from directly above at a slight angle so the piece '
       + 'dominates the frame and its carved detail is large and legible. The box sits on a crumpled oatmeal '
@@ -129,7 +139,6 @@ export const STYLES = {
 export const FLAT_RE = /\b(tray|board|coaster|platter|plate|bowl|lazy susan|charcuterie|serving|dish)\b/i;
 export const isFlatProduct = (title) => FLAT_RE.test(String(title || ''));
 
-const hash = (s) => [...String(s || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
 
 /**
  * Which style a product gets. Flat pieces alternate between the CNC bed and the
@@ -147,14 +156,16 @@ export function styleForProduct(title, slug) {
 
 /** One product, staged in the owner's chosen style. */
 export function mockupPrompt(styleKey, opts = {}) {
-  const { flat = false, extra = '' } = typeof opts === 'string' ? { extra: opts } : opts;
+  const { flat = false, extra = '', seed = '' } = typeof opts === 'string' ? { extra: opts } : opts;
   const style = STYLES[styleKey] || STYLES.gift_box;
   return 'You are a world-top product photographer shooting a premium handmade wooden product for a '
     + 'marketplace listing and Pinterest.\n'
     + FIDELITY
     // Some styles read differently for a flat piece: a boxed tray gets the satin
     // lining, a panel keeps the tissue-and-linen styling.
-    + (flat && style.flatText ? style.flatText : style.text)
+    + (flat && style.flatText
+      ? (typeof style.flatText === 'function' ? style.flatText(satinFor(seed || styleKey)) : style.flatText)
+      : style.text)
     + (flat ? '' : NO_FRAMES)
     + framing(style.fill)
     + (extra ? `EXTRA DIRECTION: ${extra}\n` : '')
