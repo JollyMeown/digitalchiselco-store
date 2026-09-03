@@ -112,12 +112,22 @@ export const GET: APIRoute = async ({ params, request }) => {
       try {
         const r = await fetch(p.image_url);
         if (!r.ok) return null;
+        // NEVER crop a hero. The catalogue mixes 4:3 and 1:1 (and future art may
+        // be portrait), and cropping to a fixed tile silently cuts elements off
+        // the design a pinner is being sold. Fit the whole image inside the tile
+        // and letterbox it on a warm card instead.
         const img = await sharp(Buffer.from(await r.arrayBuffer()))
-          .resize(CW, CH, { fit: 'cover', position: 'attention' })
+          .resize(CW - 16, CH - 16, { fit: 'inside', withoutEnlargement: false })
+          .toBuffer();
+        const meta = await sharp(img).metadata();
+        const tile = await sharp({ create: { width: CW, height: CH, channels: 4, background: { r: 26, g: 18, b: 8, alpha: 1 } } })
+          .composite([{ input: img, left: Math.round((CW - (meta.width || CW)) / 2), top: Math.round((CH - (meta.height || CH)) / 2) }])
+          .png().toBuffer();
+        const rounded = await sharp(tile)
           .composite([{ input: Buffer.from(`<svg width="${CW}" height="${CH}"><rect width="${CW}" height="${CH}" rx="16" fill="#fff"/></svg>`), blend: 'dest-in' }])
           .png().toBuffer();
         return {
-          input: img,
+          input: rounded,
           left: gridLeft + (i % 2) * (CW + GAP),
           top: gridTop + Math.floor(i / 2) * (CH + GAP),
         };

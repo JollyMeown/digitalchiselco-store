@@ -133,12 +133,18 @@ export const GET: APIRoute = async ({ params, request }) => {
       if (prod?.image_url) {
         const r = await fetch(prod.image_url);
         if (r.ok) {
-          productBuf = await sharp(Buffer.from(await r.arrayBuffer()))
-            .resize(620, 460, { fit: 'cover', position: 'attention' })
-            .composite([{
-              input: Buffer.from(`<svg width="620" height="460"><rect width="620" height="460" rx="18" fill="#fff"/></svg>`),
-              blend: 'dest-in',
-            }])
+          // Whole design, never a crop: heroes are 4:3 and 1:1 today and may be
+          // portrait tomorrow, and a cropped hero advertises a design that is
+          // not the one on sale.
+          const fitted = await sharp(Buffer.from(await r.arrayBuffer()))
+            .resize(600, 440, { fit: 'inside', withoutEnlargement: false })
+            .toBuffer();
+          const fm = await sharp(fitted).metadata();
+          productBuf = await sharp({ create: { width: 620, height: 460, channels: 4, background: { r: 22, g: 16, b: 8, alpha: 1 } } })
+            .composite([
+              { input: fitted, left: Math.round((620 - (fm.width || 620)) / 2), top: Math.round((460 - (fm.height || 460)) / 2) },
+              { input: Buffer.from(`<svg width="620" height="460"><rect width="620" height="460" rx="18" fill="#fff"/></svg>`), blend: 'dest-in' },
+            ])
             .png().toBuffer();
         }
       }
