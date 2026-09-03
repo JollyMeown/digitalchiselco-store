@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
+import MakerMap from '../components/MakerMap.tsx';
 import Footer from '../components/Footer.astro';
 import RecentlyViewed from '../components/RecentlyViewed.astro';
 import CarvedByYou from '../components/CarvedByYou.astro';
@@ -141,12 +142,12 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
           <div class="cl-grid" aria-hidden="true"></div>
           <div class="cl-glow cl-glow-a" aria-hidden="true"></div>
           <div class="cl-glow cl-glow-b" aria-hidden="true"></div>
-          <div class="relative grid lg:grid-cols-[1.15fr_1fr] gap-8 items-center p-7 sm:p-10">
+          <div class="relative grid lg:grid-cols-[1.05fr_1.2fr] gap-6 lg:gap-9 items-center p-7 sm:p-10">
             <div>
-              <span class="cl-in cl-in-1 inline-flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-[#8fd6cf] font-semibold px-3 py-1 rounded-full border border-[#2c6a67]/50 bg-[#2c6a67]/15">
+              <span class="cl-in cl-in-1 cl-eyebrow inline-flex items-center gap-2.5 text-[13px] sm:text-[14px] tracking-[0.16em] uppercase text-[#a8e5dd] font-semibold px-4.5 py-2 rounded-full border border-[#2c6a67]/60 bg-[#2c6a67]/20">
                 <span class="cl-live"></span> New · Cut Local maker network
               </span>
-              <h2 class="cl-in cl-in-2 font-serif text-[32px] sm:text-[42px] text-white leading-[1.08] mt-4 tracking-tight">Love a design?<br/>Get it made near you.</h2>
+              <h2 class="cl-in cl-in-2 font-serif text-[34px] sm:text-[40px] 2xl:text-[46px] text-white leading-[1.06] mt-5 tracking-tight">Love a design?<br/>Get it made near you.</h2>
               <p class="cl-in cl-in-3 mt-4 text-cream/75 text-[15px] leading-relaxed max-w-lg">No CNC or 3D printer? No problem. Post any design and a <strong class="text-white">vetted maker near you</strong> builds it, ready for local pickup. You compare quotes and star ratings, they do the making.</p>
 
               <!-- mini flow -->
@@ -173,33 +174,24 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
               </div>
             </div>
 
-            <!-- right: floating maker cards over an animated node field -->
-            <div class="hidden lg:block relative h-[300px]">
-              <div class="cl-nodes" aria-hidden="true">
-                <span style="left:12%;top:30%"></span><span style="left:78%;top:20%;animation-delay:.5s"></span>
-                <span style="left:60%;top:70%;animation-delay:1s"></span><span style="left:24%;top:78%;animation-delay:1.5s"></span>
-                <span style="left:88%;top:60%;animation-delay:.3s"></span><span style="left:44%;top:12%;animation-delay:.8s"></span>
+            <!-- right: the LIVE maker map. Real dots at real workshops beats
+                 invented cards: hover any dot for that maker's name, rating,
+                 city and machines, click to open their profile. Loaded only
+                 when scrolled into view so the homepage stays fast. -->
+            <div class="hidden md:block relative self-center lg:-mr-6">
+              <MakerMap client:visible compact />
+              <div class="mt-2 text-center text-[11px] text-cream/45">
+                {makerCount > 0
+                  ? <span>Hover any glowing dot to see that workshop</span>
+                  : <span>The first workshops are joining now</span>}
               </div>
-              {(topMakers.length ? topMakers : [null, null]).slice(0, 3).map((m, i) => (
-                <div class={`cl-card cl-card-${i}`}>
-                  <div class="flex items-center gap-2.5">
-                    <div class="cl-ava">{m ? (m.maker_name || 'M').slice(0, 2).toUpperCase() : '🛠️'}</div>
-                    <div class="min-w-0">
-                      <div class="text-[13px] font-semibold text-white truncate">{m ? m.maker_name : 'A maker near you'}</div>
-                      <div class="text-[11px] text-cream/70">
-                        {m && m.rating_count > 0
-                          ? <span><span class="text-[#f6b25a]">{starStr(m.rating_avg)}</span> {Number(m.rating_avg).toFixed(1)} · {m.jobs_completed || 0} jobs</span>
-                          : <span>{m ? 'New maker' : 'CNC · laser · 3D print'}</span>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            </div>
             </div>
           </div>
 
           <style>
             .cl-banner{background:linear-gradient(135deg,#14100a 0%,#1a2321 55%,#14100a 100%)}
+            .cl-eyebrow{padding-left:18px;padding-right:18px;box-shadow:inset 0 1px 0 rgba(159,224,217,.18),0 2px 14px rgba(44,106,103,.35);text-shadow:0 1px 8px rgba(159,224,217,.25)}
             .cl-grid{position:absolute;inset:0;opacity:.5;background-image:radial-gradient(rgba(246,178,90,.10) 1px,transparent 1px);background-size:26px 26px;-webkit-mask-image:radial-gradient(120% 120% at 70% 30%,#000 30%,transparent 75%);mask-image:radial-gradient(120% 120% at 70% 30%,#000 30%,transparent 75%)}
             .cl-glow{position:absolute;border-radius:50%;filter:blur(60px);opacity:.55;pointer-events:none}
             .cl-glow-a{width:340px;height:340px;top:-120px;right:-60px;background:#2c6a67}

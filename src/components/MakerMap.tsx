@@ -28,6 +28,11 @@ const US_STATE: Record<string, [number, number]> = {
   'new york': [42.9, -75.5], california: [37.2, -119.3], texas: [31.5, -99.3], florida: [28.6, -82.4],
 };
 
+const MACHINE_LABEL: Record<string, string> = {
+  cnc_router: 'CNC router', cnc_mill: 'CNC mill', laser: 'Laser', fdm: '3D print', resin: 'Resin print',
+};
+const machineLabel = (m: string) => MACHINE_LABEL[m] || String(m).replace(/_/g, ' ');
+
 const W = 960, H = 520;
 const projection = geoNaturalEarth1().fitExtent([[6, 6], [W - 6, H - 6]], { type: 'Sphere' } as any);
 const path = geoPath(projection);
@@ -38,12 +43,25 @@ const BORDERS = (feature(countries110 as any, (countries110 as any).objects.coun
 type Maker = { id?: string; name: string; city?: string; region?: string; country?: string; rating: number; reviews: number; jobs: number; machines: string[]; photo?: string | null };
 function hash(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
 
-export default function MakerMap() {
+// `compact` renders the same live map for the homepage banner: no caption line
+// underneath (the banner already states the count), a rounded frame and an edge
+// fade so it sits inside the dark card instead of looking like a pasted image.
+export default function MakerMap({ compact = false }: { compact?: boolean } = {}) {
   const [makers, setMakers] = useState<Maker[] | null>(null);
   const [hover, setHover] = useState<{ m: Maker; x: number; y: number } | null>(null);
+  const [spot, setSpot] = useState(0);   // rotating spotlight under the compact map
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { fetch('/api/mp/makers-public').then((r) => r.json()).then((j) => setMakers(j.makers || [])).catch(() => setMakers([])); }, []);
+
+  // Compact map: cycle through real makers underneath so the space below the
+  // map carries a live workshop instead of a static caption. Hovering a dot
+  // pins that maker, which makes the map and the card one control.
+  useEffect(() => {
+    if (!compact || !makers || makers.length < 2 || hover) return;
+    const t = setInterval(() => setSpot((i) => (i + 1) % makers.length), 4200);
+    return () => clearInterval(t);
+  }, [compact, makers, hover]);
 
   const dots = useMemo(() => {
     if (!makers) return [];
@@ -66,7 +84,10 @@ export default function MakerMap() {
 
   return (
     <div ref={wrapRef} style={{ position: 'relative' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Map of Cut Local makers" style={{ display: 'block' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Map of Cut Local makers"
+        style={compact
+          ? { display: 'block', borderRadius: 16, WebkitMaskImage: 'radial-gradient(120% 100% at 50% 45%, #000 62%, transparent 100%)', maskImage: 'radial-gradient(120% 100% at 50% 45%, #000 62%, transparent 100%)' }
+          : { display: 'block' }}>
         <defs>
           <radialGradient id="ocean" cx="50%" cy="38%" r="80%">
             <stop offset="0%" stopColor="#1c1408" />
@@ -97,13 +118,14 @@ export default function MakerMap() {
 
         {/* maker dots — glowing, pulsing, staggered (pure artwork) */}
         {dots.map((d) => (
-          <g key={d.i} transform={`translate(${d.x} ${d.y})`}
+          <g key={d.i} transform={`translate(${d.x} ${d.y})${compact ? ' scale(2.1)' : ''}`}
             onMouseEnter={() => setHover({ m: d.m, x: d.x, y: d.y })} onMouseLeave={() => setHover(null)}
             onClick={() => { if (d.m.id) window.location.href = `/m/${d.m.id}`; }} style={{ cursor: 'pointer' }}>
             <circle r="16" fill="url(#glow)" className="mm-glow" style={{ animationDelay: `${(d.i % 12) * 0.25}s` }} />
             <circle r="5" fill="none" stroke="#f6b25a" strokeWidth="1.2" className="mm-ring" style={{ animationDelay: `${(d.i % 12) * 0.25}s` }} />
             <circle r="2.6" fill="#ffd9a0" />
             <circle r="2.6" fill="#f6b25a" className="mm-core" />
+            <circle r="9" fill="transparent" />{/* generous hover target */}
           </g>
         ))}
       </svg>
@@ -115,18 +137,51 @@ export default function MakerMap() {
             {hover.m.reviews > 0 ? `★ ${hover.m.rating.toFixed(1)} · ${hover.m.reviews} reviews · ${hover.m.jobs} jobs` : 'New maker'}
           </div>
           <div style={{ fontSize: 11.5, color: '#b9a88f', marginTop: 2 }}>{[hover.m.city, hover.m.region].filter(Boolean).join(', ')}</div>
-          <div style={{ fontSize: 10.5, color: '#8a7a63', marginTop: 3, fontFamily: 'monospace' }}>{(hover.m.machines || []).join(' · ')}</div>
+          <div style={{ fontSize: 10.5, color: '#8a7a63', marginTop: 3, fontFamily: 'monospace' }}>{(hover.m.machines || []).map(machineLabel).join(' · ')}</div>
           <div style={{ fontSize: 10.5, color: '#e0b876', marginTop: 4 }}>click to view profile →</div>
         </div>
       )}
 
-      <div style={{ textAlign: 'center', marginTop: 14, fontSize: 14, color: 'var(--mm-count,#6f6151)' }}>
+      {compact && (() => {
+        const m = hover?.m || (makers && makers.length ? makers[spot % makers.length] : null);
+        if (!m) return null;
+        const place = [m.city, m.region, m.country].filter(Boolean).join(', ');
+        return (
+          <a href={m.id ? `/m/${m.id}` : '/makers'} key={m.name}
+            style={{ display: 'flex', alignItems: 'center', gap: 11, textDecoration: 'none', marginTop: 10,
+              background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)', borderRadius: 14,
+              padding: '11px 14px', animation: 'mmFade .5s ease-out' }}>
+            <span style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', background: 'linear-gradient(140deg,#2c6a67,#1c4a48)', color: '#dff3f0',
+              fontWeight: 700, fontSize: 13, letterSpacing: '.02em' }}>
+              {(m.name || 'M').slice(0, 2).toUpperCase()}
+            </span>
+            <span style={{ minWidth: 0, flex: 1 }}>
+              <span style={{ display: 'block', color: '#fff', fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</span>
+              <span style={{ display: 'block', color: 'rgba(245,239,227,.62)', fontSize: 11.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {place || 'Workshop'}{(m.machines || []).length ? ' · ' + (m.machines || []).slice(0, 2).map(machineLabel).join(', ') : ''}
+              </span>
+            </span>
+            <span style={{ flexShrink: 0, textAlign: 'right' }}>
+              <span style={{ display: 'block', fontSize: 12, color: '#f6b25a', fontWeight: 600 }}>
+                {m.reviews > 0 ? `★ ${m.rating.toFixed(1)}` : 'New maker'}
+              </span>
+              <span style={{ display: 'block', fontSize: 10.5, color: 'rgba(245,239,227,.45)' }}>
+                {m.jobs > 0 ? `${m.jobs} job${m.jobs === 1 ? '' : 's'}` : 'ready to build'}
+              </span>
+            </span>
+          </a>
+        );
+      })()}
+
+      {!compact && <div style={{ textAlign: 'center', marginTop: 14, fontSize: 14, color: 'var(--mm-count,#6f6151)' }}>
         {makers === null ? 'Loading makers…' : count > 0
           ? <span><b style={{ color: '#854F0B' }}>{count}</b> maker{count === 1 ? '' : 's'} ready to build near you</span>
           : <span>Makers are joining now — be one of the first in your area.</span>}
-      </div>
+      </div>}
 
       <style>{`
+        @keyframes mmFade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
         @keyframes mmGlow{0%,100%{opacity:.35}50%{opacity:.9}}
         @keyframes mmRing{0%{r:5;opacity:.9}100%{r:15;opacity:0}}
         @keyframes mmCore{0%,100%{opacity:1}50%{opacity:.55}}
