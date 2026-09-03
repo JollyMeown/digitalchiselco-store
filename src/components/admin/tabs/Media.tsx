@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { Card, btnGhost, btnPrimary, inputCls, labelCls } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
 import ImageUpload from '../ImageUpload';
+import SawdustCinemaAdmin from '../SawdustCinema';
 
 export default function Media() {
   const [s, setS] = useState<any>(null);
@@ -63,6 +64,7 @@ export default function Media() {
 
   return (
     <div className="space-y-5">
+      <SawdustCinemaAdmin />
       <Card title="Image rules of thumb" action={
         <button className={btnGhost} onClick={() => {
           const el = document.getElementById('rot-body');

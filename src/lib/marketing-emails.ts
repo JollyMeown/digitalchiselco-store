@@ -587,6 +587,71 @@ export function portalGuideEmail(): { subject: string; html: string; text: strin
   return { subject, html, text };
 }
 
+
+// ── Film campaign ("Sawdust Cinema") ─────────────────────────────────
+// A short film about one design, mailed to subscribers.
+//
+// HONEST CONSTRAINT: <video> does not play in Gmail, Outlook or Yahoo. So the
+// email carries a TALL POSTER with the play badge burned into the image, and the
+// whole poster is one big tap target that opens the film on the product page.
+// On a phone the poster fills the screen, which is the "full format" the owner
+// asked for, and every tap lands on the design.
+export function filmEmail(opts: {
+  email: string;
+  filmTitle: string;
+  posterUrl: string;
+  productUrl: string;
+  productTitle: string;
+  price?: number | null;
+  runtime?: string;          // e.g. "31 seconds"
+  blurb?: string;            // one line under the title
+  subject?: string;          // override the generated subject line
+}): { subject: string; html: string; text: string } {
+  const runtime = opts.runtime || '31 seconds';
+  // "a 31 seconds film" reads wrong in a subject line; the adjective form does.
+  const runtimeAdj = runtime.replace(/^(\d+)\s*seconds?$/i, '$1-second').replace(/^(\d+)\s*minutes?$/i, '$1-minute');
+  const link = opts.productUrl.includes('?')
+    ? `${opts.productUrl}&utm_source=email&utm_medium=film&utm_campaign=sawdust-cinema`
+    : `${opts.productUrl}?utm_source=email&utm_medium=film&utm_campaign=sawdust-cinema`;
+  const subject = opts.subject || `🎬 ${opts.filmTitle} — our new ${runtimeAdj} film`;
+  const priceLine = opts.price ? ` — $${Number(opts.price).toFixed(2)}` : '';
+  const body = `
+<p style="margin:0 0 14px;font-size:15px;line-height:1.6;">We made a little film. ${runtime}, no sales pitch, just a Highland cow, a lot of oak and one very patient wife.</p>
+<p style="margin:0 0 18px;font-size:15px;line-height:1.6;">Tap the picture to watch it, then the design is right underneath.</p>
+
+<!-- the poster IS the play button: one tap target, full width on a phone -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 6px;">
+  <tr><td align="center">
+    <a href="${esc(link)}" style="display:block;text-decoration:none;">
+      <img src="${esc(opts.posterUrl)}" width="600" alt="Watch: ${esc(opts.filmTitle)}"
+        style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:14px;" />
+    </a>
+  </td></tr>
+</table>
+<p style="margin:6px 0 20px;text-align:center;font-size:12px;color:#8a7a68;">▶ ${runtime} · tap the picture to watch</p>
+
+${btn(link, `Get the ${esc(opts.productTitle)}${priceLine}`)}
+
+<p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#555;">
+  ${opts.blurb ? esc(opts.blurb) + ' ' : ''}Every design in it is a ready-to-carve bas-relief STL, instant download, commercial use included.
+</p>
+<p style="margin:14px 0 0;font-size:13px;color:#777;">More films are on the way. If you carve one of these, send a photo, we love seeing them.</p>
+<p style="margin:16px 0 0;font-size:14px;">Happy carving,<br/>Jolly · DigitalChiselCo</p>`;
+
+  const html = shell(subject, opts.filmTitle, body, opts.email);
+  const text = `${opts.filmTitle} — our new ${runtimeAdj} film.
+
+Watch it and see the designs: ${link}
+
+`
+    + `Every design is a ready-to-carve bas-relief STL, instant download, commercial use included.
+
+`
+    + `Happy carving, Jolly · DigitalChiselCo
+Unsubscribe: ${unsubUrl(opts.email)}`;
+  return { subject, html, text };
+}
+
 // ── Maker recruitment (sent from Admin → Makers to subscribers) ───────
 // Invites the existing audience to apply as a fabricator. Links to the gated
 // /become-a-maker form with ?email= prefill. `applyUrl` lets the admin point

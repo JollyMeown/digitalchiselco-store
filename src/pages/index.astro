@@ -4,6 +4,7 @@ import Header from '../components/Header.astro';
 import MakerMap from '../components/MakerMap.tsx';
 import Footer from '../components/Footer.astro';
 import RecentlyViewed from '../components/RecentlyViewed.astro';
+import SawdustCinema from '../components/SawdustCinema.astro';
 import CarvedByYou from '../components/CarvedByYou.astro';
 import SideMenu from '../components/SideMenu.astro';
 import SiteBanner from '../components/SiteBanner.astro';
@@ -417,6 +418,11 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
     .dcc-faq > div { animation: dcc-fade 0.25s ease-out; }
     @keyframes dcc-fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
   </style>
+
+  <!-- Sawdust Cinema: short films of the designs, each linking to its product -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 pb-14">
+    <SawdustCinema />
+  </div>
 
   <!-- Closing brand strip (product-focused) -->
   <section class="bg-bronze-800 text-cream">

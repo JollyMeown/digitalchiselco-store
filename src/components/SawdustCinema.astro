@@ -1,0 +1,110 @@
+---
+// "Sawdust Cinema": short films of the designs, low on the homepage.
+//
+// Each film points at the product it is about, so a visitor who likes what they
+// just watched is one tap from the design. Nothing downloads until they press
+// play: each card shows a poster still and loads the video on demand, which
+// keeps the homepage fast even with several films on the page.
+//
+// Renders nothing when there are no active films, so it can ship before the
+// first one is uploaded.
+import { supabase } from '../lib/supabase';
+import { img } from '../lib/img';
+
+type Row = {
+  id: string; video_url: string; poster_url: string | null;
+  title: string | null; caption: string | null;
+  products: { slug: string; title: string; image_url: string | null; price_usd: number | null } | null;
+};
+
+let films: Row[] = [];
+try {
+  const { data } = await supabase
+    .from('showcase_videos')
+    .select('id, video_url, poster_url, title, caption, products(slug, title, image_url, price_usd)')
+    .eq('active', true)
+    .order('sort_order')
+    .order('created_at', { ascending: false })
+    .limit(8);
+  films = (data || []) as any;
+} catch { /* the section simply does not render */ }
+
+const clean = (s: string) => String(s || '').split('|')[0].trim();
+---
+{films.length > 0 && (
+  <section class="sc-wrap relative overflow-hidden rounded-3xl border border-black/10">
+    <div class="relative px-5 sm:px-8 py-8 sm:py-10">
+      <header class="text-center max-w-2xl mx-auto">
+        <p class="text-[11px] tracking-[0.22em] uppercase text-[#f0c98a] font-semibold">🎬 Now showing</p>
+        <h2 class="font-serif text-[30px] sm:text-[38px] text-white leading-tight mt-2">Sawdust Cinema</h2>
+        <p class="mt-2.5 text-cream/70 text-[14.5px] leading-relaxed">
+          Short films of our designs, one minute of chisels and shavings each. Tap any film to watch, then tap the design to make it yours.
+        </p>
+      </header>
+
+      <div class={`mt-7 grid gap-5 ${films.length === 1 ? 'max-w-md mx-auto' : films.length === 2 ? 'sm:grid-cols-2 max-w-3xl mx-auto' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+        {films.map((f) => {
+          const p = f.products;
+          const name = clean(f.title || p?.title || 'Our latest design');
+          const poster = f.poster_url || (p?.image_url ? img(p.image_url, { w: 700, q: 78 }) : null);
+          return (
+            <figure class="sc-card group rounded-2xl overflow-hidden bg-black/30 border border-white/10 flex flex-col">
+              <div class="sc-player relative aspect-[4/5] bg-black" data-video={f.video_url}>
+                {poster && <img src={poster} alt={name} loading="lazy" class="absolute inset-0 w-full h-full object-cover" />}
+                <button type="button" class="sc-play absolute inset-0 grid place-items-center bg-black/25 hover:bg-black/10 transition" aria-label={`Play ${name}`}>
+                  <span class="w-16 h-16 rounded-full bg-white/95 text-[#1c4a48] grid place-items-center shadow-lg group-hover:scale-105 transition-transform">
+                    <svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true"><path d="M2 2l18 11L2 24z" fill="currentColor"/></svg>
+                  </span>
+                </button>
+              </div>
+              <figcaption class="p-4 flex flex-col gap-2 flex-1">
+                <div>
+                  <div class="text-white font-semibold text-[14.5px] leading-snug line-clamp-2">{name}</div>
+                  {f.caption && <p class="text-cream/60 text-[12.5px] mt-1 line-clamp-2">{f.caption}</p>}
+                </div>
+                {p?.slug && (
+                  <a href={`/product/${p.slug}`}
+                    class="mt-auto inline-flex items-center justify-between gap-2 bg-white text-[#1c4a48] font-bold text-[13px] px-4 py-2.5 rounded-xl hover:shadow-lg transition">
+                    <span>Get this design</span>
+                    <span class="text-[#854F0B]">{p.price_usd ? `$${Number(p.price_usd).toFixed(2)}` : '→'}</span>
+                  </a>
+                )}
+              </figcaption>
+            </figure>
+          );
+        })}
+      </div>
+    </div>
+
+    <style>
+      .sc-wrap { background: linear-gradient(140deg, #141009 0%, #1a2321 55%, #120f08 100%); }
+      .sc-card { transition: transform .25s ease; }
+      .sc-card:hover { transform: translateY(-2px); }
+      @media (prefers-reduced-motion: reduce) { .sc-card:hover { transform: none; } }
+    </style>
+
+    <script is:inline>
+      // Swap the poster for a real <video> only when someone asks to watch, so
+      // the homepage never pays for a film nobody plays.
+      document.querySelectorAll('.sc-player').forEach(function (box) {
+        var btn = box.querySelector('.sc-play');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          var src = box.getAttribute('data-video');
+          if (!src || box.dataset.loaded) return;
+          box.dataset.loaded = '1';
+          var v = document.createElement('video');
+          v.src = src;
+          v.controls = true;
+          v.autoplay = true;
+          v.playsInline = true;
+          v.preload = 'auto';
+          v.className = 'absolute inset-0 w-full h-full object-cover bg-black';
+          box.appendChild(v);
+          btn.remove();
+          v.play().catch(function () { /* the browser will show its own control */ });
+        });
+      });
+    </script>
+  </section>
+)}

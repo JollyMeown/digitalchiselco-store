@@ -8,6 +8,7 @@ import { getProductBySlug, getRelatedProducts, getSettings, getSoldCount } from 
 import { pricing, money } from '../../lib/pricing';
 import { jsonLd } from '../../lib/jsonld';
 import { img } from '../../lib/img';
+import { supabase } from '../../lib/supabase';
 
 const { slug } = Astro.params;
 const p = await getProductBySlug(slug!);
@@ -35,6 +36,15 @@ const mockups: string[] = [
   p.mockup_b_status === 'approved' ? p.mockup_b_url : null,
 ].filter(Boolean) as string[];
 const gallery: string[] = [baseGallery[0], ...mockups, ...baseGallery.slice(1)].filter(Boolean);
+// If this design has a Sawdust Cinema film, it plays at the top of the page:
+// the film email sends people here, so the promise has to be kept.
+let film: { video_url: string; poster_url: string | null; title: string | null; caption: string | null } | null = null;
+try {
+  const { data: f } = await supabase.from('showcase_videos')
+    .select('video_url, poster_url, title, caption')
+    .eq('product_id', p.id).eq('active', true).order('sort_order').limit(1).maybeSingle();
+  film = (f as any) || null;
+} catch { /* the page works without it */ }
 const related = await getRelatedProducts(p.id, 5);
 const soldCount = await getSoldCount(p.id);
 
@@ -126,6 +136,44 @@ const breadcrumbLd = {
 ---
 <Shell title={pageTitle} description={pageDesc} image={gallery[0]} hideBanner={true} ogType="product" price={price} currency="USD" availability="in stock">
   <Breadcrumbs crumbs={[cat ? { label: cat.name, href: `/collections/${cat.slug}` } : { label: 'Catalog', href: '/catalog' }, { label: cleanTitle }]} />
+
+  {film && (
+    <!-- Sawdust Cinema: the film email links here, so it plays first -->
+    <section class="mb-8 rounded-2xl overflow-hidden border border-black/10" style="background:linear-gradient(140deg,#141009,#1a2321)">
+      <div class="grid md:grid-cols-[minmax(0,340px)_1fr] gap-0">
+        <div class="pf-player relative bg-black aspect-[9/16] md:aspect-auto md:min-h-[420px]" data-video={film.video_url}>
+          {film.poster_url && <img src={film.poster_url} alt={film.title || cleanTitle} class="absolute inset-0 w-full h-full object-cover" loading="lazy" />}
+          <button type="button" class="pf-play absolute inset-0 grid place-items-center bg-black/25 hover:bg-black/10 transition" aria-label="Play the film">
+            <span class="w-16 h-16 rounded-full bg-white/95 text-[#1c4a48] grid place-items-center shadow-lg">
+              <svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true"><path d="M2 2l18 11L2 24z" fill="currentColor"/></svg>
+            </span>
+          </button>
+        </div>
+        <div class="p-6 sm:p-8 flex flex-col justify-center">
+          <p class="text-[11px] tracking-[0.2em] uppercase text-[#f0c98a] font-semibold">🎬 Now showing</p>
+          <h2 class="font-serif text-2xl sm:text-3xl text-white mt-2 leading-tight">{film.title || 'A short film about this design'}</h2>
+          {film.caption && <p class="text-cream/70 text-sm mt-2.5 leading-relaxed">{film.caption}</p>}
+          <p class="text-cream/50 text-xs mt-3">Press play, then scroll down for the designs.</p>
+        </div>
+      </div>
+      <script is:inline>
+        document.querySelectorAll('.pf-player').forEach(function (box) {
+          var btn = box.querySelector('.pf-play');
+          if (!btn) return;
+          btn.addEventListener('click', function () {
+            if (box.dataset.loaded) return;
+            box.dataset.loaded = '1';
+            var v = document.createElement('video');
+            v.src = box.getAttribute('data-video');
+            v.controls = true; v.autoplay = true; v.playsInline = true; v.preload = 'auto';
+            v.className = 'absolute inset-0 w-full h-full object-cover bg-black';
+            box.appendChild(v); btn.remove();
+            v.play().catch(function () {});
+          });
+        });
+      </script>
+    </section>
+  )}
 
   <div class="grid md:grid-cols-2 gap-8 lg:gap-12">
     <!-- gallery -->
