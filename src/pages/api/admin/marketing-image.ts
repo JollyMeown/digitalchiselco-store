@@ -73,19 +73,21 @@ export const POST: APIRoute = async ({ request }) => {
   // ── the review queue ────────────────────────────────────────────────
   if (action === 'list') {
     const status = ['pending', 'approved', 'rejected'].includes(b?.status) ? b.status : 'pending';
-    const [{ data: cats }, { data: prods }, { count: pendingP }, { count: approvedP }, { count: totalP }, { count: withMockup }, { count: withMockupB }] = await Promise.all([
+    const [{ data: cats }, { data: prods }, { count: pendingA }, { count: approvedA }, { count: totalP }, { count: withMockup }, { count: withMockupB }, { count: pendingB }, { count: approvedB }, { count: pendingC }, { count: approvedC }] = await Promise.all([
       db.from('categories').select('id, name, slug, mockup_url, mockup_status, mockup_scene').not('mockup_url', 'is', null).eq('mockup_status', status).order('name'),
       db.from('products')
         .select('id, title, slug, image_url, mockup_url, mockup_status, mockup_style, mockup_b_url, mockup_b_status, mockup_b_style, mockup_scene, etsy_sales_365')
         .or(`and(mockup_url.not.is.null,mockup_status.eq.${status}),and(mockup_b_url.not.is.null,mockup_b_status.eq.${status})`)
         .order('etsy_sales_365', { ascending: false }).limit(80),
-      db.from('products').select('id', { count: 'exact', head: true })
-        .or('and(mockup_url.not.is.null,mockup_status.eq.pending),and(mockup_b_url.not.is.null,mockup_b_status.eq.pending)'),
-      db.from('products').select('id', { count: 'exact', head: true })
-        .or('and(mockup_url.not.is.null,mockup_status.eq.approved),and(mockup_b_url.not.is.null,mockup_b_status.eq.approved)'),
+      db.from('products').select('id', { count: 'exact', head: true }).not('mockup_url', 'is', null).eq('mockup_status', 'pending'),
+      db.from('products').select('id', { count: 'exact', head: true }).not('mockup_url', 'is', null).eq('mockup_status', 'approved'),
       db.from('products').select('id', { count: 'exact', head: true }).eq('active', true),
       db.from('products').select('id', { count: 'exact', head: true }).not('mockup_url', 'is', null),
       db.from('products').select('id', { count: 'exact', head: true }).not('mockup_b_url', 'is', null),
+      db.from('products').select('id', { count: 'exact', head: true }).not('mockup_b_url', 'is', null).eq('mockup_b_status', 'pending'),
+      db.from('products').select('id', { count: 'exact', head: true }).not('mockup_b_url', 'is', null).eq('mockup_b_status', 'approved'),
+      db.from('categories').select('id', { count: 'exact', head: true }).not('mockup_url', 'is', null).eq('mockup_status', 'pending'),
+      db.from('categories').select('id', { count: 'exact', head: true }).not('mockup_url', 'is', null).eq('mockup_status', 'approved'),
     ]);
     // Coverage of the top 100 sellers, which is the batch the owner asked for first.
     const { data: top } = await db.from('products').select('mockup_url, mockup_b_url').eq('active', true)
@@ -97,7 +99,9 @@ export const POST: APIRoute = async ({ request }) => {
       categories: cats || [],
       products: prods || [],
       stats: {
-        pending: pendingP || 0, approved: approvedP || 0,
+        // images, not products: a product can have two variants in review
+        pending: (pendingA || 0) + (pendingB || 0) + (pendingC || 0),
+        approved: (approvedA || 0) + (approvedB || 0) + (approvedC || 0),
         total: totalP || 0, withMockup: withMockup || 0, withMockupB: withMockupB || 0,
         topDone, topDoneB, topTotal: (top || []).length,
       },
