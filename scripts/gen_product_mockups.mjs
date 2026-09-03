@@ -42,8 +42,13 @@ const PREVIEW = Number(flag('preview', 0));
 const LIMIT = Number(flag('limit', 0));
 const ONLY_SLUG = flag('slug', '');
 const KIND = String(flag('kind', 'mockup'));            // mockup | macro
+const SLOT = String(flag('slot', 'a')).toLowerCase();   // a | b (staging variant)
 const FORCE = args.includes('--force');
-const COLUMN = KIND === 'macro' ? 'macro_url' : 'mockup_url';
+const COLUMN = KIND === 'macro' ? 'macro_url' : (SLOT === 'b' ? 'mockup_b_url' : 'mockup_url');
+const STYLE_COL = SLOT === 'b' ? 'mockup_b_style' : 'mockup_style';
+// Variant A = gift box for everything. Variant B = golden stand for panels, food
+// styling for trays, because a tray on a stand is not a real use.
+const variantStyle = (title) => (SLOT === 'b' ? (isFlatProduct(title) ? 'food' : 'stand') : 'gift_box');
 
 // ── prompts (verbatim from BRS marketing prompts) ──────────────────────────
 
@@ -86,7 +91,7 @@ async function gemini(prompt, refBuf, aspect) {
 }
 
 async function upload(kind, slug, buf) {
-  const key = `${kind === 'macro' ? 'macros' : 'mockups'}/${slug}.jpg`;
+  const key = `${kind === 'macro' ? 'macros' : 'mockups'}/${slug}${kind === 'macro' || SLOT === 'a' ? '' : '-b'}.jpg`;
   const r = await fetch(`${URL_BASE}/storage/v1/object/${BUCKET}/${key}`, {
     method: 'POST', headers: { ...H, 'content-type': 'image/jpeg', 'x-upsert': 'true' }, body: buf,
   });
@@ -96,7 +101,7 @@ async function upload(kind, slug, buf) {
 
 // ── run ────────────────────────────────────────────────────────────────────
 let q = `${URL_BASE}/rest/v1/products?select=id,slug,title,image_url,${COLUMN},product_categories(categories(slug))`
-  + '&active=eq.true&image_url=not.is.null&order=created_at.desc';
+  + '&active=eq.true&image_url=not.is.null&order=etsy_sales_365.desc';
 if (ONLY_SLUG && ONLY_SLUG !== true) q += `&slug=eq.${encodeURIComponent(ONLY_SLUG)}`;
 else if (!FORCE) q += `&${COLUMN}=is.null`;
 const take = PREVIEW || LIMIT;
@@ -111,7 +116,7 @@ let ok = 0, failed = 0;
 for (const p of products) {
   // Style comes from the product itself: trays are staged on the CNC bed or
   // filled with food, panels in a gift box or on a golden stand.
-  const styleKey = String(flag('style', '')) || styleForProduct(p.title, p.slug);
+  const styleKey = String(flag('style', '')) || variantStyle(p.title);
   process.stdout.write(`. ${p.slug.slice(0, 42)} [${STYLES[styleKey]?.label || styleKey}] … `);
   try {
     const hero = Buffer.from(await (await fetch(p.image_url)).arrayBuffer());
@@ -128,7 +133,7 @@ for (const p of products) {
     } else {
       const url = await upload(KIND, p.slug, out);
       const r = await fetch(`${URL_BASE}/rest/v1/products?id=eq.${p.id}`, {
-        method: 'PATCH', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ [COLUMN]: url }),
+        method: 'PATCH', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ [COLUMN]: url, [STYLE_COL]: styleKey }),
       });
       if (!r.ok) throw new Error(`patch ${r.status}`);
       console.log('ok');

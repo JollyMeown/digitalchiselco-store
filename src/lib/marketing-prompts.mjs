@@ -68,28 +68,15 @@ export const STYLES = {
     label: 'Gift box',
     forFlat: 'both',        // panels AND trays: a boxed piece reads as a gift
     fill: '75-85%',         // a close-up of the boxed piece, not a wide table scene
-    text:
-      'SETTING: the piece lies inside an open natural kraft gift box sized to it, lined with soft crumpled white tissue '
-      + 'paper, photographed CLOSE IN from directly above at a slight angle so the boxed piece dominates the '+ 'frame and its carved detail is large and legible. The box sits on a crumpled oatmeal linen '
-      + 'cloth. Beside it: a closed kraft gift box with a soft olive-green satin ribbon tied in a bow and a '
-      + 'small round kraft tag reading "Handmade" with a little heart, sprigs of dried baby\'s breath and a '
-      + 'few dried pale roses. Keep the props at the EDGES of the frame, partly cropped, so nothing competes '
-      + 'with the carving: the second box and the flowers are supporting detail, not the subject.\n'
-      + 'LIGHT: soft diffused natural daylight from a window to one side, gentle directional shadows that '
-      + 'reveal the carving depth, warm neutral palette of kraft brown, cream and sage. Calm, tactile, '
-      + 'artisanal, the feeling of a beautiful handmade gift about to be given. Shallow depth of field so '
-      + 'the props soften while the carving stays sharp.\n',
-    // Boxed TRAYS get the shiny packing cloth the owner asked for: satin. Panels
-    // keep the tissue-and-linen styling that was already approved.
-    flatText: (satin = SATINS[0]) =>
+    text: (satin = SATIN) =>
       'SETTING: the piece lies inside an open natural kraft gift box sized to it, the box LINED WITH '
-      + `LUSTROUS SATIN: ${satin}, arranged in soft `
-      + 'folds that catch the light and spill slightly over the box edge, the kind of shiny lining used in '
-      + 'luxury gift packaging. Photographed CLOSE IN from directly above at a slight angle so the piece '
-      + 'dominates the frame and its carved detail is large and legible. The box sits on a crumpled oatmeal '
-      + 'linen cloth. At the EDGES of the frame, partly cropped: a closed kraft box with a soft olive satin '
-      + 'ribbon and a small round kraft tag reading "Handmade" with a little heart, and a few sprigs of dried '
-      + "baby's breath. Nothing competes with the carving.\n"
+      + `LUSTROUS SATIN: ${satin}, arranged in soft folds that catch the light and spill slightly over the `
+      + 'box edge, the kind of shiny lining used in luxury gift packaging. Photographed CLOSE IN from '
+      + 'directly above at a slight angle so the piece dominates the frame and its carved detail is large '
+      + 'and legible. The box sits on a crumpled oatmeal linen cloth. At the EDGES of the frame, partly '
+      + 'cropped: a closed kraft box with a soft olive satin ribbon and a small round kraft tag reading '
+      + '"Handmade" with a little heart, and a few sprigs of dried gypsophila. Nothing competes with '
+      + 'the carving.\n'
       + 'LIGHT: soft diffused natural daylight from a window to one side, with delicate specular highlights '
       + 'running along the satin folds so the fabric reads as silky and expensive, while the wood stays warm '
       + 'and matte. Calm, tactile, luxurious, the feeling of an heirloom gift about to be given.\n',
@@ -163,9 +150,7 @@ export function mockupPrompt(styleKey, opts = {}) {
     + FIDELITY
     // Some styles read differently for a flat piece: a boxed tray gets the satin
     // lining, a panel keeps the tissue-and-linen styling.
-    + (flat && style.flatText
-      ? (typeof style.flatText === 'function' ? style.flatText(satinFor(seed || styleKey)) : style.flatText)
-      : style.text)
+    + (typeof style.text === 'function' ? style.text(satinFor(seed)) : style.text)
     + (flat ? '' : NO_FRAMES)
     + framing(style.fill)
     + (extra ? `EXTRA DIRECTION: ${extra}\n` : '')
