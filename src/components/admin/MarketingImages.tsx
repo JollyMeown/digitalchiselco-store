@@ -24,6 +24,7 @@ export default function MarketingImages() {
   const [busy, setBusy] = useState<string>('');
   const [scenes, setScenes] = useState<Record<string, string>>({});
   const [note, setNote] = useState('');
+  const [picked, setPicked] = useState<Set<string>>(new Set());
 
   const call = useCallback(async (body: any) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -47,6 +48,7 @@ export default function MarketingImages() {
         url: p.mockup_url, scene: p.mockup_scene, sales: p.etsy_sales_365,
       }));
       setItems([...cats, ...prods]);
+      setPicked(new Set());
       setStats(j.stats);
       setCanRegen(!!j.canRegenerate);
     }
@@ -70,6 +72,31 @@ export default function MarketingImages() {
       setItems((list) => list.filter((x) => x.id !== it.id));
       load(tab);
     }
+  }
+
+  const toggle = (id: string) => setPicked((p) => {
+    const n = new Set(p);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+  const allPicked = items.length > 0 && picked.size === items.length;
+
+  // Bulk review: approving hundreds of images one card at a time is not a workflow.
+  async function bulk(kind: 'selected' | 'all') {
+    const n = kind === 'selected' ? picked.size : (stats?.pending ?? 0);
+    if (kind === 'selected' && !n) { setNote('Nothing selected.'); return; }
+    if (!confirm(kind === 'selected'
+      ? `Approve ${n} selected image(s)? They go live on Pinterest and the site.`
+      : `Approve ALL ${n} pending image(s) without reviewing the rest? They go live on Pinterest and the site.`)) return;
+    setBusy('bulk'); setNote('');
+    const body = kind === 'selected'
+      ? { action: 'approve_many', items: items.filter((i) => picked.has(i.id)).map((i) => ({ id: i.id, kind: i.kind })) }
+      : { action: 'approve_all_pending' };
+    const j = await call(body);
+    setBusy('');
+    if (j?.error) { setNote(j.error); return; }
+    setNote(`✓ Approved ${j.done}. They are live.`);
+    load(tab);
   }
 
   const pct = stats && stats.total ? Math.round((stats.withMockup / stats.total) * 100) : 0;
@@ -120,6 +147,24 @@ export default function MarketingImages() {
         <button className="text-xs px-3 py-1.5 rounded-full font-medium bg-cream text-ink-700 hover:bg-bronze-600/10" onClick={() => load(tab)}>↻ refresh</button>
       </div>
 
+      {tab === 'pending' && items.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-3 p-2.5 rounded-lg bg-cream/60 border border-bronze-600/15">
+          <label className="flex items-center gap-2 text-xs font-medium text-ink-800 cursor-pointer">
+            <input type="checkbox" checked={allPicked}
+              onChange={() => setPicked(allPicked ? new Set() : new Set(items.map((i) => i.id)))} />
+            Select all ({items.length})
+          </label>
+          <span className="text-[11px] text-ink-700/50">{picked.size} selected</span>
+          <span className="flex-1" />
+          <button className={btnPrimary + ' text-xs px-3 py-1.5'} disabled={!!busy || !picked.size} onClick={() => bulk('selected')}>
+            {busy === 'bulk' ? 'Working…' : `✓ Approve selected (${picked.size})`}
+          </button>
+          <button className={btnGhost + ' text-xs px-3 py-1.5'} disabled={!!busy || !stats?.pending} onClick={() => bulk('all')}>
+            ✓✓ Approve all pending ({stats?.pending ?? 0})
+          </button>
+        </div>
+      )}
+
       {note && <div className="text-xs mb-3 px-3 py-2 rounded-lg bg-cream border border-bronze-600/20 text-ink-800">{note}</div>}
 
       {loading ? <div className="text-sm text-ink-700/60">Loading…</div>
@@ -130,10 +175,18 @@ export default function MarketingImages() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {items.map((it) => (
-              <div key={it.id} className="rounded-xl border border-black/10 bg-white overflow-hidden flex flex-col">
-                <a href={it.url} target="_blank" rel="noreferrer" className="block bg-cream/50">
-                  <img src={it.url} alt={it.name} loading="lazy" className="w-full h-56 object-contain" />
-                </a>
+              <div key={it.id} className={`rounded-xl border bg-white overflow-hidden flex flex-col ${picked.has(it.id) ? 'border-bronze-600 ring-2 ring-bronze-600/30' : 'border-black/10'}`}>
+                <div className="relative">
+                  <a href={it.url} target="_blank" rel="noreferrer" className="block bg-cream/50">
+                    <img src={it.url} alt={it.name} loading="lazy" className="w-full h-56 object-contain" />
+                  </a>
+                  {tab === 'pending' && (
+                    <label className="absolute top-2 left-2 flex items-center gap-1.5 bg-white/95 rounded-md px-2 py-1 shadow cursor-pointer text-[11px] font-medium">
+                      <input type="checkbox" checked={picked.has(it.id)} onChange={() => toggle(it.id)} />
+                      select
+                    </label>
+                  )}
+                </div>
                 <div className="p-3 flex flex-col gap-2 flex-1">
                   <div>
                     <div className="text-[10px] uppercase tracking-wide font-semibold text-bronze-700">

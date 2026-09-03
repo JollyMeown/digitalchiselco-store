@@ -99,6 +99,36 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
+  // ── bulk review: approving 200 images one at a time is not a workflow ──
+  if (action === 'approve_many' || action === 'reject_many') {
+    const status = action === 'approve_many' ? 'approved' : 'rejected';
+    const items: { id: string; kind?: string }[] = Array.isArray(b?.items) ? b.items.slice(0, 500) : [];
+    if (!items.length) return json({ error: 'no items' }, 400);
+    const prodIds = items.filter((i) => i.kind !== 'category').map((i) => String(i.id));
+    const catIds = items.filter((i) => i.kind === 'category').map((i) => String(i.id));
+    let done = 0;
+    if (prodIds.length) {
+      const { error, count } = await db.from('products').update({ mockup_status: status }, { count: 'exact' }).in('id', prodIds);
+      if (error) return json({ error: error.message }, 500);
+      done += count || prodIds.length;
+    }
+    if (catIds.length) {
+      const { error, count } = await db.from('categories').update({ mockup_status: status }, { count: 'exact' }).in('id', catIds);
+      if (error) return json({ error: error.message }, 500);
+      done += count || catIds.length;
+    }
+    return json({ ok: true, done, status });
+  }
+
+  // Approve everything still waiting, in one call.
+  if (action === 'approve_all_pending') {
+    const [{ count: pc }, { count: cc }] = await Promise.all([
+      db.from('products').update({ mockup_status: 'approved' }, { count: 'exact' }).eq('mockup_status', 'pending').not('mockup_url', 'is', null),
+      db.from('categories').update({ mockup_status: 'approved' }, { count: 'exact' }).eq('mockup_status', 'pending').not('mockup_url', 'is', null),
+    ]);
+    return json({ ok: true, done: (pc || 0) + (cc || 0) });
+  }
+
   const kind = b?.kind === 'category' ? 'categories' : 'products';
   const id = String(b?.id || '');
   if (!id) return json({ error: 'id required' }, 400);
