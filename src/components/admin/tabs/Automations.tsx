@@ -746,6 +746,7 @@ const EMAIL_KIND_LABELS: Record<string, string> = {
   'optin': 'Opt-in confirmations', 'resendLibrary': 'Library re-sends', 'payRecovery': 'Payment recovery',
   'portalGuide': 'Portal guide', 'weekly-digest': 'Weekly digest', 'drip1': 'Nurture drip 1',
   'drip2': 'Nurture drip 2', 'drip3': 'Nurture drip 3', 'drip4': 'Nurture drip 4', 'drip5': 'Nurture drip 5',
+  'drip6': 'Finishing guide', 'guideCampaign': 'Finishing guide broadcast',
   'cartSave': 'Cart reminders', 'browse': 'Browse reminders', 'winback': 'Win-back',
   'priceDrop': 'Price-drop alerts', 'referralNudge': 'Referral nudges', 'etsyWelcome': 'Etsy welcome',
   'wishlistReminder': 'Wishlist reminders', 'refundWinback': 'Refund win-back', 'picks': 'Hand-picked designs',
