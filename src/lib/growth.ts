@@ -411,12 +411,13 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       const { data: fb } = await db.from('products').select('title, slug, image_url, price_usd').eq('active', true).order('created_at', { ascending: false }).limit(3);
       bestsellers = (fb || []) as MiniProduct[];
     }
-    // make sure the stage-5 coupon exists (15%, 60 days)
+    // make sure the stage-5 coupon exists (15%, 60 days). Stage 6 is the
+    // finishing guide, which sells nothing and needs no coupon.
     const { data: cv } = await db.from('coupons').select('id').ilike('code', 'CARVE15').maybeSingle();
     if (!cv) await db.from('coupons').insert({ code: 'CARVE15', percent_off: 15, active: true, expires_at: new Date(Date.now() + 60 * 86400000).toISOString() });
 
     const { data: due } = await db.from('subscriber_drip')
-      .select('email, stage, last_sent_at').eq('status', 'active').lt('stage', 5)
+      .select('email, stage, last_sent_at').eq('status', 'active').lt('stage', 6)
       .or(`last_sent_at.is.null,last_sent_at.lte.${daysAgo(DRIP_GAP_DAYS)}`)
       .order('enrolled_at').limit(DRIP_MAX_PER_RUN);
     for (const r of due || []) {
@@ -430,7 +431,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           dripEmail(stage, { email: r.email, bestsellers, bundle: bundle as MiniProduct | null, plan: plan as any, couponCode: 'CARVE15' }), r.email);
         const res = await sendEmail({ to: r.email, subject, html, text, idempotencyKey: `drip:${r.email}:${stage}`, tags: [{ name: 'kind', value: `drip${stage}` }] });
         if (res.ok) {
-          await db.from('subscriber_drip').update({ stage, last_sent_at: new Date().toISOString(), ...(stage >= 5 ? { status: 'done' } : {}) }).eq('email', r.email);
+          await db.from('subscriber_drip').update({ stage, last_sent_at: new Date().toISOString(), ...(stage >= 6 ? { status: 'done' } : {}) }).eq('email', r.email);
           s.sent++;
         } else if (res.quota) { (s as any).note = 'stopped: daily budget reached (resumes tomorrow)'; break; }
         else s.failed++;

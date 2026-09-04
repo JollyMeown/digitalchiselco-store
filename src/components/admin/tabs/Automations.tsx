@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, btnPrimary, btnGhost, inputCls, Toast } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
+import GuideBroadcast from '../GuideBroadcast';
 
 const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'drip1', label: '1 · Did you carve the free pack?', group: 'Subscriber drip' },
@@ -9,6 +10,7 @@ const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'drip3', label: '3 · Bundle spotlight', group: 'Subscriber drip' },
   { key: 'drip4', label: '4 · Membership pitch', group: 'Subscriber drip' },
   { key: 'drip5', label: '5 · CARVE15 coupon', group: 'Subscriber drip' },
+  { key: 'drip6', label: '6 · The finishing guide', group: 'Subscriber drip' },
   { key: 'cart', label: 'Abandoned-cart reminder', group: 'Cart recovery' },
   { key: 'browse', label: 'Abandoned-browse reminder', group: 'Cart recovery' },
   { key: 'review7', label: 'Review request (+7 days)', group: 'Post-purchase' },
@@ -275,6 +277,8 @@ export default function Automations() {
       <div className="text-xs text-ink-700/70 bg-cream/40 border border-bronze-600/15 rounded-lg px-3 py-2">
         🛡 <b>Review-first:</b> each system starts OFF — a <b>green</b> toggle means it's <b>ON</b>. Preview each email (right) and test-send it to yourself before enabling. The daily cron (08:00 UTC) does the actual sending, so the counters below stay at <b>0</b> until it next runs and there's activity to report — that's normal, not "off".
       </div>
+
+      <GuideBroadcast />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Toggle field="drip_enabled" label="Subscriber nurture drip"

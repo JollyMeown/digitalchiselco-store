@@ -189,6 +189,11 @@ export function dripEmail(stage: number, d: {
       ${btn(SITE + '/#membership', 'See membership plans')}`;
     return { subject, html: shell(subject, 'The membership pays for itself', body, e), text: `Membership: ${SITE}/#membership\nUnsubscribe: ${unsubUrl(e)}` };
   }
+  // Stage 6 closes the sequence with the finishing guide. Every earlier stage
+  // asks for something; this one only gives, which is why it goes last and why
+  // it is the one people reply to.
+  if (stage >= 6) return guideEmail({ email: e });
+
   const code = d.couponCode || 'CARVE15';
   const subject = `A 15% thank-you, just for you (code ${code})`;
   const body = `
@@ -197,6 +202,82 @@ export function dripEmail(stage: number, d: {
     <p style="margin:10px 0 0;font-size:12px;color:#999;text-align:center;">Paste it in the cart's promo box. Don't wait too long — it won't last forever.</p>
     ${btn(SITE + '/catalog', 'Pick your designs')}`;
   return { subject, html: shell(subject, 'Here is 15% off — our treat', body, e), text: `15% off with code ${code}: ${SITE}/catalog\nUnsubscribe: ${unsubUrl(e)}` };
+}
+
+// ── The finishing guide ──────────────────────────────────────────────
+// Written because a customer asked the question and there was no page to send
+// them to. It is the shop's most useful piece of writing, so it does double
+// duty: a one-off broadcast to the list, and the last stage of the new
+// subscriber sequence.
+//
+// Deliberately not a sales email. There is one link, it goes to the article,
+// and the only pitch is the sign-off. That is what makes people open the next
+// one.
+const GUIDE_URL = `${SITE}/blog/how-to-finish-cnc-relief-carvings`;
+// Same bucket the article itself serves from, so the pictures in the email are
+// the pictures on the page. Host comes from env rather than a literal.
+const STORAGE = (envAny('PUBLIC_SUPABASE_URL') || 'https://tutalnieozbngrsfywes.supabase.co').replace(/\/$/, '');
+const GUIDE_IMG = (k: string) => `${STORAGE}/storage/v1/object/public/site-media/blog/finishing/${k}.jpg`;
+
+export function guideEmail(d: { email: string; name?: string | null }): Out {
+  const e = d.email;
+  const subject = 'The step that makes a carving look carved';
+  const p = 'margin:0 0 14px;font-size:15px;line-height:1.65;color:#555;';
+  const body = `
+    <a href="${GUIDE_URL}?utm_source=email&utm_medium=newsletter&utm_campaign=finishing-guide" style="text-decoration:none;">
+      <img src="${GUIDE_IMG('cover')}" width="544" alt="A finished cherry relief carving on a workbench with the oils, waxes and brushes used to finish it" style="width:100%;max-width:544px;border-radius:10px;display:block;margin:0 0 20px;">
+    </a>
+
+    <p style="${p}">Most relief carvings are lost after the machine finishes, not during the cut.</p>
+
+    <p style="${p}">A carving is a landscape of very small hills and valleys, and the only reason anyone can see it is that light falls across it and leaves shadows. Fill those valleys with thick varnish and the whole thing goes flat. Keep them dark and the same board looks like it came out of a church.</p>
+
+    <p style="${p}">We have just published the long version of how to do that, and there is one step that does most of the work. Flood the carving with a dark glaze, then wipe it back off the raised surfaces only. Here it is, half finished:</p>
+
+    <img src="${GUIDE_IMG('glaze-wipe')}" width="544" alt="A relief carving half wiped back, the left side clean and warm, the right side still dark with glaze" style="width:100%;max-width:544px;border-radius:10px;display:block;margin:0 0 8px;">
+    <p style="margin:0 0 20px;font-size:12.5px;line-height:1.5;color:#8a7a68;text-align:center;font-style:italic;">Left side wiped, right side not. Same panel, same light, same five minutes of work.</p>
+
+    <p style="${p}">The guide walks through the whole job, with the products and tools that actually work:</p>
+
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 18px;">
+      <tr><td style="padding:5px 0;font-size:14.5px;line-height:1.5;color:#555;">Which woods hold fine detail, and which fight you</td></tr>
+      <tr><td style="padding:5px 0;font-size:14.5px;line-height:1.5;color:#555;">Getting the machining fuzz off without rounding your edges</td></tr>
+      <tr><td style="padding:5px 0;font-size:14.5px;line-height:1.5;color:#555;">Why sealing first is the step everyone skips, and what it costs</td></tr>
+      <tr><td style="padding:5px 0;font-size:14.5px;line-height:1.5;color:#555;">The antique glaze, in detail</td></tr>
+      <tr><td style="padding:5px 0;font-size:14.5px;line-height:1.5;color:#555;">Oils, waxes and the one finish to keep away from carved work</td></tr>
+      <tr><td style="padding:5px 0;font-size:14.5px;line-height:1.5;color:#555;">Food safe trays, outdoor signs, and painting 3D printed reliefs</td></tr>
+      <tr><td style="padding:5px 0;font-size:14.5px;line-height:1.5;color:#555;">A troubleshooting table for when it goes wrong</td></tr>
+    </table>
+
+    ${btn(`${GUIDE_URL}?utm_source=email&utm_medium=newsletter&utm_campaign=finishing-guide`, 'Read the full guide')}
+
+    <p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#666;">It is free, there is nothing to sign up for, and it took a while to write. If it saves you one panel it has done its job.</p>
+
+    <p style="margin:16px 0 0;font-size:14px;line-height:1.6;color:#666;">One more thing worth knowing: the guide exists because a customer emailed and asked. If something is not behaving in your shop, reply to this and ask. That is genuinely how this gets written.</p>
+
+    <p style="margin:18px 0 0;font-size:13px;color:#777;">Jolly, DigitalChiselCo</p>`;
+
+  const text = [
+    'Most relief carvings are lost after the machine finishes, not during the cut.',
+    '',
+    'A carving is a landscape of very small hills and valleys, and the only reason anyone can see it',
+    'is that light falls across it and leaves shadows. Fill those valleys with thick varnish and the',
+    'whole thing goes flat. Keep them dark and the same board looks like it came out of a church.',
+    '',
+    'We have just published the long version of how to do that. It covers wood choice, removing',
+    'machining fuzz, sealing, the antique glaze that makes the depth read, oils and waxes, food safe',
+    'trays, outdoor signs, painting 3D printed reliefs, and a troubleshooting table.',
+    '',
+    `Read it: ${GUIDE_URL}`,
+    '',
+    'It is free and there is nothing to sign up for. If something is not behaving in your shop,',
+    'reply and ask.',
+    '',
+    'Jolly, DigitalChiselCo',
+    `Unsubscribe: ${unsubUrl(e)}`,
+  ].join('\n');
+
+  return { subject, html: shell(subject, 'How to finish a relief carving', body, e), text };
 }
 
 // ── Abandoned cart (one reminder, ~20h later) ────────────────────────
