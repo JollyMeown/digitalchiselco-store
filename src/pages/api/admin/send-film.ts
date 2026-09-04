@@ -13,7 +13,7 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../lib/supabase';
-import { send as sendEmail } from '../../../lib/resend';
+import { send as sendEmail, sendBatch } from '../../../lib/resend';
 import { filmEmail, unsubHeaders } from '../../../lib/marketing-emails';
 
 export const prerender = false;
@@ -184,24 +184,41 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  const results: { email: string; ok: boolean; error?: string }[] = [];
-  for (const to of recipients) {
-    try {
+  // A test is one email, so it takes the simple path.
+  if (b?.test) {
+    const to = recipients[0];
+    const { subject: s, html, text } = build(film, to, subject);
+    const r = await sendEmail({
+      to, subject: `TEST: ${s}`, html, text, headers: unsubHeaders(to),
+      idempotencyKey: `film-test:${film.id}:${Date.now()}`,
+      tags: [{ name: 'kind', value: 'filmCampaign' }],
+    });
+    return json({ ok: !!(r as any)?.ok, sent: (r as any)?.ok ? 1 : 0, total: 1, skipped, error: (r as any)?.error });
+  }
+
+  // The campaign goes through Resend's batch endpoint, 100 per call.
+  //
+  // Sending one at a time is what broke the first three campaigns: behind the
+  // 2/second throttle each run reached 118 or 119 people in the 59 seconds the
+  // serverless function gets, then died mid-loop. Nobody saw an error, and
+  // roughly 195 subscribers simply never received them. Four batch calls carry
+  // the whole list in seconds, and because the ledger records every recipient,
+  // a run that is cut short can be finished by pressing the button again.
+  let sent = 0;
+  const errors: string[] = [];
+  for (let i = 0; i < recipients.length; i += 100) {
+    const slice = recipients.slice(i, i + 100);
+    const batch = slice.map((to) => {
       const { subject: s, html, text } = build(film, to, subject);
-      const r = await sendEmail({
-        to,
-        subject: b?.test ? `TEST: ${s}` : s,
-        html, text,
-        headers: unsubHeaders(to),
-        // one per address per film: a double click cannot mail anyone twice
-        idempotencyKey: b?.test ? `film-test:${film.id}:${Date.now()}` : `film:${film.id}:${to}`,
-        tags: [{ name: 'kind', value: 'filmCampaign' }],
-      });
-      results.push({ email: to, ok: !!(r as any)?.ok, error: (r as any)?.error });
-    } catch (e: any) {
-      results.push({ email: to, ok: false, error: String(e?.message || e).slice(0, 140) });
+      return { to, subject: s, html, text, headers: unsubHeaders(to), tags: [{ name: 'kind', value: 'filmCampaign' }] };
+    });
+    // The batch key still starts film:<id>: so the already-sent check reads it.
+    const r = await sendBatch(batch, `film:${film.id}:${i / 100}`);
+    if (r.ok) sent += r.sent || slice.length;
+    else {
+      errors.push(String(r.error || 'batch failed').slice(0, 140));
+      if (r.quota) { errors.push('stopped: daily budget reached, press again tomorrow'); break; }
     }
   }
-  const sent = results.filter((r) => r.ok).length;
-  return json({ ok: true, sent, total: results.length, skipped, results: results.slice(0, 60) });
+  return json({ ok: true, sent, total: recipients.length, skipped, errors: errors.slice(0, 5) });
 };
