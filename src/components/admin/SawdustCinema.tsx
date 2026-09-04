@@ -93,11 +93,27 @@ export default function SawdustCinemaAdmin() {
   // ── mail a film to subscribers ──────────────────────────────────────
   const [subCount, setSubCount] = useState<number | null>(null);
   const [mailSubject, setMailSubject] = useState('');
-  useEffect(() => {
-    supabase.from('subscribers').select('id', { count: 'exact', head: true })
-      .is('unsubscribed_at', null).is('suppressed_at', null)
-      .then(({ count }) => setSubCount(count ?? 0));
-  }, []);
+  // Per film: how many have had it, when it last went out, and how many are
+  // left. "Left" is what the campaign button sends to, so a film already
+  // mailed only ever reaches subscribers who joined since.
+  type Stat = { sent: number; last: string | null; remaining: number };
+  const [stats, setStats] = useState<Record<string, Stat>>({});
+
+  async function loadStats() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch('/api/admin/send-film', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ stats: true }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) { setSubCount(r.subscribers ?? 0); setStats(r.films || {}); }
+  }
+  useEffect(() => { loadStats(); }, []);
+
+  // Never sent = everyone is new, so fall back to the full list.
+  const statOf = (id: string): Stat => stats[id] || { sent: 0, last: null, remaining: subCount ?? 0 };
+  const shortDate = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
 
   async function mail(kind: 'preview' | 'test' | 'all', filmId: string) {
     setBusy('mail-' + kind); setNote('');
@@ -117,7 +133,10 @@ export default function SawdustCinemaAdmin() {
       setNote(`Preview opened. Subject: ${j.subject}`);
       return;
     }
-    setNote(kind === 'test' ? 'Test sent to jolly@digitalchiselco.com.' : `Sent to ${j.sent} of ${j.total} subscribers.`);
+    if (kind === 'test') { setNote('Test sent to jolly@digitalchiselco.com.'); return; }
+    setNote(j.message || `Sent to ${j.sent} new subscriber${j.sent === 1 ? '' : 's'}`
+      + `${j.skipped ? `, ${j.skipped} already had it` : ''}.`);
+    loadStats();
   }
 
   async function remove(id: string) {
@@ -206,6 +225,18 @@ export default function SawdustCinemaAdmin() {
                   {f.products?.slug ? <a href={`/product/${f.products.slug}`} target="_blank" rel="noreferrer" className="text-bronze-700 hover:underline">/product/{f.products.slug}</a> : 'no design linked'}
                 </div>
                 {f.caption && <div className="text-[11px] text-ink-700/50 truncate">{f.caption}</div>}
+                {/* Say plainly whether this film has gone out, so nobody has to
+                    guess and re-send to find out. */}
+                {statOf(f.id).sent > 0 ? (
+                  <div className="text-[11px] text-emerald-700 font-medium">
+                    ✓ sent to {statOf(f.id).sent} on {shortDate(statOf(f.id).last)}
+                    {statOf(f.id).remaining > 0 && (
+                      <span className="text-bronze-700"> · {statOf(f.id).remaining} new since</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-ink-700/40">not sent yet</div>
+                )}
               </div>
               <label className="flex items-center gap-1.5 text-[11px] text-ink-700/70">
                 <input type="checkbox" checked={f.active} onChange={() => patch(f.id, { active: !f.active })} /> live
@@ -213,9 +244,17 @@ export default function SawdustCinemaAdmin() {
               <div className="flex items-center gap-1">
                 <button className={btnGhost + ' text-xs px-2 py-1'} title="Preview the email" disabled={!!busy} onClick={() => mail('preview', f.id)}>👁</button>
                 <button className={btnGhost + ' text-xs px-2 py-1'} title="Send a test to your inbox" disabled={!!busy} onClick={() => mail('test', f.id)}>✉ test</button>
-                <button className={btnPrimary + ' text-xs px-2 py-1'} title={`Email ${subCount ?? '…'} subscribers`} disabled={!!busy}
-                  onClick={() => { if (confirm(`Email this film to all ${subCount ?? 0} subscribers? Each person receives it once.`)) mail('all', f.id); }}>
-                  📣 {subCount ?? '…'}
+                {/* The count is who is LEFT, not the whole list: pressing this
+                    twice must not mail anyone a second time. */}
+                <button className={btnPrimary + ' text-xs px-2 py-1'} disabled={!!busy || statOf(f.id).remaining === 0}
+                  title={statOf(f.id).remaining === 0
+                    ? 'Every subscriber has already had this film'
+                    : `Email ${statOf(f.id).remaining} subscriber(s) who have not had this film`}
+                  onClick={() => {
+                    const n = statOf(f.id).remaining;
+                    if (confirm(`Email this film to ${n} subscriber${n === 1 ? '' : 's'} who have not had it yet?`)) mail('all', f.id);
+                  }}>
+                  📣 {stats[f.id] || subCount !== null ? statOf(f.id).remaining : '…'}
                 </button>
                 <button className={btnGhost + ' text-xs px-2 py-1'} disabled={i === 0} onClick={() => patch(f.id, { sort_order: f.sort_order - 1 })}>↑</button>
                 <button className={btnGhost + ' text-xs px-2 py-1'} disabled={i === films.length - 1} onClick={() => patch(f.id, { sort_order: f.sort_order + 1 })}>↓</button>

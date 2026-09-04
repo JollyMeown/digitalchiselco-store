@@ -34,6 +34,73 @@ async function isCallerAdmin(request: Request): Promise<boolean> {
   return !!prof?.is_admin;
 }
 
+/**
+ * Who has already had this film.
+ *
+ * Every send is written to the central ledger with batch_key = the idempotency
+ * key, which carries the film id, so the ledger already knows this and no new
+ * table is needed. Resend's own idempotency key expires after a day, so it
+ * stops a double click and nothing more: without this the second campaign click
+ * a week later would mail all 313 people again.
+ *
+ * Paged deliberately. PostgREST caps a plain select, and silently missing rows
+ * here would mean mailing someone a second time.
+ */
+async function sentRecipients(db: any, filmId: string): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from('email_send_log').select('recipient')
+      .eq('status', 'sent').like('batch_key', `film:${filmId}:%`)
+      .range(from, from + 999);
+    if (error || !data?.length) break;
+    for (const r of data) if (r.recipient) out.add(String(r.recipient).toLowerCase().trim());
+    if (data.length < 1000) break;
+  }
+  return out;
+}
+
+/** Eligible subscribers: everyone who has not unsubscribed or been suppressed. */
+async function eligible(db: any): Promise<string[]> {
+  const out: string[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from('subscribers').select('email, unsubscribed_at, suppressed_at').range(from, from + 999);
+    if (error || !data?.length) break;
+    for (const s of data) {
+      if (s.email && !s.unsubscribed_at && !s.suppressed_at) out.push(String(s.email).toLowerCase().trim());
+    }
+    if (data.length < 1000) break;
+  }
+  return [...new Set(out)];
+}
+
+/** Per-film send status for the admin panel: who has had it, and who is left. */
+async function campaignStats(db: any) {
+  const list = await eligible(db);
+  const films: Record<string, { sent: number; last: string | null; remaining: number }> = {};
+  const seen: Record<string, Set<string>> = {};
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from('email_send_log').select('batch_key, recipient, sent_at')
+      .eq('kind', 'filmCampaign').eq('status', 'sent').range(from, from + 999);
+    if (error || !data?.length) break;
+    for (const r of data) {
+      // test sends use a film-test: prefix, so they never count as delivered
+      const m = /^film:([^:]+):/.exec(String(r.batch_key || ''));
+      if (!m) continue;
+      const id = m[1];
+      const f = (films[id] ||= { sent: 0, last: null, remaining: 0 });
+      (seen[id] ||= new Set()).add(String(r.recipient || '').toLowerCase().trim());
+      f.sent = seen[id].size;
+      if (!f.last || String(r.sent_at) > f.last) f.last = String(r.sent_at);
+    }
+    if (data.length < 1000) break;
+  }
+  for (const [id, f] of Object.entries(films)) f.remaining = list.filter((e) => !seen[id].has(e)).length;
+  return { subscribers: list.length, films };
+}
+
 /** The film to mail: the one asked for, else the first active one. */
 async function loadFilm(db: any, id?: string) {
   // The per-film email columns arrive in migration 093. Fall back to the base
@@ -75,6 +142,9 @@ export const POST: APIRoute = async ({ request }) => {
   const b = await request.json().catch(() => ({} as any));
   const db = supabaseAdmin();
 
+  // Panel asking who has already had what. No film needed.
+  if (b?.stats) return json({ ok: true, ...(await campaignStats(db)) });
+
   const film = await loadFilm(db, b?.filmId);
   if (!film) return json({ error: 'No active film to send. Add one in Admin → Media → Sawdust Cinema.' }, 400);
   if (!film.products?.slug) return json({ error: 'That film is not linked to a design, so the email would have nowhere to send people.' }, 400);
@@ -87,20 +157,32 @@ export const POST: APIRoute = async ({ request }) => {
 
   // Who gets it.
   let recipients: string[] = [];
+  let skipped = 0;
   if (b?.test) {
     recipients = [OPS_INBOX];
   } else if (Array.isArray(b?.emails) && b.emails.length) {
+    // An explicit list is the manual override, for re-sending to someone who
+    // says it never arrived. It is deliberately NOT filtered.
     recipients = b.emails.map((e: any) => String(e).toLowerCase().trim()).filter(Boolean);
   } else if (b?.audience === 'all') {
-    const { data: subs } = await db.from('subscribers').select('email, unsubscribed_at, suppressed_at').limit(20000);
-    recipients = (subs || [])
-      .filter((s: any) => s.email && !s.unsubscribed_at && !s.suppressed_at)
-      .map((s: any) => String(s.email).toLowerCase().trim());
-    recipients = [...new Set(recipients)];
+    // The campaign button always means "the people who have not had this yet",
+    // so a second click after new subscribers join reaches only them.
+    const all = await eligible(db);
+    const done = await sentRecipients(db, film.id);
+    recipients = all.filter((e) => !done.has(e));
+    skipped = all.length - recipients.length;
   } else {
     return json({ error: 'Nothing to send: pass test, emails, or audience "all".' }, 400);
   }
-  if (!recipients.length) return json({ error: 'No eligible recipients.' }, 400);
+  if (!recipients.length) {
+    // Not an error: it is the normal state once a film has gone out.
+    return json({
+      ok: true, sent: 0, total: 0, skipped,
+      message: skipped
+        ? `Everyone on the list has already had this film (${skipped} previously sent). Nothing to do.`
+        : 'No eligible subscribers.',
+    });
+  }
 
   const results: { email: string; ok: boolean; error?: string }[] = [];
   for (const to of recipients) {
@@ -121,5 +203,5 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
   const sent = results.filter((r) => r.ok).length;
-  return json({ ok: true, sent, total: results.length, results: results.slice(0, 60) });
+  return json({ ok: true, sent, total: results.length, skipped, results: results.slice(0, 60) });
 };

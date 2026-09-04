@@ -37,7 +37,11 @@ if (!post) return Astro.rewrite('/404');
         {post.published_at && <span> · {new Date(post.published_at).toLocaleDateString()}</span>}
       </div>
     </header>
-    <div class="prose prose-lg max-w-none text-ink-700 leading-relaxed" set:html={xss(post.body || '')} />
+    <div class="prose prose-lg max-w-none text-ink-700 leading-relaxed" set:html={xss(post.body || '', {
+      // Long guides need a contents list that jumps, so headings keep their id.
+      // Everything else stays on the library's default allowlist.
+      whiteList: { ...(xss as any).whiteList, h2: ['id'], h3: ['id'], h4: ['id'], section: ['id'] },
+    })} />
   </article>
 
   <script type="application/ld+json" set:html={jsonLd({
