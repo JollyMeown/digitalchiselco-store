@@ -65,3 +65,6 @@ scripts/.etsy-welcome-preview.html
 
 # local marketing-image previews (never deployed)
 .mockups/
+
+# local retag run log
+cults3d-retag.log
