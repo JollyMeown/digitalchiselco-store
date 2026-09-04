@@ -26,6 +26,7 @@ import Customized from './tabs/Customized';
 import Seo from './tabs/Seo';
 import Discounts from './tabs/Discounts';
 import Cults from './tabs/Cults';
+import Shorts from './tabs/Shorts';
 import PdfMaker from './tabs/PdfMaker';
 import Seasonal from './tabs/Seasonal';
 import DesignBoard from './tabs/DesignBoard';
@@ -49,6 +50,7 @@ const TABS: Tab[] = [
   { key: 'categorymgr', label: 'Category Manager', icon: '🗂', Component: CategoryManager },
   { key: 'orders',      label: 'Orders',       icon: '⊞', Component: Orders },
   { key: 'cults',       label: 'Cults3D Sales', icon: '◈', Component: Cults },
+  { key: 'shorts',      label: 'YouTube Shorts', icon: '▶', Component: Shorts },
   { key: 'discounts',   label: 'Discounts',    icon: '%', Component: Discounts },
   { key: 'creations',   label: 'Carved by you', icon: '✦', Component: Creations },
   { key: 'seasonal',    label: 'Seasonal',     icon: '❄', Component: Seasonal },
