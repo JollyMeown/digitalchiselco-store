@@ -64,6 +64,10 @@ export default function Shorts() {
     return m;
   }, [rows, days]);
 
+  // eight hours = at least two missed 3-hourly syncs
+  const stale = !!rows?.[0]?.synced_at &&
+    Date.now() - new Date(rows[0].synced_at as string).getTime() > 8 * 3600e3;
+
   if (rows === null) return <Card><div className="p-4 text-sm text-ink-500">Loading Shorts…</div></Card>;
 
   return (
@@ -72,8 +76,14 @@ export default function Shorts() {
         <div className="p-4">
           <div className="flex items-baseline justify-between flex-wrap gap-2">
             <h3 className="font-serif text-lg">YouTube Shorts</h3>
-            <span className="text-[11px] text-ink-500">
-              {rows[0]?.synced_at ? `synced ${ago(rows[0].synced_at)} from BRS` : 'never synced'}
+            {/* The sync runs every 3 hours on the owner's machine. Two missed runs
+                means the PC is off or the task is broken, and stale numbers read
+                exactly like a Short that stopped growing. Say so rather than
+                quietly showing yesterday's figures. */}
+            <span className={`text-[11px] ${stale ? 'text-amber-700 font-medium' : 'text-ink-500'}`}>
+              {rows[0]?.synced_at
+                ? `${stale ? '⚠ stale, ' : ''}synced ${ago(rows[0].synced_at)} from BRS`
+                : 'never synced'}
             </span>
           </div>
           {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
