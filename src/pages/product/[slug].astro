@@ -42,7 +42,11 @@ let film: { video_url: string; poster_url: string | null; title: string | null; 
 try {
   const { data: f } = await supabase.from('showcase_videos')
     .select('video_url, poster_url, title, caption')
-    .eq('product_id', p.id).eq('active', true).order('sort_order').limit(1).maybeSingle();
+    // A design can have more than one film. Show the newest, and break ties on
+    // date rather than leaving it to whichever row the database returns first.
+    .eq('product_id', p.id).eq('active', true)
+    .order('sort_order').order('created_at', { ascending: false })
+    .limit(1).maybeSingle();
   film = (f as any) || null;
 } catch { /* the page works without it */ }
 const related = await getRelatedProducts(p.id, 5);
