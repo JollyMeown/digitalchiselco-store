@@ -221,7 +221,10 @@ const GUIDE_IMG = (k: string) => `${STORAGE}/storage/v1/object/public/site-media
 
 export function guideEmail(d: { email: string; name?: string | null }): Out {
   const e = d.email;
-  const subject = 'The step that makes a carving look carved';
+  // Say what it is. The earlier line ("The step that makes a carving look
+  // carved") was intriguing but a subscriber could not tell it was a finishing
+  // guide, and curiosity subjects age badly in a crowded inbox.
+  const subject = 'How to finish a relief carving: the complete guide';
   const p = 'margin:0 0 14px;font-size:15px;line-height:1.65;color:#555;';
   const body = `
     <a href="${GUIDE_URL}?utm_source=email&utm_medium=newsletter&utm_campaign=finishing-guide" style="text-decoration:none;">
