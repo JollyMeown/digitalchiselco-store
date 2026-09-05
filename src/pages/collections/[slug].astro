@@ -3,6 +3,8 @@ import Shell from '../../layouts/Shell.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import { getCategoryBySlug, getProductsByCategory, getSettings } from '../../lib/queries';
+import { jsonLd } from '../../lib/jsonld';
+import xss from 'xss';
 
 const { slug } = Astro.params;
 const category = await getCategoryBySlug(slug!);
@@ -11,24 +13,55 @@ if (!category) return Astro.rewrite('/404');
 const page = Math.max(1, Number(Astro.url.searchParams.get('page') || '1'));
 const { products, total, perPage } = await getProductsByCategory(category.id, page);
 const pages = Math.ceil(total / perPage);
-const meta = (category.description || '').slice(0, 155) || `Browse ${total} ${category.name} bas-relief STL files for CNC, 3D printing and laser engraving.`;
 const isPremium = category.slug === 'premium-bundle-offer';
 const settings = await getSettings();
+const site = (import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
+
+// Search-facing copy (migration 097). Titles used to read "Fish & Fly
+// Fishing STL STL Files", the H1 was hidden and there was no intro at all;
+// Search Console had these pages at positions 18 to 22 with impressions and
+// no clicks. Each collection now carries its own title, description, intro
+// and FAQ, with page 2+ marked in the title so paginated copies do not
+// compete with page 1.
+const baseName = String(category.name).replace(/\s+STL$/i, '');
+const pageTitle = (category.seo_title || `${baseName} Relief STL Files for CNC Carving | DigitalChiselCo`) + (page > 1 ? ` (page ${page})` : '');
+const meta = (category.seo_description || category.description || '').slice(0, 160)
+  || `Browse ${total} ${baseName} bas-relief STL files for CNC routers, 3D printers and laser engravers. Instant download, commercial use included.`;
+const intro = page === 1 && category.intro_html ? xss(String(category.intro_html), {
+  whiteList: { p: [], a: ['href', 'title'], strong: [], em: [], br: [] },
+}) : '';
+const faq: { q: string; a: string }[] = page === 1 && Array.isArray(category.faq) ? category.faq.filter((f: any) => f?.q && f?.a) : [];
+const faqSafe = faq.map((f) => ({ q: f.q, a: xss(String(f.a), { whiteList: { a: ['href', 'title'], strong: [], em: [] } }) }));
+
+// Rich results: the collection as an ItemList of products, and the FAQ.
+const listLd = {
+  '@context': 'https://schema.org', '@type': 'CollectionPage',
+  name: pageTitle.replace(/ \| DigitalChiselCo.*$/, ''), description: meta,
+  url: `${site}/collections/${category.slug}${page > 1 ? `?page=${page}` : ''}`,
+  isPartOf: { '@type': 'WebSite', '@id': `${site}#website` },
+  mainEntity: {
+    '@type': 'ItemList', numberOfItems: total,
+    itemListElement: products.slice(0, 48).map((p, i) => ({
+      '@type': 'ListItem', position: (page - 1) * perPage + i + 1,
+      url: `${site}/product/${p.slug}`, name: String(p.title).split('|')[0].trim(),
+      ...(p.image_url ? { image: p.image_url } : {}),
+    })),
+  },
+};
+const faqLd = faq.length ? {
+  '@context': 'https://schema.org', '@type': 'FAQPage',
+  mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: String(f.a).replace(/<[^>]+>/g, '') } })),
+} : null;
 ---
-<Shell title={`${category.name} STL Files | DigitalChiselCo`} description={meta} scrollPastBanner={true}>
+<Shell title={pageTitle} description={meta} image={category.image_url || undefined} scrollPastBanner={true}>
   <Breadcrumbs crumbs={[{ label: 'Collections', href: '/collections' }, { label: category.name }]} />
-  {category.image_url ? (
+  {category.image_url && !isPremium ? (
     <>
       <div class="mb-5 overflow-hidden rounded-lg">
-        <img src={category.image_url} alt={category.name} class="w-full h-auto block" loading="eager" />
+        <img src={category.image_url} alt={`${baseName} relief carvings, a selection of designs from this collection`} class="w-full h-auto block" loading="eager" />
       </div>
-      <h1 class="sr-only">{category.name}</h1>
-      {!isPremium && (
-        <>
-          <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} designs</p>
-          {category.description && <p class="text-ink-700/80 text-sm mb-6 max-w-3xl">{category.description}</p>}
-        </>
-      )}
+      <h1 class="font-serif text-2xl sm:text-3xl text-bronze-800 leading-tight">{baseName} relief STL files</h1>
+      <p class="text-ink-700/70 text-sm mt-1 mb-4">{total.toLocaleString()} designs · instant download · commercial licence included</p>
     </>
   ) : isPremium ? (
     <section class="mb-6 sm:mb-8 -mx-4 sm:-mx-6 px-5 sm:px-6 py-7 sm:py-10 bg-gradient-to-br from-[#FAEEDA] via-[#fbf4e6] to-[#FAC775]/40 rounded-2xl border border-[#FAC775]/30">
@@ -41,11 +74,18 @@ const settings = await getSettings();
     </section>
   ) : (
     <>
-      <h1 class="text-3xl mb-1">{category.name}</h1>
-      <p class="text-ink-700/70 text-sm mb-6">{total.toLocaleString()} designs</p>
-      {category.description && <p class="text-ink-700/80 text-sm mb-6 max-w-3xl">{category.description}</p>}
+      <h1 class="font-serif text-2xl sm:text-3xl text-bronze-800 leading-tight">{baseName} relief STL files</h1>
+      <p class="text-ink-700/70 text-sm mt-1 mb-4">{total.toLocaleString()} designs · instant download · commercial licence included</p>
     </>
   )}
+
+  {intro && (
+    <div class="coll-intro max-w-3xl mb-7 text-[15px] leading-relaxed text-ink-800" set:html={intro} />
+  )}
+  {!intro && category.description && !isPremium && (
+    <p class="text-ink-700/80 text-sm mb-6 max-w-3xl">{category.description}</p>
+  )}
+
   <!-- "Complete the collection" progress — renders only for returning buyers
        (email known from a past cart/subscribe) who own 1+ designs here. -->
   <div id="coll-progress" class="hidden mb-5 bg-[#FAEEDA] border border-bronze-600/30 rounded-lg px-4 py-3" data-slug={category.slug}>
@@ -60,12 +100,39 @@ const settings = await getSettings();
     {products.map((p) => <ProductCard product={p} discount={settings.discount_percent} />)}
   </div>
   {pages > 1 && (
-    <nav class="flex justify-center gap-2 mt-10 text-sm">
+    <nav class="flex justify-center gap-2 mt-10 text-sm" aria-label="Pages">
       {page > 1 && <a href={`/collections/${slug}?page=${page - 1}`} class="px-3 py-1.5 border border-black/10 rounded">← Prev</a>}
       <span class="px-3 py-1.5">Page {page} of {pages}</span>
       {page < pages && <a href={`/collections/${slug}?page=${page + 1}`} class="px-3 py-1.5 border border-black/10 rounded">Next →</a>}
     </nav>
   )}
+
+  {faqSafe.length > 0 && (
+    <section class="mt-14 max-w-3xl" aria-labelledby="coll-faq">
+      <h2 id="coll-faq" class="font-serif text-xl text-bronze-800 mb-3">Questions about {baseName.toLowerCase()} files</h2>
+      <div class="divide-y divide-bronze-600/15 border-y border-bronze-600/15">
+        {faqSafe.map((f) => (
+          <details class="group py-3">
+            <summary class="cursor-pointer list-none flex items-start justify-between gap-3 text-[15px] font-medium text-ink-900">
+              <span>{f.q}</span>
+              <span class="text-bronze-600 transition group-open:rotate-45" aria-hidden="true">+</span>
+            </summary>
+            <div class="coll-intro mt-2 text-sm leading-relaxed text-ink-700" set:html={f.a} />
+          </details>
+        ))}
+      </div>
+    </section>
+  )}
+
+  <style is:global>
+    .coll-intro p { margin: 0 0 .85rem; }
+    .coll-intro p:last-child { margin-bottom: 0; }
+    .coll-intro a { color: #633806; text-decoration: underline; text-decoration-color: rgba(133, 79, 11, .35); text-underline-offset: 3px; }
+    .coll-intro a:hover { color: #412402; text-decoration-color: #854F0B; }
+  </style>
+
+  <script type="application/ld+json" set:html={jsonLd(listLd)} />
+  {faqLd && <script type="application/ld+json" set:html={jsonLd(faqLd)} />}
 
   <script is:inline>
     // Collection-completion progress: only for buyers whose email we already

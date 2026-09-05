@@ -1163,6 +1163,16 @@ ${ideasHtml}
     stats.searchConsole = await syncSearchConsole((count || 0) < 120 ? 480 : 14);
   });
 
+  // ── Index coverage: inspect a slice of the sitemap every night ───────
+  // 250 URLs a night (quota is 2,000) walks the whole sitemap in about a
+  // week, then keeps every verdict under ten days old.
+  stats.indexAudit = 'off';
+  await step(stats, 'indexAudit', async () => {
+    const { gscConfigured, gscInspectSlice } = await import('./search-console');
+    if (!gscConfigured()) { stats.indexAudit = 'not configured'; return; }
+    stats.indexAudit = await gscInspectSlice(250, { budgetMs: 3 * 60 * 1000 });
+  });
+
   // ── Cut Local maker automations (gated) ──────────────────────────────
   // Nudge makers who have unquoted open jobs near them (max once/20h each),
   // and remind low-credit makers to top up (max once/7d each).

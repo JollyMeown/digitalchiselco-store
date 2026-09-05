@@ -84,6 +84,79 @@ function Kpi({ label, value, sub, color }: { label: string; value: string; sub?:
   );
 }
 
+// Index coverage from the URL Inspection API: which sitemap URLs Google has
+// indexed, and Google's own reason for each one it has not. The Pages report
+// in Search Console says "1,231 not indexed" without an API; this is the
+// same verdict, URL by URL, filled 250 a night plus the Audit button.
+type UrlRow = { url: string; verdict: string | null; coverage_state: string | null; google_canonical: string | null; user_canonical: string | null; last_crawl: string | null; inspected_at: string };
+function IndexCoverage() {
+  const [rows, setRows] = useState<UrlRow[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [open, setOpen] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const load = async () => {
+    const out: UrlRow[] = [];
+    for (let from = 0; from < 5000; from += 1000) {
+      const { data } = await supabase.from('gsc_url_status').select('url, verdict, coverage_state, google_canonical, user_canonical, last_crawl, inspected_at').order('inspected_at', { ascending: false }).range(from, from + 999);
+      out.push(...((data || []) as UrlRow[]));
+      if (!data || data.length < 1000) break;
+    }
+    setRows(out); setTotal(out.length);
+  };
+  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
+  async function audit() {
+    setBusy(true); setMsg('');
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const r = await fetch('/api/admin/gsc-inspect?max=600', { method: 'POST', headers: { authorization: `Bearer ${s.session?.access_token || ''}` } });
+      const j = await r.json();
+      setMsg(j.ok ? `✓ ${j.status}` : j.error || 'failed');
+    } catch (e: any) { setMsg(String(e?.message || e)); }
+    setBusy(false);
+  }
+  if (!rows) return null;
+  const groups = new Map<string, UrlRow[]>();
+  for (const r of rows) { const k = r.coverage_state || (r.verdict || 'unknown'); groups.set(k, [...(groups.get(k) || []), r]); }
+  const indexed = rows.filter((r) => r.verdict === 'PASS').length;
+  const sorted = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+  const typeOf = (u: string) => { const p = pathOf(u).split('/')[1] || 'home'; return p || 'home'; };
+  const byType = (list: UrlRow[]) => { const m: Record<string, number> = {}; for (const r of list) m[typeOf(r.url)] = (m[typeOf(r.url)] || 0) + 1; return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(' · '); };
+  return (
+    <div className="mt-4 border-t border-black/10 pt-3">
+      <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
+        <div className="text-xs font-bold text-ink-900">Index coverage · {total ? `${indexed} of ${total} inspected URLs indexed` : 'nothing inspected yet'}</div>
+        <button onClick={audit} disabled={busy} className="text-[11px] px-2 py-0.5 rounded border border-black/15 hover:border-bronze-600">{busy ? 'Starting…' : 'Audit 600 URLs now'}</button>
+      </div>
+      <p className="text-[11px] text-ink-700/55 mb-2">Google's own verdict per sitemap URL. The nightly run inspects 250 a night; the whole sitemap takes about a week. Tap a reason to see which pages it applies to.</p>
+      {msg && <div className={`text-[11px] mb-2 ${msg.startsWith('✓') ? 'text-green-700' : 'text-red-700'}`}>{msg}</div>}
+      {sorted.length > 0 && (
+        <div className="space-y-1">
+          {sorted.map(([reason, list]) => (
+            <div key={reason}>
+              <button onClick={() => setOpen(open === reason ? null : reason)} className={`w-full flex items-baseline justify-between gap-2 px-2 py-1 rounded text-left ${open === reason ? 'bg-bronze-600/10' : 'hover:bg-cream/70'}`}>
+                <span className={`text-[13px] ${list[0]?.verdict === 'PASS' ? 'text-green-800' : 'text-ink-800'}`}>{reason}</span>
+                <span className="text-[12px] tabular-nums text-ink-700/70 shrink-0">{list.length} <span className="text-ink-700/40">· {byType(list)}</span></span>
+              </button>
+              {open === reason && (
+                <div className="ml-3 mb-2 border-l-2 border-bronze-600/30 pl-3 max-h-64 overflow-y-auto">
+                  {list.slice(0, 200).map((r) => (
+                    <div key={r.url} className="text-[12px] py-0.5 flex justify-between gap-2">
+                      <a href={r.url} target="_blank" rel="noreferrer" className="text-ink-800 truncate hover:underline" title={r.url}>{pathOf(r.url)}</a>
+                      <span className="text-ink-700/45 shrink-0">{r.google_canonical && r.google_canonical !== r.url ? 'canonical elsewhere' : r.last_crawl ? `crawled ${String(r.last_crawl).slice(0, 10)}` : 'never crawled'}</span>
+                    </div>
+                  ))}
+                  {list.length > 200 && <div className="text-[10px] text-ink-700/45">and {list.length - 200} more</div>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SearchConsole() {
   const [days, setDays] = useState<number>(30);
   const [rows, setRows] = useState<Day[] | null>(null);
@@ -301,6 +374,7 @@ export default function SearchConsole() {
               </div>
             )}
           </div>
+          <IndexCoverage />
           {meta.err && <div className="mt-2 text-[11px] text-red-700 break-all">Last sync error: {meta.err}</div>}
           {msg && <div className="mt-2 text-[11px] text-ink-700/70">{msg}</div>}
           <div className="mt-2 text-[10px] text-ink-700/45">

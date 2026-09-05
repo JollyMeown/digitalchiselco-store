@@ -110,6 +110,84 @@ export async function gscAddSite(): Promise<string> {
   return `property added; the account now sees: ${mine.join(', ') || 'nothing yet'}`;
 }
 
+// ── Index coverage, URL by URL ────────────────────────────────────────
+// Search Console's Pages report ("1,231 not indexed") has no API, but the URL
+// Inspection API returns the same verdict per URL, 2,000 a day. The nightly
+// run inspects the sitemap URLs least recently looked at; the admin button
+// runs a bigger slice in a background function.
+export type UrlStatus = {
+  url: string; verdict: string | null; coverage_state: string | null; indexing_state: string | null;
+  robots_txt_state: string | null; page_fetch_state: string | null; google_canonical: string | null;
+  user_canonical: string | null; last_crawl: string | null; crawled_as: string | null; rich_results: string | null; inspected_at: string;
+};
+
+export async function gscInspectUrl(url: string, token?: string): Promise<UrlStatus> {
+  const t = token || await accessToken(FULL_SCOPE);
+  const res = await fetch('https://searchconsole.googleapis.com/v1/urlInspection/index:inspect', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${t}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ inspectionUrl: url, siteUrl: gscSite(), languageCode: 'en-US' }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`inspect ${res.status}: ${text.slice(0, 300)}`);
+  const r = JSON.parse(text || '{}').inspectionResult || {};
+  const idx = r.indexStatusResult || {};
+  return {
+    url, verdict: idx.verdict || null, coverage_state: idx.coverageState || null, indexing_state: idx.indexingState || null,
+    robots_txt_state: idx.robotsTxtState || null, page_fetch_state: idx.pageFetchState || null,
+    google_canonical: idx.googleCanonical || null, user_canonical: idx.userCanonical || null,
+    last_crawl: idx.lastCrawlTime || null, crawled_as: idx.crawledAs || null,
+    rich_results: r.richResultsResult?.verdict || null, inspected_at: new Date().toISOString(),
+  };
+}
+
+async function sitemapUrls(): Promise<string[]> {
+  const site = `https://${gscDomain()}`;
+  const res = await fetch(`${site}/sitemap.xml`, { headers: { 'user-agent': 'dcc-index-audit' } });
+  const xml = await res.text();
+  return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].replace(/&amp;/g, '&'));
+}
+
+// Inspect up to `max` sitemap URLs, oldest-inspected first (never-inspected
+// before that), within a time budget. Returns a status string for the ledger.
+export async function gscInspectSlice(max = 250, opts: { budgetMs?: number } = {}): Promise<string> {
+  const { supabaseAdmin } = await import('./supabase');
+  const db = supabaseAdmin();
+  const started = Date.now();
+  const budget = opts.budgetMs ?? 12 * 60 * 1000;
+  const urls = await sitemapUrls();
+  if (!urls.length) return 'sitemap empty';
+  // everything we already know, so the queue is "never inspected" then "oldest"
+  const known = new Map<string, string>();
+  for (let from = 0; ; from += 1000) {
+    const { data } = await db.from('gsc_url_status').select('url, inspected_at').range(from, from + 999);
+    for (const r of data || []) known.set(r.url, r.inspected_at);
+    if (!data || data.length < 1000) break;
+  }
+  const queue = urls
+    .map((u) => ({ u, at: known.get(u) || '' }))
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .slice(0, max)
+    .map((x) => x.u);
+  const token = await accessToken(FULL_SCOPE);
+  let done = 0, failed = 0; const counts: Record<string, number> = {};
+  for (const url of queue) {
+    if (Date.now() - started > budget) break;
+    try {
+      const s = await gscInspectUrl(url, token);
+      const { error } = await db.from('gsc_url_status').upsert(s, { onConflict: 'url' });
+      if (error) throw new Error(error.message);
+      counts[s.coverage_state || '?'] = (counts[s.coverage_state || '?'] || 0) + 1;
+      done++;
+    } catch (e: any) {
+      failed++;
+      if (/429|RESOURCE_EXHAUSTED|quota/i.test(String(e?.message))) { return `quota reached after ${done} (${JSON.stringify(counts)})`; }
+      if (failed > 20) return `stopped: too many failures (${done} ok): ${String(e?.message).slice(0, 200)}`;
+    }
+  }
+  return `inspected ${done} of ${urls.length} sitemap URLs (${known.size + done} known), ${failed} failed: ${JSON.stringify(counts)}`;
+}
+
 type SaRow = { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number };
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
