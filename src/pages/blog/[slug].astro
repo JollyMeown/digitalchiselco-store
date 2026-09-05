@@ -4,6 +4,7 @@ import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { jsonLd } from '../../lib/jsonld';
 import xss from 'xss';
+import PriceCalculator from '../../components/PriceCalculator.tsx';
 
 const { slug } = Astro.params;
 let post: any = null;
@@ -37,6 +38,22 @@ try {
     .order('published_at', { ascending: false }).limit(3);
   related = data || [];
 } catch {}
+
+// Long guides need a contents list that jumps, so headings keep their id,
+// and a small set of class names survive so an article can mark a link
+// as a button. Everything else stays on the library's default allowlist.
+const safeBody = xss(post.body || '', {
+  whiteList: {
+    ...(xss as any).whiteList,
+    h2: ['id'], h3: ['id'], h4: ['id'], section: ['id', 'class'],
+    a: ['target', 'href', 'title', 'class'], p: ['class'], div: ['class'], span: ['class'], figure: ['class'],
+  },
+});
+// An article can drop an interactive widget in with one empty div (the class
+// survives the sanitizer); the body is split there and the island mounted
+// between the halves, since a script can never live inside stored HTML.
+const CALC_MARK = '<div class="dcc-price-calc"></div>';
+const bodyParts = safeBody.includes(CALC_MARK) ? safeBody.split(CALC_MARK, 2) : [safeBody];
 ---
 <Shell
   title={`${post.seo_title || post.title} · DigitalChiselCo`}
@@ -59,16 +76,13 @@ try {
         <span> · {minutes} min read</span>
       </div>
     </header>
-    <div class="post-body prose prose-lg max-w-none text-ink-700 leading-relaxed" set:html={xss(post.body || '', {
-      // Long guides need a contents list that jumps, so headings keep their id,
-      // and a small set of class names survive so an article can mark a link
-      // as a button. Everything else stays on the library's default allowlist.
-      whiteList: {
-        ...(xss as any).whiteList,
-        h2: ['id'], h3: ['id'], h4: ['id'], section: ['id', 'class'],
-        a: ['target', 'href', 'title', 'class'], p: ['class'], div: ['class'], span: ['class'], figure: ['class'],
-      },
-    })} />
+    <div class="post-body prose prose-lg max-w-none text-ink-700 leading-relaxed" set:html={bodyParts[0]} />
+    {bodyParts.length > 1 && (
+      <>
+        <PriceCalculator client:load />
+        <div class="post-body prose prose-lg max-w-none text-ink-700 leading-relaxed" set:html={bodyParts[1]} />
+      </>
+    )}
     {related.length > 0 && (
       <aside class="mt-14 pt-8 border-t border-bronze-600/20">
         <h2 class="font-serif text-xl text-bronze-800 mb-4">Keep reading</h2>
@@ -135,8 +149,22 @@ try {
     .post-body figure a img { transition: transform .2s; }
     .post-body figure a:hover img { transform: scale(1.01); }
     .post-body figcaption { font-size: .85rem; color: rgba(42, 26, 14, .6); margin-top: .5rem; text-align: center; }
-    .post-body table { font-size: .92rem; }
-    .post-body thead th { background: #FAEEDA; color: #412402; }
+    /* Tables: a proper ruled table with a shaded header and zebra rows, so a
+       price or comparison table reads as data rather than run-on text. On a
+       narrow screen it scrolls sideways inside its own box instead of
+       squeezing the columns (owner request, 2026-09-05). */
+    .post-body table { font-size: .92rem; width: 100%; border-collapse: separate; border-spacing: 0; margin: 1.4rem 0 1.8rem;
+      border: 1px solid rgba(133, 79, 11, .28); border-radius: .6rem; overflow: hidden; line-height: 1.4;
+      box-shadow: 0 2px 10px rgba(65, 36, 2, .06); }
+    @media (max-width: 640px) { .post-body table { display: block; overflow-x: auto; white-space: nowrap; } }
+    .post-body thead th { background: #633806; color: #FAEEDA; font-weight: 600; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase;
+      padding: .7rem .8rem; text-align: left; border-bottom: 2px solid #412402; }
+    .post-body tbody td { padding: .6rem .8rem; border-bottom: 1px solid rgba(133, 79, 11, .15); vertical-align: top; color: #2A1A0E; }
+    .post-body tbody tr:nth-child(even) td { background: #FBF5EA; }
+    .post-body tbody tr:last-child td { border-bottom: 0; }
+    .post-body tbody tr:hover td { background: #F6E9D2; }
+    .post-body td:not(:first-child), .post-body th:not(:first-child) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .post-body td:last-child strong { color: #633806; font-size: 1.02em; }
   </style>
 
   <script type="application/ld+json" set:html={jsonLd({
