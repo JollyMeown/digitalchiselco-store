@@ -1,0 +1,43 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "jumping-trout-3d-relief-stl-fly-fishing-mountain-river-scene-panel-cnc-router-ca",
+    "alt": "A carved trout relief panel in a kraft gift box with tissue paper and a pine sprig, ready to give",
+    "scene": "GIFTING SCENE, wide magazine opening shot. The carved panel from image 1, finished in the house finish, lies nested in an open kraft-brown gift box on a bed of ivory tissue paper, a sprig of real pine and a length of undyed linen ribbon beside it, the box lid resting behind. Warm late-afternoon window light from the left. The panel fills about 55% of the frame and is the clear hero. A softly out-of-focus wooden table and a hint of a fireplace in the far background.",
+    "bench": false
+  },
+  {
+    "key": "cabin",
+    "aspect": "4:3",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-file-deer-head-forest-",
+    "alt": "Whitetail buck relief carving hanging above a stone fireplace mantel in a log cabin",
+    "scene": "The carved panel from image 1, in the house finish, hangs centred on a rough timber wall above a stone fireplace mantel in a log cabin. A low fire glows below, two brass candlesticks and a stack of old books on the mantel, a plaid wool blanket over a leather chair arm at the edge of frame. Warm firelight from below-left and cool window light from the right. The carving is sharp and reads clearly; the room falls softly out of focus.",
+    "bench": false
+  },
+  {
+    "key": "faith",
+    "aspect": "4:3",
+    "ref": "face-of-jesus-crucifixion-3d-relief-stl-crown-of-thorns-cross-wood-grain-carving",
+    "alt": "Carved Face of Christ relief on a quiet home wall beside a small shelf with a candle",
+    "scene": "The carved panel from image 1, in the house finish, hangs on a plain cream plaster wall in a quiet home hallway. Below it, a small oak shelf holds a single lit beeswax candle in a simple holder and a closed leather-bound book. Soft, reverent morning light from a window at the left. Nothing else in frame. Calm, dignified, unstaged.",
+    "bench": false
+  },
+  {
+    "key": "family",
+    "aspect": "4:3",
+    "ref": "owl-family-relief-stl-cnc-router-3d-carving-model-owls-on-branch-wood-grain-bas-",
+    "alt": "Hands lifting a carved owl family relief out of a gift box at a kitchen table",
+    "scene": "Two hands lift the carved panel from image 1, in the house finish, up out of an open kraft gift box lined with ivory tissue, at a farmhouse kitchen table. A mug of coffee, a folded handwritten card and a strip of linen ribbon lie on the table. Bright, soft morning light from a window at the left. The carving faces the camera and is fully visible between the hands.",
+    "hands": true,
+    "bench": false
+  },
+  {
+    "key": "table",
+    "aspect": "4:3",
+    "ref": "highland-cow-tray-stl-file-for-cnc-router",
+    "alt": "Carved Highland cow serving tray filled with cheese, grapes and crackers on a dining table",
+    "scene": "The carved serving tray from image 1, in the house finish, sits flat on a linen runner on a dark walnut dining table, its compartments filled with cubes of aged cheddar, red grapes, water crackers, dried apricots and walnuts. A small dish of honey with a wooden dipper and two stemmed glasses stand behind it. Warm evening candlelight from the left plus soft overhead light. The tray is fully visible, filling about 65% of the frame, shot from a three-quarter angle above.",
+    "bench": false
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl",
+    "alt": "A relief carving of an eagle half finished on a CNC router bed, the left half still stepped from roughing, the right half smooth",
+    "scene": "ON THE MACHINE, wide magazine opening shot from a low three-quarter angle. The carved panel from image 1 is clamped flat on a CNC router's MDF spoilboard, mid-job. THE PANEL IS SPLIT: its LEFT half still shows coarse stair-stepped terraces from a flat roughing cutter, pale bare wood with rough steps and a scatter of chips; its RIGHT half is already smooth from a fine finishing pass, bare pale wood with every feather crisp. A small tapered ball nose cutter in the spindle collet hangs just above the boundary between the two halves. Fresh sawdust on the spoilboard, an aluminium clamp at each corner, the machine's gantry and rails soft in the background. Bright workshop light from the left. No finish or stain yet: this is raw wood mid-cut, but the piece and its design are exactly image 1.",
+    "bench": false
+  },
+  {
+    "key": "rough",
+    "aspect": "4:3",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl",
+    "alt": "Roughing pass on a relief carving: a flat end mill has cut the design as coarse stepped terraces",
+    "scene": "CLOSE ON THE MACHINE. The panel from image 1 on the spoilboard after ONLY the roughing pass: the whole design exists but as coarse contour-map terraces, each step about 2 mm, cut by a quarter inch flat end mill that is visible in the collet above, still with chips on it. Raw pale wood, no finish. The eagle and mountains are recognisable in silhouette but everything is stepped and blocky. Sawdust everywhere. Bright, even workshop light.",
+    "bench": false
+  },
+  {
+    "key": "semi",
+    "aspect": "4:3",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl",
+    "alt": "Semi-finishing pass with a 1/8 inch tapered ball nose leaving a fine visible scallop pattern across the relief",
+    "scene": "MACRO on one wing of the panel from image 1, still on the machine, after a 1/8 inch tapered ball nose pass at a medium stepover: the surface is fully formed but shows a fine, regular parallel scallop texture running across the feathers, like corduroy, clearly visible in the raking light. The tapered ball nose cutter rests just above. Raw pale wood, no finish, fine dust in the recesses.",
+    "bench": false
+  },
+  {
+    "key": "finish",
+    "aspect": "4:3",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl",
+    "alt": "Final finishing pass with a 1/16 inch tapered ball nose confined to the eagle's head, sharp beside the scalloped background",
+    "scene": "MACRO on the eagle's head from image 1, still on the machine. The head and eye have just been cut by a tiny 1/16 inch tapered ball nose at a very fine stepover and are glass-smooth and razor crisp; immediately around it the mountains still carry the faint scallop texture of the earlier coarser pass, so the difference between the two passes is visible in one frame. The tiny cutter hangs above the eye. Raw pale wood, no finish, raking light from the left.",
+    "bench": false
+  },
+  {
+    "key": "bits",
+    "aspect": "4:3",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl",
+    "alt": "The three cutters that carve a relief, laid beside the finished panel: a flat end mill, a 1/8 inch tapered ball nose and a 1/16 inch tapered ball nose",
+    "scene": "STILL LIFE on the bench. The panel from image 1, now FINISHED in the house finish, stands propped at a slight angle at the back. In front of it, laid neatly on the maple bench in a row from thick to thin: a quarter inch two-flute flat end mill, a 1/8 inch tapered ball nose cutter, and a 1/16 inch tapered ball nose cutter, all plain unbranded carbide with polished shanks, each about 6 cm long, lying parallel with a little space between. A small brass-coloured collet beside them. Raking window light from the left so the flutes glint. Tight, calm composition; the panel fills about 50% of the frame behind the tools.",
+    "bench": true
+  }
+]
