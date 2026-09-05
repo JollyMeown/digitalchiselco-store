@@ -32,5 +32,14 @@
     "scene": "SIDE BY SIDE, THE PROBLEM AND THE FIX. Two carvings of the design from image 1 lie together on the bench. LEFT: carved shallow in pale wood with no finish, the forms soft and flat-looking under even light. RIGHT: the same design carved at full depth in the house finish, the recesses dark, the high points warm and crisp, reading with dramatic depth. Raking light from the left so the difference is obvious. Nothing else in frame.",
     "hands": false,
     "bench": true
+  },
+  {
+    "key": "pin",
+    "aspect": "2:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "alt": "The same design carved twice, one shallow and pale that looks flat, one deep and glazed that reads with real depth, portrait Pin",
+    "scene": "PORTRAIT 2:3 COMPOSITION FOR A PINTEREST PIN. Put the subject in the UPPER TWO THIRDS of the frame, large and clear, and keep the LOWER THIRD quiet and darker (plain bench surface or soft shadow, nothing important there) because a title will be printed over it later. SIDE BY SIDE, THE PROBLEM AND THE FIX. Two carvings of the design from image 1 lie together on the bench. LEFT: carved shallow in pale wood with no finish, the forms soft and flat-looking under even light. RIGHT: the same design carved at full depth in the house finish, the recesses dark, the high points warm and crisp, reading with dramatic depth. Raking light from the left so the difference is obvious. Nothing else in frame. CRITICAL: every carved panel in this picture must show THE EXACT DESIGN FROM IMAGE 1, clearly recognisable (its animal, its scene, its composition), never a plain hammered or scalloped texture with no subject. If the subject is not recognisable the picture is wrong.",
+    "hands": false,
+    "bench": true
   }
 ]

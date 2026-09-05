@@ -246,6 +246,20 @@ export async function GET() {
     </item>`;
   }))).filter(Boolean).join('\n');
 
+  // ── Guide Pins ──────────────────────────────────────────────────────
+  // The articles, as designed posters. They ride in this feed because it is
+  // the one already connected to a board, so they publish with no new setup;
+  // /pinterest-guides-rss.xml carries the same items for a dedicated board.
+  let guideXml = '';
+  try {
+    const { guidePins, guideItemXml } = await import('../lib/pinterest-guides');
+    const pins = await guidePins(30);
+    const sizes = await Promise.all(pins.map((g) => imageBytes(g.image)));
+    guideXml = pins.map((g, i) => guideItemXml(g, sizes[i])).join('\n');
+  } catch (e) {
+    console.error('pinterest-rss guide pins failed:', e);
+  }
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
@@ -254,6 +268,7 @@ export async function GET() {
     <description>Fresh bas-relief STL files for CNC routers, laser engravers and 3D printers, released daily.</description>
     <language>en-us</language>
     <lastBuildDate>${new Date(now).toUTCString()}</lastBuildDate>
+${guideXml}
 ${promoXml}
 ${mockupXml}
 ${itemXml}

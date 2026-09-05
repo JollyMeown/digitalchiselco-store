@@ -43,5 +43,15 @@
     "hands": false,
     "bench": false,
     "finish": false
+  },
+  {
+    "key": "pin",
+    "aspect": "2:3",
+    "ref": "bald-eagle-head-3d-relief-stl",
+    "alt": "A tapered ball nose cutter finishing the relief, the fine scallop texture visible in raking light, portrait Pin",
+    "scene": "PORTRAIT 2:3 COMPOSITION FOR A PINTEREST PIN. Put the subject in the UPPER TWO THIRDS of the frame, large and clear, and keep the LOWER THIRD quiet and darker (plain bench surface or soft shadow, nothing important there) because a title will be printed over it later. MACRO, ON THE MACHINE. A 1/16 inch tapered ball nose cutter is in the collet, resting just above the surface of the design from image 1 in raw pale cherry, no finish yet. The finished two thirds of the surface show the fine even scallop texture of a finishing pass; the last third still shows the coarser stair-step terraces from roughing. Fine sawdust in the recesses. Raking light from the left so the scallops glint. No writing, no brand.",
+    "hands": false,
+    "bench": false,
+    "finish": false
   }
 ]
