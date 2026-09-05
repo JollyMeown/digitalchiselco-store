@@ -13,7 +13,7 @@ type Pack = {
   link_history: { standard_drive_link?: string | null; bonus_drive_link?: string | null; title?: string | null; built_by?: string | null; replaced_at?: string | null }[];
 };
 type Sub = { id: string; email: string; status: string; start_date: string; total_drops: number; tier: string };
-type Log = { subscription_id: string; email_type: string; drop_month: string; status: string; provider_id: string | null };
+type Log = { subscription_id: string; email_type: string; drop_month: string; status: string; provider_id: string | null; pack_snapshot?: { standard_drive_link?: string | null; title?: string | null } | null };
 type Dl = { subscription_id: string; month: string };
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -40,7 +40,7 @@ export default function MonthlyDrops() {
     const [{ data: pk }, { data: sb }, { data: lg }, { data: dl }, { data: gs }] = await Promise.all([
       supabase.from('monthly_files').select('*').order('month', { ascending: false }),
       supabase.from('member_subscriptions').select('id, email, status, start_date, total_drops, tier').in('status', ['active', 'paused', 'expired']),
-      supabase.from('subscription_email_logs').select('subscription_id, email_type, drop_month, status, provider_id').in('email_type', ['first_pack', 'monthly_drop']).eq('status', 'sent').limit(5000),
+      supabase.from('subscription_email_logs').select('subscription_id, email_type, drop_month, status, provider_id, pack_snapshot').in('email_type', ['first_pack', 'monthly_drop', 'imported']).eq('status', 'sent').order('sent_at', { ascending: true }).limit(5000),
       supabase.from('pack_downloads').select('subscription_id, month').limit(5000),
       supabase.from('growth_settings').select('membership_reminder_days, membership_winback_days, membership_winback_coupon, membership_pack_alert_days').eq('id', 1).maybeSingle(),
     ]);
@@ -79,6 +79,9 @@ export default function MonthlyDrops() {
     }
     return m;
   }, [subs, logs, dls, opened]);
+
+  // members whose delivered snapshot of this month points at different files than the row holds now
+  const heldOld = (r: Pack) => new Set(logs.filter((l) => l.drop_month.split('#')[0] === r.month && l.pack_snapshot?.standard_drive_link && l.pack_snapshot.standard_drive_link !== r.standard_drive_link).map((l) => l.subscription_id)).size;
 
   // months in the horizon (this month + next two) that have no pack yet
   const missing = useMemo(() => {
@@ -154,6 +157,9 @@ export default function MonthlyDrops() {
                     {r.standard_drive_link ? <a href={r.standard_drive_link} target="_blank" rel="noreferrer" className="text-bronze-700 underline">standard link ↗</a> : <span className="text-red-600">standard link missing</span>}
                     {r.bonus_drive_link ? <a href={r.bonus_drive_link} target="_blank" rel="noreferrer" className="text-bronze-700 underline">bonus link ↗</a> : <span className="text-ink-700/40">no bonus link</span>}
                   </div>
+                  {heldOld(r) > 0 && (
+                    <div className="mt-1.5 text-[11px] text-ink-700/70">🔒 {heldOld(r)} member{heldOld(r) === 1 ? '' : 's'} received an earlier version of this pack and keep it in their account; members who get this month from now on receive the current files.</div>
+                  )}
                   {r.link_history.length > 0 && (
                     <details className="mt-1.5 text-[11px]">
                       <summary className="cursor-pointer text-ink-700/60 hover:text-ink-900">Previous links ({r.link_history.length}) kept for reference</summary>

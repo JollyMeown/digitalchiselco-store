@@ -102,6 +102,7 @@ function Overview({ go }: { go: (k: SubKey) => void }) {
           <div className="text-sm font-bold text-ink-900">Order check</div>
           <div className="text-[12px] text-ink-700/60 flex-1">Every paid membership order must have a term. The nightly run checks this itself and creates anything missing (with a Telegram note); press to check now.</div>
           <button onClick={reconcile} disabled={check.busy} className="text-xs px-3 py-1.5 rounded border border-black/15 hover:border-bronze-600">{check.busy ? 'Checking…' : '🧾 Check paid orders now'}</button>
+          <a href="https://digitalchiselco-admin.netlify.app" target="_blank" rel="noreferrer" title="The previous standalone membership app. Copy each member's email, start date and packs received from there into Members > Import from old system." className="text-xs px-3 py-1.5 rounded border border-black/15 hover:border-bronze-600 inline-flex items-center gap-1">↗ Old membership system</a>
         </div>
         {check.msg && <div className={`mt-2 text-[12px] ${/^Created/.test(check.msg) ? 'text-amber-700' : 'text-green-700'}`}>{check.msg}</div>}
       </Card>

@@ -90,6 +90,28 @@ export async function getPack(db: DB, ym: string): Promise<Pack | null> {
   return { ...data, items: Array.isArray(data.items) ? data.items : [], bonus_items: Array.isArray(data.bonus_items) ? data.bonus_items : [] } as Pack;
 }
 const hasFiles = (p: Pack | null) => !!(p && (p.standard_drive_link || p.bonus_drive_link));
+const PACK_TYPES = ['first_pack', 'monthly_drop', 'imported'];
+/** What a pack email carried, stored on its log row so a later regeneration of the month never changes what this member holds. */
+export function snapshotOf(p: Pack | null): Record<string, unknown> | null {
+  if (!p) return null;
+  return { title: p.title, preview_note: p.preview_note, standard_drive_link: p.standard_drive_link, bonus_drive_link: p.bonus_drive_link, cover_image_url: p.cover_image_url, items: p.items, bonus_items: p.bonus_items, captured_at: new Date().toISOString() };
+}
+/**
+ * The pack THIS member holds for a month: the snapshot on the first pack email
+ * (or import record) for that month, else the live row. Members who received a
+ * month before it was regenerated keep the old bundle; everyone else gets the
+ * current one.
+ */
+export async function getMemberPack(db: DB, subscriptionId: string, ym: string): Promise<Pack | null> {
+  const { data: logs } = await db.from('subscription_email_logs').select('drop_month, pack_snapshot, sent_at')
+    .eq('subscription_id', subscriptionId).in('email_type', PACK_TYPES).eq('status', 'sent').or(`drop_month.eq.${ym},drop_month.like.${ym}#%`)
+    .not('pack_snapshot', 'is', null).order('sent_at', { ascending: true }).limit(1);
+  const snap = logs?.[0]?.pack_snapshot as any;
+  if (snap && (snap.standard_drive_link || snap.bonus_drive_link)) {
+    return { month: ym, title: snap.title ?? null, preview_note: snap.preview_note ?? null, standard_drive_link: snap.standard_drive_link ?? null, bonus_drive_link: snap.bonus_drive_link ?? null, cover_image_url: snap.cover_image_url ?? null, items: Array.isArray(snap.items) ? snap.items : [], bonus_items: Array.isArray(snap.bonus_items) ? snap.bonus_items : [] };
+  }
+  return getPack(db, ym);
+}
 async function getSettings(db: DB) {
   const { data } = await db.from('growth_settings')
     .select('membership_reminder_days, membership_winback_days, membership_winback_coupon, membership_pack_alert_days, membership_last_alert_at, marketplace_enabled').eq('id', 1).maybeSingle();
@@ -112,7 +134,7 @@ async function planName(db: DB, slug: string): Promise<string> {
 // ── idempotent send ───────────────────────────────────────────────────
 async function sendOnce(
   db: DB,
-  claim: { subscription_id: string; email: string; email_type: string; drop_month: string },
+  claim: { subscription_id: string; email: string; email_type: string; drop_month: string; pack_snapshot?: Record<string, unknown> | null },
   build: () => { subject: string; html: string; text: string },
   opts: { force?: boolean } = {},
 ): Promise<'sent' | 'failed' | 'duplicate'> {
@@ -122,6 +144,7 @@ async function sendOnce(
   const { error: claimErr } = await db.from('subscription_email_logs').insert({
     subscription_id: claim.subscription_id, email: claim.email,
     email_type: claim.email_type, drop_month: dropMonth, status: 'pending',
+    pack_snapshot: claim.pack_snapshot ?? null,
   });
   if (claimErr) {
     if ((claimErr as any).code === '23505') return 'duplicate';
@@ -231,6 +254,19 @@ export async function createSubscriptionForPurchase(input: {
   if (chainedFrom) await db.from('member_subscriptions').update({ renewed_to: subId }).eq('id', chainedFrom);
   if (upgradedFrom) await db.from('member_subscriptions').update({ renewed_to: subId, status: 'upgraded', next_drop_date: null }).eq('id', upgradedFrom);
 
+  // A member migrated from the old system already holds some packs: record
+  // each one with a snapshot of the pack as it is today, so the portal keeps
+  // showing them that bundle even if the month is regenerated later.
+  const already = Math.max(0, Math.min(months + creditMonths, Number(input.dropsAlreadySent) || 0));
+  for (let k = 0; k < already; k++) {
+    const ym = toYM(addMonths(start, k));
+    const pack = await getPack(db, ym);
+    await db.from('subscription_email_logs').insert({
+      subscription_id: subId, email, email_type: 'imported', drop_month: ym, status: 'sent',
+      subject: `received before migration (${input.source || 'import'})`, sent_at: new Date().toISOString(), pack_snapshot: snapshotOf(pack),
+    });
+  }
+
   // Deliver whatever is already due (pack 1 today, or every past month of a
   // backdated add). A future-dated renewal sends nothing yet.
   const { data: s } = await db.from('member_subscriptions').select('*').eq('id', subId).single();
@@ -284,7 +320,7 @@ export async function processSubscription(db: DB, s: any, ctx: Ctx): Promise<voi
       const dropNumber = dropsSent + 1;
       const type = dropNumber === 1 ? 'first_pack' : 'monthly_drop';
       const data = dropData(s, ym, pack, dropNumber, plan, logoUrl, false, settings.makerInvite);
-      const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: type, drop_month: ym },
+      const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: type, drop_month: ym, pack_snapshot: snapshotOf(pack) },
         () => (dropNumber === 1 ? firstPackEmail(data) : monthlyDropEmail(data)));
       if (r === 'failed') { stats.failures++; break; }
       if (r === 'sent') stats.drops++;
@@ -469,7 +505,8 @@ export async function resendPack(subscriptionId: string, ym: string, opts: { req
   const testTerm = String(s.email).toLowerCase() === TEST_INBOX && String(s.start_date) >= '2090';
   if (ym >= '2090' && !testTerm) return { ok: false, error: 'test months are only sent to the shop inbox' };
   if (addMonths(s.start_date, idx) > todayYMD() && !testTerm) return { ok: false, error: 'that pack has not unlocked yet' };
-  const pack = await getPack(db, ym);
+  // re-send exactly the pack this member holds, not a later regeneration
+  const pack = await getMemberPack(db, s.id, ym);
   if (!hasFiles(pack)) return { ok: false, error: 'that pack has no files yet' };
   // rate limit member-initiated re-sends: one per pack per 12 h
   if (opts.requireEmail) {
@@ -477,7 +514,7 @@ export async function resendPack(subscriptionId: string, ym: string, opts: { req
     if (recent?.length) return { ok: false, error: 'already re-sent recently; check your spam folder' };
   }
   const data = dropData(s, ym, pack, idx + 1, await planName(db, s.plan_slug), await getLogoUrl(db), true, (await getSettings(db)).makerInvite);
-  const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: 'monthly_drop', drop_month: ym }, () => monthlyDropEmail(data), { force: true });
+  const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: 'monthly_drop', drop_month: ym, pack_snapshot: snapshotOf(pack) }, () => monthlyDropEmail(data), { force: true });
   return r === 'sent' ? { ok: true } : { ok: false, error: r === 'failed' ? 'send failed, try again shortly' : 'duplicate' };
 }
 
@@ -508,7 +545,7 @@ export async function resolvePackClick(q: { s: string; m: string; k: string; v: 
   }
   const { data: s } = await db.from('member_subscriptions').select('id, email, tier, status, start_date, total_drops').eq('id', q.s).maybeSingle();
   if (!s) return { error: 'membership not found', status: 404 };
-  const pack = await getPack(db, q.m);
+  const pack = await getMemberPack(db, s.id, q.m);
   const url = kind === 'bonus' ? (s.tier === 'premium' ? pack?.bonus_drive_link : null) : pack?.standard_drive_link;
   if (!url) return { error: 'this pack is not available yet', status: 404 };
   // packs stay downloadable after expiry (files never expire), but only the

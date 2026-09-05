@@ -141,7 +141,7 @@ if (session?.email) {
     const [{ data: plans }, { data: packs }, { data: sent }, { data: dls }] = await Promise.all([
       db.from('membership_plans').select('slug, name'),
       db.from('monthly_files').select('month, title, preview_note, standard_drive_link, bonus_drive_link, cover_image_url, items, bonus_items'),
-      db.from('subscription_email_logs').select('subscription_id, drop_month, email_type, sent_at').in('subscription_id', ids).in('email_type', ['first_pack', 'monthly_drop']).eq('status', 'sent'),
+      db.from('subscription_email_logs').select('subscription_id, drop_month, email_type, sent_at, pack_snapshot').in('subscription_id', ids).in('email_type', ['first_pack', 'monthly_drop', 'imported']).eq('status', 'sent').order('sent_at', { ascending: true }),
       db.from('pack_downloads').select('subscription_id, month').in('subscription_id', ids),
     ]);
     const planName = (slug: string) => (plans || []).find((p: any) => p.slug === slug)?.name || 'CNC STL Membership';
@@ -152,8 +152,11 @@ if (session?.email) {
       const list: EntitledPack[] = [];
       for (let k = 1; k <= s.total_drops; k++) {
         const ym = addMonthsYM(s.start_date, k - 1);
-        const pack: any = packByMonth.get(ym) || null;
         const sentRow = (sent || []).find((l: any) => l.subscription_id === s.id && String(l.drop_month).split('#')[0] === ym);
+        // the pack this member actually received (snapshot on the first pack
+        // email or import record) wins over a later regeneration of the month
+        const snap: any = (sent || []).find((l: any) => l.subscription_id === s.id && String(l.drop_month).split('#')[0] === ym && l.pack_snapshot && (l.pack_snapshot.standard_drive_link || l.pack_snapshot.bonus_drive_link))?.pack_snapshot || null;
+        const pack: any = snap || packByMonth.get(ym) || null;
         // the owner's 2099 test term (BRS pack builder proof) is always unlocked
         const testTerm = session.email === 'jolly@digitalchiselco.com' && String(s.start_date) >= '2090';
         list.push({
