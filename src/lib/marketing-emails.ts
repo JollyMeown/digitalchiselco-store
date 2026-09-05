@@ -182,7 +182,7 @@ export function dripEmail(stage: number, d: {
     const body = `
       <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">If you carve regularly, the membership is the best deal we offer: <strong>${p ? p.files_per_month : 8} brand-new bas-relief designs every month</strong>, delivered to your inbox and your account.</p>
       <ul style="margin:12px 0 0;padding-left:18px;font-size:14px;color:#555;line-height:1.7;">
-        <li>Works out around <strong>$${perFile} per design</strong> (singles are $5–13)</li>
+        <li>Works out around <strong>$${perFile} per design</strong> (most singles are around $6)</li>
         <li>Commercial use included — sell what you carve</li>
         <li>Every pack stays yours forever</li>
       </ul>

@@ -6,6 +6,7 @@
 // Edits the product_categories join table. Caller must be an admin.
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
+import { fetchAll } from '../../../lib/fetch-all';
 import { supabaseAdmin } from '../../../lib/supabase';
 
 export const prerender = false;
@@ -33,7 +34,7 @@ export const GET: APIRoute = async ({ request, url }) => {
   try {
     if (view === 'categories') {
       const { data: cats } = await db.from('categories').select('id, name, slug, sort_order').order('sort_order');
-      const { data: links } = await db.from('product_categories').select('category_id').limit(100000);
+      const { data: links } = await fetchAll((a, b) => db.from('product_categories').select('category_id').range(a, b)).then((data) => ({ data }));
       const counts: Record<string, number> = {};
       for (const l of links || []) counts[l.category_id] = (counts[l.category_id] || 0) + 1;
       return json({ ok: true, categories: (cats || []).map((c) => ({ ...c, count: counts[c.id] || 0 })) });

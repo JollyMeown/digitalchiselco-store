@@ -7,6 +7,7 @@
 // Every send is idempotent (Resend idempotency keys + ledger tables).
 
 import { createHash } from 'node:crypto';
+import { fetchAll } from './fetch-all';
 import { supabaseAdmin } from './supabase';
 import { send as sendEmail, sendBatch, isQuotaExhausted, marketingBudgetRemaining } from './resend';
 import {
@@ -156,8 +157,8 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     const { data: gsF } = await db.from('growth_settings').select('founding_credits').eq('id', 1).maybeSingle();
     const founding = gsF?.founding_credits ?? undefined;
     const [{ data: invited }, { data: makerRows }] = await Promise.all([
-      db.from('maker_invites').select('email, last_sent_at, invite_count, applied_at').limit(20000),
-      db.from('makers').select('email').limit(20000),
+      fetchAll((a, b) => db.from('maker_invites').select('email, last_sent_at, invite_count, applied_at').range(a, b)).then((data) => ({ data })),
+      fetchAll((a, b) => db.from('makers').select('email').range(a, b)).then((data) => ({ data })),
     ]);
     const makerSet = new Set((makerRows || []).map((r: any) => String(r.email).toLowerCase()));
     const invitedBy = new Map<string, any>();
@@ -552,9 +553,9 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   await step(stats, 'etsyWelcome', async () => {
     if (!g.etsy_welcome_enabled) return;
     const s = { candidates: 0, sent: 0, failed: 0 };
-    const { data: buyers } = await db.from('subscribers').select('email')
-      .eq('source', 'etsy-buyer').not('confirmed_at', 'is', null).is('unsubscribed_at', null).limit(3000);
-    const { data: done } = await db.from('etsy_welcome_log').select('email').limit(20000);
+    const { data: buyers } = await fetchAll((a, b) => db.from('subscribers').select('email')
+      .eq('source', 'etsy-buyer').not('confirmed_at', 'is', null).is('unsubscribed_at', null).range(a, b)).then((data) => ({ data }));
+    const { data: done } = await fetchAll((a, b) => db.from('etsy_welcome_log').select('email').range(a, b)).then((data) => ({ data }));
     const welcomed = new Set((done || []).map((r) => r.email.toLowerCase()));
     const TEST = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
     const pending = [...new Set((buyers || []).map((r) => r.email.toLowerCase().trim()))]
@@ -601,12 +602,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   await step(stats, 'priceDrop', async () => {
     if (!g.price_drop_enabled) return;
     const s = { drops: 0, sent: 0, failed: 0 };
-    const { data: snaps } = await db.from('product_price_snapshot').select('product_id, price_usd').limit(50000);
+    const { data: snaps } = await fetchAll((a, b) => db.from('product_price_snapshot').select('product_id, price_usd').range(a, b)).then((data) => ({ data }));
     const snapMap = new Map((snaps || []).map((r) => [r.product_id, Number(r.price_usd)]));
-    const { data: prods } = await db.from('products').select('id, slug, title, image_url, price_usd').eq('active', true).not('price_usd', 'is', null).limit(50000);
+    const { data: prods } = await fetchAll((a, b) => db.from('products').select('id, slug, title, image_url, price_usd').eq('active', true).not('price_usd', 'is', null).range(a, b)).then((data) => ({ data }));
     const drops = (prods || []).filter((p) => snapMap.has(p.id) && Number(p.price_usd) < (snapMap.get(p.id) as number) - 0.001).slice(0, 20);
     s.drops = drops.length;
-    const suppressed = new Set(((await db.from('subscribers').select('email').not('suppressed_at', 'is', null).limit(50000)).data || []).map((r) => r.email.toLowerCase()));
+    const suppressed = new Set(((await fetchAll((a, b) => db.from('subscribers').select('email').not('suppressed_at', 'is', null).range(a, b))) || []).map((r) => r.email.toLowerCase()));
     for (const p of drops) {
       const oldPrice = snapMap.get(p.id) as number, newPrice = Number(p.price_usd);
       // interested non-buyers: clickers + browsers
@@ -643,8 +644,8 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   await step(stats, 'referralNudge', async () => {
     if (!g.referral_nudge_enabled) return;
     const s = { candidates: 0, sent: 0, failed: 0 };
-    const { data: rfm } = await db.from('v_subscriber_rfm').select('email, orders, last_order_at').gte('orders', 1).limit(50000);
-    const { data: nl } = await db.from('referral_nudge_log').select('email').limit(50000);
+    const { data: rfm } = await fetchAll((a, b) => db.from('v_subscriber_rfm').select('email, orders, last_order_at').gte('orders', 1).range(a, b)).then((data) => ({ data }));
+    const { data: nl } = await fetchAll((a, b) => db.from('referral_nudge_log').select('email').range(a, b)).then((data) => ({ data }));
     const nudged = new Set((nl || []).map((r) => r.email.toLowerCase()));
     const now = Date.now();
     const cand = (rfm || []).filter((r) => {
@@ -727,11 +728,11 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   await step(stats, 'winback', async () => {
     if (!g.winback_enabled) return;
     const s = { candidates: 0, sent: 0, suppressed: 0, failed: 0 };
-    const { data: eng } = await db.from('v_subscriber_engagement')
-      .select('email, joined_at, sent, opened, bounced, complained, last_opened_at, unsubscribed_at').limit(50000);
-    const { data: supRows } = await db.from('subscribers').select('email').not('suppressed_at', 'is', null).limit(50000);
+    const { data: eng } = await fetchAll((a, b) => db.from('v_subscriber_engagement')
+      .select('email, joined_at, sent, opened, bounced, complained, last_opened_at, unsubscribed_at').range(a, b)).then((data) => ({ data }));
+    const { data: supRows } = await fetchAll((a, b) => db.from('subscribers').select('email').not('suppressed_at', 'is', null).range(a, b)).then((data) => ({ data }));
     const suppressed = new Set((supRows || []).map((r) => r.email.toLowerCase()));
-    const { data: wl } = await db.from('winback_log').select('email').limit(50000);
+    const { data: wl } = await fetchAll((a, b) => db.from('winback_log').select('email').range(a, b)).then((data) => ({ data }));
     const welcomedBack = new Set((wl || []).map((r) => r.email.toLowerCase()));
     const now = Date.now();
     const D = (d: any) => (d ? new Date(d).getTime() : 0);
@@ -772,7 +773,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   stats.sendtime = 'off';
   await step(stats, 'sendtime', async () => {
     if (!g.sendtime_enabled) return;
-    const { data: opens } = await db.from('email_events').select('email, created_at').eq('event', 'opened').gte('created_at', daysAgo(90)).limit(50000);
+    const { data: opens } = await fetchAll((a, b) => db.from('email_events').select('email, created_at').eq('event', 'opened').gte('created_at', daysAgo(90)).range(a, b)).then((data) => ({ data }));
     const hours = new Map<string, number[]>();   // email → 24-bucket histogram
     for (const o of opens || []) {
       const em = (o.email || '').toLowerCase(); if (!em) continue;
@@ -797,7 +798,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       .not('refunded_at', 'is', null)
       .lte('refunded_at', daysAgo(30)).gte('refunded_at', daysAgo(37))
       .limit(500);
-    const { data: rl } = await db.from('refund_winback_log').select('email').limit(50000);
+    const { data: rl } = await fetchAll((a, b) => db.from('refund_winback_log').select('email').range(a, b)).then((data) => ({ data }));
     const alreadySent = new Set((rl || []).map((r) => r.email.toLowerCase()));
     const cand = [...new Set((refunded || [])
       .map((r) => (r.email || '').toLowerCase())
@@ -929,7 +930,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           const prevSinceDay = daysAgo(14).slice(0, 10);
           const [{ count: pvPrev }, { data: emailLog }, { count: invitesTotal }, { count: applied }, { count: approved }, { count: openReq }, { count: doneReq }, { data: feeRows }] = await Promise.all([
             db.from('site_visits').select('id', { count: 'exact', head: true }).gte('day', prevSinceDay).lt('day', sinceDay),
-            db.from('email_send_log').select('kind, status').gte('sent_at', since).limit(20000),
+            fetchAll((a, b) => db.from('email_send_log').select('kind, status').gte('sent_at', since).range(a, b)).then((data) => ({ data })),
             db.from('maker_invites').select('email', { count: 'exact', head: true }),
             db.from('maker_invites').select('email', { count: 'exact', head: true }).not('applied_at', 'is', null),
             db.from('makers').select('id', { count: 'exact', head: true }).eq('status', 'approved'),

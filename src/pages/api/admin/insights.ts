@@ -9,6 +9,7 @@
 import type { APIRoute } from 'astro';
 import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { fetchAll } from '../../../lib/fetch-all';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { send as sendEmail, sendBatch } from '../../../lib/resend';
 import { productSpotlightEmail, type MiniProduct } from '../../../lib/marketing-emails';
@@ -41,8 +42,8 @@ const slugFromUrl = (u: string | null): string | null => {
 
 async function overview() {
   const db = supabaseAdmin();
-  const { data: eng } = await db.from('v_subscriber_engagement')
-    .select('email, source, sent, delivered, opened, clicked, bounced, complained, last_opened_at, unsubscribed_at').limit(200000);
+  const { data: eng } = await fetchAll((a, b) => db.from('v_subscriber_engagement')
+    .select('email, source, sent, delivered, opened, clicked, bounced, complained, last_opened_at, unsubscribed_at').range(a, b)).then((data) => ({ data }));
   const rows = eng || [];
   const now = Date.now();
   let engaged30 = 0, clickers = 0, dormant = 0, neverOpened = 0, bounced = 0, complained = 0, unsub = 0;
@@ -75,8 +76,8 @@ async function overview() {
 
   // most-clicked designs in the last 7 days (from email link clicks)
   const weekAgo = new Date(now - 7 * DAY).toISOString();
-  const { data: recentClicks } = await db.from('email_events')
-    .select('url, email').eq('event', 'clicked').gte('created_at', weekAgo).limit(20000);
+  const { data: recentClicks } = await fetchAll((a, b) => db.from('email_events')
+    .select('url, email').eq('event', 'clicked').gte('created_at', weekAgo).range(a, b)).then((data) => ({ data }));
   const clickAgg = new Map<string, Set<string>>();  // slug → unique emails
   for (const c of recentClicks || []) {
     const s = slugFromUrl(c.url); if (!s) continue;
@@ -166,7 +167,7 @@ async function suppressBounced() {
   // everyone with a hard bounce or spam complaint, not already suppressed
   const bad = new Set<string>();
   for (const ev of ['bounced', 'complained']) {
-    const { data } = await db.from('email_events').select('email').eq('event', ev).limit(50000);
+    const { data } = await fetchAll((a, b) => db.from('email_events').select('email').eq('event', ev).range(a, b)).then((data) => ({ data }));
     for (const r of data || []) if (r.email) bad.add(r.email.toLowerCase());
   }
   const emails = [...bad];
