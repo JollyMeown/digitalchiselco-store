@@ -1,0 +1,22 @@
+[
+  {
+    "key": "hero",
+    "alt": "A carved Face of Christ relief seen from a three-quarter angle under raking light, showing the thorns, hair, face and background at clearly different depths",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/what-makes-a-good-bas-relief-stl-file/hero.jpg"
+  },
+  {
+    "key": "profile",
+    "alt": "Two carvings of the same design seen edge-on: one with clear stepped depth layers, one a smooth shallow bump",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/what-makes-a-good-bas-relief-stl-file/profile.jpg"
+  },
+  {
+    "key": "gouge",
+    "alt": "A raw relief carving on the machine with a deep accidental gouge torn through the background where the cutter dived",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/what-makes-a-good-bas-relief-stl-file/gouge.jpg"
+  },
+  {
+    "key": "scrap",
+    "alt": "A small test carving of the eagle's head on a cheap pine offcut, held beside the finished panel",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/what-makes-a-good-bas-relief-stl-file/scrap.jpg"
+  }
+]
