@@ -77,6 +77,7 @@ export const POST: APIRoute = async ({ request }) => {
       const { subject, html, text } = monthlyDropEmail({
         email: OPS_INBOX, customerName: 'Jolly', planName: 'Test of the pack email', monthLabel: ymLabel(month),
         packTitle: pack.title, previewNote: pack.preview_note, coverUrl: pack.cover_image_url, items: pack.items,
+        bonusItems: pack.bonus_items, hasBonus: !!pack.bonus_drive_link, makerInvite: true,
         standardLink: pack.standard_drive_link ? packLink(fake.id, month, 'standard', 'email') : null,
         bonusLink: pack.bonus_drive_link ? packLink(fake.id, month, 'bonus', 'email') : null,
         dropNumber: 1, totalDrops: 3, isPremium: true, nextPackLabel: ymLabel(toYM(addMonths(month + '-01', 1))), endDateLabel: ymdLabel(fake.end_date), logoUrl: null, makerInvite: true,

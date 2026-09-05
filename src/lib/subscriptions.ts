@@ -83,11 +83,11 @@ async function getLogoUrl(db: DB): Promise<string | null> {
   const { data } = await db.from('site_settings').select('logo_image_url').eq('id', 1).maybeSingle();
   return data?.logo_image_url || null;
 }
-export type Pack = { month: string; title: string | null; preview_note: string | null; standard_drive_link: string | null; bonus_drive_link: string | null; cover_image_url: string | null; items: PackItem[] };
+export type Pack = { month: string; title: string | null; preview_note: string | null; standard_drive_link: string | null; bonus_drive_link: string | null; cover_image_url: string | null; items: PackItem[]; bonus_items: PackItem[] };
 export async function getPack(db: DB, ym: string): Promise<Pack | null> {
-  const { data } = await db.from('monthly_files').select('month, title, preview_note, standard_drive_link, bonus_drive_link, cover_image_url, items').eq('month', ym).maybeSingle();
+  const { data } = await db.from('monthly_files').select('month, title, preview_note, standard_drive_link, bonus_drive_link, cover_image_url, items, bonus_items').eq('month', ym).maybeSingle();
   if (!data) return null;
-  return { ...data, items: Array.isArray(data.items) ? data.items : [] } as Pack;
+  return { ...data, items: Array.isArray(data.items) ? data.items : [], bonus_items: Array.isArray(data.bonus_items) ? data.bonus_items : [] } as Pack;
 }
 const hasFiles = (p: Pack | null) => !!(p && (p.standard_drive_link || p.bonus_drive_link));
 async function getSettings(db: DB) {
@@ -155,6 +155,8 @@ function dropData(s: any, ym: string, pack: Pack | null, dropNumber: number, pla
     coverUrl: pack?.cover_image_url, items: pack?.items || [],
     standardLink: pack?.standard_drive_link ? packLink(s.id, ym, 'standard', 'email') : null,
     bonusLink: s.tier === 'premium' && pack?.bonus_drive_link ? packLink(s.id, ym, 'bonus', 'email') : null,
+    bonusItems: s.tier === 'premium' ? (pack?.bonus_items || []) : [],
+    hasBonus: !!pack?.bonus_drive_link,
     dropNumber, totalDrops: s.total_drops, isPremium: s.tier === 'premium',
     nextPackLabel: nextYM ? ymLabel(nextYM) : null, endDateLabel: ymdLabel(s.end_date), logoUrl, resend,
   };

@@ -124,7 +124,7 @@ function addMonthsYM(startYMD: string, n: number): string {
 }
 function ymLabel(ym: string): string { const [y, m] = ym.split('-').map(Number); return `${_MONTHS[m - 1]} ${y}`; }
 
-type EntitledPack = { monthYM: string; monthLabel: string; accessible: boolean; dropNumber: number; title: string | null; note: string | null; cover: string | null; items: { title: string; image_url?: string | null; slug?: string | null }[]; standard: string | null; bonus: string | null; sentAt: string | null; downloaded: number };
+type EntitledPack = { monthYM: string; monthLabel: string; accessible: boolean; dropNumber: number; title: string | null; note: string | null; cover: string | null; items: { title: string; image_url?: string | null; slug?: string | null }[]; bonusItems: { title: string; image_url?: string | null; slug?: string | null }[]; standard: string | null; bonus: string | null; sentAt: string | null; downloaded: number };
 type MemberBlock = { id: string; planName: string; status: string; dropsSent: number; totalDrops: number; tier: string; startLabel: string; endLabel: string; daysLeft: number; renewed: boolean; packs: EntitledPack[] };
 let memberBlocks: MemberBlock[] = [];
 
@@ -140,7 +140,7 @@ if (session?.email) {
     const ids = subs.map((s: any) => s.id);
     const [{ data: plans }, { data: packs }, { data: sent }, { data: dls }] = await Promise.all([
       db.from('membership_plans').select('slug, name'),
-      db.from('monthly_files').select('month, title, preview_note, standard_drive_link, bonus_drive_link, cover_image_url, items'),
+      db.from('monthly_files').select('month, title, preview_note, standard_drive_link, bonus_drive_link, cover_image_url, items, bonus_items'),
       db.from('subscription_email_logs').select('subscription_id, drop_month, email_type, sent_at').in('subscription_id', ids).in('email_type', ['first_pack', 'monthly_drop']).eq('status', 'sent'),
       db.from('pack_downloads').select('subscription_id, month').in('subscription_id', ids),
     ]);
@@ -160,6 +160,7 @@ if (session?.email) {
           monthYM: ym, monthLabel: ymLabel(ym), accessible: ym <= currentYM || testTerm, dropNumber: k,
           title: pack?.title || null, note: pack?.preview_note || null, cover: pack?.cover_image_url || null,
           items: Array.isArray(pack?.items) ? pack.items.slice(0, 8) : [],
+          bonusItems: s.tier === 'premium' && Array.isArray(pack?.bonus_items) ? pack.bonus_items.slice(0, 4) : [],
           standard: pack?.standard_drive_link ? packLink(s.id, ym, 'standard', 'portal') : null,
           bonus: s.tier === 'premium' && pack?.bonus_drive_link ? packLink(s.id, ym, 'bonus', 'portal') : null,
           sentAt: sentRow?.sent_at || null,
@@ -395,6 +396,12 @@ if (session?.email) {
                         {p.accessible && p.items.length > 0 && (
                           <div class="flex gap-1 mt-2 overflow-x-auto">
                             {p.items.map((it) => it.image_url ? <img src={it.image_url} alt={it.title} title={it.title} loading="lazy" class="w-11 h-11 object-cover rounded border border-black/10 shrink-0" /> : null)}
+                          </div>
+                        )}
+                        {p.accessible && p.bonusItems.length > 0 && (
+                          <div class="flex items-center gap-1 mt-2 overflow-x-auto">
+                            <span class="text-[10px] uppercase tracking-wide text-bronze-700 font-semibold shrink-0 mr-1">⭐ Premium bonus</span>
+                            {p.bonusItems.map((it) => it.image_url ? <img src={it.image_url} alt={it.title} title={it.title} loading="lazy" class="w-11 h-11 object-cover rounded border border-[#F1D9A6] shrink-0" /> : null)}
                           </div>
                         )}
                         {!p.accessible ? (

@@ -89,6 +89,30 @@ function itemGrid(items?: PackItem[] | null): string {
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">${rows.join('')}</table>`;
 }
 
+// Premium members: their bonus designs with their own button. Standard
+// members: one quiet line saying what Premium adds, linking to the plans.
+function bonusSection(d: DropEmailData): string {
+  if (d.isPremium && d.bonusLink) {
+    const list = (d.bonusItems || []).filter((i) => i && i.title).slice(0, 4);
+    const cells = list.map((i) => `
+      <td width="${Math.floor(100 / Math.max(1, list.length))}%" style="padding:6px;vertical-align:top;text-align:center;">
+        ${i.image_url ? `<img src="${esc(i.image_url)}" alt="${esc(i.title)}" width="150" style="width:100%;max-width:150px;border-radius:6px;display:block;margin:0 auto;border:1px solid #E5DDD0;">` : ''}
+        <div style="font-size:11px;line-height:1.35;color:#555;margin-top:5px;">${esc(String(i.title).split('|')[0].trim().slice(0, 48))}</div>
+      </td>`).join('');
+    return `
+    <div style="margin:22px 0 0;padding:16px 18px 18px;background:#FFF8E8;border:1px solid #F1D9A6;border-radius:10px;">
+      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${BRONZE_DARK};font-weight:700;">&#11088; Your Premium bonus</div>
+      <p style="margin:6px 0 0;font-size:14px;line-height:1.6;color:#555;">Premium members receive ${list.length || 'two'} extra design${list.length === 1 ? '' : 's'} this month, on top of the pack above.</p>
+      ${cells ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:8px;"><tr>${cells}</tr></table>` : ''}
+      <p style="text-align:center;margin:14px 0 0;">${btn(d.bonusLink, '&#11088; Download the bonus files', false)}</p>
+    </div>`;
+  }
+  if (!d.isPremium && d.hasBonus) {
+    return `<p style="margin:18px 0 0;font-size:12.5px;line-height:1.6;color:#8a7a68;">Premium members also received two bonus designs this month. <a href="${SITE}/membership" style="color:${BRONZE};">See the 12-month Premium plan</a>.</p>`;
+  }
+  return '';
+}
+
 const termLine = (d: DropEmailData) => {
   const bits: string[] = [];
   if (d.nextPackLabel) bits.push(`Your next pack arrives in <strong>${esc(d.nextPackLabel)}</strong>.`);
@@ -107,7 +131,9 @@ export type DropEmailData = {
   coverUrl?: string | null;
   items?: PackItem[] | null;
   standardLink?: string | null;   // TRACKED link
-  bonusLink?: string | null;      // TRACKED link
+  bonusLink?: string | null;      // TRACKED link (Premium members only)
+  bonusItems?: PackItem[] | null; // the bonus designs (Premium members only)
+  hasBonus?: boolean;             // the pack HAS a bonus bundle (shown as an upsell line to standard members)
   dropNumber: number;     // 1-based
   totalDrops: number;
   isPremium: boolean;
@@ -134,11 +160,11 @@ export function firstPackEmail(d: DropEmailData): { subject: string; html: strin
     ${cover(d)}
     ${d.packTitle ? `<p style="margin:14px 0 0;font-size:16px;color:${INK};font-family:Georgia,serif;"><strong>${esc(d.packTitle)}</strong></p>` : ''}
     ${d.previewNote ? `<p style="margin:6px 0 0;font-size:14px;color:#666;line-height:1.6;">${esc(d.previewNote)}</p>` : ''}
-    ${hasFiles ? packButtons(d.standardLink, d.bonusLink) : pending}
+    ${hasFiles ? packButtons(d.standardLink) : pending}
     ${itemGrid(d.items)}
+    ${hasFiles ? bonusSection(d) : ''}
     ${termLine(d)}
-    <p style="margin:14px 0 0;font-size:13px;color:#777;line-height:1.6;">Every pack also lives in <a href="${SITE}/account" style="color:${BRONZE};">your account</a>, forever. New packs arrive by email automatically each month; nothing to do.</p>
-    ${d.isPremium ? `<p style="margin:10px 0 0;font-size:13px;color:${BRONZE_DARK};">&#11088; As a Premium member you also get the bonus files each month.</p>` : ''}`;
+    <p style="margin:14px 0 0;font-size:13px;color:#777;line-height:1.6;">Every pack also lives in <a href="${SITE}/account" style="color:${BRONZE};">your account</a>, forever. New packs arrive by email automatically each month; nothing to do.</p>`;
   const html = shell({ subject, heading: 'Your membership is live', subheading: `Pack 1 of ${d.totalDrops}`, bodyHtml: body, logoUrl: d.logoUrl, makerBlock: d.makerInvite, preheader: d.packTitle || `Pack 1 of ${d.totalDrops} is ready to download` });
   const text = `Welcome to the ${d.planName}.\n\nThis is pack 1 of ${d.totalDrops}.\n${d.packTitle ? d.packTitle + '\n' : ''}${d.previewNote ? d.previewNote + '\n' : ''}\n${d.standardLink ? 'Download: ' + d.standardLink + '\n' : ''}${d.bonusLink ? 'Bonus: ' + d.bonusLink + '\n' : ''}\nAll packs: ${SITE}/account`;
   return { subject, html, text: text + (d.makerInvite ? MAKER_BLOCK_TEXT : '') };
@@ -155,8 +181,9 @@ export function monthlyDropEmail(d: DropEmailData): { subject: string; html: str
     ${cover(d)}
     ${d.packTitle ? `<p style="margin:14px 0 0;font-size:16px;color:${INK};font-family:Georgia,serif;"><strong>${esc(d.packTitle)}</strong></p>` : ''}
     ${d.previewNote ? `<p style="margin:6px 0 0;font-size:14px;color:#666;line-height:1.6;">${esc(d.previewNote)}</p>` : ''}
-    ${(d.standardLink || d.bonusLink) ? packButtons(d.standardLink, d.bonusLink) : pending}
+    ${(d.standardLink || d.bonusLink) ? packButtons(d.standardLink) : pending}
     ${itemGrid(d.items)}
+    ${(d.standardLink || d.bonusLink) ? bonusSection(d) : ''}
     ${termLine(d)}
     <p style="margin:14px 0 0;font-size:13px;color:#777;line-height:1.6;">All your packs are always available in <a href="${SITE}/account" style="color:${BRONZE};">your account</a>.</p>`;
   const html = shell({ subject, heading: `${d.monthLabel} pack is ready`, subheading: `Pack ${d.dropNumber} of ${d.totalDrops}`, bodyHtml: body, logoUrl: d.logoUrl, makerBlock: d.makerInvite, preheader: d.packTitle || `Pack ${d.dropNumber} of ${d.totalDrops}` });

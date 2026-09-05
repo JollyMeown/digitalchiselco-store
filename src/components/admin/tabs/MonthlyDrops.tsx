@@ -9,7 +9,7 @@ import { useLiveRefresh } from '../useLiveRefresh';
 
 type Pack = {
   id: string; month: string; title: string | null; preview_note: string | null; standard_drive_link: string | null; bonus_drive_link: string | null;
-  cover_image_url: string | null; items: { title: string; slug?: string | null; image_url?: string | null }[]; file_count: number | null; built_by: string | null; notes: string | null; created_at: string;
+  cover_image_url: string | null; items: { title: string; slug?: string | null; image_url?: string | null }[]; bonus_items: { title: string; slug?: string | null; image_url?: string | null }[]; file_count: number | null; built_by: string | null; notes: string | null; created_at: string;
 };
 type Sub = { id: string; email: string; status: string; start_date: string; total_drops: number; tier: string };
 type Log = { subscription_id: string; email_type: string; drop_month: string; status: string; provider_id: string | null };
@@ -43,7 +43,7 @@ export default function MonthlyDrops() {
       supabase.from('pack_downloads').select('subscription_id, month').limit(5000),
       supabase.from('growth_settings').select('membership_reminder_days, membership_winback_days, membership_winback_coupon, membership_pack_alert_days').eq('id', 1).maybeSingle(),
     ]);
-    setRows(((pk ?? []) as any[]).map((p) => ({ ...p, items: Array.isArray(p.items) ? p.items : [] })) as Pack[]);
+    setRows(((pk ?? []) as any[]).map((p) => ({ ...p, items: Array.isArray(p.items) ? p.items : [], bonus_items: Array.isArray(p.bonus_items) ? p.bonus_items : [] })) as Pack[]);
     setSubs((sb ?? []) as Sub[]); setLogs((lg ?? []) as Log[]); setDls((dl ?? []) as Dl[]); setSettings(gs || {});
     const ids = [...new Set((lg || []).map((l: any) => l.provider_id).filter(Boolean))] as string[];
     const op = new Set<string>();
@@ -141,6 +141,12 @@ export default function MonthlyDrops() {
                   {r.items.length > 0 && (
                     <div className="flex gap-1 mt-2 overflow-x-auto">
                       {r.items.slice(0, 8).map((it, i) => it.image_url ? <img key={i} src={it.image_url} alt={it.title} title={it.title} className="w-10 h-10 object-cover rounded border border-black/10 shrink-0" /> : <span key={i} className="text-[10px] bg-cream px-1.5 py-1 rounded shrink-0">{it.title}</span>)}
+                    </div>
+                  )}
+                  {r.bonus_items.length > 0 && (
+                    <div className="flex items-center gap-1 mt-2 overflow-x-auto">
+                      <span className="text-[10px] uppercase tracking-wide text-bronze-700 font-semibold shrink-0 mr-1">⭐ Premium bonus</span>
+                      {r.bonus_items.slice(0, 4).map((it, i) => it.image_url ? <img key={i} src={it.image_url} alt={it.title} title={it.title} className="w-10 h-10 object-cover rounded border border-[#F1D9A6] shrink-0" /> : <span key={i} className="text-[10px] bg-[#FFF8E8] px-1.5 py-1 rounded shrink-0">{it.title}</span>)}
                     </div>
                   )}
                   <div className="flex flex-wrap gap-3 text-[11px] mt-1.5">
