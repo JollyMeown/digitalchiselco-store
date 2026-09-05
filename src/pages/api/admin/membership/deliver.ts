@@ -82,7 +82,7 @@ export const POST: APIRoute = async ({ request }) => {
         dropNumber: 1, totalDrops: 3, isPremium: true, nextPackLabel: ymLabel(toYM(addMonths(month + '-01', 1))), endDateLabel: ymdLabel(fake.end_date), logoUrl: null, makerInvite: true,
       });
       const r = await sendEmail({ to: OPS_INBOX, subject: `TEST: ${subject}`, html, text, tags: [{ name: 'kind', value: 'membership' }], idempotencyKey: `membership-test:${month}:${Date.now()}` });
-      return r.ok ? json({ ok: true, message: `Test sent to ${OPS_INBOX} (its download buttons point at a test membership and will say so).` }) : json({ error: r.error }, 500);
+      return r.ok ? json({ ok: true, message: `Test sent to ${OPS_INBOX}. Its download buttons open the pack but are not counted as member downloads.` }) : json({ error: r.error }, 500);
     }
     if (action === 'reconcile') {
       const { reconcileMembershipOrders } = await import('../../../../lib/subscriptions');

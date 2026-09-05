@@ -472,6 +472,13 @@ export async function resolvePackClick(q: { s: string; m: string; k: string; v: 
   const expected = packLinkSig(q.s, q.m, kind);
   if (!q.t || q.t.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(q.t), Buffer.from(expected))) return { error: 'invalid link', status: 403 };
   const db = supabaseAdmin();
+  // The admin "test to me" email signs its buttons with the all-zero
+  // membership id: valid signature, no member. Open the pack, log nothing.
+  if (q.s === '00000000-0000-0000-0000-000000000000') {
+    const pack = await getPack(db, q.m);
+    const url = kind === 'bonus' ? pack?.bonus_drive_link : pack?.standard_drive_link;
+    return url ? { url } : { error: 'this pack has no files yet', status: 404 };
+  }
   const { data: s } = await db.from('member_subscriptions').select('id, email, tier, status, start_date, total_drops').eq('id', q.s).maybeSingle();
   if (!s) return { error: 'membership not found', status: 404 };
   const pack = await getPack(db, q.m);
