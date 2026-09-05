@@ -84,6 +84,11 @@ export const POST: APIRoute = async ({ request }) => {
       const r = await sendEmail({ to: OPS_INBOX, subject: `TEST: ${subject}`, html, text, tags: [{ name: 'kind', value: 'membership' }], idempotencyKey: `membership-test:${month}:${Date.now()}` });
       return r.ok ? json({ ok: true, message: `Test sent to ${OPS_INBOX} (its download buttons point at a test membership and will say so).` }) : json({ error: r.error }, 500);
     }
+    if (action === 'reconcile') {
+      const { reconcileMembershipOrders } = await import('../../../../lib/subscriptions');
+      const r = await reconcileMembershipOrders();
+      return json({ ok: true, ...r, message: r.created.length ? `Created ${r.created.length} membership(s) from paid orders that had none: ${r.created.join('; ')}` : `Checked ${r.checked} membership order(s); every one already has its term.` });
+    }
     return json({ error: 'unknown action' }, 400);
   } catch (e: any) {
     return json({ error: String(e?.message || e).slice(0, 400) }, 500);

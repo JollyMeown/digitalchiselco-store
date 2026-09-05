@@ -70,6 +70,13 @@ function Overview({ go }: { go: (k: SubKey) => void }) {
       });
     })();
   }, []);
+  const [check, setCheck] = useState<{ busy: boolean; msg: string }>({ busy: false, msg: '' });
+  async function reconcile() {
+    setCheck({ busy: true, msg: '' });
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch('/api/admin/membership/deliver', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ action: 'reconcile' }) }).then((x) => x.json()).catch(() => ({ error: 'bad response' }));
+    setCheck({ busy: false, msg: r?.error || r?.message || 'Done.' });
+  }
   if (!d) return <div className="text-sm text-ink-700/60">Loading…</div>;
   const st = d.cron?.summary?.stats;
   const tile = (label: string, value: any, sub?: string, tone?: 'good' | 'bad' | 'warn', onClick?: () => void) => (
@@ -89,6 +96,15 @@ function Overview({ go }: { go: (k: SubKey) => void }) {
         {tile('Pack emails opened', `${d.opened}/${d.sent}`, `${d.downloaded} downloaded`, undefined, () => go('members'))}
         {tile('Nightly run', d.cron ? (d.cron.ok ? '✓' : '✗') : '–', d.cron ? `${new Date(d.cron.finished_at).toLocaleString()}${st ? ` · ${st.drops ?? 0} packs, ${st.preExpiry ?? 0} reminders, ${st.failures ?? 0} failed` : ''}` : 'no run yet', d.cron && !d.cron.ok ? 'bad' : undefined)}
       </div>
+
+      <Card>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="text-sm font-bold text-ink-900">Order check</div>
+          <div className="text-[12px] text-ink-700/60 flex-1">Every paid membership order must have a term. The nightly run checks this itself and creates anything missing (with a Telegram note); press to check now.</div>
+          <button onClick={reconcile} disabled={check.busy} className="text-xs px-3 py-1.5 rounded border border-black/15 hover:border-bronze-600">{check.busy ? 'Checking…' : '🧾 Check paid orders now'}</button>
+        </div>
+        {check.msg && <div className={`mt-2 text-[12px] ${/^Created/.test(check.msg) ? 'text-amber-700' : 'text-green-700'}`}>{check.msg}</div>}
+      </Card>
 
       <Card>
         <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">

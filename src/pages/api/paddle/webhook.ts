@@ -439,6 +439,24 @@ async function handleTransactionCompleted(db: any, txn: any) {
       if (p) { productId = p.id; }
     }
 
+    // (4) A catalogue PRODUCT that grants a membership (is_subscription +
+    //     membership_plan_slug). Bought like any other product, it must still
+    //     create the term; on 2026-09-05 one such purchase went unnoticed and
+    //     the member had to be added by hand. Plan by slug, else by the months
+    //     in the product title ("3-Month ..."), else the cheapest plan.
+    if (productId && !membershipPlan) {
+      const { data: sp } = await db.from('products').select('is_subscription, membership_plan_slug, title').eq('id', productId).maybeSingle();
+      if (sp?.is_subscription) {
+        const { data: plans } = await db.from('membership_plans').select('name, slug, price_usd, months, files_per_month').eq('active', true);
+        const m = /(\d+)\s*-?\s*month/i.exec(String(sp.title || ''));
+        const mp = (plans || []).find((p: any) => p.slug === sp.membership_plan_slug)
+          || (m ? (plans || []).find((p: any) => Number(p.months) === Number(m[1])) : null)
+          || (plans || []).sort((a: any, b: any) => Number(a.months) - Number(b.months))[0] || null;
+        if (mp) { membershipPlan = mp; purchasedMemberships.push({ ...mp, qty }); }
+        else console.error(`[membership] subscription product ${productId} bought but no active plan to map it to`);
+      }
+    }
+
     const { data: insertedItem } = must(await db.from('order_items').insert({
       order_id: order.id,
       product_id: productId,

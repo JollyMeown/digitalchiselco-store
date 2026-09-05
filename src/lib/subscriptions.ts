@@ -303,6 +303,13 @@ export async function runDailyAutomation(): Promise<RunStats> {
   const stats = newStats();
   const ctx: Ctx = { today, logoUrl: await getLogoUrl(db), settings: await getSettings(db), stats };
 
+  // First the safety net: any paid membership order with no term gets one now
+  // (the created term sends its first pack inside createSubscriptionForPurchase).
+  try {
+    const rec = await reconcileMembershipOrders();
+    if (rec.created.length) { stats.notes.push(`reconciled: ${rec.created.join('; ')}`); (stats as any).reconciled = rec.created; }
+  } catch (e: any) { stats.notes.push(`reconcile failed: ${String(e?.message || e).slice(0, 120)}`); }
+
   const { data: subs, error } = await db.from('member_subscriptions')
     .select('*').in('status', ['active', 'expired']).order('created_at');
   if (error) throw error;
@@ -323,6 +330,8 @@ export async function runDailyAutomation(): Promise<RunStats> {
     if (!hasFiles(nextPack) && daysToNext <= ctx.settings.packAlertDays && (activeCount || 0) > 0) {
       alerts.push(`⏰ ${ymLabel(nextYM)} pack is not uploaded yet and ${activeCount} member(s) expect it in ${daysToNext} day(s).`);
     }
+    const rec = (stats as any).reconciled as string[] | undefined;
+    if (rec?.length) alerts.push(`🧾 Created ${rec.length} membership(s) from paid orders that had none (first pack sent): ${rec.join('; ')}`);
     if (stats.failures) alerts.push(`⚠️ ${stats.failures} membership email(s) failed to send; they retry tomorrow.${stats.notes.length ? '\n' + stats.notes.slice(0, 5).join('\n') : ''}`);
     if (alerts.length) {
       const last = ctx.settings.lastAlertAt ? new Date(ctx.settings.lastAlertAt).getTime() : 0;
@@ -334,6 +343,59 @@ export async function runDailyAutomation(): Promise<RunStats> {
     }
   } catch (e: any) { console.error('[subscriptions] alert failed', e?.message); }
   return stats;
+}
+
+// ── reconciliation: no paid membership order may exist without a term ─
+// Safety net under the webhook. Looks at paid orders of the last 120 days
+// whose items are subscription products or plan names, and creates the term
+// for any that has none (idempotent on `${txn}:${slug}`, and skipped when a
+// term for that email already starts within 3 days of the order, which is
+// how a hand-added member looks). Returns what it did, for the ledger.
+export async function reconcileMembershipOrders(): Promise<{ checked: number; created: string[]; skipped: number }> {
+  const db = supabaseAdmin();
+  const out = { checked: 0, created: [] as string[], skipped: 0 };
+  const since = new Date(Date.now() - 120 * 864e5).toISOString();
+  const { data: plans } = await db.from('membership_plans').select('name, slug, months, price_usd, files_per_month');
+  if (!plans?.length) return out;
+  const planNames = new Set(plans.map((p: any) => p.name));
+  const { data: subProducts } = await db.from('products').select('id, title, membership_plan_slug').eq('is_subscription', true);
+  const byProduct = new Map((subProducts || []).map((p: any) => [p.id, p]));
+  const { data: items } = await db.from('order_items')
+    .select('order_id, product_id, title, orders!inner(id, email, customer_name, status, created_at, paddle_transaction_id)')
+    .gte('orders.created_at', since).eq('orders.status', 'paid').limit(5000);
+  const planFor = (it: any) => {
+    if (planNames.has(it.title)) return plans.find((p: any) => p.name === it.title);
+    const sp = it.product_id ? byProduct.get(it.product_id) : null;
+    if (!sp) return null;
+    const m = /(\d+)\s*-?\s*month/i.exec(String(sp.title || ''));
+    return plans.find((p: any) => p.slug === sp.membership_plan_slug) || (m ? plans.find((p: any) => Number(p.months) === Number(m[1])) : null) || [...plans].sort((a: any, b: any) => a.months - b.months)[0];
+  };
+  const seen = new Set<string>();
+  for (const it of items || []) {
+    const o: any = (it as any).orders;
+    const plan: any = planFor(it);
+    if (!o?.email || !plan) continue;
+    const key = `${o.id}:${plan.slug}`;
+    if (seen.has(key)) continue;
+    seen.add(key); out.checked++;
+    const email = String(o.email).toLowerCase();
+    const orderDay = String(o.created_at).slice(0, 10);
+    const { data: existing } = await db.from('member_subscriptions').select('id, start_date, order_id, paddle_transaction_id').ilike('email', email);
+    const has = (existing || []).some((s: any) => s.order_id === o.id
+      || (o.paddle_transaction_id && s.paddle_transaction_id === `${o.paddle_transaction_id}:${plan.slug}`)
+      || Math.abs(daysUntil(orderDay, s.start_date)) <= 3);
+    if (has) { out.skipped++; continue; }
+    try {
+      const r = await createSubscriptionForPurchase({
+        email, customerName: o.customer_name, orderId: o.id,
+        paddleTransactionId: o.paddle_transaction_id ? `${o.paddle_transaction_id}:${plan.slug}` : null,
+        plan: { slug: plan.slug, name: plan.name, months: plan.months, files_per_month: plan.files_per_month, price_usd: plan.price_usd },
+        startDate: orderDay, source: 'paddle', notes: `created by reconciliation on ${todayYMD()} (order ${String(o.id).slice(0, 8)} had no membership)`,
+      });
+      if (r.created) out.created.push(`${email} (${plan.slug}, order ${String(o.id).slice(0, 8)})`);
+    } catch (e: any) { console.error('[subscriptions] reconcile failed', o.id, e?.message); }
+  }
+  return out;
 }
 
 // ── admin / member actions ────────────────────────────────────────────
