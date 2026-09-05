@@ -548,7 +548,7 @@ export function customDesignPitchEmail(d: {
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:14px;">
         <tr><td style="font-size:13px;color:#555;padding:4px 0;">Starting price</td><td align="right" style="font-size:15px;font-weight:700;color:${BRONZE_DARK};padding:4px 0;">from $${from}</td></tr>
         <tr><td style="font-size:13px;color:#555;padding:4px 0;">Quote</td><td align="right" style="font-size:13px;color:${INK};padding:4px 0;">within 24 hours, before you pay anything</td></tr>
-        <tr><td style="font-size:13px;color:#555;padding:4px 0;">Delivery</td><td align="right" style="font-size:13px;color:${INK};padding:4px 0;">usually 3 to 5 days</td></tr>
+        <tr><td style="font-size:13px;color:#555;padding:4px 0;">Delivery</td><td align="right" style="font-size:13px;color:${INK};padding:4px 0;">usually 1 to 2 days</td></tr>
         <tr><td style="font-size:13px;color:#555;padding:4px 0;">Revisions</td><td align="right" style="font-size:13px;color:${INK};padding:4px 0;">one round included</td></tr>
         <tr><td style="font-size:13px;color:#555;padding:4px 0;">You receive</td><td align="right" style="font-size:13px;color:${INK};padding:4px 0;">a carve-ready STL file</td></tr>
       </table>
@@ -568,7 +568,7 @@ export function customDesignPitchEmail(d: {
       <p style="text-align:center;margin:10px 0 0;"><a href="${SITE}/catalog?sort=newest" style="color:${BRONZE};font-size:13px;">See everything new &rarr;</a></p>
     </div>` : ''}
     <p style="font-size:14px;line-height:1.6;margin:22px 0 4px;color:${INK};">Happy carving,<br><b>Jolly</b> · DigitalChiselCo</p>`;
-  const text = `${first ? 'Hi ' + first : 'Hi there'},\n\nThank you for asking us about a custom design. We make bas-relief STL files to order from anything you have: a concept, artwork, a sketch, a photo. From $${from}.${d.note ? '\n\n' + d.note : ''}\n\nHow it works:\n1. Share your picture or idea: ${CUSTOM_DESIGN_URL}\n2. We quote within 24 hours, before you pay anything.\n3. Your STL in 3 to 5 days, one revision included.\n\n` +
+  const text = `${first ? 'Hi ' + first : 'Hi there'},\n\nThank you for asking us about a custom design. We make bas-relief STL files to order from anything you have: a concept, artwork, a sketch, a photo. From $${from}.${d.note ? '\n\n' + d.note : ''}\n\nHow it works:\n1. Share your picture or idea: ${CUSTOM_DESIGN_URL}\n2. We quote within 24 hours, before you pay anything.\n3. Your STL in 1 to 2 days, one revision included.\n\n` +
     (n ? `Released this week (${total} new designs):\n` + d.products.slice(0, 12).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join('\n') + '\n\n' : '') +
     `Happy carving, Jolly, DigitalChiselCo\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, TEMPLATE_HEADINGS.customPitch, body, d.email), text };
