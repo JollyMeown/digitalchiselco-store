@@ -74,19 +74,18 @@ function packButtons(standardLink?: string | null, bonusLink?: string | null): s
 
 export type PackItem = { title: string; slug?: string | null; image_url?: string | null };
 
-// The designs inside the pack, as a small picture grid (up to 8).
+// OWNER RULE (2026-09-06): pack emails carry NO design pictures and no cover.
+// The pictures are the shop's copyright and travel only inside the download
+// PDF (and the member portal behind login). The email lists the titles as text.
 function itemGrid(items?: PackItem[] | null): string {
   const list = (items || []).filter((i) => i && i.title).slice(0, 8);
   if (!list.length) return '';
-  const cells = list.map((i) => `
-    <td width="25%" style="padding:6px;vertical-align:top;text-align:center;">
-      ${i.image_url ? `<img src="${esc(i.image_url)}" alt="${esc(i.title)}" width="124" style="width:100%;max-width:124px;border-radius:6px;display:block;margin:0 auto;border:1px solid #E5DDD0;">` : ''}
-      <div style="font-size:11px;line-height:1.35;color:#555;margin-top:5px;">${esc(String(i.title).split('|')[0].trim().slice(0, 48))}</div>
-    </td>`);
+  const cells = list.map((i) => `<td width="50%" style="padding:3px 6px 3px 0;vertical-align:top;font-size:13px;line-height:1.45;color:#555;">&#8226; ${esc(String(i.title).split('|')[0].trim().slice(0, 60))}</td>`);
   const rows: string[] = [];
-  for (let r = 0; r < cells.length; r += 4) rows.push(`<tr>${cells.slice(r, r + 4).join('')}${cells.slice(r, r + 4).length < 4 ? '<td></td>'.repeat(4 - cells.slice(r, r + 4).length) : ''}</tr>`);
-  return `<div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${BRONZE};font-weight:700;margin:18px 0 4px;">Inside this pack</div>
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">${rows.join('')}</table>`;
+  for (let r = 0; r < cells.length; r += 2) rows.push(`<tr>${cells.slice(r, r + 2).join('')}${cells.slice(r, r + 2).length < 2 ? '<td></td>' : ''}</tr>`);
+  return `<div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${BRONZE};font-weight:700;margin:18px 0 6px;">Inside this pack</div>
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">${rows.join('')}</table>
+  <p style="margin:8px 0 0;font-size:12px;color:#8a7a68;">Pictures of every design are in the download PDF and in your account.</p>`;
 }
 
 // Premium members: their bonus designs with their own button. Standard
@@ -94,11 +93,8 @@ function itemGrid(items?: PackItem[] | null): string {
 function bonusSection(d: DropEmailData): string {
   if (d.isPremium && d.bonusLink) {
     const list = (d.bonusItems || []).filter((i) => i && i.title).slice(0, 4);
-    const cells = list.map((i) => `
-      <td width="${Math.floor(100 / Math.max(1, list.length))}%" style="padding:6px;vertical-align:top;text-align:center;">
-        ${i.image_url ? `<img src="${esc(i.image_url)}" alt="${esc(i.title)}" width="150" style="width:100%;max-width:150px;border-radius:6px;display:block;margin:0 auto;border:1px solid #E5DDD0;">` : ''}
-        <div style="font-size:11px;line-height:1.35;color:#555;margin-top:5px;">${esc(String(i.title).split('|')[0].trim().slice(0, 48))}</div>
-      </td>`).join('');
+    // titles only, no pictures (owner rule, see itemGrid)
+    const cells = list.map((i) => `<td style="padding:3px 6px 3px 0;vertical-align:top;font-size:13px;line-height:1.45;color:#555;">&#8226; ${esc(String(i.title).split('|')[0].trim().slice(0, 60))}</td>`).join('');
     return `
     <div style="margin:22px 0 0;padding:16px 18px 18px;background:#FFF8E8;border:1px solid #F1D9A6;border-radius:10px;">
       <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${BRONZE_DARK};font-weight:700;">&#11088; Your Premium bonus</div>
@@ -150,7 +146,10 @@ export type DropEmailData = {
 };
 
 const greet = (name?: string | null) => `<p style="margin:0;font-size:16px;color:${INK};">${name ? `Hi ${esc(String(name).split(' ')[0])},` : 'Hi there,'}</p>`;
-const cover = (d: DropEmailData) => d.coverUrl ? `<img src="${esc(d.coverUrl)}" alt="${esc(d.packTitle || d.monthLabel)}" width="544" style="width:100%;max-width:544px;border-radius:10px;display:block;margin:16px 0 4px;">` : '';
+// Cover image deliberately NOT sent in emails (owner rule 2026-09-06: the
+// pictures are copyright and only travel inside the PDF / portal). Kept as a
+// no-op so the templates stay readable; coverUrl is still used by the portal.
+const cover = (_d: DropEmailData) => '';
 const pending = `<div style="background:#FFFBF4;border-left:3px solid ${BRONZE};padding:14px 16px;border-radius:0 6px 6px 0;margin-top:16px;font-size:14px;color:#555;line-height:1.6;">This month&#39;s pack is being finalised. You will get a follow-up email with the download the moment it is live, usually within a day, and it will also appear in your account.</div>`;
 
 /** First pack, sent the moment a membership starts. */
