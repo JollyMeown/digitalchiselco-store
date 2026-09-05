@@ -13,5 +13,10 @@
     "key": "materials",
     "alt": "The same design laser engraved on four materials: pale maple, figured walnut, black slate and tan leather",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/stl-files-for-laser-engraving-guide/materials.jpg"
+  },
+  {
+    "key": "poster",
+    "alt": "Laser Studio poster: photos, 3D models and the night sky turned into ready-to-burn laser files on your own machine; 11 output styles, star maps, sundials, tumblers, boxes; 100 percent offline, one-time purchase",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/stl-files-for-laser-engraving-guide/poster.jpg"
   }
 ]
