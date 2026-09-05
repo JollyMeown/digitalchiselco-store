@@ -194,6 +194,18 @@ let linked = 0, videos = 0;
 const final = [];
 for (const a of accepted) {
   if ((claims.get(a.l.id) || []).length > 1) { rej(a.p, 'N products claim the same listing'); continue; }
+  // Picture-only picks get a stricter gate: never for bundles, only when the
+  // listing actually has a video (the point of the link), and unless the
+  // pictures are near-identical the model must confirm the pair a second time.
+  if (a.how.startsWith('picture')) {
+    if (/bundle/i.test(a.p.title) || /bundle/i.test(a.l.title)) { rej(a.p, 'bundle: picture matches are not trusted'); continue; }
+    if (!a.l.video?.url) { rej(a.p, 'picture pick but the listing has no video, not worth the risk'); continue; }
+    if (a.d > 8) {
+      const again = await sameDesign(a.p.image_url, a.l.image);
+      if (again !== true) { rej(a.p, `picture pick (d=N) not confirmed on second check`); continue; }
+      a.ai = 'PICKED + confirmed';
+    }
+  }
   final.push(a); linked++;
   if (a.l.video?.url) videos++;
   if (!DRY) {
