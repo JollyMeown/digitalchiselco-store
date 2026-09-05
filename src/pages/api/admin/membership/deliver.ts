@@ -79,7 +79,7 @@ export const POST: APIRoute = async ({ request }) => {
         packTitle: pack.title, previewNote: pack.preview_note, coverUrl: pack.cover_image_url, items: pack.items,
         standardLink: pack.standard_drive_link ? packLink(fake.id, month, 'standard', 'email') : null,
         bonusLink: pack.bonus_drive_link ? packLink(fake.id, month, 'bonus', 'email') : null,
-        dropNumber: 1, totalDrops: 3, isPremium: true, nextPackLabel: ymLabel(toYM(addMonths(month + '-01', 1))), endDateLabel: ymdLabel(fake.end_date), logoUrl: null,
+        dropNumber: 1, totalDrops: 3, isPremium: true, nextPackLabel: ymLabel(toYM(addMonths(month + '-01', 1))), endDateLabel: ymdLabel(fake.end_date), logoUrl: null, makerInvite: true,
       });
       const r = await sendEmail({ to: OPS_INBOX, subject: `TEST: ${subject}`, html, text, tags: [{ name: 'kind', value: 'membership' }], idempotencyKey: `membership-test:${month}:${Date.now()}` });
       return r.ok ? json({ ok: true, message: `Test sent to ${OPS_INBOX} (its download buttons point at a test membership and will say so).` }) : json({ error: r.error }, 500);

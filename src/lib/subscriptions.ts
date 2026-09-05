@@ -90,9 +90,11 @@ export async function getPack(db: DB, ym: string): Promise<Pack | null> {
 const hasFiles = (p: Pack | null) => !!(p && (p.standard_drive_link || p.bonus_drive_link));
 async function getSettings(db: DB) {
   const { data } = await db.from('growth_settings')
-    .select('membership_reminder_days, membership_winback_days, membership_winback_coupon, membership_pack_alert_days, membership_last_alert_at').eq('id', 1).maybeSingle();
+    .select('membership_reminder_days, membership_winback_days, membership_winback_coupon, membership_pack_alert_days, membership_last_alert_at, marketplace_enabled').eq('id', 1).maybeSingle();
   const days = String(data?.membership_reminder_days || '10,3').split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n >= 0);
   return {
+    // the Cut Local block at the foot of every membership email, same gate as the order email
+    makerInvite: !!data?.marketplace_enabled,
     reminderDays: days.length ? [...new Set(days)].sort((a, b) => b - a) : [10, 3],
     winbackDays: Number(data?.membership_winback_days) || 14,
     coupon: (data?.membership_winback_coupon || '').trim() || null,
@@ -142,9 +144,10 @@ async function sendOnce(
   return 'failed';
 }
 
-function dropData(s: any, ym: string, pack: Pack | null, dropNumber: number, plan: string, logoUrl: string | null, resend = false): DropEmailData {
+function dropData(s: any, ym: string, pack: Pack | null, dropNumber: number, plan: string, logoUrl: string | null, resend = false, makerInvite = false): DropEmailData {
   const nextYM = dropNumber < s.total_drops ? toYM(addMonths(s.start_date, dropNumber)) : null;
   return {
+    makerInvite,
     email: s.email, customerName: s.customer_name, planName: plan,
     monthLabel: ymLabel(ym), packTitle: pack?.title, previewNote: pack?.preview_note,
     coverUrl: pack?.cover_image_url, items: pack?.items || [],
@@ -237,7 +240,7 @@ export async function processSubscription(db: DB, s: any, ctx: Ctx): Promise<voi
       }
       const dropNumber = dropsSent + 1;
       const type = dropNumber === 1 ? 'first_pack' : 'monthly_drop';
-      const data = dropData(s, ym, pack, dropNumber, plan, logoUrl);
+      const data = dropData(s, ym, pack, dropNumber, plan, logoUrl, false, settings.makerInvite);
       const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: type, drop_month: ym },
         () => (dropNumber === 1 ? firstPackEmail(data) : monthlyDropEmail(data)));
       if (r === 'failed') { stats.failures++; break; }
@@ -255,7 +258,7 @@ export async function processSubscription(db: DB, s: any, ctx: Ctx): Promise<voi
       for (const d of settings.reminderDays) {
         // fire at day d, and still fire if the cron missed that exact day (up to 2 days late)
         if (left <= d && left > d - 3 && left >= 0) {
-          const ed: ExpiryEmailData = { email: s.email, customerName: s.customer_name, planName: plan, endDateLabel: ymdLabel(s.end_date), daysLeft: left, renewUrl: RENEW_URL, coupon: null, packsReceived: s.drops_sent, logoUrl };
+          const ed: ExpiryEmailData = { email: s.email, customerName: s.customer_name, planName: plan, endDateLabel: ymdLabel(s.end_date), daysLeft: left, renewUrl: RENEW_URL, coupon: null, packsReceived: s.drops_sent, logoUrl, makerInvite: settings.makerInvite };
           const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: `pre_expiry_${d}`, drop_month: toYM(s.end_date) }, () => preExpiryEmail(ed));
           if (r === 'sent') stats.preExpiry++;
           if (r === 'failed') stats.failures++;
@@ -267,7 +270,7 @@ export async function processSubscription(db: DB, s: any, ctx: Ctx): Promise<voi
     // 3) expiry, on or after the end date
     if (s.end_date <= today) {
       if (!s.renewed_to) {
-        const ed: ExpiryEmailData = { email: s.email, customerName: s.customer_name, planName: plan, endDateLabel: ymdLabel(s.end_date), renewUrl: RENEW_URL, coupon: null, logoUrl };
+        const ed: ExpiryEmailData = { email: s.email, customerName: s.customer_name, planName: plan, endDateLabel: ymdLabel(s.end_date), renewUrl: RENEW_URL, coupon: null, logoUrl, makerInvite: settings.makerInvite };
         const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: 'expiry', drop_month: toYM(s.end_date) }, () => expiryEmail(ed));
         if (r === 'failed') stats.failures++;
       }
@@ -284,7 +287,7 @@ export async function processSubscription(db: DB, s: any, ctx: Ctx): Promise<voi
       const { data: later } = await db.from('member_subscriptions').select('id').ilike('email', s.email).gt('start_date', s.end_date).limit(1);
       if (!later?.length) {
         const latest = await db.from('monthly_files').select('title').order('month', { ascending: false }).limit(1).maybeSingle();
-        const ed = { email: s.email, customerName: s.customer_name, planName: plan, endDateLabel: ymdLabel(s.end_date), renewUrl: RENEW_URL, coupon: settings.coupon, logoUrl, newPackTitle: latest.data?.title || null };
+        const ed = { email: s.email, customerName: s.customer_name, planName: plan, endDateLabel: ymdLabel(s.end_date), renewUrl: RENEW_URL, coupon: settings.coupon, logoUrl, newPackTitle: latest.data?.title || null, makerInvite: settings.makerInvite };
         const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: 'winback', drop_month: toYM(s.end_date) }, () => winbackEmail(ed));
         if (r === 'sent') stats.winback++;
         if (r === 'failed') stats.failures++;
@@ -366,7 +369,7 @@ export async function resendPack(subscriptionId: string, ym: string, opts: { req
     const { data: recent } = await db.from('subscription_email_logs').select('sent_at').eq('subscription_id', s.id).like('drop_month', `${ym}#%`).gte('sent_at', new Date(Date.now() - 12 * 3600e3).toISOString()).limit(1);
     if (recent?.length) return { ok: false, error: 'already re-sent recently; check your spam folder' };
   }
-  const data = dropData(s, ym, pack, idx + 1, await planName(db, s.plan_slug), await getLogoUrl(db), true);
+  const data = dropData(s, ym, pack, idx + 1, await planName(db, s.plan_slug), await getLogoUrl(db), true, (await getSettings(db)).makerInvite);
   const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: 'monthly_drop', drop_month: ym }, () => monthlyDropEmail(data), { force: true });
   return r === 'sent' ? { ok: true } : { ok: false, error: r === 'failed' ? 'send failed, try again shortly' : 'duplicate' };
 }
@@ -377,7 +380,7 @@ export async function sendReminderNow(subscriptionId: string): Promise<{ ok: boo
   const { data: s } = await db.from('member_subscriptions').select('*').eq('id', subscriptionId).maybeSingle();
   if (!s) return { ok: false, error: 'membership not found' };
   const settings = await getSettings(db);
-  const ed: ExpiryEmailData = { email: s.email, customerName: s.customer_name, planName: await planName(db, s.plan_slug), endDateLabel: ymdLabel(s.end_date), daysLeft: Math.max(0, daysUntil(todayYMD(), s.end_date)), renewUrl: RENEW_URL, coupon: settings.coupon, packsReceived: s.drops_sent, logoUrl: await getLogoUrl(db) };
+  const ed: ExpiryEmailData = { email: s.email, customerName: s.customer_name, planName: await planName(db, s.plan_slug), endDateLabel: ymdLabel(s.end_date), daysLeft: Math.max(0, daysUntil(todayYMD(), s.end_date)), renewUrl: RENEW_URL, coupon: settings.coupon, packsReceived: s.drops_sent, logoUrl: await getLogoUrl(db), makerInvite: settings.makerInvite };
   const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: 'pre_expiry_manual', drop_month: toYM(s.end_date) }, () => preExpiryEmail(ed), { force: true });
   return r === 'sent' ? { ok: true } : { ok: false, error: 'send failed' };
 }

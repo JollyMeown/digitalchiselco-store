@@ -4,6 +4,8 @@
 // link is a TRACKED link (/api/member/pack) so the admin can see who actually
 // downloaded, not just who opened. No em dashes anywhere (house rule).
 
+import { SUCCESS_FEE_PCT } from './marketplace-pricing';
+
 const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
 const BRAND_NAME = 'DigitalChiselCo';
 const BRONZE = '#854F0B';
@@ -17,7 +19,23 @@ function esc(s: string): string {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 }
 
-function shell(opts: { subject: string; heading: string; subheading?: string; bodyHtml: string; logoUrl?: string | null; preheader?: string }): string {
+// The same Cut Local block the order emails carry (green): every member owns a
+// machine, so the maker network is relevant to all of them. Shown only when
+// the marketplace is live (the caller decides, same gate as the order email).
+export const MAKER_BLOCK_HTML = `
+      <tr><td style="padding:0 28px 24px;">
+        <div style="background:#1c4a48;color:#F5EFE3;padding:18px 22px;border-radius:8px;">
+          <div style="font-size:11px;letter-spacing:2px;color:#9fe0d9;text-transform:uppercase;margin-bottom:5px;">Cut Local &middot; maker network</div>
+          <div style="font-family:Georgia,'Times New Roman',serif;font-size:17px;margin-bottom:6px;">Your machine could be earning between projects</div>
+          <p style="margin:0 0 12px;font-size:13px;line-height:1.6;color:#dce8e6;">
+            Plenty of people love these designs and own no CNC, so they ask us who can build one near them. We send those jobs, design file included, to makers like you. Free to join, the buyer pays you directly, and we take ${SUCCESS_FEE_PCT}% only when a job completes.
+          </p>
+          <a href="${SITE}/faq?for=makers" style="display:inline-block;background:#FAC775;color:#5E380A;text-decoration:none;padding:9px 20px;border-radius:6px;font-size:13px;font-weight:600;">&#128295; See how Cut Local works</a>
+        </div>
+      </td></tr>`;
+export const MAKER_BLOCK_TEXT = `\n\nOwn a CNC, laser or 3D printer? Cut Local sends paid local jobs to makers like you, with the design file included. Free to join, the buyer pays you directly, and we take ${SUCCESS_FEE_PCT}% only on completed jobs: ${SITE}/faq?for=makers`;
+
+function shell(opts: { subject: string; heading: string; subheading?: string; bodyHtml: string; logoUrl?: string | null; preheader?: string; makerBlock?: boolean }): string {
   const logoHtml = opts.logoUrl
     ? `<img src="${esc(opts.logoUrl)}" alt="${BRAND_NAME}" width="48" height="48" style="display:block;margin:0 auto 12px;border-radius:8px;">`
     : '';
@@ -34,6 +52,7 @@ function shell(opts: { subject: string; heading: string; subheading?: string; bo
         ${opts.subheading ? `<p style="margin:8px 0 0;font-size:14px;color:#E5DDD0;">${esc(opts.subheading)}</p>` : ''}
       </td></tr>
       <tr><td style="padding:26px 28px 22px;">${opts.bodyHtml}</td></tr>
+      ${opts.makerBlock ? MAKER_BLOCK_HTML : ''}
       <tr><td style="background:${CREAM};padding:18px 28px;text-align:center;font-size:12px;color:#8a7a68;line-height:1.6;">
         You are receiving this because you hold a ${BRAND_NAME} membership.<br>
         <a href="${SITE}/account" style="color:${BRONZE};text-decoration:underline;">Your packs and membership</a> &middot; <a href="${SITE}/membership" style="color:${BRONZE};text-decoration:underline;">Plans</a> &middot; reply to this email for help
@@ -95,7 +114,8 @@ export type DropEmailData = {
   nextPackLabel?: string | null;  // e.g. 'October 2026'
   endDateLabel?: string | null;
   logoUrl?: string | null;
-  resend?: boolean;       // "here it is again"
+  resend?: boolean;
+  makerInvite?: boolean;   // append the Cut Local block (marketplace live)       // "here it is again"
 };
 
 const greet = (name?: string | null) => `<p style="margin:0;font-size:16px;color:${INK};">${name ? `Hi ${esc(String(name).split(' ')[0])},` : 'Hi there,'}</p>`;
@@ -117,9 +137,9 @@ export function firstPackEmail(d: DropEmailData): { subject: string; html: strin
     ${termLine(d)}
     <p style="margin:14px 0 0;font-size:13px;color:#777;line-height:1.6;">Every pack also lives in <a href="${SITE}/account" style="color:${BRONZE};">your account</a>, forever. New packs arrive by email automatically each month; nothing to do.</p>
     ${d.isPremium ? `<p style="margin:10px 0 0;font-size:13px;color:${BRONZE_DARK};">&#11088; As a Premium member you also get the bonus files each month.</p>` : ''}`;
-  const html = shell({ subject, heading: 'Your membership is live', subheading: `Pack 1 of ${d.totalDrops}`, bodyHtml: body, logoUrl: d.logoUrl, preheader: d.packTitle || `Pack 1 of ${d.totalDrops} is ready to download` });
+  const html = shell({ subject, heading: 'Your membership is live', subheading: `Pack 1 of ${d.totalDrops}`, bodyHtml: body, logoUrl: d.logoUrl, makerBlock: d.makerInvite, preheader: d.packTitle || `Pack 1 of ${d.totalDrops} is ready to download` });
   const text = `Welcome to the ${d.planName}.\n\nThis is pack 1 of ${d.totalDrops}.\n${d.packTitle ? d.packTitle + '\n' : ''}${d.previewNote ? d.previewNote + '\n' : ''}\n${d.standardLink ? 'Download: ' + d.standardLink + '\n' : ''}${d.bonusLink ? 'Bonus: ' + d.bonusLink + '\n' : ''}\nAll packs: ${SITE}/account`;
-  return { subject, html, text };
+  return { subject, html, text: text + (d.makerInvite ? MAKER_BLOCK_TEXT : '') };
 }
 
 /** Monthly drop (and re-sends). */
@@ -137,9 +157,9 @@ export function monthlyDropEmail(d: DropEmailData): { subject: string; html: str
     ${itemGrid(d.items)}
     ${termLine(d)}
     <p style="margin:14px 0 0;font-size:13px;color:#777;line-height:1.6;">All your packs are always available in <a href="${SITE}/account" style="color:${BRONZE};">your account</a>.</p>`;
-  const html = shell({ subject, heading: `${d.monthLabel} pack is ready`, subheading: `Pack ${d.dropNumber} of ${d.totalDrops}`, bodyHtml: body, logoUrl: d.logoUrl, preheader: d.packTitle || `Pack ${d.dropNumber} of ${d.totalDrops}` });
+  const html = shell({ subject, heading: `${d.monthLabel} pack is ready`, subheading: `Pack ${d.dropNumber} of ${d.totalDrops}`, bodyHtml: body, logoUrl: d.logoUrl, makerBlock: d.makerInvite, preheader: d.packTitle || `Pack ${d.dropNumber} of ${d.totalDrops}` });
   const text = `Your ${d.monthLabel} STL pack (pack ${d.dropNumber} of ${d.totalDrops}) is ready.\n${d.packTitle ? d.packTitle + '\n' : ''}${d.previewNote ? d.previewNote + '\n' : ''}\n${d.standardLink ? 'Download: ' + d.standardLink + '\n' : ''}${d.bonusLink ? 'Bonus: ' + d.bonusLink + '\n' : ''}\nAll packs: ${SITE}/account`;
-  return { subject, html, text };
+  return { subject, html, text: text + (d.makerInvite ? MAKER_BLOCK_TEXT : '') };
 }
 
 export type ExpiryEmailData = {
@@ -152,6 +172,7 @@ export type ExpiryEmailData = {
   coupon?: string | null;
   packsReceived?: number;
   logoUrl?: string | null;
+  makerInvite?: boolean;
 };
 
 const couponBox = (code?: string | null, note = 'Use this code at checkout.') => code
@@ -171,9 +192,9 @@ export function preExpiryEmail(d: ExpiryEmailData): { subject: string; html: str
     <p style="text-align:center;margin:20px 0 4px;">${btn(d.renewUrl, 'Renew my membership')}</p>
     ${couponBox(d.coupon, 'Members renewing get this code at checkout.')}
     <p style="margin:16px 0 0;font-size:13px;color:#777;line-height:1.6;">Everything you have received stays in <a href="${SITE}/account" style="color:${BRONZE};">your account</a> whatever you decide.${d.packsReceived ? ` So far you have ${d.packsReceived} pack${d.packsReceived === 1 ? '' : 's'} there.` : ''}</p>`;
-  const html = shell({ subject, heading: `Your membership ends ${when}`, subheading: `Last day ${d.endDateLabel}`, bodyHtml: body, logoUrl: d.logoUrl, preheader: 'Renew and the packs continue without a gap' });
+  const html = shell({ subject, heading: `Your membership ends ${when}`, subheading: `Last day ${d.endDateLabel}`, bodyHtml: body, logoUrl: d.logoUrl, makerBlock: d.makerInvite, preheader: 'Renew and the packs continue without a gap' });
   const text = `Your ${d.planName} ends ${when}, on ${d.endDateLabel}.\nRenew: ${d.renewUrl}${d.coupon ? `\nCode: ${d.coupon}` : ''}\nYour packs stay in your account: ${SITE}/account`;
-  return { subject, html, text };
+  return { subject, html, text: text + (d.makerInvite ? MAKER_BLOCK_TEXT : '') };
 }
 
 /** Sent on the end date. */
@@ -185,9 +206,9 @@ export function expiryEmail(d: ExpiryEmailData): { subject: string; html: string
     <p style="margin:12px 0 0;font-size:15px;line-height:1.6;color:#555;">Want to keep going? Start a new term and the monthly drops pick straight back up.</p>
     <p style="text-align:center;margin:20px 0 4px;">${btn(d.renewUrl, 'Start a new membership')}</p>
     ${couponBox(d.coupon)}`;
-  const html = shell({ subject, heading: 'Thank you for your membership', subheading: 'Your files are still yours', bodyHtml: body, logoUrl: d.logoUrl });
+  const html = shell({ subject, heading: 'Thank you for your membership', subheading: 'Your files are still yours', bodyHtml: body, logoUrl: d.logoUrl, makerBlock: d.makerInvite });
   const text = `Your ${d.planName} has ended. Your packs stay in your account: ${SITE}/account\nStart again: ${d.renewUrl}${d.coupon ? `\nCode: ${d.coupon}` : ''}`;
-  return { subject, html, text };
+  return { subject, html, text: text + (d.makerInvite ? MAKER_BLOCK_TEXT : '') };
 }
 
 /** Win-back, some days after expiry, with the code. */
@@ -199,7 +220,7 @@ export function winbackEmail(d: ExpiryEmailData & { newPackTitle?: string | null
     ${couponBox(d.coupon, 'Applies to any plan at checkout.')}
     <p style="text-align:center;margin:20px 0 4px;">${btn(d.renewUrl, 'Restart my membership')}</p>
     <p style="margin:16px 0 0;font-size:13px;color:#777;line-height:1.6;">Everything you received before is still in <a href="${SITE}/account" style="color:${BRONZE};">your account</a>. Nothing expires.</p>`;
-  const html = shell({ subject, heading: 'The packs are still coming', subheading: 'Pick up where you left off', bodyHtml: body, logoUrl: d.logoUrl });
+  const html = shell({ subject, heading: 'The packs are still coming', subheading: 'Pick up where you left off', bodyHtml: body, logoUrl: d.logoUrl, makerBlock: d.makerInvite });
   const text = `Your membership ended on ${d.endDateLabel}.${d.coupon ? ` Code ${d.coupon} at checkout.` : ''}\nRestart: ${d.renewUrl}\nYour packs: ${SITE}/account`;
-  return { subject, html, text };
+  return { subject, html, text: text + (d.makerInvite ? MAKER_BLOCK_TEXT : '') };
 }
