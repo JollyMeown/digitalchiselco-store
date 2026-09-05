@@ -1150,6 +1150,16 @@ ${ideasHtml}
     stats.merchantStats = await syncMerchantStats(30);
   });
 
+  // ── Google Search Console daily stats ────────────────────────────────
+  // Same service account, added as a user on the Search Console property.
+  // Re-reads a rolling 14 days because Google finalises numbers ~3 days late.
+  stats.searchConsole = 'off';
+  await step(stats, 'searchConsole', async () => {
+    const { gscConfigured, syncSearchConsole } = await import('./search-console');
+    if (!gscConfigured()) { stats.searchConsole = 'not configured (add GOOGLE_SA_* env)'; return; }
+    stats.searchConsole = await syncSearchConsole(14);
+  });
+
   // ── Cut Local maker automations (gated) ──────────────────────────────
   // Nudge makers who have unquoted open jobs near them (max once/20h each),
   // and remind low-credit makers to top up (max once/7d each).
