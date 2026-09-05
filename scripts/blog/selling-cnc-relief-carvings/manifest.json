@@ -1,0 +1,17 @@
+[
+  {
+    "key": "hero",
+    "alt": "Three finished relief carvings displayed on a craft fair table with a linen cloth, small easels and blank kraft price tags",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/selling-cnc-relief-carvings/hero.jpg"
+  },
+  {
+    "key": "boxed",
+    "alt": "A finished wolf relief packed in a kraft box with tissue paper, a blank card and a sawtooth hanger fitted on the back",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/selling-cnc-relief-carvings/boxed.jpg"
+  },
+  {
+    "key": "photo",
+    "alt": "A finished eagle relief being photographed on a plain background with a single lamp raking across it from the side",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/selling-cnc-relief-carvings/photo.jpg"
+  }
+]

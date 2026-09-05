@@ -1,0 +1,22 @@
+[
+  {
+    "key": "hero",
+    "alt": "A finished first relief carving of a wolf held up proudly in two hands in a home workshop",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/hero.jpg"
+  },
+  {
+    "key": "clamp",
+    "alt": "A blank cherry board clamped flat on a CNC spoilboard with four low clamps at the corners, ready to carve",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/clamp.jpg"
+  },
+  {
+    "key": "roughing",
+    "alt": "The wolf design half way through the roughing pass, the right half still uncut blank and the left half stepped terraces",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/roughing.jpg"
+  },
+  {
+    "key": "back",
+    "alt": "The back of the finished panel with a keyhole slot, felt bumpers and the maker's initials burned in",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/back.jpg"
+  }
+]
