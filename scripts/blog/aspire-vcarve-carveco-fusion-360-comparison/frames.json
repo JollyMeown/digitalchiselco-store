@@ -1,0 +1,18 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl",
+    "alt": "A finished eagle relief carving on a workbench in front of a laptop whose screen is switched off, with a notebook and coffee",
+    "scene": "DECISION AT THE BENCH, wide magazine shot. The finished panel from image 1, in the house finish, stands propped on the maple bench in the foreground, the hero of the frame. Behind it and to the right, slightly out of focus, a plain unbranded laptop sits closed or with its screen completely BLACK AND OFF (no interface, no text, no logo of any kind on the screen or lid), beside an open paper notebook with a pencil resting on it and a mug of coffee. Warm window light from the left. Calm, considered, the mood of someone about to choose a tool.",
+    "bench": true
+  },
+  {
+    "key": "same",
+    "aspect": "4:3",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-file-deer-head-forest-",
+    "alt": "Four identical carvings of the same design side by side, indistinguishable from one another",
+    "scene": "FOUR IDENTICAL COPIES of the panel from image 1, each about 22 cm wide, all in the house finish, standing side by side in a neat row on the bench, shot straight on. They are exactly the same design, same size, same finish, same crispness, deliberately indistinguishable from one another, like four prints from one plate. Even soft light, no drama. Nothing else in frame except the bench.",
+    "bench": true
+  }
+]

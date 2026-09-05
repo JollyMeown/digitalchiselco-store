@@ -28,8 +28,8 @@
     "key": "thickness",
     "aspect": "4:3",
     "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-file-deer-head-forest-",
-    "alt": "A carved panel sawn in half to show its cross-section: the carved profile on top and the solid floor of wood left beneath the deepest cut",
-    "scene": "CROSS-SECTION. The panel from image 1, in the house finish, has been SAWN CLEANLY IN HALF straight through the middle of the design, and the two halves are pulled slightly apart on the bench. The NEAR half is turned so the camera looks straight at the fresh SAWN FACE: a flat, pale, clean-cut cross-section of the board, about 25 mm thick, whose top edge is the wavy PROFILE of the carving (high where the buck's head is, low where the background ground is) and whose bottom edge is the flat back of the board, so a solid band of uncarved wood, the floor, is clearly visible beneath the deepest point of the carving. A plain steel rule lies along the sawn face for scale. The FAR half shows the carved front face in the house finish, slightly out of focus. Nothing else measures or clamps anything. Raking light from the left. The cut face and the floor of wood beneath the carving are the point of the photograph.",
+    "alt": "Diagram of a carved board seen edge-on with dimensions: 25 mm board, 12 mm relief depth, 13 mm floor beneath the deepest cut",
+    "scene": "DRAWN, not rendered: thickness_diagram.mjs in this folder produces thickness.jpg. Do not regenerate with Gemini.",
     "bench": true
   },
   {

@@ -1,0 +1,17 @@
+[
+  {
+    "key": "hero",
+    "alt": "The butterfly heart design laser engraved as a grayscale relief on pale maple, with a diode laser head above it",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/stl-files-for-laser-engraving-guide/hero.jpg"
+  },
+  {
+    "key": "depthmap",
+    "alt": "A printed grayscale depth map of the design on paper lying beside the finished laser engraving of it",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/stl-files-for-laser-engraving-guide/depthmap.jpg"
+  },
+  {
+    "key": "materials",
+    "alt": "The same design laser engraved on four materials: pale maple, figured walnut, black slate and tan leather",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/stl-files-for-laser-engraving-guide/materials.jpg"
+  }
+]

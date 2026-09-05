@@ -1,0 +1,13 @@
+{
+  "title": "Aspire vs VCarve vs Carveco vs Fusion 360: Which CAM Software for Relief Carving?",
+  "excerpt": "The honest comparison for carving bas-relief STL files: what each package does with a relief, what it costs in 2026, the bed-size and licence catches, and three plain recommendations depending on what you actually carve. Easel and Carbide Create included, because people ask.",
+  "seo_title": "Best CAM Software for CNC Relief Carving: Aspire vs VCarve vs Carveco vs Fusion (2026)",
+  "seo_description": "Aspire, VCarve Pro, VCarve Desktop, Carveco Maker and Maker Plus, Fusion 360, Carbide Create Pro and Easel compared for carving bas-relief STL files: 2026 prices, STL import, roughing and finishing toolpaths, bed limits, and which one to buy.",
+  "cover": "hero",
+  "email": {
+    "subject": "Which CAM software for relief carving? The honest 2026 comparison",
+    "intro": "The internet will tell you Aspire is the standard for relief carving. That is true, and for most people it is also two thousand dollars more than they need to spend.\n\nWe rewrote our comparison of Aspire, VCarve, Carveco and Fusion 360, with Easel and Carbide Create added because people keep asking. What each one actually does with a relief file, the 2026 prices, the catches nobody mentions on the box, and three plain recommendations depending on what you carve.",
+    "image": "same",
+    "drip": true
+  }
+}
