@@ -1,0 +1,163 @@
+<p>Which CAM software should you buy to carve bas-relief STL files? The internet will tell you "Aspire is the standard." That is true, and for most people it is also about two thousand dollars more than they need to spend. This is the working maker's version, written by a studio whose files run in every package below every week, with the 2026 prices, the catches nobody prints on the box, and three plain recommendations at the end.</p>
+
+<p>Two additions since the last time we wrote this. Easel and Carbide Create both import STL files now, on their paid tiers, and people keep asking whether that is enough. It is covered honestly below.</p>
+
+<figure>
+  <img src="{{IMG:hero}}" alt="A finished eagle relief carving on a workbench in front of a laptop whose screen is switched off, with a notebook and coffee" loading="lazy" />
+  <figcaption>The carving is the same whichever package cut it. What differs is how many hours, clicks and dollars it took to get there.</figcaption>
+</figure>
+
+<h2 id="contents">In this comparison</h2>
+<ul>
+  <li><a href="#tldr">The short version</a></li>
+  <li><a href="#good">What "good with STL files" actually means</a></li>
+  <li><a href="#table">All eight, side by side</a></li>
+  <li><a href="#aspire">Vectric Aspire</a></li>
+  <li><a href="#vcarve">Vectric VCarve Pro and VCarve Desktop</a></li>
+  <li><a href="#carveco">Carveco Maker and Maker Plus</a></li>
+  <li><a href="#fusion">Fusion 360</a></li>
+  <li><a href="#easel">Easel Pro and Carbide Create Pro</a></li>
+  <li><a href="#which">Which one should you buy?</a></li>
+  <li><a href="#faq">Questions people ask</a></li>
+</ul>
+
+<h2 id="tldr">The short version</h2>
+
+<ul>
+  <li><strong>Vectric VCarve Desktop, $349 one-time.</strong> The best value in this list for anyone with a machine under 24 by 24 inches who buys finished files. Imports one STL per job with the full 3D toolpath set.</li>
+  <li><strong>Vectric VCarve Pro, $699 one-time.</strong> Same toolpaths, no bed limit, nesting and production tools. The right buy for most makers with a bigger machine.</li>
+  <li><strong>Vectric Aspire, $1,995 one-time.</strong> Adds modelling: sculpting your own reliefs from photographs, combining components, texturing. Buy it if you make files, not just carve them.</li>
+  <li><strong>Carveco Maker, $17.50 a month; Maker Plus, about $40 a month on an annual plan.</strong> Aspire-class tools from the old ArtCAM team on subscription. Best for people who want the modelling without the two-thousand-dollar cheque.</li>
+  <li><strong>Fusion 360, free for personal use, $85 a month commercial.</strong> The strongest mesh engine here and the least natural relief workflow. Right if you already live in Fusion, or you are on a Mac.</li>
+  <li><strong>Easel Pro, about $18 a month, and Carbide Create Pro, $120 a year.</strong> They will carve a relief STL now. They will not let you rough, boundary, or ladder your cutters, so a big panel takes far longer than it needs to.</li>
+</ul>
+
+<h2 id="good">What "good with STL files" actually means</h2>
+
+<p>Every package here will open a relief STL in 2026. The differences are in what you can do next, and they matter more than the import:</p>
+
+<ol>
+  <li><strong>A roughing pass with a flat cutter.</strong> Without one, a small ball nose does the whole job and a 400 mm panel takes days. <a href="/blog/cnc-relief-carving-time">Our carve-time guide</a> shows why this single feature is worth more than any other on the list.</li>
+  <li><strong>A finishing pass you can confine to a boundary</strong>, so the fine cutter works the face and not the sky.</li>
+  <li><strong>Honest control of size and depth on import</strong>, with a "leave stock" allowance between passes. <a href="/blog/how-to-scale-stl-files-for-cnc-routers">Scaling</a> is where most bad carvings begin.</li>
+  <li><strong>A simulation that knows the size of your bit</strong>, so what you see is what the wood will show.</li>
+  <li><strong>A preview that does not crawl</strong> on a 150,000-triangle mesh.</li>
+</ol>
+
+<p>The three Vectric products and both Carveco tiers do all five. Fusion does all five, differently. Easel and Carbide Create do the first one poorly or not at all, and that is the whole story of their place on this page.</p>
+
+<figure>
+  <img src="{{IMG:same}}" alt="Four identical carvings of the same design side by side, indistinguishable from one another" loading="lazy" />
+  <figcaption>Four packages, one file, four indistinguishable carvings. At the same bit and stepover the G-code from Aspire, VCarve, Carveco and Fusion cuts the same surface. You are paying for the road, not the destination.</figcaption>
+</figure>
+
+<h2 id="table">All eight, side by side</h2>
+
+<table>
+  <thead><tr><th>Package</th><th>2026 price</th><th>STL import</th><th>Roughing pass</th><th>Boundary on finishing</th><th>Models reliefs</th><th>Catch</th></tr></thead>
+  <tbody>
+    <tr><td>VCarve Desktop</td><td>$349 once</td><td>One model per job</td><td>Yes</td><td>Yes</td><td>No</td><td>24 by 24 inch job limit</td></tr>
+    <tr><td>VCarve Pro</td><td>$699 once</td><td>One model per job</td><td>Yes</td><td>Yes</td><td>No</td><td>Cannot combine or sculpt models</td></tr>
+    <tr><td>Aspire</td><td>$1,995 once</td><td>Unlimited, combinable</td><td>Yes</td><td>Yes</td><td>Yes, best in class</td><td>The price, and Windows only</td></tr>
+    <tr><td>Carveco Maker</td><td>$17.50 a month</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Limited</td><td>Subscription; modelling needs Plus</td></tr>
+    <tr><td>Carveco Maker Plus</td><td>$486 a year</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Subscription; three years costs more than Aspire</td></tr>
+    <tr><td>Fusion 360 personal</td><td>Free</td><td>Yes</td><td>Adaptive clearing</td><td>Yes</td><td>No (mesh only)</td><td>Non-commercial, 10 active documents</td></tr>
+    <tr><td>Fusion 360 commercial</td><td>$85 a month or $680 a year</td><td>Yes</td><td>Adaptive clearing</td><td>Yes</td><td>No</td><td>Relief workflow is the long way round</td></tr>
+    <tr><td>Easel Pro</td><td>about $18 a month</td><td>Yes, simplified over 100 MB</td><td>No</td><td>No</td><td>No</td><td>One fixed strategy, browser-based</td></tr>
+    <tr><td>Carbide Create Pro</td><td>$120 a year</td><td>Yes</td><td>Limited</td><td>Limited</td><td>Basic</td><td>Aimed at Carbide 3D machines</td></tr>
+  </tbody>
+</table>
+
+<p>Prices are US list prices at the time of writing and change. Resellers bundled with machines often discount the Vectric products.</p>
+
+<h2 id="aspire">Vectric Aspire</h2>
+
+<p><strong>$1,995 one-time. Windows. Free 30-day trial.</strong></p>
+
+<p>Aspire is where professional relief carvers end up, and the reason is not any one toolpath. It is that the path from "drop in an STL" to "post the G-code" is shorter than in anything else, the previews are honest, and the modelling side, building a relief from a photograph, combining several components into one scene, adding texture to a background, is the best in the industry.</p>
+
+<p>Here is the thing to understand before you spend the money: for <em>carving a finished file</em>, Aspire's 3D toolpaths are identical to VCarve Pro's. Same roughing, same finishing, same boundary control, same simulation. The $1,300 difference buys the modelling tools and the ability to have more than one 3D model in a job. If you never intend to model your own reliefs, you are paying for a workshop you will not walk into.</p>
+
+<p><strong>Buy it if:</strong> you make files as well as carve them, or you routinely combine several reliefs into one composition.</p>
+
+<h2 id="vcarve">Vectric VCarve Pro and VCarve Desktop</h2>
+
+<p><strong>Pro: $699 one-time. Desktop: $349 one-time. Windows. Free 30-day trial.</strong></p>
+
+<p>VCarve is the package most makers should actually buy, and Desktop is the one most people overlook. Both import a single STL per job and give you the full 3D toolpath set: roughing with a flat cutter, finishing with a tapered ball nose, boundaries drawn from any vector, machining allowance between passes, and a simulation that knows your bit. That is everything in the "what good means" list above.</p>
+
+<p>The difference between the two is the job size. <strong>Desktop is capped at 24 by 24 inches.</strong> If your machine's bed is that size or smaller, which covers most hobby routers, Desktop is the same experience for half the money. Pro removes the cap and adds nesting, job setup sheets and gadgets, which are production features you will know you need if you need them.</p>
+
+<p>What neither can do is model. You cannot sculpt the relief, combine two STLs into one scene, or add a textured background. For a maker who buys finished files, that is not a limit; it is a saving.</p>
+
+<p><strong>Buy Desktop if:</strong> your bed is 24 by 24 or smaller and you carve files you bought. <strong>Buy Pro if:</strong> the bed is bigger, or you sell and want nesting.</p>
+
+<h2 id="carveco">Carveco Maker and Maker Plus</h2>
+
+<p><strong>Maker: $17.50 a month. Maker Plus: $486 a year, about $40 a month. Windows. Free trial.</strong></p>
+
+<p>Carveco came out of the ArtCAM team after Autodesk discontinued it in 2018, and the heritage shows. The relief modelling at the Maker Plus tier is genuinely strong, with sculpting tools that feel closer to ZBrush than to a CAM package, and its toolpath engine has a knack for choosing efficient patterns on busy multi-subject reliefs. Makers who run both report Carveco shaving real time off a complex panel against a hand-tuned Vectric pass.</p>
+
+<p>The trade is the subscription. At $17.50 a month, Maker imports, toolpaths and carves STLs perfectly well but does not model. Plus unlocks the modelling for about $40 a month on the annual plan. Three years of Plus costs more than Aspire, but you are always current, and you never write a large cheque.</p>
+
+<p><strong>Buy it if:</strong> you want Aspire-class modelling without the up-front cost, or you prefer "always current" to "buy once".</p>
+
+<h2 id="fusion">Fusion 360</h2>
+
+<p><strong>Free for personal use. $85 a month or $680 a year commercial. Windows and Mac.</strong></p>
+
+<p>Fusion has the strongest mesh engine in this list: it opens million-triangle files without complaint, its Adaptive Clearing roughing is the most efficient stock removal available anywhere, and it is the only package here with a native Mac version.</p>
+
+<p>The catch is that relief carving is not what Fusion is for. An STL arrives as an arbitrary mesh body in a mechanical project. There is no "model height" field, no relief allowance, no sense that this is a panel for a router; you set stock, boundaries and passes yourself. It works, and once set up it works well, but every step is the long way round compared with a package that understands reliefs out of the box.</p>
+
+<p>The personal licence is free but not open: it is for people earning under $1,000 a year from their work and excludes commercial use even below that; you get ten active documents at a time and 3-axis milling, which is all a relief needs.</p>
+
+<p><strong>Use it if:</strong> you already use Fusion for other work, you are on a Mac, or free matters more than workflow.</p>
+
+<h2 id="easel">Easel Pro and Carbide Create Pro</h2>
+
+<p><strong>Easel Pro: about $18 a month. Carbide Create Pro: $120 a year.</strong></p>
+
+<p>Both import an STL now, which they did not a few years ago, and both will carve a relief. What they lack is the part that makes relief carving practical: Easel runs one fixed 3D strategy with no separate roughing pass, no boundary and no cutter ladder; Carbide Create Pro is better but still limited, and built around Carbide 3D's own machines. A 400 mm panel that runs in four hours with a roughing pass and a boundary can run for two days in Easel.</p>
+
+<p>If one of these is what your machine came with, carve the small projects in <a href="/blog/10-beginner-cnc-bas-relief-projects">our beginner list</a> with it and see how you get on. The day you set up an overnight carve is the day to spend $349 on VCarve Desktop.</p>
+
+<h2 id="which">Which one should you buy?</h2>
+
+<p>Three honest answers, depending on what you actually do:</p>
+
+<ul>
+  <li><strong>You buy finished relief files and carve them.</strong> VCarve Desktop if your bed is 24 by 24 or smaller, VCarve Pro if it is bigger. The money you do not spend on Aspire buys a lot of walnut.</li>
+  <li><strong>You model your own reliefs, from photographs or sculpts.</strong> Aspire if you want to pay once; Carveco Maker Plus if a subscription suits your cash flow.</li>
+  <li><strong>You already use Fusion, or you are on a Mac.</strong> Stay in Fusion. The relief workflow is inelegant but a second CAM package is rarely worth learning.</li>
+</ul>
+
+<p>Whichever you choose, the file matters more than the software. Every design in the <a href="/catalog">catalogue</a> is opened and toolpathed in a real CAM before it goes on the site, and if one of ours will not post clean toolpaths in your package, <a href="/contact">send it over</a> with the software and the size and you will get a working version back. The <a href="{{URL:eaglemtn}}">{{TITLE:eaglemtn}}</a> is a good first test of any package: sky, mountains, trees and a bird at four depths, and a face that needs a boundary.</p>
+
+<p><a class="dl-btn" href="{{URL:eaglemtn}}">Download the eagle mountain scene · {{PRICE:eaglemtn}}</a></p>
+
+<h2 id="faq">Questions people ask</h2>
+
+<h3>What is the best software for carving STL files on a CNC router?</h3>
+<p>For carving finished files, VCarve (Desktop or Pro). For making your own reliefs as well, Aspire or Carveco Maker Plus. Fusion 360 if you already use it.</p>
+
+<h3>Is Aspire worth it over VCarve Pro?</h3>
+<p>Only if you model your own reliefs or combine several into one scene. For carving a bought file the 3D toolpaths are identical.</p>
+
+<h3>What is the difference between VCarve Desktop and Pro?</h3>
+<p>Desktop is limited to 24 by 24 inch jobs; Pro is unlimited and adds nesting and production tools. The 3D toolpaths are the same.</p>
+
+<h3>Can Easel carve STL files?</h3>
+<p>Easel Pro imports and carves them with one fixed strategy. It has no roughing pass or boundary, so large panels take much longer than in a full CAM package.</p>
+
+<h3>Is Fusion 360 free for CNC carving?</h3>
+<p>The personal licence is free for non-commercial use under $1,000 a year of revenue, with ten active documents and 3-axis milling, which covers relief carving.</p>
+
+<h3>Which CAM software works on a Mac?</h3>
+<p>Fusion 360 natively. Vectric and Carveco are Windows only, though Vectric runs well under Parallels.</p>
+
+<hr />
+
+<p>Buy the package that matches what you do, not the one the forum swears by. For most people reading this, that is VCarve Desktop, and the difference goes into wood, a proper set of tapered cutters, and the <a href="/blog/how-to-finish-cnc-relief-carvings">finishing supplies</a> that decide how the carving looks on the wall.</p>
+
+<p><em>Jolly, DigitalChiselCo</em></p>
