@@ -77,7 +77,7 @@ export default function CustomPitch() {
         </div>
         <div>
           <label className="text-xs font-medium block mb-1">Personal line <span className="text-ink-700/50 font-normal">(optional, shown after the opening paragraph)</span></label>
-          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className={inputCls} placeholder="e.g. The eagle you mentioned is a lovely subject. Send a photo or a sketch of the pose you like and we will model it for you." />
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className={inputCls} placeholder="Optional. One sentence written for this person, left blank for most sends." />
           <div className="flex flex-wrap gap-2 mt-3">
             <button className={btnGhost} disabled={!!busy} onClick={() => act('preview')}>{busy === 'preview' ? '…' : '👁 Preview'}</button>
             <button className={btnGhost} disabled={!!busy} onClick={() => act('test')}>{busy === 'test' ? '…' : '✉ Test to me'}</button>
