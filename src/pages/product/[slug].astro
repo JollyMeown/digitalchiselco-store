@@ -49,6 +49,15 @@ try {
     .limit(1).maybeSingle();
   film = (f as any) || null;
 } catch { /* the page works without it */ }
+// the newest PUBLIC Short for this design (BRS writes youtube_stats; RLS shows
+// public rows only) → the YouTube banner under the title
+let ytId: string | null = null;
+try {
+  const { data: y } = await supabase.from('youtube_stats')
+    .select('video_id, published_at').eq('product_id', p.id).eq('privacy', 'public')
+    .order('published_at', { ascending: false }).limit(1).maybeSingle();
+  ytId = (y as any)?.video_id || null;
+} catch { /* optional */ }
 const related = await getRelatedProducts(p.id, 5);
 const soldCount = await getSoldCount(p.id);
 
@@ -220,6 +229,14 @@ const breadcrumbLd = {
     <div>
       {cat && <a href={`/collections/${cat.slug}`} class="text-xs text-ink-700/60">{cat.name}</a>}
       <h1 class="text-2xl md:text-3xl leading-snug mt-1">{cleanTitle}</h1>
+      {ytId && (
+        <a href={`https://www.youtube.com/shorts/${ytId}`} target="_blank" rel="noopener"
+           class="mt-2 inline-flex items-center gap-2 bg-[#FF0000] text-white text-xs font-medium px-3 py-1.5 rounded-md shadow-sm hover:bg-[#d90000] transition"
+           aria-label="Watch this design's film on YouTube">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.2 3.6-6.2 3.6z"/></svg>
+          Watch this design's film on YouTube
+        </a>
+      )}
 
       <div class="mt-3 flex items-center gap-3 flex-wrap">
         <span class="text-2xl text-bronze-600 font-medium" data-usd={price}>{money(price)}</span>

@@ -1,10 +1,13 @@
 ---
 import type { ProductCard } from '../lib/queries';
+import { youtubeId } from '../lib/queries';
 import { pricing, money, DEFAULT_DISCOUNT } from '../lib/pricing';
 interface Props { product: ProductCard; discount?: number; }
 const { product, discount = DEFAULT_DISCOUNT } = Astro.props;
 const { price, original, percent } = pricing(product.price_usd, discount);
 const title = product.title.split('|')[0].trim();
+// a public Short exists for this design: show the YouTube mark on the card
+const yt = youtubeId(product);
 ---
 <div class="group border border-black/10 rounded-md overflow-hidden hover:shadow-md transition flex flex-col bg-white">
   <a href={`/product/${product.slug}`} class="relative block aspect-square bg-cream overflow-hidden">
@@ -19,6 +22,12 @@ const title = product.title.split('|')[0].trim();
         <span aria-hidden="true">🔥</span> Bundle
       </span>
     )}
+    {yt && (
+      <span class={`absolute ${product.is_bundle ? 'top-8' : 'top-2'} left-2 inline-flex items-center gap-1 bg-[#FF0000] text-white text-[10px] font-medium tracking-wide px-2 py-0.5 rounded shadow-sm`}
+            title="This design has a film on our YouTube channel">
+        <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg> YouTube
+      </span>
+    )}
     <button type="button" class="wish-btn absolute top-2 right-2 w-8 h-8 rounded-full bg-white/85 backdrop-blur flex items-center justify-center text-base shadow-sm hover:scale-110 transition"
       aria-label="Save to favorites" data-wish-id={product.id} data-wish-slug={product.slug} data-wish-title={title}
       data-wish-price={price} data-wish-img={product.image_url || ''}>
@@ -29,6 +38,13 @@ const title = product.title.split('|')[0].trim();
     <a href={`/product/${product.slug}`} class="block">
       <h3 class="text-sm leading-snug line-clamp-2 text-ink-800 min-h-[2.5em]">{title}</h3>
     </a>
+    {yt && (
+      <a href={`https://www.youtube.com/shorts/${yt}`} target="_blank" rel="noopener"
+         class="mt-1 inline-flex items-center gap-1 text-[11px] text-[#c00] hover:underline w-fit" aria-label="Watch the film on YouTube">
+        <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.2 3.6-6.2 3.6z"/></svg>
+        Watch the film
+      </a>
+    )}
     {(product.rating_count ?? 0) > 0 && (
       <div class="flex items-center gap-1 mt-0.5" aria-label={`Rated ${product.rating_avg} out of 5`}>
         <span class="text-yellow-500 text-xs leading-none" aria-hidden="true">

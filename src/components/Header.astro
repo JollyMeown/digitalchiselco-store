@@ -25,6 +25,8 @@ const links = [
   { href: '/account', label: 'Account' },
 ];
 const q = Astro.url.searchParams.get('q') ?? '';
+// main-menu switch: show only the designs that have a film on YouTube
+const ytOnly = Astro.url.searchParams.get('yt') === '1';
 const categories = await getCategories();
 // Live Etsy numbers (refreshed daily by scripts/etsy_stats_sync.mjs)
 const hs = await getSettings();
@@ -58,6 +60,9 @@ try {
          (Laser Studio / Our story / Blog) appear from xl so the row always fits. -->
     <div class="hidden lg:flex items-center gap-3 text-sm text-ink-700 ml-auto whitespace-nowrap shrink-0">
       {links.filter((l) => l.desk !== 'none').map((l) => <a href={l.href} class={`hover:text-bronze-600 ${l.href === '/free' ? 'text-bronze-600' : ''} ${l.desk === 'xl' ? 'hidden xl:inline' : ''}`}>{l.label}</a>)}
+      <label class="dcc-yt-only inline-flex items-center gap-1 cursor-pointer select-none text-[#c00]" title="Show only the designs that have a film on our YouTube channel">
+        <input type="checkbox" class="accent-[#FF0000]" checked={ytOnly} /> <span aria-hidden="true">▶</span> YouTube films
+      </label>
       <a href="/membership" class="hidden xl:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
       <a href="/favorites" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Wishlist"><span class="text-red-500">❤</span><span class="wish-count text-bronze-600 font-medium"></span></a>
       <a href="/cart" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 Cart <span class="cart-count text-bronze-600 font-medium"></span></a>
@@ -85,6 +90,9 @@ try {
     {links.map((l) => (
       <a href={l.href} class={`block px-4 py-2.5 hover:bg-cream ${l.href === '/free' ? 'text-bronze-600 font-medium' : 'text-ink-800'}`}>{l.label}</a>
     ))}
+    <label class="dcc-yt-only flex items-center gap-2 px-4 py-2.5 text-[#c00] cursor-pointer hover:bg-cream">
+      <input type="checkbox" class="accent-[#FF0000]" checked={ytOnly} /> <span aria-hidden="true">▶</span> Only designs with a YouTube film
+    </label>
     <a href="/membership" class="block px-4 py-2.5 text-bronze-600 font-medium hover:bg-cream">Become a member</a>
     <a href="/favorites" class="block px-4 py-2.5 text-ink-800 hover:bg-cream"><span class="text-red-500">❤</span> Wishlist</a>
     <a href="/cart" class="block px-4 py-2.5 text-ink-800 hover:bg-cream">Cart</a>
@@ -253,6 +261,11 @@ try {
     input.addEventListener('focus', () => { if (input.value.trim().length >= 2 && box.innerHTML) box.classList.remove('hidden'); });
     document.addEventListener('click', (e) => { if (!form.contains(e.target)) hide(); });
     input.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+  });
+
+  // ── "YouTube films" switch: the catalog filtered to designs with a Short ──
+  document.querySelectorAll('.dcc-yt-only input').forEach((cb) => {
+    cb.addEventListener('change', () => { window.location.href = cb.checked ? '/catalog?yt=1' : '/catalog'; });
   });
 
   // ── Mobile drawer (nav + categories) ──────────────────────────────

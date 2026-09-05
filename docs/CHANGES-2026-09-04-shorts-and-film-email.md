@@ -154,6 +154,24 @@ second, top traffic sources, a small retention bar chart and the verdict.
 Required once on the Google Cloud project that owns the OAuth client: **enable
 the YouTube Analytics API** (done 2026-09-05).
 
+## 4. YouTube mark on products + "YouTube films" catalog switch (2026-09-05)
+
+`099_youtube_public_read.sql` lets the storefront (anon) read `youtube_stats`
+rows **where privacy = 'public'** only, so a design can show that it has a Short.
+
+- `src/lib/queries.ts`: the card select embeds `youtube_stats(video_id,privacy,published_at)`;
+  `youtubeId(card)` returns the newest public Short. `getProducts(page, perPage, ytOnly)`
+  uses an inner join when `ytOnly` so only designs with a public Short come back.
+- `ProductCard.astro`: red **▶ YouTube** corner mark and a "Watch the film" link.
+- `product/[slug].astro`: red **Watch this design's film on YouTube** button under the title.
+- `Header.astro`: a **▶ YouTube films** checkbox in the desktop nav and the mobile
+  drawer; ticking it opens `/catalog?yt=1`.
+- `catalog.astro`: honours `?yt=1` (title, count, pagination keep the switch).
+
+BRS side: every Cut now renders two files, `FINAL.mp4` for the website (captions
++ branded end card) and `FINAL_yt.mp4` for YouTube and Pinterest (no captions,
+no end card, ends on the punchline so it loops). Uploads pick `FINAL_yt.mp4`.
+
 ## Still open
 
 - `cults3d-retag.log` sits untracked in the repo root. It looks like a stray log
