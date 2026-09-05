@@ -12,6 +12,7 @@
 //     a second press reaches only people who joined since. That also makes the
 //     send safely resumable if it ever is cut short again.
 import type { APIRoute } from 'astro';
+import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { sendBatch, send as sendOne } from '../../../lib/resend';
@@ -109,9 +110,12 @@ export const POST: APIRoute = async ({ request }) => {
       const { subject, html, text } = guideEmail({ email: to });
       return { to, subject, html, text, headers: unsubHeaders(to), tags: [{ name: 'kind', value: KIND }] };
     });
-    // The batch key carries the campaign and the chunk, so the ledger rows this
-    // writes are what the dedupe above reads on the next press.
-    const r = await sendBatch(batch, `guide:${CAMPAIGN}:${i / CHUNK}`);
+    // The batch key is a hash of WHO is in this batch. Resend refuses a reused
+    // key with a different body, so a positional key (chunk 0, 1, 2) broke the
+    // second press: the leftover one person landed in "chunk 0" with a new body.
+    // The same people again within 24h dedupes; a different set goes through.
+    const who = createHash('sha1').update(slice.join(',')).digest('hex').slice(0, 12);
+    const r = await sendBatch(batch, `guide:${CAMPAIGN}:${who}`);
     if (r.ok) sent += r.sent || slice.length;
     else {
       errors.push(r.error || 'batch failed');

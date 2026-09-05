@@ -11,6 +11,7 @@
 //     double click cannot mail anyone twice,
 //   * the throttle in lib/resend handles Resend's rate limit and daily cap.
 import type { APIRoute } from 'astro';
+import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { send as sendEmail, sendBatch } from '../../../lib/resend';
@@ -212,8 +213,12 @@ export const POST: APIRoute = async ({ request }) => {
       const { subject: s, html, text } = build(film, to, subject);
       return { to, subject: s, html, text, headers: unsubHeaders(to), tags: [{ name: 'kind', value: 'filmCampaign' }] };
     });
-    // The batch key still starts film:<id>: so the already-sent check reads it.
-    const r = await sendBatch(batch, `film:${film.id}:${i / 100}`);
+    // Key = film id + a hash of who is in this batch. The film:<id>: prefix is
+    // what the already-sent check reads; the hash stops Resend rejecting a
+    // second press as "same key, different body" (a positional chunk index did
+    // exactly that on the guide send).
+    const who = createHash('sha1').update(slice.join(',')).digest('hex').slice(0, 12);
+    const r = await sendBatch(batch, `film:${film.id}:${who}`);
     if (r.ok) sent += r.sent || slice.length;
     else {
       errors.push(String(r.error || 'batch failed').slice(0, 140));
