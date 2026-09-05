@@ -17,6 +17,7 @@
   <li><a href="#settings">Settings to start from</a></li>
   <li><a href="#mistakes">Five mistakes that turn a good file into mud</a></li>
   <li><a href="#files">Which designs work best on a laser</a></li>
+  <li><a href="#laser-studio">Laser Studio: the whole workflow in one app</a></li>
   <li><a href="#faq">Questions people ask</a></li>
 </ul>
 
@@ -35,10 +36,11 @@
   <figcaption>Left: the depth map. White is high, black is low, nothing else. Right: the burn. If the map is good the burn is good; if the map is muddy, no setting rescues it.</figcaption>
 </figure>
 
-<p>You need a grayscale PNG where brightness equals height. Four ways to get one, all free:</p>
+<p>You need a grayscale PNG where brightness equals height. Five ways to get one:</p>
 
 <ol>
-  <li><strong>STL2PNG in your browser, nothing to install.</strong> <a href="https://fenrus75.github.io/FenrusCNCtools/javascript/stl2png.html" target="_blank" rel="noopener">STL2PNG</a> is a free page that turns an STL into a true heightmap PNG: choose the Top view, set the resolution to match your engraving, adjust the depth offset if the background is not landing on black, and download. Everything runs inside your browser, so the file never leaves your computer, and there is no account. It was written for Carbide Create Pro users, and the heightmap it makes is exactly what a laser wants. A caution about other "STL to PNG" sites: several of the popular ones simply take a <em>screenshot</em> of the model in a 3D viewer. That is a shaded picture, not a depth map, and burned into wood it gives you a rendering with lighting baked in rather than relief. If a converter shows you a rotating model and asks where you want the camera, it is the wrong kind.</li>
+  <li><strong>Laser Studio, our own app.</strong> It was built for exactly this step: open the STL, and it renders a true orthographic height map at 8-bit or 16-bit, with the background sitting on black and the highest point on white, at whatever size and DPI you type in. It also does the things the other routes cannot: a 3D-illusion render for machines that only burn tone, nine dithering modes, a calibration wedge for your material, and export straight to the laser. <a href="#laser-studio">There is a section on it below</a>.</li>
+  <li><strong>A free browser converter.</strong> Search for a tool called STL2PNG that runs in the browser; it produces a real heightmap with a top view, a resolution setting and a depth offset. A caution about other "STL to PNG" sites: several of the popular ones simply take a <em>screenshot</em> of the model in a 3D viewer. That is a shaded picture, not a depth map, and burned into wood it gives you a rendering with lighting baked in rather than relief. If a converter shows you a rotating model and asks where you want the camera, it is the wrong kind.</li>
   <li><strong>LightBurn itself, from a mesh.</strong> Recent versions of LightBurn can import an STL and render it to a depth map directly, which is the fewest steps if you already own it. Set the resolution to match your engraving DPI, not higher.</li>
   <li><strong>A resin slicer.</strong> Most resin 3D-print slicers can export a depth map of a model lying flat. Import, orient the carved face up, export.</li>
   <li><strong>Blender.</strong> Point an orthographic camera straight down at the model and render the Z depth pass. More control than any of the above, and a steeper hill to climb.</li>
@@ -177,6 +179,25 @@
 
 <p>Beyond those, the <a href="/collections/wildlife-wall-art-stl">wildlife portraits</a>, <a href="/collections/religious-christian">religious panels</a> and <a href="/collections/floral-botanical">floral collection</a> convert well. Wide landscapes and multi-figure scenes are possible but need more tuning; <a href="/blog/what-makes-a-good-bas-relief-stl-file#depth">the depth-grading test</a> in our file-quality guide is a good predictor of how a file will burn.</p>
 
+<h2 id="laser-studio">Laser Studio: the whole workflow in one app</h2>
+
+<p>Everything above can be done with a chain of free tools, and for a first test that is fine. It is also how we did it for two years, until the chain got long enough that we wrote our own application. <a href="/laser-studio">Laser Studio</a> is a desktop app for Windows that takes an STL, or a photograph, and turns it into laser-ready art, offline, on your own machine.</p>
+
+<p>For relief files specifically, it does the conversion step properly and then keeps going:</p>
+
+<ul>
+  <li><strong>True height maps from STL</strong>, orthographic, 8-bit or 16-bit, with gap filling so a mesh with tiny holes does not leave white specks in the burn.</li>
+  <li><strong>3D-illusion rendering</strong>: a raking-light and ambient-occlusion pass that makes a flat tonal burn read as sculpture, with relief strength, light angle and contrast under your control. This is the look in the photographs on this page.</li>
+  <li><strong>Nine dithering modes</strong> for photo engraving, plus a compare-all view, and shape masks (circle, heart, badge, hexagon) with a raised border frame.</li>
+  <li><strong>Smart export</strong> at the exact size in millimetres, inches or pixels and the DPI your machine wants, for diode and CO2, with a burn-on-wood preview before you commit a board.</li>
+  <li><strong>A calibration kit</strong>: a grayscale wedge, a power-and-speed grid and a settings log card, so the "settings to start from" section above becomes measured numbers for your laser and your wood.</li>
+  <li><strong>Product makers built in</strong>: coasters, sundials, tumblers, recipe boards, proof and care cards, so a relief file becomes a thing you can sell.</li>
+</ul>
+
+<p>It runs offline, it never uploads your files anywhere, and you own it outright rather than renting it. It is <strong>$40</strong>, once.</p>
+
+<p><a class="dl-btn" href="/laser-studio">Get Laser Studio · $40</a></p>
+
 <h2 id="faq">Questions people ask</h2>
 
 <h3>Can a laser engraver use STL files?</h3>
@@ -193,6 +214,9 @@
 
 <h3>What lines-per-inch setting for a depth engraving?</h3>
 <p>200 to 270. Higher on a diode causes overburn and blur; lower shows scan lines.</p>
+
+<h3>Is there one app that does the STL to depth map step properly?</h3>
+<p><a href="/laser-studio">Laser Studio</a>, our own Windows app: true 8 and 16-bit height maps from STL, a 3D-illusion render, dithering, calibration and export at your size and DPI, offline, for $40 once.</p>
 
 <h3>What is 3D sliced mode?</h3>
 <p>A multi-pass mode that treats the depth map as layers and removes more material where the map is darker, producing a shallow physical relief. Best on CO2 and fibre machines and on materials like acrylic, hardboard and leather.</p>
