@@ -213,7 +213,9 @@ function PackForm({ p, onDone }: { p: Pack | null; onDone: () => void }) {
   const [std, setStd] = useState(p?.standard_drive_link || '');
   const [bonus, setBonus] = useState(p?.bonus_drive_link || '');
   const [cover, setCover] = useState(p?.cover_image_url || '');
-  const [items, setItems] = useState((p?.items || []).map((i) => [i.title, i.slug || '', i.image_url || ''].join(' | ')).join('\n'));
+  const toLines = (list: { title: string; slug?: string | null; image_url?: string | null }[]) => (list || []).map((i) => [i.title, i.slug || '', i.image_url || ''].join(' | ')).join('\n');
+  const [items, setItems] = useState(toLines(p?.items || []));
+  const [bonusItems, setBonusItems] = useState(toLines(p?.bonus_items || []));
   const [notes, setNotes] = useState(p?.notes || '');
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
   const [busy, setBusy] = useState(false);
@@ -221,11 +223,11 @@ function PackForm({ p, onDone }: { p: Pack | null; onDone: () => void }) {
   async function save() {
     if (!/^\d{4}-\d{2}$/.test(month)) { setMsg({ kind: 'error', text: 'Month must be YYYY-MM.' }); return; }
     setBusy(true);
-    const parsed = items.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const [t, s, img] = l.split('|').map((x) => x.trim()); return { title: t, slug: s || null, image_url: img || null }; });
+    const parse = (text: string) => text.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const [t, s, img] = l.split('|').map((x) => x.trim()); return { title: t, slug: s || null, image_url: img || null }; });
     const payload: any = {
       month, title: title.trim() || null, preview_note: note.trim() || null,
       standard_drive_link: std.trim() || null, bonus_drive_link: bonus.trim() || null,
-      cover_image_url: cover.trim() || null, items: parsed, notes: notes.trim() || null, updated_at: new Date().toISOString(),
+      cover_image_url: cover.trim() || null, items: parse(items), bonus_items: parse(bonusItems), notes: notes.trim() || null, updated_at: new Date().toISOString(),
     };
     if (!p) payload.built_by = 'manual';
     const { error } = p ? await supabase.from('monthly_files').update(payload).eq('id', p.id) : await supabase.from('monthly_files').upsert(payload, { onConflict: 'month' });
@@ -246,6 +248,7 @@ function PackForm({ p, onDone }: { p: Pack | null; onDone: () => void }) {
       <div><label className={labelCls}>Bonus Drive link <span className="text-ink-700/40">(Premium / 12-month only)</span></label><input value={bonus} onChange={(e) => setBonus(e.target.value)} className={inputCls} placeholder="https://drive.google.com/…" /></div>
       <div><label className={labelCls}>Cover image URL <span className="text-ink-700/40">(shown at the top of the pack email)</span></label><input value={cover} onChange={(e) => setCover(e.target.value)} className={inputCls} placeholder="https://…jpg" /></div>
       <div><label className={labelCls}>Designs inside, one per line: <code>Title | product-slug | image url</code> <span className="text-ink-700/40">(the BRS pack builder fills this automatically)</span></label><textarea rows={5} value={items} onChange={(e) => setItems(e.target.value)} className={inputCls + ' font-mono text-xs'} /></div>
+      <div><label className={labelCls}>⭐ Premium bonus designs, same format <span className="text-ink-700/40">(shown to 12-month members in the pack email and portal, with the Bonus link above)</span></label><textarea rows={2} value={bonusItems} onChange={(e) => setBonusItems(e.target.value)} className={inputCls + ' font-mono text-xs'} placeholder={'Bald Eagle Head | bald-eagle-head-3d-relief-stl | https://…jpg\nHowling Wolf | howling-wolf-moon-3d-relief-stl | https://…jpg'} /></div>
       <div><label className={labelCls}>Notes (admin only)</label><input value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} /></div>
       <div className="flex items-center gap-3 border-t border-black/10 pt-3">
         <button disabled={busy} onClick={save} className={btnPrimary}>{busy ? 'Saving…' : (p ? 'Save changes' : 'Add pack')}</button>
