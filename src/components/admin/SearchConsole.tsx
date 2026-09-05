@@ -136,6 +136,32 @@ export default function SearchConsole() {
     })();
   }, []);
 
+  // The Add-user dialog in Search Console rejects service accounts ("email
+  // not found", Google bug since April 2026). Ownership by DNS goes round it.
+  const [dns, setDns] = useState<{ value: string; domain: string } | null>(null);
+  const [dnsMsg, setDnsMsg] = useState('');
+  const [dnsBusy, setDnsBusy] = useState(false);
+  async function dnsToken() {
+    setDnsBusy(true); setDnsMsg('');
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const r = await fetch('/api/admin/gsc-verify', { headers: { authorization: `Bearer ${s.session?.access_token || ''}` } });
+      const j = await r.json();
+      if (j.ok) setDns({ value: j.record.value, domain: j.domain }); else setDnsMsg(j.error || 'failed');
+    } catch (e: any) { setDnsMsg(String(e?.message || e)); }
+    setDnsBusy(false);
+  }
+  async function dnsVerify() {
+    setDnsBusy(true); setDnsMsg('');
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const r = await fetch('/api/admin/gsc-verify', { method: 'POST', headers: { authorization: `Bearer ${s.session?.access_token || ''}` } });
+      const j = await r.json();
+      setDnsMsg(j.ok ? `✓ ${j.status}. Now press Refresh.` : j.error || 'failed');
+    } catch (e: any) { setDnsMsg(String(e?.message || e)); }
+    setDnsBusy(false);
+  }
+
   async function refresh(backfill = false) {
     setBusy(true); setMsg('');
     try {
@@ -184,6 +210,27 @@ export default function SearchConsole() {
             </li>
             <li>Google Cloud &gt; APIs &amp; Services &gt; Library &gt; <b>Google Search Console API</b> &gt; Enable (in the project that owns that account).</li>
           </ol>
+          <div className="rounded-lg border border-bronze-600/25 bg-white/60 p-3 space-y-2">
+            <div className="font-bold text-ink-900">Add user says “email not found”? Make the account an owner by DNS instead.</div>
+            <div className="text-ink-700/70">Google has been rejecting service accounts in that dialog since April 2026. This route does not use it. First enable <b>Site Verification API</b> in the same Cloud project (Library &gt; search “Site Verification”), then:</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={dnsToken} disabled={dnsBusy} className="text-xs px-2.5 py-1 rounded bg-bronze-600 text-cream disabled:opacity-50">{dnsBusy ? 'Working…' : '1. Get the DNS record'}</button>
+              <button onClick={dnsVerify} disabled={dnsBusy || !dns} className="text-xs px-2.5 py-1 rounded border border-bronze-600 text-bronze-700 disabled:opacity-40">3. Verify</button>
+            </div>
+            {dns && (
+              <div className="space-y-1">
+                <div><b>2.</b> At your DNS host (Hostinger &gt; Domains &gt; {dns.domain} &gt; DNS / Name servers &gt; DNS records) add a record:</div>
+                <div className="grid grid-cols-[60px_60px_1fr] gap-1 items-start">
+                  <span className="text-ink-700/50">Type</span><span className="text-ink-700/50">Name</span><span className="text-ink-700/50">Value (copy exactly)</span>
+                  <code className="bg-cream px-1.5 py-0.5 rounded">TXT</code>
+                  <code className="bg-cream px-1.5 py-0.5 rounded">@</code>
+                  <code className="bg-cream px-1.5 py-0.5 rounded select-all break-all">{dns.value}</code>
+                </div>
+                <div className="text-ink-700/50">Leave the existing google-site-verification record alone; this is a second one. Wait a few minutes after saving, then press Verify.</div>
+              </div>
+            )}
+            {dnsMsg && <div className={`break-all ${dnsMsg.startsWith('✓') ? 'text-green-700' : 'text-red-700'}`}>{dnsMsg}</div>}
+          </div>
           <div className="text-ink-700/50">Property: {setup?.site || 'sc-domain:digitalchiselco.com'}</div>
           {meta.err && <div className="text-red-700 break-all">Last error: {meta.err}</div>}
           {msg && <div className={msg.startsWith('✓') ? 'text-green-700' : 'text-red-700'}>{msg}</div>}

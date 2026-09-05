@@ -33,12 +33,12 @@ export function gscSite(): string {
 
 const b64url = (b: Buffer | string) => Buffer.from(b).toString('base64url');
 
-async function accessToken(): Promise<string> {
+async function accessToken(scope: string = SCOPE): Promise<string> {
   const email = String(env('GOOGLE_SA_EMAIL'));
   const key = String(env('GOOGLE_SA_PRIVATE_KEY')).replace(/\\n/g, '\n');
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claim = b64url(JSON.stringify({ iss: email, scope: SCOPE, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
+  const claim = b64url(JSON.stringify({ iss: email, scope, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
   const signature = b64url(crypto.createSign('RSA-SHA256').update(`${header}.${claim}`).sign(key));
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -48,6 +48,47 @@ async function accessToken(): Promise<string> {
   const j = await res.json();
   if (!res.ok || !j.access_token) throw new Error(`token: ${res.status} ${JSON.stringify(j).slice(0, 200)}`);
   return j.access_token as string;
+}
+
+// ── Ownership by DNS, the way around Search Console's "email not found" ──
+// Since late April 2026 Search Console's Add-user dialog rejects service
+// accounts ("Failed to add user: email not found", a Google-side bug with no
+// fix date). The Site Verification API sidesteps the dialog entirely: the
+// service account asks Google for a DNS TXT token for the domain, the owner
+// adds that record at the DNS host, the service account then verifies and
+// becomes a verified OWNER of the domain property, which is all the access
+// the sync needs. Needs "Site Verification API" enabled in the SA's project.
+const VERIFY_SCOPE = 'https://www.googleapis.com/auth/siteverification';
+const VERIFY_API = 'https://www.googleapis.com/siteVerification/v1';
+export function gscDomain(): string {
+  return gscSite().replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+}
+
+export async function gscVerificationToken(): Promise<string> {
+  const token = await accessToken(VERIFY_SCOPE);
+  const res = await fetch(`${VERIFY_API}/token`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ site: { type: 'INET_DOMAIN', identifier: gscDomain() }, verificationMethod: 'DNS_TXT' }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`siteVerification token: ${res.status} ${text.slice(0, 400)}`);
+  const j = JSON.parse(text || '{}');
+  if (!j.token) throw new Error('no token in response: ' + text.slice(0, 200));
+  return String(j.token);
+}
+
+export async function gscVerifyDomain(): Promise<string> {
+  const token = await accessToken(VERIFY_SCOPE);
+  const res = await fetch(`${VERIFY_API}/webResource?verificationMethod=DNS_TXT`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ site: { type: 'INET_DOMAIN', identifier: gscDomain() } }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`siteVerification verify: ${res.status} ${text.slice(0, 400)}`);
+  const j = JSON.parse(text || '{}');
+  return `verified: ${j.site?.identifier || gscDomain()} is now owned by ${gscServiceAccountEmail()} (owners: ${(j.owners || []).length})`;
 }
 
 type SaRow = { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number };
