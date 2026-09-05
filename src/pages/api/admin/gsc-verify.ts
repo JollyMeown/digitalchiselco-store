@@ -39,11 +39,15 @@ export const GET: APIRoute = async ({ request }) => {
 
 export const POST: APIRoute = async ({ request }) => {
   if (!(await isCallerAdmin(request))) return json({ error: 'unauthorized' }, 401);
-  const { gscConfigured, gscVerifyDomain } = await import('../../../lib/search-console');
+  const { gscConfigured, gscVerifyDomain, gscAddSite } = await import('../../../lib/search-console');
   if (!gscConfigured()) return json({ error: 'GOOGLE_SA_EMAIL / GOOGLE_SA_PRIVATE_KEY are not set in Netlify.' }, 503);
   try {
     const status = await gscVerifyDomain();
-    return json({ ok: true, status });
+    // ownership alone is not enough: the property must also sit in the
+    // account's own Search Console list
+    let added = '';
+    try { added = await gscAddSite(); } catch (e: any) { added = `(sites.add: ${String(e?.message || e).slice(0, 200)})`; }
+    return json({ ok: true, status: `${status}; ${added}` });
   } catch (e: any) {
     return json({ error: String(e?.message || e).slice(0, 600) }, 500);
   }

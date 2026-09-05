@@ -91,6 +91,25 @@ export async function gscVerifyDomain(): Promise<string> {
   return `verified: ${j.site?.identifier || gscDomain()} is now owned by ${gscServiceAccountEmail()} (owners: ${(j.owners || []).length})`;
 }
 
+// A verified owner still has to ADD the property to its own Search Console
+// list before searchAnalytics answers ("User does not have sufficient
+// permission for site"). A person gets that for free in the UI; a service
+// account has to call sites.add, which needs the full (not readonly) scope.
+const FULL_SCOPE = 'https://www.googleapis.com/auth/webmasters';
+export async function gscAddSite(): Promise<string> {
+  const token = await accessToken(FULL_SCOPE);
+  const site = encodeURIComponent(gscSite());
+  const res = await fetch(`${API}/sites/${site}`, { method: 'PUT', headers: { authorization: `Bearer ${token}` } });
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text();
+    throw new Error(`sites.add: ${res.status} ${text.slice(0, 400)}`);
+  }
+  const list = await fetch(`${API}/sites`, { headers: { authorization: `Bearer ${token}` } });
+  const j = await list.json().catch(() => ({}));
+  const mine = (j.siteEntry || []).map((s: any) => `${s.siteUrl} (${s.permissionLevel})`);
+  return `property added; the account now sees: ${mine.join(', ') || 'nothing yet'}`;
+}
+
 type SaRow = { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number };
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -144,8 +163,17 @@ export async function syncSearchConsole(days = 14, opts: { budgetMs?: number } =
     const token = await accessToken();
     const fetched_at = new Date().toISOString();
 
-    // 1) totals per day: one request, always completes
-    const daily = await query(token, { startDate, endDate, dimensions: ['date'] });
+    // 1) totals per day: one request, always completes. On the first run
+    // after DNS verification the property is not in the account's list yet;
+    // add it and try once more before giving up.
+    let daily: SaRow[];
+    try {
+      daily = await query(token, { startDate, endDate, dimensions: ['date'] });
+    } catch (e: any) {
+      if (!/sufficient permission/i.test(String(e?.message))) throw e;
+      await gscAddSite();
+      daily = await query(token, { startDate, endDate, dimensions: ['date'] });
+    }
     const d = await upsertChunks(db, 'gsc_daily', daily.map((r) => ({ day: r.keys![0], ...num(r), fetched_at })), 'day');
 
     // 2) per page per day (the blog scoreboard)
