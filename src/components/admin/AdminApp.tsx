@@ -12,10 +12,7 @@ import Settings from './tabs/Settings';
 import Links from './tabs/Links';
 import Reviews from './tabs/Reviews';
 import Faqs from './tabs/Faqs';
-import Membership from './tabs/Membership';
-import MonthlyDrops from './tabs/MonthlyDrops';
-import MemberSubs from './tabs/MemberSubs';
-import MemberEmails from './tabs/MemberEmails';
+import MembershipHub from './tabs/MembershipHub';
 import Finance from './tabs/Finance';
 import Traffic from './tabs/Traffic';
 import Insights from './tabs/Insights';
@@ -55,10 +52,10 @@ const TABS: Tab[] = [
   { key: 'creations',   label: 'Carved by you', icon: '✦', Component: Creations },
   { key: 'seasonal',    label: 'Seasonal',     icon: '❄', Component: Seasonal },
   { key: 'designboard', label: 'Design Board', icon: '💡', Component: DesignBoard },
-  { key: 'membership',  label: 'Membership',   icon: '◆', Component: Membership },
-  { key: 'monthly',     label: 'Monthly Drops', icon: '🗓', Component: MonthlyDrops },
-  { key: 'membersubs',  label: 'Subscriptions', icon: '♺', Component: MemberSubs },
-  { key: 'memberemails', label: 'Member Emails', icon: '✈', Component: MemberEmails },
+  // Everything about memberships lives in ONE section (members, packs, plans,
+  // emails, settings). The old entries #monthly / #membersubs / #memberemails
+  // still deep-link into the right sub-tab, see MEMBERSHIP_ALIASES.
+  { key: 'membership',  label: 'Membership',   icon: '◆', Component: MembershipHub },
   { key: 'reviews',     label: 'Reviews',      icon: '★', Component: Reviews },
   { key: 'faqs',        label: 'FAQs',         icon: '?', Component: Faqs },
   { key: 'subscribers', label: 'Subscribers',  icon: '✉', Component: Subscribers },
@@ -68,10 +65,21 @@ const TABS: Tab[] = [
   { key: 'links',       label: 'Download Links', icon: '↗', Component: Links },
 ];
 
+// Old sidebar keys that now live inside the Membership section. The hub reads
+// the wanted sub-tab from sessionStorage on mount.
+const MEMBERSHIP_ALIASES = new Set(['monthly', 'membersubs', 'memberemails']);
+function resolveTab(h: string): string {
+  if (MEMBERSHIP_ALIASES.has(h)) {
+    try { sessionStorage.setItem('dcc_membership_sub', h); } catch {}
+    return 'membership';
+  }
+  return h;
+}
+
 export default function AdminApp() {
   const [session, setSession] = useState<any>(undefined);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [tab, setTab] = useState<string>(() => (typeof window !== 'undefined' && window.location.hash.slice(1)) || 'overview');
+  const [tab, setTab] = useState<string>(() => resolveTab((typeof window !== 'undefined' && window.location.hash.slice(1)) || 'overview'));
   const [collapsed, setCollapsed] = useState(false);
   // Custom sidebar order (drag-to-reorder, saved per browser).
   const ORDER_KEY = 'dcc_admin_tab_order';
@@ -122,7 +130,7 @@ export default function AdminApp() {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s); if (s) check(s.user.id); else setIsAdmin(false);
     });
-    const onHash = () => { const h = window.location.hash.slice(1); if (h) setTab(h); };
+    const onHash = () => { const h = window.location.hash.slice(1); if (h) setTab(resolveTab(h)); };
     window.addEventListener('hashchange', onHash);
     return () => { sub.subscription.unsubscribe(); window.removeEventListener('hashchange', onHash); };
   }, []);
