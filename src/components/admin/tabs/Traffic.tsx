@@ -168,7 +168,7 @@ export default function Traffic() {
           {RANGES.map((r) => (
             <button key={r} onClick={() => setDays(r)} className={`text-xs px-2 py-1 rounded ${days === r ? 'bg-bronze-600 text-cream' : 'bg-cream text-ink-700'}`}>{r}d</button>
           ))}
-          <button className="text-xs px-2 py-1 rounded bg-cream text-bronze-700 underline" onClick={load}>reload</button>
+          <button className="text-xs px-2 py-1 rounded bg-cream text-bronze-700 underline" onClick={() => load()}>reload</button>
         </div>
       </div>
 
@@ -297,11 +297,19 @@ function LampStudio({ days }: { days: number }) {
 //   capture, orders from the orders table) + the latest raw events with times.
 // • LIVE strip: visitors on site in the last 5 min (pulsing) and a BLINKING
 //   heart/cart when someone is on the cart or in checkout right now. 15s poll.
+// Rolling windows in hours (owner request 2026-09-05: "current hour, last 6
+// hours, last 12 hours, 1 day, 1 week"). 'today' is the calendar day; the
+// rest count back from right now using each event's timestamp.
 const PANEL_RANGES = [
-  { key: 'today', label: 'Today', days: 1 },
-  { key: 'week', label: 'This week', days: 7 },
-  { key: 'month', label: 'This month', days: 30 },
+  { key: 'hour', label: 'This hour', hours: 1 },
+  { key: '6h', label: '6 h', hours: 6 },
+  { key: '12h', label: '12 h', hours: 12 },
+  { key: '24h', label: '24 h', hours: 24 },
+  { key: 'today', label: 'Today', hours: 0 },
+  { key: 'week', label: '7 days', hours: 24 * 7 },
+  { key: 'month', label: '30 days', hours: 24 * 30 },
 ] as const;
+type RangeKey = typeof PANEL_RANGES[number]['key'];
 
 function LiveNow() {
   const [live, setLive] = useState<{ onSite: number; onCart: number } | null>(null);
@@ -340,18 +348,41 @@ function LiveNow() {
 }
 
 function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Record<string, string>; paid: number; days: number }) {
-  const [range, setRange] = useState<'today' | 'week' | 'month'>('today');
+  const [range, setRange] = useState<RangeKey>('hour');   // owner: "this hour to be made default"
   const [open, setOpen] = useState<string | null>(null);      // drill-down metric type
   const [people, setPeople] = useState<{ label: string; rows: { who: string; what: string; when: string }[] } | null>(null);
   const [peopleBusy, setPeopleBusy] = useState(false);
   const [idMap, setIdMap] = useState<Record<string, string>>({});   // visitor_hash → email (identity bridge)
+  // paid orders with timestamps, so the paid card follows the same window as
+  // the other cards instead of the page's day range
+  const [orders, setOrders] = useState<{ created_at: string; total: number }[]>([]);
+  useEffect(() => {
+    (async () => {
+      const since = new Date(Date.now() - 61 * 86400000).toISOString();
+      const { data } = await supabase.from('orders').select('created_at, total').eq('status', 'paid').gte('created_at', since).limit(5000);
+      setOrders((data || []) as any);
+    })();
+  }, [events]);
 
   const rangeDef = PANEL_RANGES.find((r) => r.key === range)!;
-  const sinceDay = new Date(Date.now() - (rangeDef.days - 1) * 86400000).toISOString().slice(0, 10);
-  const inRange = events.filter((e) => e.day >= sinceDay);
+  const now = Date.now();
   const todayKey = new Date().toISOString().slice(0, 10);
+  const yesterdayKey = new Date(now - 86400000).toISOString().slice(0, 10);
+  // rolling windows use the event timestamp; events logged before timestamps
+  // existed fall back to midday of their day
+  const startMs = rangeDef.hours ? now - rangeDef.hours * 3600e3 : null;
+  const prevStartMs = rangeDef.hours ? now - 2 * rangeDef.hours * 3600e3 : null;
+  const tsOf = (iso: string | undefined, day?: string) => iso ? new Date(iso).getTime() : new Date((day || todayKey) + 'T12:00:00Z').getTime();
+  const within = (iso: string | undefined, day?: string) => startMs != null ? tsOf(iso, day) >= startMs : (day || (iso || '').slice(0, 10)) === todayKey;
+  const withinPrev = (iso: string | undefined, day?: string) => startMs != null ? (tsOf(iso, day) >= (prevStartMs as number) && tsOf(iso, day) < startMs) : (day || (iso || '').slice(0, 10)) === yesterdayKey;
+  const inRange = events.filter((e) => within(e.ts, e.day));
+  const prevRange = events.filter((e) => withinPrev(e.ts, e.day));
   const count = (t: string) => inRange.filter((e) => e.type === t).length;
-  const todayCount = (t: string) => events.filter((e) => e.type === t && e.day === todayKey).length;
+  const prevCount = (t: string) => prevRange.filter((e) => e.type === t).length;
+  const paidIn = orders.filter((o) => within(o.created_at));
+  const paidPrev = orders.filter((o) => withinPrev(o.created_at));
+  const prevLabel = range === 'today' ? 'yesterday' : `previous ${rangeDef.label.replace('This ', '').toLowerCase()}`;
+  const sinceTsForRange = () => startMs != null ? new Date(startMs).toISOString() : todayKey + 'T00:00:00Z';
   const metrics = [
     { icon: '🛒', label: 'Added to cart', type: 'add_to_cart' },
     { icon: '⚡', label: 'Buy-now taps', type: 'buy_now' },
@@ -371,7 +402,7 @@ function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Re
   // most shoppers stay anonymous until they type an email — that's expected.
   async function loadPeople(type: string) {
     setPeopleBusy(true); setPeople(null);
-    const sinceTs = new Date(Date.now() - rangeDef.days * 86400000).toISOString();
+    const sinceTs = sinceTsForRange();
     const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     // Identity bridge: resolve visitor hashes on this metric's events to emails
     // captured when those visitors identified themselves (cart / subscribe).
@@ -438,13 +469,21 @@ function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Re
             <div className="text-lg" aria-hidden="true">{m.icon}</div>
             <div className="text-3xl font-extrabold text-bronze-800 leading-tight">{count(m.type).toLocaleString()}</div>
             <div className="text-[11px] font-bold text-ink-800 mt-0.5">{m.label}</div>
-            <div className="text-[11px] text-ink-700/60">today: <span className="font-bold text-ink-900">{todayCount(m.type)}</span></div>
+            <div className="text-[11px] text-ink-700/60">
+              {prevLabel}: <span className="font-bold text-ink-900">{prevCount(m.type)}</span>
+              {prevCount(m.type) !== count(m.type) && (
+                <span className={`ml-1 ${count(m.type) > prevCount(m.type) ? 'text-green-700' : 'text-red-600'}`}>{count(m.type) > prevCount(m.type) ? '▲' : '▼'}</span>
+              )}
+            </div>
           </button>
         ))}
         <div className="bg-[#5E380A] rounded-lg p-3 text-center">
           <div className="text-lg" aria-hidden="true">✅</div>
-          <div className="text-3xl font-extrabold text-[#FAC775] leading-tight">{paid.toLocaleString()}</div>
-          <div className="text-[11px] font-bold text-[#F5EFE3] mt-0.5">Paid orders ({days}d)</div>
+          <div className="text-3xl font-extrabold text-[#FAC775] leading-tight">{(orders.length ? paidIn.length : paid).toLocaleString()}</div>
+          <div className="text-[11px] font-bold text-[#F5EFE3] mt-0.5">Paid orders · {rangeDef.label.toLowerCase()}</div>
+          <div className="text-[11px] text-[#F5EFE3]/70">
+            {paidIn.length ? `$${paidIn.reduce((a, o) => a + (Number(o.total) || 0), 0).toFixed(0)} · ` : ''}{prevLabel}: <span className="font-bold text-[#FAC775]">{paidPrev.length}</span>
+          </div>
         </div>
       </div>
 
