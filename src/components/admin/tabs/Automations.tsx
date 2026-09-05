@@ -22,7 +22,7 @@ const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'priceDrop', label: 'Price-drop alert', group: 'Broadcasts' },
   { key: 'referralNudge', label: 'Referral nudge (happy customers)', group: 'Broadcasts' },
   { key: 'etsyWelcome', label: 'Etsy-buyer welcome (one-time)', group: 'Etsy buyers' },
-  { key: 'customPitch', label: 'Custom-design pitch (asked us to copy a design)', group: 'Etsy buyers' },
+  { key: 'customPitch', label: 'Custom-design pitch (share your concept or picture)', group: 'Etsy buyers' },
 ];
 
 // ── Block-based template builder ─────────────────────────────────────
@@ -307,7 +307,7 @@ export default function Automations() {
         <Toggle field="etsy_welcome_enabled" label="Etsy-buyer welcome"
           desc="One-time welcome to imported Etsy buyers (source 'etsy-buyer'): this week's newest designs + a 10% code. Sent once each, never twice. They skip the free-pack drip, then join the weekly digest like everyone else." />
         <Toggle field="custom_pitch_enabled" label="Custom-design pitch drip"
-          desc="One-time pitch to people added with 'Add to drip' in the Custom-design pitch card (source 'custom-ask'): originals from their own photo from $30, the /custom-design upload link, plus this week's designs. Never twice; 'Send now' shares the same ledger." />
+          desc="One-time pitch to people added with 'Add to drip' in the Custom-design pitch card (source 'custom-ask'): share a concept, sketch or photo, custom reliefs from $30, the /custom-design upload link, plus this week's designs. Never twice; 'Send now' shares the same ledger." />
         <Toggle field="weekly_personalized" label="Personalized weekly digest"
           desc="Orders each subscriber's weekly designs by their own category affinity (from their clicks, browses and buys), so the designs most like what they engage with appear first." />
         <Toggle field="winback_enabled" label="Win-back dormant subscribers"

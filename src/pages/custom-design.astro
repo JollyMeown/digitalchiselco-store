@@ -13,8 +13,8 @@ const { data: examples } = await supabaseAdmin()
 const shots = (examples || []).slice(0, 6);
 
 const FAQ = [
-  { q: 'Will you copy a design I saw in another shop?', a: 'No. Every design we sell or make is our own work, and we keep it that way. Send us your own photo, artwork or idea and we make something original for you.' },
-  { q: 'What kind of picture works best?', a: 'A clear, well lit photo with the subject filling most of the frame. Portraits, pets, logos, crests, landscapes and buildings all work. A phone photo is fine.' },
+  { q: 'What can I send?', a: 'Anything that shows what you have in mind: a photo, a sketch on paper, artwork, a logo file, or a picture that captures the feel you are after. A phone photo is fine.' },
+  { q: 'What kind of picture works best?', a: 'A clear, well lit image with the subject filling most of the frame. Portraits, pets, logos, crests, landscapes and buildings all work well.' },
   { q: 'How much does it cost?', a: `Most single-subject designs start at $${FROM}. Scenes with several elements or very fine detail cost more. You get a firm quote before paying anything.` },
   { q: 'How long does it take?', a: 'Usually 3 to 5 days after you approve the quote. Say so in the form if you have a deadline.' },
   { q: 'What do I receive?', a: 'A watertight STL and a 16-bit greyscale height map, sized for your machine, plus one round of revisions. Files arrive by email and in your account.' },
@@ -37,7 +37,7 @@ const inputCls = 'w-full px-4 py-2.5 rounded-md border border-bronze-600/30 focu
     <header class="mb-10 max-w-2xl">
       <p class="text-xs tracking-widest text-bronze-600 mb-3">★ CUSTOM DESIGN SERVICE</p>
       <h1 class="font-serif text-4xl sm:text-5xl text-bronze-800 leading-tight">Your photo, carved in relief.</h1>
-      <p class="mt-4 text-ink-700 leading-relaxed text-lg">Send us a picture and we model an original bas-relief STL from it, ready for your CNC, laser or 3D printer. A firm quote within 24 hours, from <strong>${FROM}</strong>, and nothing is charged until you approve it.</p>
+      <p class="mt-4 text-ink-700 leading-relaxed text-lg">Share a concept, a sketch, artwork or a photo and we model a bas-relief STL from it, ready for your CNC, laser or 3D printer. A firm quote within 24 hours, from <strong>${FROM}</strong>, and nothing is charged until you approve it.</p>
       <div class="mt-5 flex flex-wrap gap-3 text-sm">
         <a href="#request" class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-5 py-2.5 rounded-md font-medium transition">Post your picture</a>
         <a href="#how" class="inline-flex items-center border border-bronze-600/40 text-bronze-700 hover:bg-cream px-5 py-2.5 rounded-md transition">How it works</a>
@@ -46,7 +46,7 @@ const inputCls = 'w-full px-4 py-2.5 rounded-md border border-bronze-600/30 focu
 
     <section id="how" class="grid sm:grid-cols-3 gap-4 mb-12">
       {[
-        ['1', 'Post your picture', 'Upload the photo below and tell us the size, the material and anything you want kept or left out.'],
+        ['1', 'Share your idea', 'Upload a photo, sketch or artwork below and tell us the size, the material and anything you want kept or left out.'],
         ['2', 'Approve the quote', 'Within 24 hours you get a firm price and a delivery date by email. Say yes and pay through the usual secure checkout.'],
         ['3', 'Carve it', 'Usually 3 to 5 days later the STL and greyscale are in your inbox and your account, with one revision round included.'],
       ].map(([n, t, b]) => (
@@ -73,13 +73,13 @@ const inputCls = 'w-full px-4 py-2.5 rounded-md border border-bronze-600/30 focu
       <div>
         <h2 class="font-serif text-2xl text-bronze-800 mb-3">What you get</h2>
         <ul class="text-sm text-ink-700 space-y-2">
-          <li class="flex gap-2"><span class="text-bronze-600">✓</span> An original relief modelled from your picture, never a copy of anyone else's design</li>
+          <li class="flex gap-2"><span class="text-bronze-600">✓</span> A relief modelled from your own picture, sketch or concept</li>
           <li class="flex gap-2"><span class="text-bronze-600">✓</span> Watertight STL plus 16-bit greyscale height map, sized for your machine</li>
           <li class="flex gap-2"><span class="text-bronze-600">✓</span> One revision round included</li>
           <li class="flex gap-2"><span class="text-bronze-600">✓</span> Commercial licence: carve and sell the finished pieces</li>
           <li class="flex gap-2"><span class="text-bronze-600">✓</span> Files by email and in your account, forever</li>
         </ul>
-        <p class="mt-4 text-sm text-ink-700/80 leading-relaxed"><strong>One rule:</strong> we do not reproduce designs from other shops or artists. Your own photos, your own artwork and your own ideas are all welcome.</p>
+        <p class="mt-4 text-sm text-ink-700/80 leading-relaxed">Photos, artwork, sketches and rough ideas are all welcome. If you are not sure what to send, send what you have and we will tell you if we need more.</p>
       </div>
     </section>
 
@@ -103,7 +103,7 @@ const inputCls = 'w-full px-4 py-2.5 rounded-md border border-bronze-600/30 focu
             <div><label for="cd-email" class="text-xs font-medium block mb-1">Email for the quote *</label><input id="cd-email" name="email" type="email" required autocomplete="email" placeholder="you@email.com" class={inputCls} /></div>
           </div>
           <div>
-            <label for="cd-image" class="text-xs font-medium block mb-1">Your picture * <span class="text-ink-700/50 font-normal">JPG, PNG or WebP, up to 8MB</span></label>
+            <label for="cd-image" class="text-xs font-medium block mb-1">Your picture, sketch or artwork * <span class="text-ink-700/50 font-normal">JPG, PNG or WebP, up to 8MB</span></label>
             <input id="cd-image" name="image" type="file" accept="image/jpeg,image/png,image/webp" required class="w-full text-sm text-ink-700" />
             <div id="cd-preview" class="mt-2 hidden"><img alt="preview" class="max-h-48 rounded-lg border border-black/10" /></div>
           </div>

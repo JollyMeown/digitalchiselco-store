@@ -68,7 +68,7 @@ export default function CustomPitch() {
   const fresh = reqs.filter((q) => q.status === 'new').length;
 
   return (
-    <Card title="🖼 Custom-design pitch" subtitle={`For people who asked us to copy another shop's design: we say no to copies and offer an original from their own photo, from $30, with the /custom-design upload link. Page two lists this week's ${weekDesigns} new design${weekDesigns === 1 ? '' : 's'}. Nobody receives it twice.`}>
+    <Card title="🖼 Custom-design pitch" subtitle={`For people who asked about a custom design: invites them to share a concept, sketch, artwork or photo, from $30, with the /custom-design upload link. Page two lists this week's ${weekDesigns} new design${weekDesigns === 1 ? '' : 's'}. Nobody receives it twice.`}>
       <div className="grid md:grid-cols-2 gap-4">
         <div>
           <label className="text-xs font-medium block mb-1">Addresses, one per line <span className="text-ink-700/50 font-normal">("Jane Doe &lt;jane@x.com&gt;" or "jane@x.com Jane" keeps the first name)</span></label>
@@ -77,7 +77,7 @@ export default function CustomPitch() {
         </div>
         <div>
           <label className="text-xs font-medium block mb-1">Personal line <span className="text-ink-700/50 font-normal">(optional, shown after the opening paragraph)</span></label>
-          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className={inputCls} placeholder="e.g. The eagle you sent us is a lovely subject. If you have a photo of the bird or the pose you like, we can model our own version of it for you." />
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className={inputCls} placeholder="e.g. The eagle you mentioned is a lovely subject. Send a photo or a sketch of the pose you like and we will model it for you." />
           <div className="flex flex-wrap gap-2 mt-3">
             <button className={btnGhost} disabled={!!busy} onClick={() => act('preview')}>{busy === 'preview' ? '…' : '👁 Preview'}</button>
             <button className={btnGhost} disabled={!!busy} onClick={() => act('test')}>{busy === 'test' ? '…' : '✉ Test to me'}</button>

@@ -534,17 +534,17 @@ export function customDesignPitchEmail(d: {
       <td style="padding:10px 0 10px 8px;border-top:1px solid #EFE7DA;vertical-align:top;">
       <div style="font-size:14px;font-weight:600;color:${INK};">${title}</div>
       <div style="font-size:13px;line-height:1.55;color:#666;margin-top:2px;">${body}</div></td></tr>`;
-  const subject = `About your custom design request: we can make an original from your photo, from $${from}`;
+  const subject = `Your custom design: share a picture, sketch or idea and we model it, from $${from}`;
   const body = `
     <p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">${hi}</p>
     <p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">
-      Thank you for writing to us about a custom design. We had to say no to reproducing another shop's work, because every design we sell is our own and we keep it that way. But we did not want to leave it there, because what you actually need is a relief that carves the way you imagine it.
+      Thank you for asking us about a custom design. We make bas-relief STL files to order, and the starting point can be anything you have: a concept, a piece of artwork, a sketch, a photo, or a picture that shows the feel you are after. Send it over and we model a relief that carves the way you imagine it.
     </p>
     ${d.note ? `<p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">${esc(d.note)}</p>` : ''}
     <div style="background:${CREAM};border:1px solid #E5DDD0;border-radius:10px;padding:18px 20px;margin:18px 0;">
       <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${BRONZE};margin-bottom:6px;">Original custom design</div>
-      <div style="font-family:Georgia,serif;font-size:21px;line-height:1.3;color:${BRONZE_DARK};">Send us a photo, we model the relief.</div>
-      <div style="font-size:14px;line-height:1.6;color:#555;margin-top:8px;">A pet, a portrait, your logo, a family crest, a scene from your own picture. You get a carve-ready STL made from scratch, yours alone, with the same commercial licence as every design in the shop.</div>
+      <div style="font-family:Georgia,serif;font-size:21px;line-height:1.3;color:${BRONZE_DARK};">Share your concept, we model the relief.</div>
+      <div style="font-size:14px;line-height:1.6;color:#555;margin-top:8px;">A pet, a portrait, a logo, a family crest, a scene, a sketch on paper. You get a carve-ready STL made for you, with the same commercial licence as every design in the shop.</div>
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:14px;">
         <tr><td style="font-size:13px;color:#555;padding:4px 0;">Starting price</td><td align="right" style="font-size:15px;font-weight:700;color:${BRONZE_DARK};padding:4px 0;">from $${from}</td></tr>
         <tr><td style="font-size:13px;color:#555;padding:4px 0;">Quote</td><td align="right" style="font-size:13px;color:${INK};padding:4px 0;">within 24 hours, before you pay anything</td></tr>
@@ -554,7 +554,7 @@ export function customDesignPitchEmail(d: {
       </table>
     </div>
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:4px 0 6px;">
-      ${step('1', 'Post your picture', `Open the custom design page, upload the photo and tell us the size and material you carve.`)}
+      ${step('1', 'Share your picture or idea', `Open the custom design page, upload a photo, sketch or artwork and tell us the size and material you carve.`)}
       ${step('2', 'Approve the quote', `We reply with a firm price and a delivery date. Nothing is charged until you say yes.`)}
       ${step('3', 'Carve it', `You receive the STL and greyscale by email and in your account, with one revision if anything needs a tweak.`)}
     </table>
@@ -568,7 +568,7 @@ export function customDesignPitchEmail(d: {
       <p style="text-align:center;margin:10px 0 0;"><a href="${SITE}/catalog?sort=newest" style="color:${BRONZE};font-size:13px;">See everything new &rarr;</a></p>
     </div>` : ''}
     <p style="font-size:14px;line-height:1.6;margin:22px 0 4px;color:${INK};">Happy carving,<br><b>Jolly</b> · DigitalChiselCo</p>`;
-  const text = `${first ? 'Hi ' + first : 'Hi there'},\n\nThank you for writing to us about a custom design. We cannot reproduce another shop's work, but we make ORIGINAL custom reliefs from your own photo, from $${from}.${d.note ? '\n\n' + d.note : ''}\n\nHow it works:\n1. Post your picture: ${CUSTOM_DESIGN_URL}\n2. We quote within 24 hours, before you pay anything.\n3. STL + greyscale in 3 to 5 days, one revision included.\n\n` +
+  const text = `${first ? 'Hi ' + first : 'Hi there'},\n\nThank you for asking us about a custom design. We make bas-relief STL files to order from anything you have: a concept, artwork, a sketch, a photo. From $${from}.${d.note ? '\n\n' + d.note : ''}\n\nHow it works:\n1. Share your picture or idea: ${CUSTOM_DESIGN_URL}\n2. We quote within 24 hours, before you pay anything.\n3. STL + greyscale in 3 to 5 days, one revision included.\n\n` +
     (n ? `Released this week (${total} new designs):\n` + d.products.slice(0, 12).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join('\n') + '\n\n' : '') +
     `Happy carving, Jolly, DigitalChiselCo\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, TEMPLATE_HEADINGS.customPitch, body, d.email), text };
