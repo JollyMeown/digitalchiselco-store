@@ -16,6 +16,7 @@ import {
 } from '../lib/marketplace-pricing';
 import { supabaseAdmin } from '../lib/supabase';
 import { PADDLE_ENTITIES, PADDLE_URL, PADDLE_BUYER_TERMS } from '../lib/paddle-entity';
+import { MEMBER_FAQ } from '../lib/membership-faq';
 
 const packs = creditPacks();
 const [cheapest, dearest] = quotePriceRange();
@@ -137,9 +138,10 @@ const MAKER: QA[] = [
 
 const buyerGroups = [...new Set(BUYER.map((x) => x.group))];
 const makerGroups = [...new Set(MAKER.map((x) => x.group))];
+const memberGroups = [...new Set(MEMBER_FAQ.map((x) => x.group))];
 const faqLd = {
   '@context': 'https://schema.org', '@type': 'FAQPage',
-  mainEntity: [...BUYER, ...(live ? MAKER : [])].map((x) => ({
+  mainEntity: [...BUYER, ...MEMBER_FAQ, ...(live ? MAKER : [])].map((x) => ({
     '@type': 'Question', name: x.q, acceptedAnswer: { '@type': 'Answer', text: x.a },
   })),
 };
@@ -157,14 +159,13 @@ const faqLd = {
       </p>
     </header>
 
-    {live && (
-      <div class="flex justify-center mb-8">
-        <div class="inline-flex bg-cream/70 border border-bronze-600/20 rounded-full p-1" role="tablist">
-          <button id="tab-buyers" role="tab" class="faq-tab px-5 py-2 rounded-full text-sm font-bold transition">🛒 I am buying a design</button>
-          <button id="tab-makers" role="tab" class="faq-tab px-5 py-2 rounded-full text-sm font-bold transition">🛠️ I own a machine</button>
-        </div>
+    <div class="flex justify-center mb-8">
+      <div class="inline-flex flex-wrap justify-center bg-cream/70 border border-bronze-600/20 rounded-full p-1" role="tablist">
+        <button id="tab-buyers" role="tab" class="faq-tab px-5 py-2 rounded-full text-sm font-bold transition">🛒 I am buying a design</button>
+        <button id="tab-members" role="tab" class="faq-tab px-5 py-2 rounded-full text-sm font-bold transition">◆ Membership</button>
+        {live && <button id="tab-makers" role="tab" class="faq-tab px-5 py-2 rounded-full text-sm font-bold transition">🛠️ I own a machine</button>}
       </div>
-    )}
+    </div>
 
     <!-- ── BUYERS ─────────────────────────────────────────────────── -->
     <div id="faq-buyers">
@@ -214,6 +215,40 @@ const faqLd = {
           <a href="/contact" class="bg-bronze-600 hover:bg-bronze-700 transition text-cream font-bold rounded-lg px-5 py-2.5 text-sm">Contact us</a>
           <a href="/resend-downloads" class="border border-bronze-600/30 hover:bg-cream transition text-bronze-700 font-bold rounded-lg px-5 py-2.5 text-sm">Resend my downloads</a>
           <a href="/free" class="border border-bronze-600/30 hover:bg-cream transition text-bronze-700 font-bold rounded-lg px-5 py-2.5 text-sm">Free files</a>
+        </div>
+      </section>
+    </div>
+
+    <!-- ── MEMBERSHIP ─────────────────────────────────────────────── -->
+    <div id="faq-members" hidden>
+      <div class="bg-bronze-800 text-cream rounded-2xl p-5 sm:p-6 mb-7">
+        <p class="text-[11px] tracking-[0.2em] uppercase text-[#FAC775]">Membership</p>
+        <h2 class="font-serif text-2xl mt-1">A pack of new designs every month, for a fixed term</h2>
+        <p class="text-cream/80 text-sm mt-2 max-w-xl">One payment, no automatic renewal, every pack kept in your account for good. These answers describe exactly how the system behaves, because they are written from the same rules it runs on.</p>
+        <a href="/membership" class="inline-block mt-4 bg-[#FAC775] text-bronze-900 font-bold rounded-lg px-5 py-2.5 text-sm">See the plans</a>
+      </div>
+      {memberGroups.map((g) => (
+        <section class="mb-8">
+          <h2 class="font-serif text-2xl text-bronze-800 mb-3">{g}</h2>
+          <div class="space-y-2">
+            {MEMBER_FAQ.filter((x) => x.group === g).map((x) => (
+              <details class="group bg-cream/40 border border-bronze-600/15 rounded-xl px-4 py-3 open:bg-cream/70 transition-colors">
+                <summary class="cursor-pointer list-none flex items-start justify-between gap-3 font-semibold text-ink-900 text-[15px]">
+                  <span>{x.q}</span>
+                  <span class="text-bronze-600 shrink-0 mt-0.5 transition-transform group-open:rotate-45 text-xl leading-none">+</span>
+                </summary>
+                <p class="mt-2.5 text-sm text-ink-700/85 leading-relaxed">{x.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      ))}
+      <section class="text-center bg-cream/60 border border-bronze-600/20 rounded-2xl p-6">
+        <h2 class="font-serif text-xl text-bronze-800">Something else about your membership?</h2>
+        <p class="text-sm text-ink-700/75 mt-1.5 max-w-md mx-auto">Reply to any membership email or write to jolly@digitalchiselco.com. Packs can be re-sent, dates adjusted and terms paused by a person, quickly.</p>
+        <div class="mt-4 flex flex-wrap gap-2 justify-center">
+          <a href="/account" class="bg-bronze-600 hover:bg-bronze-700 transition text-cream font-bold rounded-lg px-5 py-2.5 text-sm">Open my account</a>
+          <a href="/membership" class="border border-bronze-600/30 hover:bg-cream transition text-bronze-700 font-bold rounded-lg px-5 py-2.5 text-sm">Plans</a>
         </div>
       </section>
     </div>
@@ -288,23 +323,24 @@ const faqLd = {
 
   <script is:inline>
     (function () {
-      var tabs = { buyers: document.getElementById('tab-buyers'), makers: document.getElementById('tab-makers') };
-      var panes = { buyers: document.getElementById('faq-buyers'), makers: document.getElementById('faq-makers') };
-      if (!tabs.makers || !panes.makers) return;   // marketplace off: buyers only
+      var tabs = { buyers: document.getElementById('tab-buyers'), members: document.getElementById('tab-members'), makers: document.getElementById('tab-makers') };
+      var panes = { buyers: document.getElementById('faq-buyers'), members: document.getElementById('faq-members'), makers: document.getElementById('faq-makers') };
+      for (var k in tabs) if (!tabs[k] || !panes[k]) { delete tabs[k]; delete panes[k]; }   // makers tab only while the marketplace is live
       var ON = 'bg-bronze-600 text-cream', OFF = 'text-ink-700 hover:text-bronze-700';
       function show(which, push) {
-        for (var k in panes) panes[k].hidden = k !== which;
+        if (!panes[which]) which = 'buyers';
+        for (var p in panes) panes[p].hidden = p !== which;
         for (var t in tabs) {
           tabs[t].className = 'faq-tab px-5 py-2 rounded-full text-sm font-bold transition ' + (t === which ? ON : OFF);
           tabs[t].setAttribute('aria-selected', String(t === which));
         }
-        if (push) history.replaceState(null, '', which === 'makers' ? '#makers' : location.pathname);
+        if (push) history.replaceState(null, '', which === 'buyers' ? location.pathname : '#' + (which === 'members' ? 'membership' : which));
       }
-      // ?for=makers keeps the old /maker-faq links working; #makers is shareable.
-      var want = (new URLSearchParams(location.search).get('for') === 'makers' || location.hash === '#makers') ? 'makers' : 'buyers';
+      // ?for=makers / ?for=membership keep old links working; #makers and #membership are shareable.
+      var f = new URLSearchParams(location.search).get('for');
+      var want = (f === 'makers' || location.hash === '#makers') ? 'makers' : (f === 'membership' || location.hash === '#membership') ? 'members' : 'buyers';
       show(want, false);
-      tabs.buyers.addEventListener('click', function () { show('buyers', true); });
-      tabs.makers.addEventListener('click', function () { show('makers', true); });
+      for (var t2 in tabs) (function (name) { tabs[name].addEventListener('click', function () { show(name, true); }); })(t2);
     })();
   </script>
 </Shell>
