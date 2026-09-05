@@ -14,7 +14,7 @@ import {
   articleEmail, dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
   weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS,
   winbackEmail, priceDropEmail, referralNudgeEmail, refundWinbackEmail,
-  wishlistReminderEmail, ownerWeeklyReport,
+  wishlistReminderEmail, ownerWeeklyReport, filmEmail,
   type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
 import { isoWeekKey } from './weekly-digest';
@@ -488,6 +488,64 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       else s.failed++;
     }
     stats.articleDrip = s;
+  });
+
+  // ── 1c. Film drip: every Sawdust Cinema film, one at a time, to everyone ──
+  // Same idea as the article drip. A film marked for the drip reaches every
+  // confirmed subscriber in turn, one per gap, newest film last so a new
+  // joiner sees the story in order. The ledger (batch_key film:<id>:...) says
+  // who has had what, so the broadcast button and the drip never overlap.
+  stats.filmDrip = 'off';
+  await step(stats, 'filmDrip', async () => {
+    if (!g.film_drip_enabled) return;
+    const gap = Number(g.film_drip_gap_days) || 4;
+    const s = { candidates: 0, sent: 0, failed: 0 };
+    const films = await fetchAll((a, b) => db.from('showcase_videos')
+      .select('id, title, caption, poster_url, email_intro, email_subject, runtime_seconds, created_at, products(slug, title, price_usd)')
+      .eq('active', true).eq('email_in_drip', true).order('created_at', { ascending: true }).range(a, b));
+    const usable = films.filter((f: any) => f.products?.slug);
+    if (!usable.length) return;
+    const subs = await fetchAll((a, b) => db.from('subscribers').select('email, confirmed_at, unsubscribed_at, suppressed_at').range(a, b));
+    const people = [...new Set(subs.filter((r: any) => r.email && r.confirmed_at && !r.unsubscribed_at && !r.suppressed_at)
+      .map((r: any) => String(r.email).toLowerCase().trim()))] as string[];
+    const log = await fetchAll((a, b) => db.from('email_send_log').select('batch_key, recipient, sent_at')
+      .in('kind', ['filmCampaign', 'filmDrip']).eq('status', 'sent').range(a, b));
+    const had = new Map<string, Set<string>>(); const lastAt = new Map<string, number>();
+    for (const r of log) {
+      const em = String(r.recipient || '').toLowerCase().trim();
+      const m = /^film:([^:]+):/.exec(String(r.batch_key || ''));
+      if (!m) continue;
+      if (!had.has(em)) had.set(em, new Set());
+      had.get(em)!.add(m[1]);
+      const t = new Date(r.sent_at).getTime();
+      if ((lastAt.get(em) || 0) < t) lastAt.set(em, t);
+    }
+    const site = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
+    const cutoff = Date.now() - gap * 86400000;
+    for (const em of people) {
+      if (s.sent >= ARTICLE_DRIP_MAX_PER_RUN) break;
+      if ((lastAt.get(em) || 0) > cutoff) continue;
+      const next: any = usable.find((f: any) => !had.get(em)?.has(f.id));
+      if (!next) continue;
+      s.candidates++;
+      const p = next.products;
+      const { subject, html, text } = filmEmail({
+        email: em,
+        filmTitle: next.title || String(p.title || '').split('|')[0].trim() || 'A new film',
+        posterUrl: String(next.poster_url || '').replace(/-poster\.jpg$/, '-email.jpg') || next.poster_url,
+        productUrl: `${site}/product/${p.slug}`,
+        productTitle: String(p.title || '').split('|')[0].trim() || 'the collection',
+        price: p.price_usd ?? null, blurb: next.caption || undefined,
+        intro: next.email_intro || undefined,
+        runtime: next.runtime_seconds ? `${next.runtime_seconds} seconds` : undefined,
+        subject: next.email_subject || undefined,
+      });
+      const res = await sendEmail({ to: em, subject, html, text, idempotencyKey: `film:${next.id}:drip:${em}`, tags: [{ name: 'kind', value: 'filmDrip' }] });
+      if (res.ok) s.sent++;
+      else if (res.quota) { (s as any).note = 'stopped: daily budget reached (resumes tomorrow)'; break; }
+      else s.failed++;
+    }
+    stats.filmDrip = s;
   });
 
   // ── 2. abandoned-cart reminders ─────────────────────────────────────

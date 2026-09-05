@@ -84,7 +84,7 @@ async function campaignStats(db: any) {
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db
       .from('email_send_log').select('batch_key, recipient, sent_at')
-      .eq('kind', 'filmCampaign').eq('status', 'sent').range(from, from + 999);
+      .in('kind', ['filmCampaign', 'filmDrip']).eq('status', 'sent').range(from, from + 999);
     if (error || !data?.length) break;
     for (const r of data) {
       // test sends use a film-test: prefix, so they never count as delivered
@@ -145,6 +145,41 @@ export const POST: APIRoute = async ({ request }) => {
 
   // Panel asking who has already had what. No film needed.
   if (b?.stats) return json({ ok: true, ...(await campaignStats(db)) });
+
+  // The Film emails panel: every active film with its email copy and its
+  // send status, newest first.
+  if (b?.list) {
+    const [{ data: films }, stats] = await Promise.all([
+      db.from('showcase_videos')
+        .select('id, title, caption, poster_url, video_url, email_intro, email_subject, runtime_seconds, email_in_drip, created_at, products(slug, title)')
+        .eq('active', true).order('created_at', { ascending: false }).limit(500),
+      campaignStats(db),
+    ]);
+    return json({
+      ok: true, subscribers: stats.subscribers,
+      films: (films || []).map((f: any) => {
+        const st = stats.films[f.id];
+        return {
+          id: f.id, title: f.title, caption: f.caption, poster_url: f.poster_url, video_url: f.video_url,
+          email_intro: f.email_intro, email_subject: f.email_subject, runtime_seconds: f.runtime_seconds,
+          email_in_drip: !!f.email_in_drip, created_at: f.created_at,
+          product_slug: f.products?.slug || null, product_title: String(f.products?.title || '').split('|')[0].trim() || null,
+          sent: st?.sent || 0, last: st?.last || null, remaining: st ? st.remaining : stats.subscribers,
+        };
+      }),
+    });
+  }
+
+  if (b?.save) {
+    const id = String(b.filmId || '').trim();
+    if (!id) return json({ error: 'filmId required' }, 400);
+    const patch: any = {};
+    for (const k of ['email_subject', 'email_intro']) if (k in b) patch[k] = String(b[k] || '').trim().slice(0, 2000) || null;
+    if ('runtime_seconds' in b) patch.runtime_seconds = Number(b.runtime_seconds) > 0 ? Math.round(Number(b.runtime_seconds)) : null;
+    if ('email_in_drip' in b) patch.email_in_drip = !!b.email_in_drip;
+    const { error } = await db.from('showcase_videos').update(patch).eq('id', id);
+    return error ? json({ error: error.message }, 400) : json({ ok: true });
+  }
 
   const film = await loadFilm(db, b?.filmId);
   if (!film) return json({ error: 'No active film to send. Add one in Admin → Media → Sawdust Cinema.' }, 400);

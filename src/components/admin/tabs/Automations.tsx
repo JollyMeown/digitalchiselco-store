@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { Card, btnPrimary, btnGhost, inputCls, Toast } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
 import ArticleEmails from '../ArticleEmails';
+import FilmEmails from '../FilmEmails';
 
 const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'drip1', label: '1 · Did you carve the free pack?', group: 'Subscriber drip' },
@@ -279,9 +280,13 @@ export default function Automations() {
 
       <ArticleEmails />
 
+      <FilmEmails />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Toggle field="article_drip_enabled" label="Guide emails, one at a time"
           desc="Every published guide marked for the drip goes to every subscriber in turn, one every few days. New subscribers get them all automatically." />
+        <Toggle field="film_drip_enabled" label="Film emails, one at a time"
+          desc="Every Sawdust Cinema film marked for the drip goes to every subscriber in turn, one every few days. Nobody gets the same film twice, whichever route sent it." />
         <Toggle field="drip_enabled" label="Subscriber nurture drip"
           desc="5 emails, ~4 days apart, to double-opt-in free subscribers. Stops automatically when someone buys."
           stat={`${drip.active} active · ${drip.done} completed · ${drip.converted} converted · ${drip.stopped} unsubscribed`} />

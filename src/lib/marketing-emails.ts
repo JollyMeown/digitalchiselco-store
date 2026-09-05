@@ -301,31 +301,62 @@ export function articleEmail(d: { email: string; post: ArticlePost }): Out {
   const heading = p.title.split(':')[0].trim();
   const body = String(p.body || '');
   const imgs = [...body.matchAll(/<img[^>]+src="([^"]+)"/g)].map((m) => m[1]);
-  const inside = p.email_image_url || imgs.find((u) => u !== p.cover_image_url) || null;
-  // Section headings become the list. Navigation and FAQ headings are noise.
-  const headings = [...body.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/g)].map((m) => stripTags(m[1]))
-    .filter((h) => !/^(what this guide covers|in this article|contents|who are you giving to\??|questions people ask|common questions)$/i.test(h))
+  // The inside photo must not be the cover, and the first figure in an
+  // article is the hero, which is the cover's twin even when the URL differs
+  // (owner, 2026-09-05: "two similar pictures"). So skip the first figure as
+  // well and take the next one, which is a step photo, not another hero.
+  const candidates = imgs.filter((u) => u !== p.cover_image_url);
+  const inside = p.email_image_url || candidates[candidates.length > 2 ? 1 : 0] || null;
+  // Section headings become the list, each linking to its section. The
+  // contents heading itself and the FAQ heading are navigation, not content.
+  const sections = [...body.matchAll(/<h2([^>]*)>([\s\S]*?)<\/h2>/g)].map((m) => ({
+    id: (/id="([^"]+)"/.exec(m[1]) || [])[1] || '', text: stripTags(m[2]),
+  })).filter((h) => h.text && !/^(what this guide covers|in this (guide|article|comparison)|contents|who are you giving to\??|questions people ask|common questions|faq)$/i.test(h.text))
     .slice(0, 7);
+  const headings = sections.map((s) => s.text);
   const intro = String(p.email_intro || p.excerpt || '').split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
   const P = 'margin:0 0 14px;font-size:15px;line-height:1.65;color:#555;';
+  const readMin = Math.max(1, Math.round(stripTags(body).split(/\s+/).filter(Boolean).length / 220));
 
   const html = shell(subject, heading, `
     ${p.cover_image_url ? `<a href="${url}" style="text-decoration:none;"><img src="${esc(p.cover_image_url)}" width="544" alt="${esc(p.title)}" style="width:100%;max-width:544px;border-radius:10px;display:block;margin:0 0 20px;"></a>` : ''}
     ${intro.map((t) => `<p style="${P}">${esc(t)}</p>`).join('')}
-    ${inside ? `<img src="${esc(inside)}" width="544" alt="" style="width:100%;max-width:544px;border-radius:10px;display:block;margin:6px 0 20px;">` : ''}
-    ${headings.length ? `<p style="${P}">Inside:</p>
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 18px;">
-      ${headings.map((h) => `<tr><td style="padding:5px 0;font-size:14.5px;line-height:1.5;color:#555;">${esc(h)}</td></tr>`).join('')}
+    ${inside ? `<a href="${url}" style="text-decoration:none;"><img src="${esc(inside)}" width="544" alt="" style="width:100%;max-width:544px;border-radius:10px;display:block;margin:6px 0 22px;"></a>` : ''}
+    ${headings.length ? `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 22px;background:#FAF3E6;border-left:4px solid ${BRONZE};border-radius:0 10px 10px 0;">
+      <tr><td style="padding:16px 18px 6px;">
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${BRONZE};font-weight:700;">What is inside</div>
+        <div style="font-size:12px;color:#8a7a68;margin-top:2px;">${readMin} minute read · ${headings.length} sections</div>
+      </td></tr>
+      ${sections.map((s) => `<tr><td style="padding:0 18px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+          <td style="width:14px;padding:6px 0;font-size:13px;line-height:1.5;color:${BRONZE};vertical-align:top;">&#9656;</td>
+          <td style="padding:6px 0;font-size:14.5px;line-height:1.5;color:${INK};"><a href="${url}${s.id ? '#' + esc(s.id) : ''}" style="color:${INK};text-decoration:none;">${esc(s.text)}</a></td>
+        </tr></table>
+      </td></tr>`).join('')}
+      <tr><td style="padding:8px 18px 14px;"></td></tr>
     </table>` : ''}
     ${btn(url, 'Read the full guide')}
     <p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#666;">It is free and there is nothing to sign up for. If something in your shop is not behaving, reply to this and ask. Real questions are how these guides get written.</p>
-    <p style="margin:18px 0 0;font-size:13px;color:#777;">Jolly, DigitalChiselCo</p>`, e);
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:26px 0 0;border-top:1px solid #E5DDD0;">
+      <tr><td style="padding:16px 0 0;">
+        <div style="font-family:Georgia,'Times New Roman',serif;font-size:16px;color:${INK};">Jolly</div>
+        <div style="font-size:12.5px;color:#8a7a68;margin-top:2px;">DigitalChiselCo · relief files for CNC, laser and 3D printing</div>
+        <div style="font-size:12.5px;margin-top:10px;">
+          <a href="${SITE}/blog?utm_source=email&utm_medium=newsletter" style="color:${BRONZE};text-decoration:none;">All guides</a>
+          <span style="color:#c9bda9;">&nbsp;·&nbsp;</span>
+          <a href="${SITE}/collections?utm_source=email&utm_medium=newsletter" style="color:${BRONZE};text-decoration:none;">Browse designs</a>
+          <span style="color:#c9bda9;">&nbsp;·&nbsp;</span>
+          <a href="${SITE}/account" style="color:${BRONZE};text-decoration:none;">Your downloads</a>
+        </div>
+      </td></tr>
+    </table>`, e);
 
   const text = [
-    ...intro, '', ...(headings.length ? ['Inside:', ...headings.map((h) => `  - ${h}`), ''] : []),
+    ...intro, '', ...(headings.length ? [`What is inside (${readMin} minute read):`, ...headings.map((h) => `  - ${h}`), ''] : []),
     `Read it: ${url}`, '',
     'It is free and there is nothing to sign up for. If something in your shop is not behaving, reply and ask.',
-    '', 'Jolly, DigitalChiselCo', `Unsubscribe: ${unsubUrl(e)}`,
+    '', 'Jolly, DigitalChiselCo', `All guides: ${SITE}/blog`, `Unsubscribe: ${unsubUrl(e)}`,
   ].join('\n');
   return { subject, html, text };
 }
