@@ -214,6 +214,28 @@ const breadcrumbLd = {
             class="w-full rounded-lg bg-black aspect-square object-cover"></video>
         </div>
       )}
+      {!p.video_url && p.youtube_video_id && /^[A-Za-z0-9_-]{11}$/.test(p.youtube_video_id) && (
+        <div class="mt-3">
+          <div class="text-xs font-medium text-ink-700/60 mb-1">🎬 Watch it in motion</div>
+          <!-- click-to-play: only YouTube's thumbnail loads until the visitor presses play -->
+          <button type="button" class="yt-lite relative w-full rounded-lg bg-black aspect-[9/16] max-h-[520px] overflow-hidden group" data-yt={p.youtube_video_id} aria-label="Play video">
+            <img src={`https://i.ytimg.com/vi/${p.youtube_video_id}/hqdefault.jpg`} alt={`${cleanTitle} video`} loading="lazy" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition" />
+            <span class="absolute inset-0 flex items-center justify-center"><span class="w-16 h-16 rounded-full bg-black/60 border-2 border-white/80 flex items-center justify-center text-white text-2xl">▶</span></span>
+          </button>
+          <script is:inline>
+            document.querySelectorAll('.yt-lite').forEach(function (b) {
+              b.addEventListener('click', function () {
+                var id = b.getAttribute('data-yt');
+                var f = document.createElement('iframe');
+                f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&mute=1&loop=1&playlist=' + id + '&rel=0&modestbranding=1';
+                f.allow = 'autoplay; encrypted-media; picture-in-picture'; f.allowFullscreen = true; f.title = 'Product video';
+                f.className = 'w-full h-full'; f.style.border = '0';
+                b.replaceWith(f);
+              });
+            });
+          </script>
+        </div>
+      )}
     </div>
 
     <!-- details -->

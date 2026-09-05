@@ -12,6 +12,8 @@ echo --- link etsy reviews to products (powers star snippets) --- >> finance-ref
 "C:\Program Files\nodejs\node.exe" scripts\link_etsy_reviews.mjs --apply >> finance-refresh.log 2>&1
 echo --- recompute per-product rating badges --- >> finance-refresh.log
 "C:\Program Files\nodejs\node.exe" scripts\recompute_ratings.mjs >> finance-refresh.log 2>&1
+echo --- link BRS-published products to their Etsy listings by title + fetch videos (API key only, both shops) --- >> finance-refresh.log
+"C:\Program Files\nodejs\node.exe" scripts\etsy_link_videos.mjs >> finance-refresh.log 2>&1
 echo --- pull etsy videos for new products (missing only) --- >> finance-refresh.log
 "C:\Program Files\nodejs\node.exe" scripts\pull_etsy_videos.mjs >> finance-refresh.log 2>&1
 echo --- etsy per-listing stats (views/favorers for Design Scout) --- >> finance-refresh.log
