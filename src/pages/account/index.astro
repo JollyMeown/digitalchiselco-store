@@ -154,8 +154,10 @@ if (session?.email) {
         const ym = addMonthsYM(s.start_date, k - 1);
         const pack: any = packByMonth.get(ym) || null;
         const sentRow = (sent || []).find((l: any) => l.subscription_id === s.id && String(l.drop_month).split('#')[0] === ym);
+        // the owner's 2099 test term (BRS pack builder proof) is always unlocked
+        const testTerm = session.email === 'jolly@digitalchiselco.com' && String(s.start_date) >= '2090';
         list.push({
-          monthYM: ym, monthLabel: ymLabel(ym), accessible: ym <= currentYM, dropNumber: k,
+          monthYM: ym, monthLabel: ymLabel(ym), accessible: ym <= currentYM || testTerm, dropNumber: k,
           title: pack?.title || null, note: pack?.preview_note || null, cover: pack?.cover_image_url || null,
           items: Array.isArray(pack?.items) ? pack.items.slice(0, 8) : [],
           standard: pack?.standard_drive_link ? packLink(s.id, ym, 'standard', 'portal') : null,

@@ -33,6 +33,8 @@ import {
 const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
 const RENEW_URL = process.env.MEMBERSHIP_RENEW_URL || `${SITE}/membership?renew=1`;
 const KIND = [{ name: 'kind', value: 'membership' }];
+// The only address allowed to receive a test pack (month 2090 or later).
+const TEST_INBOX = 'jolly@digitalchiselco.com';
 
 type DB = ReturnType<typeof supabaseAdmin>;
 
@@ -224,14 +226,20 @@ export async function processSubscription(db: DB, s: any, ctx: Ctx): Promise<voi
   stats.processed++;
   const plan = await planName(db, s.plan_slug);
 
+  // Test terms: the owner's own membership dated 2090 or later (used to prove
+  // the BRS pack builder end to end). Its months are due immediately, and a
+  // pack month of 2090+ is NEVER sent to any other address, whatever happens.
+  const isTestTerm = String(s.email).toLowerCase() === TEST_INBOX && String(s.start_date) >= '2090';
+
   // 1) drops: catch up every month that has arrived, oldest first, stopping
   //    at the first month whose pack is not uploaded yet
   if (s.status === 'active') {
     let dropsSent = s.drops_sent;
     for (let guard = 0; guard < 24 && dropsSent < s.total_drops; guard++) {
       const dueDate = addMonths(s.start_date, dropsSent);
-      if (dueDate > today) break;
+      if (dueDate > today && !isTestTerm) break;
       const ym = toYM(dueDate);
+      if (ym >= '2090' && !isTestTerm) break;        // test months never reach real members
       const pack = await getPack(db, ym);
       if (!hasFiles(pack)) {
         stats.skippedNoPack++;
@@ -423,7 +431,9 @@ export async function resendPack(subscriptionId: string, ym: string, opts: { req
   // the month must be one of this term's months and already unlocked
   const idx = Array.from({ length: s.total_drops }, (_, k) => toYM(addMonths(s.start_date, k))).indexOf(ym);
   if (idx < 0) return { ok: false, error: 'that month is not part of this membership' };
-  if (addMonths(s.start_date, idx) > todayYMD()) return { ok: false, error: 'that pack has not unlocked yet' };
+  const testTerm = String(s.email).toLowerCase() === TEST_INBOX && String(s.start_date) >= '2090';
+  if (ym >= '2090' && !testTerm) return { ok: false, error: 'test months are only sent to the shop inbox' };
+  if (addMonths(s.start_date, idx) > todayYMD() && !testTerm) return { ok: false, error: 'that pack has not unlocked yet' };
   const pack = await getPack(db, ym);
   if (!hasFiles(pack)) return { ok: false, error: 'that pack has no files yet' };
   // rate limit member-initiated re-sends: one per pack per 12 h
