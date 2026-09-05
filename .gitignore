@@ -71,3 +71,4 @@ scripts/.etsy-welcome-preview.html
 # local retag run log
 cults3d-retag.log
 scripts/.etsy_img_hashes.json
+scripts/.video_duplicates.json

@@ -191,7 +191,7 @@ saveCache();
 
 // one product per listing, then write
 let linked = 0, videos = 0;
-const final = [];
+const final = [], duplicates = [];
 for (const a of accepted) {
   if ((claims.get(a.l.id) || []).length > 1) { rej(a.p, 'N products claim the same listing'); continue; }
   // Picture-only picks get a stricter gate: never for bundles, only when the
@@ -206,13 +206,28 @@ for (const a of accepted) {
       a.ai = 'PICKED + confirmed';
     }
   }
+  // The same Etsy listing may already belong to ANOTHER website product (the
+  // design was imported from Etsy earlier and published again by BRS under a
+  // new title). etsy_listing_id is unique per product, so link only the video
+  // and report the pair as a catalogue duplicate for the owner.
+  const { data: owner } = await db.from('products').select('id, slug, title').eq('etsy_listing_id', Number(a.l.id)).neq('id', a.p.id).limit(1);
+  const sibling = owner?.[0] || null;
+  if (sibling) { duplicates.push({ product: a.p, sibling, listing: a.l.id }); a.how += ', video only (duplicate design)'; }
   final.push(a); linked++;
   if (a.l.video?.url) videos++;
   if (!DRY) {
-    const patch = { etsy_listing_id: Number(a.l.id) };
+    const patch = sibling ? {} : { etsy_listing_id: Number(a.l.id) };
     if (a.l.video?.url) { patch.video_url = a.l.video.url; patch.video_thumb = a.l.video.thumb || null; }
-    await db.from('products').update(patch).eq('id', a.p.id);
+    if (Object.keys(patch).length) {
+      const { error } = await db.from('products').update(patch).eq('id', a.p.id);
+      if (error) { linked--; rej(a.p, 'write failed: ' + error.message.slice(0, 80)); final.pop(); }
+    }
   }
+}
+if (duplicates.length) {
+  console.log(`\nCATALOGUE DUPLICATES (same Etsy design published twice on the website; consider retiring one):`);
+  for (const d of duplicates) console.log(`  ${short(d.product.title)} (${d.product.slug.slice(0, 40)})  ==  ${short(d.sibling.title)} (${d.sibling.slug.slice(0, 40)})  listing ${d.listing}`);
+  fs.writeFileSync(new URL('./.video_duplicates.json', import.meta.url), JSON.stringify(duplicates.map((d) => ({ product: d.product.slug, sibling: d.sibling.slug, listing: d.listing })), null, 1));
 }
 console.log(`\nunlinked products: ${(unlinked || []).length} · ACCEPTED: ${linked} (${videos} with a video) · rejected: ${rejected.length} · Gemini checks: ${geminiCalls} (${geminiModel || 'none'})${DRY ? '   [dry run, nothing written]' : ''}`);
 console.log('\nAccepted  (website product  <=  Etsy listing · how · picture distance · AI):');
