@@ -1,0 +1,52 @@
+[
+  {
+    "key": "hero",
+    "alt": "Eight copies of the same whitetail buck relief carved in eight different woods, laid out in two rows on a workbench",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/hero.jpg"
+  },
+  {
+    "key": "cherry",
+    "alt": "The buck's head carved in cherry",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/cherry.jpg"
+  },
+  {
+    "key": "walnut",
+    "alt": "The buck's head carved in black walnut",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/walnut.jpg"
+  },
+  {
+    "key": "maple",
+    "alt": "The buck's head carved in hard maple",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/maple.jpg"
+  },
+  {
+    "key": "basswood",
+    "alt": "The buck's head carved in basswood",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/basswood.jpg"
+  },
+  {
+    "key": "oak",
+    "alt": "The buck's head carved in white oak, the coarse grain competing with the detail",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/oak.jpg"
+  },
+  {
+    "key": "poplar",
+    "alt": "The buck's head carved in poplar with its green and grey streaks",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/poplar.jpg"
+  },
+  {
+    "key": "sapele",
+    "alt": "The buck's head carved in sapele with its ribbon stripe",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/sapele.jpg"
+  },
+  {
+    "key": "pine",
+    "alt": "The buck's head carved in pine, with tear-out on the fine detail",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/pine.jpg"
+  },
+  {
+    "key": "grid",
+    "alt": "The same buck carved in eight woods, labelled: cherry, walnut, maple, basswood, oak, poplar, sapele, pine",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/grid.jpg"
+  }
+]

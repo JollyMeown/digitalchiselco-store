@@ -1,0 +1,129 @@
+<p>"The carving looks nothing like the picture." It is the message we receive more than any other, and it always arrives with a photograph of a panel that is, in fact, carved perfectly well. The file is fine. Something between the file and the eye has flattened it, and there are only seven things that can.</p>
+
+<p>This is the checklist, in the order to work through it. The order matters because the first causes are the most common and the cheapest to fix, and the last one, a genuinely flat file, is rare and cannot be fixed at all. Most people never get past number two.</p>
+
+<figure>
+  <img src="{{IMG:hero}}" alt="Two copies of the same wolf relief side by side: the left raw and pale and looking flat, the right finished with dark recesses and reading with full depth" loading="lazy" />
+  <figcaption>Identical carvings under identical light. The left one is what comes off the machine. The right one has been sealed, glazed and oiled. Nothing else changed.</figcaption>
+</figure>
+
+<h2 id="contents">The seven causes, in order</h2>
+<ul>
+  <li><a href="#c1">1. It is not finished yet</a></li>
+  <li><a href="#c2">2. It is lit from the wrong direction</a></li>
+  <li><a href="#c3">3. The depth was crushed to fit the board</a></li>
+  <li><a href="#c4">4. The bit was bigger than the detail</a></li>
+  <li><a href="#c5">5. The stepover was too coarse, or the machine deflected</a></li>
+  <li><a href="#c6">6. The wood fought the cutter</a></li>
+  <li><a href="#c7">7. The file was flat to begin with</a></li>
+  <li><a href="#order">Why this order</a></li>
+  <li><a href="#faq">Questions people ask</a></li>
+</ul>
+
+<h2 id="c1">1. It is not finished yet</h2>
+
+<p>Raw wood is one colour. The only thing that lets you see a raw carving at all is the shadow each edge happens to throw, and under the flat overhead light in most workshops that is almost nothing. A carving that looks lifeless straight off the machine is normal, and it is the state in which most people photograph it and decide the file is bad.</p>
+
+<p><strong>How to tell:</strong> the panel is pale and uniform, and it looks better in the morning by the window than it does at night under the shop light.</p>
+
+<p><strong>The fix:</strong> brush the fuzz off, seal, flood it with a dark glaze and wipe the glaze back off the high points, then oil. That single glaze step puts colour where the shadows already are and makes the depth read from across the room under any light. It is the whole first half of <a href="/blog/how-to-finish-cnc-relief-carvings#glaze">the finishing guide</a>, and it fixes more "flat" carvings than every other cause on this page combined.</p>
+
+<h2 id="c2">2. It is lit from the wrong direction</h2>
+
+<figure>
+  <img src="{{IMG:light}}" alt="The same finished relief photographed twice: lit flat from the front it looks shallow, lit from the side it shows every level" loading="lazy" />
+  <figcaption>The same finished panel. Left: light from the front, the way a ceiling fitting lights a wall. Right: light skimming across from the side. Relief is shadow; no shadow, no relief.</figcaption>
+</figure>
+
+<p>Relief is made of shadow. Light a carving from directly in front and every edge is lit equally, the shadows vanish, and a 14 mm relief looks like a print. Light it from the side, at a low angle, and the same panel becomes sculpture. Product photographs, ours included, are lit from the side for exactly this reason, and the wall above a sofa under a ceiling light is the worst place in the house for a relief.</p>
+
+<p><strong>How to tell:</strong> carry it to a window and turn it. If it comes alive as the light rakes across it, the carving is fine and the wall is wrong.</p>
+
+<p><strong>The fix:</strong> hang it where light arrives from the side, near a window or a lamp, or add a small picture light above it angled down. If it must go under a ceiling light, a darker glaze in the recesses partly makes up for the missing shadow.</p>
+
+<h2 id="c3">3. The depth was crushed to fit the board</h2>
+
+<figure>
+  <img src="{{IMG:shallow}}" alt="Two raw carvings of the same design edge-on: one at full depth, one with the depth crushed to fit a thin board" loading="lazy" />
+  <figcaption>Edge-on. Near: the file's own depth. Far: the same file with Z squashed to a third so it would fit a 3/4 inch board. From the front the far one looks "flat" and nobody can say why.</figcaption>
+</figure>
+
+<p>The board was 19 mm, the relief wanted 14, so the model height was typed down to 8 to leave a floor, and the layers collapsed into each other. This is the most common cause that is actually the carver's doing rather than the finish or the light, and it happens on import, in the size dialog, in a second.</p>
+
+<p><strong>How to tell:</strong> measure the deepest point with a depth gauge and compare it with what the file shipped at; the product page lists it. If the file says 14 mm and the panel says 8, this is it.</p>
+
+<p><strong>The fix:</strong> scale Z with X and Y, never independently; if the board is too thin for the result, use a thicker board rather than a thinner relief. <a href="/blog/how-to-scale-stl-files-for-cnc-routers#depth">The depth rule</a> and <a href="/blog/how-to-scale-stl-files-for-cnc-routers#floor">the floor rule</a> in the scaling guide are the two numbers to get right.</p>
+
+<h2 id="c4">4. The bit was bigger than the detail</h2>
+
+<p>A cutter cannot render a feature narrower than about two and a half times its tip. Carve a 300 mm face with a 1/8 inch ball nose and the eyelids, which are 2 mm wide at that size, simply do not exist in the wood. Everything larger is there; everything that gives the face its expression is gone; the result reads as flat even though the depth is correct.</p>
+
+<p><strong>How to tell:</strong> the big shapes are crisp and the small ones are soft or missing. Compare against the CAM's toolpath simulation, which knows the bit size, rather than the model render, which does not.</p>
+
+<p><strong>The fix:</strong> a 1/16 inch tapered ball nose for most panels and a 1/32 inch inside a boundary around faces and text. <a href="/blog/tapered-ball-nose-bits-relief-carving">The bits guide</a> has the table.</p>
+
+<h2 id="c5">5. The stepover was too coarse, or the machine deflected</h2>
+
+<p>Every raster line leaves a scallop beside it, and a 20% stepover leaves scallops big enough to read as texture from a metre away. The eye reads that texture as blur, and blur as shallowness. Deflection produces the same look unevenly: a belt-driven machine pushed too fast leaves ridges that vary across the panel.</p>
+
+<p><strong>How to tell:</strong> run a fingertip across a smooth area. Corduroy means stepover; ridges that come and go mean deflection.</p>
+
+<p><strong>The fix:</strong> 12 to 15% on the semi-finish, 8 to 10% inside a boundary on the detail, and a slower feed on a flexible machine. It costs time, which is why <a href="/blog/cnc-relief-carving-time">the carve-time guide</a> exists.</p>
+
+<h2 id="c6">6. The wood fought the cutter</h2>
+
+<p>Pine tears out at every fine edge. Oak's pores are as big as the detail and its grain pattern runs straight through a face. Basswood crushes rather than cuts under a small bit and fuzzes over the fine lines. All three give a carving that looks softer and flatter than the same file in cherry, before anyone has done anything wrong.</p>
+
+<p><strong>How to tell:</strong> the fuzz is worst where the cutter crossed the grain, and the grain pattern is as visible as the design.</p>
+
+<p><strong>The fix:</strong> a brass brush and a sharp cutter help; the real fix is the next board. <a href="/blog/best-wood-for-cnc-relief-carving">The wood guide</a> shows the same design in eight species so you can see exactly what each one does to it.</p>
+
+<h2 id="c7">7. The file was flat to begin with</h2>
+
+<p>Last, and rarest with a file from a studio that checks its work: the model itself has no depth grading. Sky, trees and subject all live in the same 3 mm, and no finish, light, bit or wood can put back layers that were never modelled.</p>
+
+<p><strong>How to tell:</strong> open the file in any viewer and look along the surface, edge-on. A good relief has countable levels; a flat one is a smooth bump. Do this before you carve, not after.</p>
+
+<p><strong>The fix:</strong> there is none, beyond a different file. <a href="/blog/what-makes-a-good-bas-relief-stl-file#depth">The profile test</a> in our file-quality guide takes thirty seconds and would have caught it.</p>
+
+<h2 id="order">Why this order</h2>
+
+<p>Because the first two causes explain most flat carvings and cost nothing to fix, and the last one cannot be fixed at all. Work down the list and stop when you find it. In our experience of the photographs people send:</p>
+
+<ul>
+  <li>about half are unfinished or badly lit,</li>
+  <li>a quarter had the depth crushed on import,</li>
+  <li>most of the rest are the bit or the stepover,</li>
+  <li>a few are the wood,</li>
+  <li>and almost none are the file.</li>
+</ul>
+
+<p>If you want a panel to practise the whole list on, the <a href="{{URL:portrait}}">{{TITLE:portrait}}</a> in the photographs has a pale moon that shows lighting and finish immediately, fur that shows stepover, and a clear subject-and-background split for the depth check.</p>
+
+<figure>
+  <a href="{{URL:portrait}}"><img src="{{MOCK:portrait}}" alt="{{TITLE:portrait}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:portrait}}">Download the howling wolf panel · {{PRICE:portrait}}</a></p>
+
+<h2 id="faq">Questions people ask</h2>
+
+<h3>Why does my CNC carving look flat?</h3>
+<p>Most often because it is unfinished and lit from the front. Seal, glaze the recesses dark, oil, and light it from the side. If it is still flat, check the depth was not reduced on import.</p>
+
+<h3>Why does my carving look blurry?</h3>
+<p>The finishing bit was larger than the fine detail, or the stepover was too coarse. Use a 1/16 or 1/32 inch tapered ball nose at 8 to 10% inside a boundary around the detail.</p>
+
+<h3>Is the file bad?</h3>
+<p>Rarely. Check it edge-on in a viewer: countable depth levels mean the file is fine and the cause is on this list; a smooth bump means the file is flat.</p>
+
+<h3>Does staining make a carving look deeper?</h3>
+<p>A glaze wiped back off the high points does, dramatically, because it puts dark colour in the recesses where the shadows belong. A uniform stain does not.</p>
+
+<h3>Where should I hang a relief carving?</h3>
+<p>Where light arrives from the side: near a window, under a picture light, or beside a lamp. Directly under a ceiling light is the worst place for it.</p>
+
+<hr />
+
+<p>Seven causes, in order, and the fix for almost all of them is an hour with a tin of glaze and a different wall. The file is the last thing to suspect, and the profile test tells you in thirty seconds whether to suspect it at all.</p>
+
+<p><em>Jolly, DigitalChiselCo</em></p>

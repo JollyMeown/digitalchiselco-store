@@ -1,0 +1,38 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "alt": "A finished first relief carving of a wolf held up proudly in two hands in a home workshop",
+    "scene": "Two hands hold up the finished panel from image 1, in the house finish, at chest height in a small home workshop, the carving facing the camera and fully visible between the hands, a modest desktop CNC router soft in the background. Warm evening light from a window at the left. The mood of a first finished piece. No face in frame.",
+    "hands": true,
+    "bench": false
+  },
+  {
+    "key": "clamp",
+    "aspect": "4:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "finish": false,
+    "alt": "A blank cherry board clamped flat on a CNC spoilboard with four low clamps at the corners, ready to carve",
+    "scene": "ON THE MACHINE, before any carving. A plain uncarved blank of pale cherry, about 25 by 30 cm and 25 mm thick, held flat on an MDF spoilboard by four low-profile aluminium clamps, one at each corner, well clear of the area to be carved; a small brass touch plate and a pencil mark for the origin at the front-left corner; a quarter inch flat end mill in the spindle above. Bright even workshop light. Nothing carved yet.",
+    "bench": false
+  },
+  {
+    "key": "roughing",
+    "aspect": "4:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "finish": false,
+    "alt": "The wolf design half way through the roughing pass, the right half still uncut blank and the left half stepped terraces",
+    "scene": "ON THE MACHINE, MID ROUGHING PASS. The blank cherry board from before: its LEFT half has been roughed into coarse stair-step terraces that show the wolf and moon from image 1 only as blocky stepped silhouettes; its RIGHT half is still flat untouched blank wood. A quarter inch flat end mill is in the collet at the boundary with chips flying, fresh sawdust piling on the spoilboard. Raw pale wood, no finish. Bright workshop light.",
+    "bench": false
+  },
+  {
+    "key": "back",
+    "aspect": "4:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "alt": "The back of the finished panel with a keyhole slot, felt bumpers and the maker's initials burned in",
+    "scene": "The finished panel from image 1 lies FACE DOWN on the bench so its plain oiled back fills the frame: a clean keyhole hanger slot routed at the top centre, two small brown felt bumpers at the bottom corners, and a small burned mark near the bottom edge that is a simple abstract maker's mark (a tiny carved-chisel symbol, no letters). Beside it a hand holds a brass sawtooth hanger for comparison. Bright soft light. No words anywhere.",
+    "hands": true,
+    "bench": true
+  }
+]

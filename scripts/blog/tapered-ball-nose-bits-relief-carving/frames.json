@@ -1,0 +1,37 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "bald-eagle-head-3d-relief-stl",
+    "alt": "Five tapered ball nose cutters laid in a row from largest to smallest in front of a finished eagle head relief carving",
+    "scene": "STILL LIFE, wide magazine shot. THE SUBJECT IS THE CARVED EAGLE HEAD PANEL FROM IMAGE 1, reproduced exactly: a bald eagle's head with its feathers, eye and beak, finished in warm satin cherry with the recesses antiqued dark brown so the relief reads. It stands propped at a slight angle at the back of the maple bench. In front of it, laid in a neat row from largest to smallest: FIVE tapered ball nose cutters (1/8 inch ball tip, 1/16 inch tapered, 1/32 inch tapered, 1 mm tapered, 0.5 mm tapered), plain unbranded polished carbide, 1/4 inch shanks, each with the long slim taper to a tiny rounded tip, and a brass collet beside them. Raking window light from the left. The eagle panel fills about half the frame behind the tools and must be clearly the eagle from image 1, not a texture sample.",
+    "bench": true,
+    "finish": false
+  },
+  {
+    "key": "scallop",
+    "aspect": "4:3",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle",
+    "finish": false,
+    "alt": "Three strips of the same carved wing at 25, 12 and 8 percent stepover, showing coarse, fine and invisible scallops",
+    "scene": "MACRO on one wing of the panel from image 1, raw pale unfinished cherry with no stain or finish, still on the machine. The wing is divided into THREE VERTICAL BANDS left to right, each carved with the same tapered ball nose at a different stepover: LEFT band shows coarse, obvious parallel scallop ridges like corduroy (25 percent stepover); MIDDLE band shows a fine, faint scallop texture (12 percent); RIGHT band is smooth with no visible tool marks at all (8 percent). The boundaries between the three bands are straight and clearly visible. Low raking light from the left so the ridges show. Fine sawdust in the recesses.",
+    "bench": false
+  },
+  {
+    "key": "geometry",
+    "aspect": "4:3",
+    "ref": null,
+    "finish": false,
+    "alt": "Diagram of a tapered ball nose cutter with its tip diameter, taper angle, cutting length and shank labelled, beside a straight ball nose for comparison",
+    "scene": "DRAWN locally by geometry_diagram.mjs; do not render."
+  },
+  {
+    "key": "broken",
+    "aspect": "4:3",
+    "ref": null,
+    "finish": false,
+    "alt": "A snapped straight 1/32 inch ball nose beside an intact tapered ball nose of the same tip size",
+    "scene": "MACRO STILL LIFE on the maple bench: two small carbide cutters side by side. LEFT: a STRAIGHT (non-tapered) 1/32 inch ball nose end mill, a very thin uniform rod the whole length of its cutting section, SNAPPED clean off about a centimetre from the shank, the broken stub and the snapped-off tip lying beside it. RIGHT: an intact TAPERED ball nose with the same tiny 1/32 inch tip but a thick conical body widening up to a 1/4 inch shank, clearly far more robust. Both plain unbranded polished carbide, no markings. Raking light from the left, shallow depth of field, fills the frame.",
+    "bench": true
+  }
+]

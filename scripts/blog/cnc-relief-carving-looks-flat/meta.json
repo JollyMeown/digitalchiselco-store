@@ -1,0 +1,13 @@
+{
+  "title": "Why Your CNC Relief Carving Looks Flat, and the Seven Fixes in Order",
+  "excerpt": "The carving is finished, it is nothing like the picture, and everyone blames the file. Nine times in ten it is one of seven things, and most of them take an hour to fix. Here they are in the order to check them, with what each one looks like.",
+  "seo_title": "CNC Relief Carving Looks Flat? 7 Causes and Fixes, in Order",
+  "seo_description": "Why a CNC relief carving looks flat or blurry: no finish, wrong light, crushed depth, bit too big for the detail, stepover too coarse, the wrong wood, or a flat file. How to tell which, and the fix for each, in the order to check.",
+  "cover": "hero",
+  "email": {
+    "subject": "Your carving looks flat. It is probably not the file",
+    "intro": "\"The carving looks nothing like the picture.\" It is the message we get most, and nine times in ten the file is fine. The panel is raw, or lit from the wrong side, or the depth was crushed to fit a thin board, or the bit was bigger than the eye.\n\nThe new guide lists the seven causes in the order to check them, with a photograph of what each one looks like and the fix. Most take an hour. Here is the same wolf, raw and finished, under the same light:",
+    "image": "hero",
+    "drip": true
+  }
+}

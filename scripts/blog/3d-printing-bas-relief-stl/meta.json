@@ -1,0 +1,13 @@
+{
+  "title": "3D Printing a Bas-Relief STL: Settings That Keep the Detail, and How to Make Plastic Look Like Wood",
+  "excerpt": "Relief files print beautifully if you print them flat, at fine layers, in the right material, and then paint them like a carving. Layer height, orientation, infill, FDM versus resin, the lettering problem, and the prime-wash-dry-brush finish that makes a print pass for wood.",
+  "seo_title": "3D Printing Bas-Relief STL Files: Best Settings, Orientation and Finishing",
+  "seo_description": "How to 3D print a bas-relief STL: layer height, flat orientation with no supports, infill, FDM versus resin, fixing lettering, and the primer, wash and dry-brush finish that makes a printed relief look like carved wood.",
+  "cover": "hero",
+  "email": {
+    "subject": "Printing our relief files: the settings, and the trick that makes plastic look like wood",
+    "intro": "A relief STL on a 3D printer is a different animal from the same file on a router: no grain, no fuzz, nothing to soak in, and one decision, the layer height, doing the job the cutter did.\n\nThe new guide covers the whole route: print it flat, at fine layers, with no supports; when to use resin instead; why lettering fails and how to fix it; and the primer, wash and dry-brush finish that makes a grey print pass for carved cherry across a room.",
+    "image": "hero",
+    "drip": true
+  }
+}

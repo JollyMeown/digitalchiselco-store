@@ -1,0 +1,27 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "extraRefs": ["bald-eagle-mountain-stl-relief-flying-eagle", "howling-wolf-moon-3d-relief-stl"],
+    "alt": "Three finished relief carvings displayed on a craft fair table with a linen cloth, small easels and blank kraft price tags",
+    "scene": "CRAFT FAIR TABLE, wide magazine shot. Three finished panels in the house finish stand on small wooden easels on a table covered in natural linen: the buck from image 1, the eagle scene from image 2 and the wolf from image 3, each exactly its own design. Each has a small plain kraft-paper tag on a string hanging from its easel, the tags BLANK with no writing. A folded stack of kraft gift boxes and a small wooden bowl of business-card-sized blank cards sit at one end. Soft daylight under a white canopy, other stalls softly out of focus behind. No people.",
+    "bench": false
+  },
+  {
+    "key": "boxed",
+    "aspect": "4:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "alt": "A finished wolf relief packed in a kraft box with tissue paper, a blank card and a sawtooth hanger fitted on the back",
+    "scene": "PACKING SHOT from above. The panel from image 1, in the house finish, lies face up in an open kraft box on ivory tissue paper. Beside it on the bench: a small blank cream card, a strip of undyed linen ribbon, and a second identical panel turned FACE DOWN showing its plain oiled back with a small brass sawtooth picture hanger fitted at the top centre and two felt bumpers at the bottom corners. Bright soft light, clean composition, nothing written anywhere.",
+    "bench": true
+  },
+  {
+    "key": "photo",
+    "aspect": "4:3",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle",
+    "alt": "A finished eagle relief being photographed on a plain background with a single lamp raking across it from the side",
+    "scene": "PRODUCT PHOTOGRAPHY SETUP, seen from behind the camera's shoulder. The finished panel from image 1, in the house finish, stands on a plain pale grey seamless background on the bench. To the LEFT a single small unbranded LED work lamp on a stand rakes light across the panel at a low angle so every carved edge throws a shadow; a white foam board on the right bounces a little light back. A plain unbranded camera on a tripod in the near foreground, slightly out of focus. The carving is tack sharp and reads with deep relief. No text, no logos.",
+    "bench": true
+  }
+]

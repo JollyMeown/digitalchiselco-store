@@ -1,0 +1,17 @@
+[
+  {
+    "key": "hero",
+    "alt": "Two copies of the same wolf relief side by side: the left raw and pale and looking flat, the right finished with dark recesses and reading with full depth",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-looks-flat/hero.jpg"
+  },
+  {
+    "key": "light",
+    "alt": "The same finished relief photographed twice: lit flat from the front it looks shallow, lit from the side it shows every level",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-looks-flat/light.jpg"
+  },
+  {
+    "key": "shallow",
+    "alt": "Two raw carvings of the same design edge-on: one at full depth, one with the depth crushed to fit a thin board",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-looks-flat/shallow.jpg"
+  }
+]

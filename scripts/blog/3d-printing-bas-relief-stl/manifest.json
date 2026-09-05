@@ -1,0 +1,27 @@
+[
+  {
+    "key": "hero",
+    "alt": "A 3D printed relief of the wolf design, painted to look like carved wood, standing beside the raw grey print it started as",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3d-printing-bas-relief-stl/hero.jpg"
+  },
+  {
+    "key": "layers",
+    "alt": "Macro of two raw grey prints of the same relief: one at a coarse layer height with visible stepping, one at a fine layer height that is smooth",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3d-printing-bas-relief-stl/layers.jpg"
+  },
+  {
+    "key": "orientation",
+    "alt": "Diagram: a relief plaque printed flat on the bed versus standing upright, with layer direction, supports and surface quality labelled",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3d-printing-bas-relief-stl/orientation.jpg"
+  },
+  {
+    "key": "paint",
+    "alt": "A hand dry-brushing pale highlights onto the raised edges of a primed and washed 3D printed wolf relief",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3d-printing-bas-relief-stl/paint.jpg"
+  },
+  {
+    "key": "resin",
+    "alt": "The same small relief printed twice: a grey resin print with crisp detail and an FDM print with visible layer lines",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3d-printing-bas-relief-stl/resin.jpg"
+  }
+]

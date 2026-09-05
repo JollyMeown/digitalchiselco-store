@@ -1,0 +1,157 @@
+<p>Everything else on this blog goes deep on one thing: the bits, the wood, the finish, the scaling, how to judge a file. This guide goes wide instead. It is the whole first carving, in order, from the file you download to the hanger on the back, with the deeper guide linked at each step for when you want it. If you own a router and have never carved a relief, start here. If you have carved one and it disappointed you, start here as well; the order is usually what went wrong.</p>
+
+<p>Plan a weekend and one board. The machine does most of the work, and the waiting, for oil to cure, is the part people underestimate.</p>
+
+<figure>
+  <img src="{{IMG:hero}}" alt="A finished first relief carving of a wolf held up proudly in two hands in a home workshop" loading="lazy" />
+  <figcaption>The end of the weekend. Everything below is how to get here without a single wasted board.</figcaption>
+</figure>
+
+<h2 id="contents">The steps, in order</h2>
+<ul>
+  <li><a href="#s1">1. Choose a file that will forgive you</a></li>
+  <li><a href="#s2">2. Choose the board</a></li>
+  <li><a href="#s3">3. Choose the three cutters</a></li>
+  <li><a href="#s4">4. Set up the job in your CAM</a></li>
+  <li><a href="#s5">5. Cut a test tile</a></li>
+  <li><a href="#s6">6. Clamp and zero</a></li>
+  <li><a href="#s7">7. The roughing pass</a></li>
+  <li><a href="#s8">8. The finishing passes</a></li>
+  <li><a href="#s9">9. Off the machine: fuzz, sanding, sealing</a></li>
+  <li><a href="#s10">10. Glaze, oil, wax</a></li>
+  <li><a href="#s11">11. The back, the hanger, the wall</a></li>
+  <li><a href="#wrong">If it went wrong</a></li>
+  <li><a href="#faq">Questions people ask</a></li>
+</ul>
+
+<h2 id="s1">1. Choose a file that will forgive you</h2>
+
+<p>Not a face, not a landscape with six layers, not text. For a first carve you want a single bold subject with a simple background, a clear split between the two, and no feature smaller than about 4 mm at the size you will carve. The <a href="{{URL:portrait}}">{{TITLE:portrait}}</a> in the photographs is the one we hand to beginners: fur to show you what stepover does, a plain moon that shows the finish off, and nothing that will punish a slightly coarse setting.</p>
+
+<p>Whatever you choose, open it in your CAM before you buy a board and look at it edge-on. Countable depth levels mean a good file. <a href="/blog/what-makes-a-good-bas-relief-stl-file">The file-quality guide</a> has the full inspection, and <a href="/blog/10-beginner-cnc-bas-relief-projects">ten beginner projects</a> is a list of files chosen for exactly this purpose.</p>
+
+<figure>
+  <a href="{{URL:portrait}}"><img src="{{MOCK:portrait}}" alt="{{TITLE:portrait}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:portrait}}">Download the howling wolf · {{PRICE:portrait}}</a></p>
+
+<h2 id="s2">2. Choose the board</h2>
+
+<p><strong>Cherry, 1 inch thick, 300 by 350 mm.</strong> That is the whole answer for a first carving. Cherry carves cleanly, holds detail, takes oil beautifully and is not expensive. One inch gives you 12 mm of relief and the 8 mm floor beneath it that the board needs to stay flat. Basswood if you want something softer and cheaper for a very first go; walnut if you want the easiest finish and can afford it. Not pine, not oak, not plywood.</p>
+
+<p><a href="/blog/best-wood-for-cnc-relief-carving">The wood guide</a> shows the same design carved in eight species so you can see why. Let the board sit in the workshop for a few days before you cut it, and look it over for knots in the area that will be carved.</p>
+
+<h2 id="s3">3. Choose the three cutters</h2>
+
+<ul>
+  <li><strong>1/4 inch two-flute flat end mill</strong>, for roughing.</li>
+  <li><strong>1/16 inch tapered ball nose</strong>, for the semi-finish over everything.</li>
+  <li><strong>1/32 inch (or 1 mm) tapered ball nose</strong>, for the fine pass over the wolf only.</li>
+</ul>
+
+<p>Tapered, not straight, for the two small ones. That single word is the difference between a cutter that lasts a year and one that snaps at hour three. <a href="/blog/tapered-ball-nose-bits-relief-carving">The bits guide</a> explains why and what each size can render. Buy a spare of the smallest.</p>
+
+<h2 id="s4">4. Set up the job in your CAM</h2>
+
+<p>The order matters, and it is the same in Aspire, VCarve, Carveco and Fusion; only the menus move.</p>
+
+<ol>
+  <li><strong>Material first.</strong> Type the board's real width, height and thickness, measured with a rule, before you import anything. Set the origin at the front-left corner and Z zero at the top of the material.</li>
+  <li><strong>Import the STL.</strong> Orient it carved-face-up with the flat back on the material surface. Lock the proportions and type the width you want, say 280 mm. Check the model height, which is now around 11 to 12 mm, leaves at least 8 mm of board beneath it. If it does not, reduce the width, not the height. <a href="/blog/how-to-scale-stl-files-for-cnc-routers">The scaling guide</a> is the long version.</li>
+  <li><strong>Roughing toolpath.</strong> 1/4 inch flat, Z-level or raster, 3 mm depth per pass, 45% stepover, 0.8 mm machining allowance, boundary set to the model's outline.</li>
+  <li><strong>Semi-finish toolpath.</strong> 1/16 inch tapered ball, raster at 45 degrees, 15% stepover, boundary the model outline.</li>
+  <li><strong>Fine toolpath.</strong> Draw a closed vector around the wolf. 1/32 inch tapered ball, raster at 90 degrees to the previous pass, 8% stepover, boundary that vector only.</li>
+  <li><strong>Simulate all three.</strong> Look at the simulation, not the model render; it knows your bit sizes. If the wolf's eye is there in the simulation it will be there in the wood.</li>
+  <li><strong>Post each toolpath as its own file</strong>, named so you cannot mix them up: 01-rough, 02-semi, 03-fine.</li>
+</ol>
+
+<p><a href="/blog/cnc-relief-carving-time">The carve-time guide</a> has feeds, RPM and the reasons behind each of those numbers. <a href="/blog/aspire-vcarve-carveco-fusion-360-comparison">The software comparison</a> has where each setting lives.</p>
+
+<h2 id="s5">5. Cut a test tile</h2>
+
+<p>Before the board goes on, cut the wolf's head alone, cropped to about 80 mm, on an offcut of the same cherry with the exact fine cutter and stepover you set up. It takes ten minutes. If the eye reads, everything downstream will work. If it does not, you have learned that on a scrap, and <a href="/blog/how-to-scale-stl-files-for-cnc-routers#tile">the test tile section</a> tells you which number to change.</p>
+
+<h2 id="s6">6. Clamp and zero</h2>
+
+<figure>
+  <img src="{{IMG:clamp}}" alt="A blank cherry board clamped flat on a CNC spoilboard with four low clamps at the corners, ready to carve" loading="lazy" />
+  <figcaption>Four low clamps at the corners, all outside the carved area, and the origin marked in pencil where the CAM expects it.</figcaption>
+</figure>
+
+<ul>
+  <li><strong>Clamps at the corners, outside the carving.</strong> Check the toolpath's extents in the CAM and keep every clamp clear of them by at least the cutter's radius. A cutter meeting a clamp at hour two is the classic first-carve disaster.</li>
+  <li><strong>Flat.</strong> Push down on each corner; if the board rocks, shim it. A rocking board chatters and the finish shows it.</li>
+  <li><strong>Origin.</strong> Jog the cutter to the front-left corner and zero X and Y there, exactly as the CAM was set up. Zero Z at the top of the board with a touch plate or a sheet of paper. Write the zero method on a sticky note; you will change cutters twice and re-zero Z each time.</li>
+  <li><strong>Dust.</strong> A relief throws a great deal of fine dust. Boot or shroud on, mask on.</li>
+</ul>
+
+<h2 id="s7">7. The roughing pass</h2>
+
+<figure>
+  <img src="{{IMG:roughing}}" alt="The wolf design half way through the roughing pass, the right half still uncut blank and the left half stepped terraces" loading="lazy" />
+  <figcaption>Half way through roughing. The terraces are the whole point: each step is wood the finishing cutter no longer has to remove.</figcaption>
+</figure>
+
+<p>Load 01-rough with the 1/4 inch flat in the collet, re-check Z, start at 50% feed override for the first minute to be sure nothing is wrong, then let it run at 100%. Twenty to forty minutes. It will look like a contour map when it is done, and that is correct.</p>
+
+<h2 id="s8">8. The finishing passes</h2>
+
+<p>Change to the 1/16 inch tapered ball, <strong>re-zero Z</strong> on the top of an uncut area of the board, load 02-semi and run it. An hour or so at 15%. Then change to the 1/32 inch, re-zero Z again, load 03-fine and run it over the wolf only; another hour. The whole carve is under three hours on most hobby machines. Without the roughing pass and the boundary it would have been a day and a half.</p>
+
+<h2 id="s9">9. Off the machine: fuzz, sanding, sealing</h2>
+
+<p>It will come off the machine pale, fuzzy and disappointing. That is normal and it is not the file. In order:</p>
+
+<ol>
+  <li>Brush the fuzz off with a soft brass brush, with the grain. A nylon abrasive wheel on a drill for the recesses.</li>
+  <li>Sand the high points only, 220 then 320, with a sponge, never into the background texture.</li>
+  <li>Wipe with a damp cloth, let it dry, knock the raised grain back with 320.</li>
+  <li>Seal with a thin coat of dewaxed shellac, into every recess, no pooling. Twenty minutes to dry.</li>
+</ol>
+
+<h2 id="s10">10. Glaze, oil, wax</h2>
+
+<p>The step that turns a carving that looks flat into one that reads across the room. Flood the whole panel with a dark gel stain or glaze, let it flash for a few minutes, then wipe it back off the raised surfaces with a rag; the dark stays in the recesses. Leave it a full day. Then two or three thin coats of Danish oil a day apart, coming back after ten minutes each time with a dry brush to lift any pooled oil out of the corners. Then a dark paste wax buffed with a shoe brush. <a href="/blog/how-to-finish-cnc-relief-carvings">The finishing guide</a> is the long version with products and photographs of every step.</p>
+
+<p>Lay the oily rags out flat outside to dry, or in a sealed metal can with water. Never in a bin. This is not optional.</p>
+
+<h2 id="s11">11. The back, the hanger, the wall</h2>
+
+<figure>
+  <img src="{{IMG:back}}" alt="The back of the finished panel with a keyhole slot, felt bumpers and the maker's initials burned in" loading="lazy" />
+  <figcaption>A keyhole slot or a sawtooth hanger, felt bumpers at the bottom, a wipe of oil, and your mark. Then it is finished, not just carved.</figcaption>
+</figure>
+
+<ul>
+  <li>Wipe the back with the same oil so the panel does not cup.</li>
+  <li>Fit a sawtooth hanger, or rout a keyhole slot before finishing if your CAM will add one, centred and level. Felt bumpers at the bottom corners.</li>
+  <li>Sign it: initials and the year, small, on the back.</li>
+  <li>Hang it where the light comes from the side, near a window or under a lamp. Directly under a ceiling light is the one place a relief looks flat. <a href="/blog/cnc-relief-carving-looks-flat#c2">Here is why</a>.</li>
+</ul>
+
+<h2 id="wrong">If it went wrong</h2>
+
+<p>Nearly every disappointing first carving is one of a short list, and most are fixed in an hour: it is unfinished, it is lit from the front, the depth was reduced on import, the bit was bigger than the detail, the stepover was coarse, or the wood fought the cutter. <a href="/blog/cnc-relief-carving-looks-flat">The "looks flat" guide</a> walks the list in the order to check it. The file is the last thing to suspect.</p>
+
+<h2 id="faq">Questions people ask</h2>
+
+<h3>How long does a first relief carving take?</h3>
+<p>Under three hours on the machine with a roughing pass and a boundary, and about a week of finishing, most of it waiting for oil to cure.</p>
+
+<h3>What is the best first file to carve?</h3>
+<p>A single bold subject with a plain background and nothing finer than 4 mm at your size. A wolf and moon, a single flower, a heart.</p>
+
+<h3>Which wood for a first carving?</h3>
+<p>Cherry, 1 inch thick. Basswood if you want it softer and cheaper.</p>
+
+<h3>Do I need to re-zero Z when I change cutters?</h3>
+<p>Yes, every time, on an uncut area of the board. Skipping it is how the fine pass ends up 2 mm too deep.</p>
+
+<h3>Why does it look flat off the machine?</h3>
+<p>Raw wood is one colour. Seal it, glaze the recesses dark, oil it, and light it from the side. It is finished when it reads from across the room, not when the machine stops.</p>
+
+<hr />
+
+<p>Eleven steps, one board, one weekend. Do them in this order and the first carving will be the one you keep, not the one you learn from.</p>
+
+<p><em>Jolly, DigitalChiselCo</em></p>

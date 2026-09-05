@@ -1,0 +1,180 @@
+<p>A relief STL on a 3D printer is a different animal from the same file on a router. There is no grain to fight, no fuzz to brush off, nothing for a finish to soak into, and no cutter deciding what detail survives. Instead one number, the layer height, does the job the cutter did, one decision, the orientation, decides whether the print is smooth or scarred, and the finish is paint rather than oil.</p>
+
+<p>Get those three right and a printed relief is genuinely hard to tell from a carving at arm's length. Get them wrong and you have a grey plastic blob with stair-steps across its face, which is what most first attempts look like. This is the whole route, from slicer to wall.</p>
+
+<figure>
+  <img src="{{IMG:hero}}" alt="A 3D printed relief of the wolf design, painted to look like carved wood, standing beside the raw grey print it started as" loading="lazy" />
+  <figcaption>Same print, before and after. The one on the right is grey PLA with primer, three coats of paint, a dark wash and a dry brush. It cost about forty cents in plastic.</figcaption>
+</figure>
+
+<h2 id="contents">In this guide</h2>
+<ul>
+  <li><a href="#different">What changes when the file is printed rather than carved</a></li>
+  <li><a href="#orientation">Orientation: flat, face up, no supports</a></li>
+  <li><a href="#layers">Layer height: the setting that is your cutter now</a></li>
+  <li><a href="#settings">The rest of the slicer settings</a></li>
+  <li><a href="#material">FDM or resin, and which filament</a></li>
+  <li><a href="#lettering">The lettering problem</a></li>
+  <li><a href="#scale">Scaling a relief for printing</a></li>
+  <li><a href="#finish">Finishing: making plastic look like wood</a></li>
+  <li><a href="#hang">Hanging and selling a printed relief</a></li>
+  <li><a href="#faq">Questions people ask</a></li>
+</ul>
+
+<h2 id="different">What changes when the file is printed rather than carved</h2>
+
+<p>Every relief in the <a href="/catalog">catalogue</a> is a closed, watertight mesh with a flat back, which is exactly what a slicer wants; the files print as they are, with no repair and no conversion. Three things do change:</p>
+
+<ul>
+  <li><strong>Detail is limited by the nozzle and the layer, not a bit.</strong> A 0.4 mm nozzle renders horizontal features down to about 0.8 mm, far finer than any router cutter; vertical resolution comes from the layer height, and that is where the decisions are.</li>
+  <li><strong>Overhangs matter and undercuts do not.</strong> A relief has no undercuts by definition, so printed flat it needs no supports at all. Print it upright and every leaf edge becomes an overhang.</li>
+  <li><strong>The surface is the finish.</strong> Wood has colour and grain that a clear oil reveals. Plastic has neither; everything the eye sees on a printed relief is paint. That is a lot of freedom and one extra afternoon.</li>
+</ul>
+
+<h2 id="orientation">Orientation: flat, face up, no supports</h2>
+
+<figure>
+  <img src="{{IMG:orientation}}" alt="Diagram: a relief plaque printed flat on the bed versus standing upright, with layer direction, supports and surface quality labelled" loading="lazy" />
+  <figcaption>Flat and face up. The back becomes the first layer and the bed makes it perfectly smooth, no supports touch the face, and the whole relief prints as one clean stack.</figcaption>
+</figure>
+
+<p>Lay the relief flat on the bed with the carved face up. The flat back is the first layer, so it comes off the bed glass-smooth and true; the relief rises from it with no overhang steeper than a hill, so it needs no supports; and nothing ever touches the carved face. This is the whole orientation rule, and the only exception is a lithophane, which prints standing up so the layers give it strength.</p>
+
+<p>People print reliefs upright because it looks like the "right way up" in the slicer. It is the wrong way up: every leaf and every lock of hair becomes an overhang, supports grow under all of them, and when the supports come off they take the surface with them.</p>
+
+<h2 id="layers">Layer height: the setting that is your cutter now</h2>
+
+<figure>
+  <img src="{{IMG:layers}}" alt="Macro of two raw grey prints of the same relief: one at a coarse layer height with visible stepping, one at a fine layer height that is smooth" loading="lazy" />
+  <figcaption>Left: 0.28 mm layers, and the muzzle is a contour map. Right: 0.08 mm, and it is a muzzle. Nothing else changed.</figcaption>
+</figure>
+
+<p>A relief is all gentle curves, and gentle curves are the worst case for layer stepping: each layer's edge shows as a contour line across the surface, and at 0.2 mm the wolf's muzzle looks like a topographic map. Finer layers put the contours closer together until the eye stops seeing them.</p>
+
+<table>
+  <thead><tr><th>Layer height</th><th>What the surface looks like</th><th>Print time, 200 mm relief</th></tr></thead>
+  <tbody>
+    <tr><td>0.28 mm</td><td>Obvious terraces on every curve. Draft only.</td><td>About 3 hours</td></tr>
+    <tr><td>0.20 mm</td><td>Visible stepping on faces and muzzles. Acceptable under heavy paint on a background, not on a subject.</td><td>4 to 5 hours</td></tr>
+    <tr><td>0.12 mm</td><td>Faint lines, gone under primer. The everyday setting.</td><td>7 to 8 hours</td></tr>
+    <tr><td>0.08 mm</td><td>Invisible. Faces, hair, anything you will look at closely.</td><td>10 to 12 hours</td></tr>
+    <tr><td>0.06 mm</td><td>No visible gain on a relief; the nozzle width limits it now.</td><td>14+ hours</td></tr>
+  </tbody>
+</table>
+
+<p>Variable layer height, which most slicers offer, is made for this job: fine layers where the surface is shallow-sloped (faces, backgrounds), coarser where it is steep (the sides of the relief). It gives 0.08 mm quality at close to 0.12 mm time. Turn it on and let the slicer place the layers.</p>
+
+<h2 id="settings">The rest of the slicer settings</h2>
+
+<ul>
+  <li><strong>Nozzle:</strong> 0.4 mm is fine. A 0.25 mm nozzle sharpens the very finest lines at a real cost in time; try it for a small face, not a wall panel.</li>
+  <li><strong>Infill:</strong> 10 to 15%, any pattern. A relief plaque is mostly solid surface anyway; the infill only fills the slab behind it.</li>
+  <li><strong>Walls:</strong> 3 perimeters, 4 top layers. Tops matter because the relief surface is all "top".</li>
+  <li><strong>Ironing:</strong> on, for the flat areas of the background. It polishes the top layer flat and hides the last of the lines.</li>
+  <li><strong>Supports:</strong> off. If the slicer wants to add them on a flat-printed relief, the file is not flat on the bed.</li>
+  <li><strong>Speed:</strong> slow the outer walls to 30 to 40 mm/s. Fine layers at high speed ring and smear on curves.</li>
+  <li><strong>Bed adhesion:</strong> a brim of 5 mm on a large plaque, because a warped corner lifts the relief off the bed at hour six.</li>
+</ul>
+
+<h2 id="material">FDM or resin, and which filament</h2>
+
+<figure>
+  <img src="{{IMG:resin}}" alt="The same small relief printed twice: a grey resin print with crisp detail and an FDM print with visible layer lines" loading="lazy" />
+  <figcaption>Resin left, FDM right, same file, same size. Resin wins on fine detail; FDM wins on size, cost and the ease of painting it.</figcaption>
+</figure>
+
+<p><strong>FDM</strong> (a normal filament printer) is the right tool for anything over about 150 mm. It is cheap, it prints a 300 mm plaque in one piece, the surface takes primer and paint well, and at 0.08 to 0.12 mm layers the result is excellent after painting.</p>
+
+<p><strong>Resin</strong> is the right tool for small, fine things: a face under 100 mm, a medallion, a coin, jewellery-scale ornament. The detail is astonishing and there are no layer lines to speak of. The trade is size (most resin printers top out around 200 mm), cost per piece, the mess, and a surface that needs washing, curing and a primer designed for resin before paint will stick.</p>
+
+<p><strong>Filament choices, in order of how well they take the wood look:</strong></p>
+<ul>
+  <li><strong>Matte PLA.</strong> The default. Prints easily, hides layers better than glossy PLA, takes primer and acrylic perfectly. Brown or tan if you can, so scratches do not show white.</li>
+  <li><strong>Wood-filled PLA.</strong> Real wood fibre in the plastic. It sands, it stains a little, and it smells like a workshop. Use a 0.5 or 0.6 mm nozzle because the fibres clog a 0.4, and expect a slightly softer surface. Beautiful when it works.</li>
+  <li><strong>PETG.</strong> Tougher and fine outdoors, but glossier and harder to paint. Scuff it with 320 grit before priming.</li>
+  <li><strong>Avoid</strong> silk and glossy filaments for anything you intend to paint; the sheen fights the primer and the layer lines shine.</li>
+</ul>
+
+<h2 id="lettering">The lettering problem</h2>
+
+<p>The single complaint we hear about printed reliefs is lettering, and it has a specific cause. Raised letters on a relief are thin walls a millimetre or two wide, and a 0.4 mm nozzle draws each stroke as two or three extrusion lines with nothing in between; the slicer either leaves a gap in the middle of the stroke or fattens it, and the serif corners round off. On a router the same letters are cut with a V-bit and come out crisp.</p>
+
+<p>Four fixes, in order of effort:</p>
+
+<ol>
+  <li><strong>Print bigger.</strong> Scaling a text panel up until the thinnest stroke is at least 2 mm solves it more often than anything else.</li>
+  <li><strong>Turn on "thin walls" or "gap fill"</strong> in the slicer, and set the line width to 0.42 or 0.45 mm so strokes fill in whole lines.</li>
+  <li><strong>A 0.25 mm nozzle</strong> for the text-heavy piece, accepting the time.</li>
+  <li><strong>Resin</strong>, for small signs and anything with fine serifs.</li>
+</ol>
+
+<h2 id="scale">Scaling a relief for printing</h2>
+
+<p>The depth rule from <a href="/blog/how-to-scale-stl-files-for-cnc-routers#depth">the scaling guide</a> holds: scale Z with X and Y so the proportions stay. Two things are easier on a printer than on a router: there is no board thickness to respect, so the "floor" behind the relief can be as thin as 3 mm and the print still holds; and there is no cutter, so the smallest feature that survives is set by the nozzle, around 0.8 mm, which means a file can be printed far smaller than it can be carved. A 400 mm carving file prints well at 120 mm, where a router would have lost the eyes.</p>
+
+<p>The one thing that does not scale is the back. Keep it flat and keep it at least 3 mm; slicers thin it out when a file is scaled down and a paper-thin back warps off the bed.</p>
+
+<h2 id="finish">Finishing: making plastic look like wood</h2>
+
+<figure>
+  <img src="{{IMG:paint}}" alt="A hand dry-brushing pale highlights onto the raised edges of a primed and washed 3D printed wolf relief" loading="lazy" />
+  <figcaption>The dry brush. Almost no paint on the bristles, dragged across the high edges only. It is the step that makes a print read as carved rather than moulded.</figcaption>
+</figure>
+
+<p>This is the printed equivalent of <a href="/blog/how-to-finish-cnc-relief-carvings#glaze">the antiquing step in the finishing guide</a>, and it does the same job: dark in the recesses, light on the edges, so the eye reads depth. Five steps, one afternoon, and it works on any filament colour.</p>
+
+<ol>
+  <li><strong>Kill the layer lines.</strong> Two or three light coats of a high-build filler primer from a spray can, sanded back with 400 grit between coats. This is most of the work and most of the difference. Skip it and every step below will show the lines through.</li>
+  <li><strong>Prime for colour.</strong> A thin coat of grey primer if you are going for wood tones, black if you want a bronze or pewter finish.</li>
+  <li><strong>Base coat.</strong> A warm mid-brown craft acrylic, two thin coats, brushed or airbrushed. This is the "cherry".</li>
+  <li><strong>Wash the recesses.</strong> A very dark brown or black acrylic thinned to the consistency of milk, flooded over everything and let to settle into the low areas; wipe the high points with a damp cloth before it dries. The recesses go dark exactly as a glaze does on wood.</li>
+  <li><strong>Dry brush the highlights.</strong> A pale tan on a stiff flat brush, wiped on a paper towel until it barely marks, then flicked across the raised edges. The moment the fur and the moon catch that pale edge, the print stops looking like plastic.</li>
+</ol>
+
+<p>Seal it with a matte or satin clear coat. Gloss destroys the illusion instantly. For the metallic look instead of wood, swap the base coat for a bronze acrylic and the dry brush for a gold rub, and use a black-green wash for verdigris.</p>
+
+<h2 id="hang">Hanging and selling a printed relief</h2>
+
+<p>A printed relief weighs a fraction of a carved one, so a single adhesive hook or a keyhole modelled into the back is enough; most slicers can add the keyhole with a "negative volume". Keep it out of direct sun, since PLA softens above about 60°C and a south-facing window in summer is enough to warp a thin plaque.</p>
+
+<p>Selling printed pieces is covered by the same licence as carved ones: the physical objects are yours to sell, the file is not. <a href="/blog/selling-cnc-relief-carvings">The selling guide</a> covers pricing; printed reliefs sit at a lower price point than carved wood and sell in volume at fairs, especially the small ones.</p>
+
+<p>Two designs that print particularly well, one for each printer:</p>
+
+<figure>
+  <a href="{{URL:portrait}}"><img src="{{MOCK:portrait}}" alt="{{TITLE:portrait}} carved in wood" loading="lazy" /></a>
+</figure>
+<p>The <a href="{{URL:portrait}}">{{TITLE:portrait}}</a> is the piece in the photographs above: bold shapes for FDM, a pale moon that shows the dry brush off, and fur that rewards fine layers.</p>
+<p><a class="dl-btn" href="{{URL:portrait}}">Download the howling wolf · {{PRICE:portrait}}</a></p>
+
+<figure>
+  <a href="{{URL:pet}}"><img src="{{MOCK:pet}}" alt="{{TITLE:pet}} carved in wood" loading="lazy" /></a>
+</figure>
+<p>The <a href="{{URL:pet}}">{{TITLE:pet}}</a> at 80 to 100 mm is a resin printer's piece: fine skin texture, a memorial people ask for by name, and small enough to make a dozen.</p>
+<p><a class="dl-btn" href="{{URL:pet}}">Download the paw memorial · {{PRICE:pet}}</a></p>
+
+<h2 id="faq">Questions people ask</h2>
+
+<h3>Can I 3D print a bas-relief STL made for CNC?</h3>
+<p>Yes, as it is. The files are watertight with a flat back, which is exactly what a slicer wants. Print flat, face up, no supports.</p>
+
+<h3>What layer height for a relief?</h3>
+<p>0.12 mm for most pieces, 0.08 mm for faces and anything looked at closely. 0.2 mm shows stepping on every curve.</p>
+
+<h3>Should I print a relief flat or standing up?</h3>
+<p>Flat, carved face up. Standing up needs supports on every overhang and they scar the face.</p>
+
+<h3>FDM or resin?</h3>
+<p>FDM for anything over about 150 mm, resin for small fine pieces under 100 mm such as faces and medallions.</p>
+
+<h3>How do I make a 3D print look like wood?</h3>
+<p>Filler primer to hide layers, a brown base coat, a dark wash into the recesses, a pale dry brush across the edges, and a matte clear coat. The wash and dry brush are what sell it.</p>
+
+<h3>Why does lettering print badly?</h3>
+<p>Thin raised strokes are narrower than a few nozzle widths and the slicer cannot fill them cleanly. Print bigger, enable thin-wall or gap fill, use a 0.25 mm nozzle, or print in resin.</p>
+
+<hr />
+
+<p>Flat, fine layers, matte filament, primer, wash, dry brush. That is the whole method, and it turns a forty-cent print of a file made for a router into something people pick up and turn over to check it is not wood.</p>
+
+<p><em>Jolly, DigitalChiselCo</em></p>

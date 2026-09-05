@@ -1,0 +1,90 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "alt": "Eight copies of the same whitetail buck relief carved in eight different woods, laid out in two rows on a workbench",
+    "finish": false,
+    "scene": "EIGHT COPIES OF THE SAME CARVING IN EIGHT DIFFERENT WOODS, wide magazine shot from above and slightly in front. The exact panel from image 1, carved identically eight times at about 20 cm wide, laid out in two neat rows of four on the bench. Each copy is finished with CLEAR OIL ONLY, no stain, no dark glaze, so each shows its own species' natural colour and grain. Top row left to right: cherry (warm reddish brown, fine even grain), black walnut (deep chocolate brown with darker streaks), hard maple (pale cream, extremely fine grain, crisp), basswood (pale cream, very soft and uniform, edges slightly fuzzy). Bottom row: white oak (tan with coarse open grain and ray fleck visibly competing with the detail), poplar (pale with green and grey streaks), sapele (reddish brown with interlocked ribbon stripe), pine (pale yellow with strong dark growth rings and visible tear-out on the fine detail). All eight identical in design and size, differing only in wood. Bright, even window light; nothing overlaps.",
+    "bench": true
+  },
+  {
+    "key": "cherry",
+    "aspect": "1:1",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "finish": false,
+    "alt": "The buck's head carved in cherry",
+    "scene": "SQUARE CLOSE-UP of the buck's head and antlers from image 1, carved in CHERRY: warm reddish brown, fine even grain, crisp detail. Finished with clear oil only, no stain, no dark glaze; the natural colour of cherry is the point. Raking light from the left. Fills the frame.",
+    "bench": true
+  },
+  {
+    "key": "walnut",
+    "aspect": "1:1",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "finish": false,
+    "alt": "The buck's head carved in black walnut",
+    "scene": "SQUARE CLOSE-UP of the buck's head and antlers from image 1, carved in BLACK WALNUT: deep chocolate brown with darker streaks, straight grain, crisp detail. Clear oil only, no stain, no glaze. Raking light from the left. Fills the frame.",
+    "bench": true
+  },
+  {
+    "key": "maple",
+    "aspect": "1:1",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "finish": false,
+    "alt": "The buck's head carved in hard maple",
+    "scene": "SQUARE CLOSE-UP of the buck's head and antlers from image 1, carved in HARD MAPLE: pale cream, extremely fine tight grain, the crispest detail of all, every hair line clean. Clear oil only, no stain. Raking light from the left. Fills the frame.",
+    "bench": true
+  },
+  {
+    "key": "basswood",
+    "aspect": "1:1",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "finish": false,
+    "alt": "The buck's head carved in basswood",
+    "scene": "SQUARE CLOSE-UP of the buck's head and antlers from image 1, carved in BASSWOOD: very pale cream, soft and uniform with almost no visible grain, edges of the finest detail slightly soft and a little fuzzy. Clear oil only, no stain. Raking light from the left. Fills the frame.",
+    "bench": true
+  },
+  {
+    "key": "oak",
+    "aspect": "1:1",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "finish": false,
+    "alt": "The buck's head carved in white oak, the coarse grain competing with the detail",
+    "scene": "SQUARE CLOSE-UP of the buck's head and antlers from image 1, carved in WHITE OAK: tan, with coarse OPEN grain lines and pale ray fleck running straight across the face and antlers and visibly competing with the carved detail. Clear oil only. Raking light from the left. Fills the frame.",
+    "bench": true
+  },
+  {
+    "key": "poplar",
+    "aspect": "1:1",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "finish": false,
+    "alt": "The buck's head carved in poplar with its green and grey streaks",
+    "scene": "SQUARE CLOSE-UP of the buck's head and antlers from image 1, carved in POPLAR: pale cream with distinct GREEN and GREY streaks running through the face, decent detail but slightly fuzzy edges. Clear oil only. Raking light from the left. Fills the frame.",
+    "bench": true
+  },
+  {
+    "key": "sapele",
+    "aspect": "1:1",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "finish": false,
+    "alt": "The buck's head carved in sapele with its ribbon stripe",
+    "scene": "SQUARE CLOSE-UP of the buck's head and antlers from image 1, carved in SAPELE. HARD RULES: the ENTIRE panel, background included, is the same warm reddish-brown sapele with a shimmering interlocked RIBBON-STRIPE figure of alternating lighter and darker bands running vertically through the face and background; NO dark stain, NO black glaze in the recesses, NO frame; bare wood with a thin clear oil only, so the background is the same colour as the deer. Crisp detail. Raking light from the left. Fills the frame.",
+    "bench": true
+  },
+  {
+    "key": "pine",
+    "aspect": "1:1",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "finish": false,
+    "alt": "The buck's head carved in pine, with tear-out on the fine detail",
+    "scene": "SQUARE CLOSE-UP of the buck's head and antlers from image 1, carved in cheap CONSTRUCTION PINE (softwood). HARD RULES: the wood is PALE CREAMY YELLOW, NOT brown, with bold DARK-AMBER GROWTH RINGS striping straight through the face and antlers like zebra stripes; the soft pale wood between the rings is TORN OUT and fuzzy at the antler tips, ear edges and around the eye, so those edges look ragged; there is a small dark resin knot near one edge. ABSOLUTELY NO dark stain, NO glaze, NO brown finish, NO frame; bare pale pine with at most a thin clear oil. Raking light from the left. Fills the frame.",
+    "bench": true
+  },
+  {
+    "key": "grid",
+    "aspect": "4:3",
+    "ref": null,
+    "alt": "The same buck carved in eight woods, labelled: cherry, walnut, maple, basswood, oak, poplar, sapele, pine",
+    "scene": "COMPOSED LOCALLY from the eight species tiles by compose_grid.mjs; do not render."
+  }
+]

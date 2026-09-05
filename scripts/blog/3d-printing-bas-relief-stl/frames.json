@@ -1,0 +1,45 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "alt": "A 3D printed relief of the wolf design, painted to look like carved wood, standing beside the raw grey print it started as",
+    "scene": "TWO VERSIONS OF THE SAME 3D PRINT side by side on the bench, wide magazine shot. LEFT: the design from image 1 as a RAW FDM 3D PRINT in plain matte grey PLA, flat-backed relief plaque about 20 cm wide, with faint but visible horizontal layer lines across the curved surfaces, sitting flat. RIGHT: an identical print that has been primed, painted in warm wood-brown tones with a dark wash in the recesses and pale dry-brushed highlights on the raised edges, so it looks convincingly like carved and glazed cherry (the house finish), standing propped upright. Same design, same size; only the surface treatment differs. Warm window light from the left.",
+    "bench": true
+  },
+  {
+    "key": "layers",
+    "aspect": "4:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "finish": false,
+    "alt": "Macro of two raw grey prints of the same relief: one at a coarse layer height with visible stepping, one at a fine layer height that is smooth",
+    "scene": "EXTREME MACRO on the wolf's muzzle and fur from image 1 as TWO RAW GREY PLA PRINTS side by side, split down the middle. LEFT: printed at a coarse 0.28 mm layer height, the curved surfaces show obvious stair-step layer lines like contour terraces. RIGHT: the same detail at 0.08 mm layers, smooth, the lines barely visible. Both plain matte grey plastic, no paint. Raking light from the left so the stepping shows. Fills the frame.",
+    "bench": true
+  },
+  {
+    "key": "orientation",
+    "aspect": "4:3",
+    "ref": null,
+    "finish": false,
+    "alt": "Diagram: a relief plaque printed flat on the bed versus standing upright, with layer direction, supports and surface quality labelled",
+    "scene": "DRAWN locally by orientation_diagram.mjs; do not render."
+  },
+  {
+    "key": "paint",
+    "aspect": "4:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "alt": "A hand dry-brushing pale highlights onto the raised edges of a primed and washed 3D printed wolf relief",
+    "scene": "A hand holds a flat, nearly dry paintbrush and drags it lightly ACROSS the raised edges of the relief from image 1, which is a 3D PRINT that has been primed and painted a warm brown with a dark wash settled into every recess; where the brush has passed, the high edges of the fur and moon carry a pale highlight that makes the print read as carved wood in the house finish. A small unlabelled pot of pale paint and a rag beside it. Bright soft light from the left, macro, hands and brush tack sharp.",
+    "hands": true,
+    "bench": true
+  },
+  {
+    "key": "resin",
+    "aspect": "4:3",
+    "ref": "cat-paw-print-3d-relief-stl-file",
+    "finish": false,
+    "alt": "The same small relief printed twice: a grey resin print with crisp detail and an FDM print with visible layer lines",
+    "scene": "TWO SMALL RAW PRINTS of the design from image 1 side by side on the bench, each about 8 cm across, both unpainted. LEFT: a RESIN print in matte grey, every fine line crisp and glassy-smooth with no layer lines at all. RIGHT: an FDM print in matte grey PLA, the same design, slightly softer with faint layer lines visible on the curves. Shot from slightly above under bright even light. No text.",
+    "bench": true
+  }
+]

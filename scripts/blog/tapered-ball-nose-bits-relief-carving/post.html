@@ -1,0 +1,187 @@
+<p>Every relief carving you have ever admired was finished by a tapered ball nose. It is the cutter that follows the surface, resolves the eye, and leaves the texture you either sand away or fall in love with. It is also the cutter people understand least: which tip to buy, why the taper is there, why the straight one snapped, and why the same bit gives a glassy finish on one panel and corduroy on the next.</p>
+
+<p>This is the whole subject in one place, with the numbers. It pairs with <a href="/blog/cnc-relief-carving-time">the carve-time guide</a>, which is about how many passes to run; this one is about what to run them with.</p>
+
+<figure>
+  <img src="{{IMG:hero}}" alt="Five tapered ball nose cutters laid in a row from largest to smallest in front of a finished eagle head relief carving" loading="lazy" />
+  <figcaption>Left to right: 1/8 inch, 1/16 inch, 1/32 inch, 1 mm and 0.5 mm tips. Three of these carve everything in the catalogue. The other two are for special cases.</figcaption>
+</figure>
+
+<h2 id="contents">In this guide</h2>
+<ul>
+  <li><a href="#what">What a tapered ball nose is, and why the taper matters</a></li>
+  <li><a href="#geometry">The geometry that matters</a></li>
+  <li><a href="#tips">Tip sizes and what each one can render</a></li>
+  <li><a href="#stepover">Stepover: the setting that decides the finish</a></li>
+  <li><a href="#walls">Taper angle and steep walls</a></li>
+  <li><a href="#feeds">Feeds and speeds on a hobby machine</a></li>
+  <li><a href="#snap">Why cutters snap, and why straight ball noses snap first</a></li>
+  <li><a href="#dull">Telling a dull bit from a bad file</a></li>
+  <li><a href="#set">The three-cutter set</a></li>
+  <li><a href="#buying">Buying and looking after them</a></li>
+  <li><a href="#faq">Questions people ask</a></li>
+</ul>
+
+<h2 id="what">What a tapered ball nose is, and why the taper matters</h2>
+
+<p>A ball nose cutter has a rounded tip, so it can sweep across a curved surface and leave a smooth one. A <em>tapered</em> ball nose has a tiny rounded tip at the end of a cone that widens up to a thick shank. The cone is the whole point.</p>
+
+<p>A straight 1/32 inch ball nose is a 0.8 mm rod, 15 mm long, with a 0.8 mm ball on the end. Push it sideways through walnut at 3,000 mm/min and it flexes, chatters, and eventually snaps, usually about three hours into the carve. A tapered cutter with the same 0.8 mm tip has a body that is 6 mm thick a few millimetres above the tip. It is stiffer by orders of magnitude, so it can run faster, cut cleaner, and survive. The price of that stiffness is that the cone cannot fit into a slot narrower than itself or follow a wall steeper than its own angle, and the rest of this article is about living with that trade.</p>
+
+<h2 id="geometry">The geometry that matters</h2>
+
+<figure>
+  <img src="{{IMG:geometry}}" alt="Diagram of a tapered ball nose cutter with its tip diameter, taper angle, cutting length and shank labelled, beside a straight ball nose for comparison" loading="lazy" />
+  <figcaption>Four numbers describe any tapered ball nose. Only the first two change how your carving looks; the other two decide whether the cutter survives.</figcaption>
+</figure>
+
+<ul>
+  <li><strong>Tip diameter.</strong> The size of the ball at the very end. This sets the smallest detail the cutter can render, and it is the number in the product name.</li>
+  <li><strong>Taper angle.</strong> How fast the cone widens, usually quoted per side: 5.4 degrees, 6.2 degrees and 7 degrees are the common ones. Smaller angle, slimmer cone, steeper walls reachable, less stiffness.</li>
+  <li><strong>Cutting length.</strong> How far up the cone the flutes go, typically 25 to 40 mm. It has to exceed the deepest point of your relief below the surrounding surface, or the shank will rub.</li>
+  <li><strong>Shank diameter.</strong> 1/4 inch (6.35 mm) on almost everything worth buying; 1/8 inch shanks exist for small machines and flex noticeably. Buy 1/4 inch if your collet allows it.</li>
+</ul>
+
+<h2 id="tips">Tip sizes and what each one can render</h2>
+
+<p>The rule from <a href="/blog/how-to-scale-stl-files-for-cnc-routers#bit">the scaling guide</a> applies here directly: <strong>a feature has to be about 2.5 times the tip diameter to render cleanly.</strong> Below that the ball averages it away.</p>
+
+<table>
+  <thead><tr><th>Tip</th><th>Renders down to</th><th>Typical job</th><th>Stepover for finish</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>1/8 inch (3.2 mm) ball, often straight</td><td>8 mm</td><td>Semi-finish over the whole panel; backgrounds; large panels</td><td>12 to 15%</td><td>Fast. Leaves a corduroy that the fine pass or a brush removes.</td></tr>
+    <tr><td>1/16 inch (1.6 mm) tapered</td><td>4 mm</td><td>The workhorse. Wildlife, scenes, feathers and fur at 300 mm and up</td><td>8 to 10%</td><td>If you own one cutter, own this.</td></tr>
+    <tr><td>1/32 inch (0.8 mm) tapered</td><td>2 mm</td><td>Faces under 300 mm, small text, ornament, eyes</td><td>8%</td><td>Always inside a boundary. Slow across a whole panel.</td></tr>
+    <tr><td>1 mm tapered</td><td>2.5 mm</td><td>Between the two above; a popular metric size</td><td>8 to 10%</td><td>Functionally close to 1/32 inch.</td></tr>
+    <tr><td>0.5 mm tapered</td><td>1.2 mm</td><td>Jewellery scale, tiny portraits, coin-sized work</td><td>6 to 8%</td><td>Fragile, slow, and rarely worth it on wood, whose fibres are coarser than the detail.</td></tr>
+  </tbody>
+</table>
+
+<p>The mistake almost everyone makes is buying the smallest tip on the theory that smaller is more detailed. It is more detailed only where the file has detail finer than 4 mm, which on a typical wildlife panel is the eye and not much else. Everywhere else a smaller tip is just a slower cutter.</p>
+
+<h2 id="stepover">Stepover: the setting that decides the finish</h2>
+
+<figure>
+  <img src="{{IMG:scallop}}" alt="Three strips of the same carved wing at 25, 12 and 8 percent stepover, showing coarse, fine and invisible scallops" loading="lazy" />
+  <figcaption>One cutter, three stepovers, one wing. Left, 25%: obvious ridges. Middle, 12%: a fine corduroy that disappears under a brush and oil. Right, 8%: invisible. The right band took three times as long as the left.</figcaption>
+</figure>
+
+<p>Stepover is the distance between one raster line and the next, written as a percentage of the tip diameter. Because a ball nose is round, each pass leaves a tiny ridge, a scallop, between itself and the previous one, and the stepover sets how tall the scallops are. That ridge is the "bit marks" people ask about.</p>
+
+<ul>
+  <li><strong>25%:</strong> visible ridges. Roughing or semi-finish only.</li>
+  <li><strong>12 to 15%:</strong> fine corduroy, invisible after a brush and a coat of oil on a background. The right setting for the semi-finish over the whole panel.</li>
+  <li><strong>8 to 10%:</strong> no visible marks. The right setting for the fine pass inside a boundary around the detail.</li>
+  <li><strong>Under 6%:</strong> wasted on wood. The fibres are coarser than the scallops you are removing, and the time doubles.</li>
+</ul>
+
+<p>Time scales inversely with stepover: halve it and you double the passes. That is why the fine setting belongs inside a boundary around the face and not across the whole sky. <a href="/blog/cnc-relief-carving-time#fine">The carve-time guide</a> shows how to draw that boundary in each CAM package.</p>
+
+<h2 id="walls">Taper angle and steep walls</h2>
+
+<p>A tapered cutter cannot follow a wall steeper than 90 degrees minus its taper angle. A 7 degree cutter cannot cut a wall steeper than 83 degrees; where the model has one, the cone rubs the wall above the tip and either gouges it or leaves it uncut. Three ways to handle it:</p>
+
+<ol>
+  <li><strong>Let the roughing pass cut the walls.</strong> A flat end mill has vertical sides. Rough with it and the steep walls are already there before the ball nose arrives; the ball nose then only has to skim them.</li>
+  <li><strong>Choose a smaller taper angle</strong> (5.4 degrees rather than 7) for models with near-vertical elements such as lettering or geometric borders.</li>
+  <li><strong>Ask whether the wall needs to be vertical.</strong> Good relief files are modelled with drafted walls for exactly this reason. Ours are.</li>
+</ol>
+
+<h2 id="feeds">Feeds and speeds on a hobby machine</h2>
+
+<p>Starting points in cherry, walnut or maple on a belt-driven or lead-screw hobby router. Back off 20% in oak; speed up 10% in basswood, because a sharp cutter moving fast leaves less fuzz in soft wood than a slow one.</p>
+
+<table>
+  <thead><tr><th>Cutter</th><th>RPM</th><th>Feed</th><th>Plunge</th><th>Depth per pass</th></tr></thead>
+  <tbody>
+    <tr><td>1/8 inch ball, semi-finish</td><td>18,000 to 20,000</td><td>2,500 to 3,500 mm/min (100 to 140 ipm)</td><td>800 mm/min</td><td>Skin only (0.5 to 1 mm left by roughing)</td></tr>
+    <tr><td>1/16 inch tapered, finish</td><td>18,000 to 22,000</td><td>2,000 to 3,000 mm/min (80 to 120 ipm)</td><td>600 mm/min</td><td>Skin only</td></tr>
+    <tr><td>1/32 inch or 1 mm tapered, detail</td><td>20,000 to 24,000</td><td>1,500 to 2,500 mm/min (60 to 100 ipm)</td><td>400 mm/min</td><td>Skin only</td></tr>
+    <tr><td>0.5 mm tapered</td><td>24,000</td><td>1,000 to 1,500 mm/min</td><td>250 mm/min</td><td>Skin only</td></tr>
+  </tbody>
+</table>
+
+<p>Two things that matter more than the exact numbers. First, a finishing cutter should only ever be removing the thin skin left by the roughing pass; if it is buried to the cone, the numbers above will snap it. Second, a rigid machine can run the top of each range and a flexible one should run the bottom, because deflection shows up as a rougher surface long before it shows up as a broken bit.</p>
+
+<h2 id="snap">Why cutters snap, and why straight ball noses snap first</h2>
+
+<figure>
+  <img src="{{IMG:broken}}" alt="A snapped straight 1/32 inch ball nose beside an intact tapered ball nose of the same tip size" loading="lazy" />
+  <figcaption>Same tip size. The straight one is a 0.8 mm rod trying to push sideways through hardwood; the tapered one has a cone behind it. Guess which one this happens to at hour three.</figcaption>
+</figure>
+
+<p>Cutters break from side load, and a finishing pass is almost all side load. The causes, in order of how often we see them:</p>
+
+<ol>
+  <li><strong>No roughing pass.</strong> The fine cutter is asked to remove 12 mm of stock in one line and buries itself. This breaks more bits than everything else combined.</li>
+  <li><strong>A straight cutter where a tapered one belonged.</strong> Anything under 1/16 inch should be tapered on wood, full stop.</li>
+  <li><strong>Plunging at feed rate.</strong> Set a separate plunge rate; the tip is the weakest part of the cutter and a plunge loads it end-on.</li>
+  <li><strong>A loose or dirty collet.</strong> Runout of a few hundredths of a millimetre at the tip of a tiny ball is a hammer blow on every revolution.</li>
+  <li><strong>A knot, a nail, or an embedded stone.</strong> Look at the board before you clamp it.</li>
+</ol>
+
+<h2 id="dull">Telling a dull bit from a bad file</h2>
+
+<p>A dull cutter and a poor file produce similar symptoms, and people blame the file. A dull cutter: fuzz along every edge where there was none last week, burnished shiny patches on the high points, faint burn marks on maple, a rising pitch from the spindle. A bad file: soft detail that was soft in the CAM preview too, and the same softness with a brand-new cutter. The test is cheap: run the same 80 mm test tile with a fresh cutter. If it comes out crisp, the bit was done.</p>
+
+<p>A tapered ball nose on hardwood is a consumable. Expect 30 to 60 hours of finishing from a good carbide one before it noticeably dulls, less in oak and maple. Budget for it the way you budget for sandpaper.</p>
+
+<h2 id="set">The three-cutter set</h2>
+
+<p>Three cutters carve every file in the <a href="/catalog">catalogue</a>:</p>
+
+<ol>
+  <li><strong>1/4 inch two-flute flat end mill</strong>, for roughing.</li>
+  <li><strong>1/16 inch tapered ball nose</strong>, for the semi-finish over everything and the finish on most wildlife and scenes.</li>
+  <li><strong>1/32 inch (or 1 mm) tapered ball nose</strong>, for faces, eyes and small text, inside a boundary.</li>
+</ol>
+
+<p>Add a 0.5 mm only when a specific piece demands it, and buy two of the 1/32 so a snap at hour three does not end the weekend. The eagle head in the photograph above was carved with exactly these three.</p>
+
+<figure>
+  <a href="{{URL:eagle}}"><img src="{{MOCK:eagle}}" alt="{{TITLE:eagle}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:eagle}}">Download the eagle head panel · {{PRICE:eagle}}</a></p>
+
+<h2 id="buying">Buying and looking after them</h2>
+
+<ul>
+  <li><strong>Solid carbide, 1/4 inch shank, two flutes.</strong> That describes every cutter you should buy. Single-flute tapers exist for very soft wood and plastics; they are not better on hardwood.</li>
+  <li><strong>Reputable makers cost more and last longer.</strong> The names carvers trust are well known; the no-name ten-packs are a false economy, because a dull cutter costs you an hour of brushing per panel and a snapped one costs a weekend.</li>
+  <li><strong>Coatings</strong> such as AlTiN or diamond-like carbon extend life in abrasive materials like MDF and do little in cherry. Plain polished carbide is fine for wood.</li>
+  <li><strong>Store them in the tubes they came in</strong>, tip up. A 0.8 mm carbide tip chips when it rolls against another cutter in a drawer.</li>
+  <li><strong>Mark the hours.</strong> A strip of tape on the tube with a tally of jobs tells you when a cutter is due before your carvings do.</li>
+</ul>
+
+<p>For a design that will show you the difference between a fresh 1/32 and a tired one, the <a href="{{URL:faith}}">{{TITLE:faith}}</a> is the honest test: eyes, beard and thorns in one panel.</p>
+
+<figure>
+  <a href="{{URL:faith}}"><img src="{{MOCK:faith}}" alt="{{TITLE:faith}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:faith}}">Download the Face of Christ panel · {{PRICE:faith}}</a></p>
+
+<h2 id="faq">Questions people ask</h2>
+
+<h3>What is the best bit for 3D relief carving?</h3>
+<p>A 1/16 inch tapered ball nose for almost everything, with a 1/32 inch tapered ball inside a boundary for faces and text. Rough first with a 1/4 inch flat end mill.</p>
+
+<h3>Tapered or straight ball nose?</h3>
+<p>Tapered for anything under 1/16 inch. The cone behind the tip is what stops it snapping and lets it run at a useful feed.</p>
+
+<h3>What stepover should I use?</h3>
+<p>12 to 15% for the semi-finish over the whole panel, 8 to 10% for the detail pass inside a boundary. Under 6% is wasted on wood.</p>
+
+<h3>Why does my carving have lines in it?</h3>
+<p>Those are scallops from too large a stepover for the cutter, or deflection on a flexible machine. Tighten the stepover on the detail, and slow the feed if the marks are uneven.</p>
+
+<h3>Why did my bit snap?</h3>
+<p>Almost always because it was buried in stock with no roughing pass, or because it was a straight cutter under 1/16 inch. Rough first, use tapered cutters, and set a slower plunge rate.</p>
+
+<h3>How long does a tapered ball nose last?</h3>
+<p>Roughly 30 to 60 hours of finishing in cherry or walnut for a good carbide cutter; less in maple and oak. Fuzz and shiny burnished high points mean it is done.</p>
+
+<hr />
+
+<p>Three cutters, a roughing pass, and a stepover matched to the tip. Get those right and the tapered ball nose stops being the thing that snaps at hour three and becomes what it was always meant to be: the cutter that makes a carving look carved.</p>
+
+<p><em>Jolly, DigitalChiselCo</em></p>
