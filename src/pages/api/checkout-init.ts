@@ -79,13 +79,19 @@ export const POST: APIRoute = async ({ request }) => {
     // min_subtotal / min_items gates run on DB prices, never browser-claimed ones).
     const [{ data: products }, { data: plans }] = await Promise.all([
       productIds.length
-        ? db.from('products').select('id, title, slug, price_usd, paddle_price_id').in('id', productIds).eq('active', true).gt('price_usd', 0)
+        ? db.from('products').select('id, title, slug, price_usd, paddle_price_id, is_subscription, membership_plan_slug').in('id', productIds).eq('active', true).gt('price_usd', 0)
         : { data: [] as any[] },
       membershipSlugs.length
         ? db.from('membership_plans').select('slug, name, price_usd, paddle_price_id').in('slug', membershipSlugs)
         : { data: [] as any[] },
     ] as any);
     const dbPriceById = new Map<string, number>((products || []).map((p: any) => [String(p.id), Number(p.price_usd)]));
+    // Memberships sold as catalogue PRODUCTS (is_subscription / membership_plan_slug)
+    // are memberships all the same: never a promo code, never the shop sale,
+    // never the member 10%, never counted toward a coupon's spend minimum.
+    // (Owner rule 2026-09-06: no membership plan ever gets a shop-wide discount.)
+    const membershipProductIds = new Set<string>((products || []).filter((p: any) => p.is_subscription || p.membership_plan_slug).map((p: any) => String(p.id)));
+    const isMembershipLine = (id: unknown) => String(id).startsWith('membership:') || membershipProductIds.has(String(id));
 
     // Resolve the fx rate for the requested currency — only trust a rate the
     // cron refreshed within the last 7 days; otherwise charge USD as always.
@@ -115,7 +121,7 @@ export const POST: APIRoute = async ({ request }) => {
         // the bundle is already a deep flat-price deal. Prices come from the DB
         // (unknown ids price as 0), so browser-inflated prices can't pass a
         // coupon's spend-minimum gate.
-        cart.filter((c) => !String(c.id).startsWith('membership:') && !String(c.id).startsWith('bundle5:')).map((c) => ({ id: c.id, price: dbPriceById.get(String(c.id)) ?? 0, qty: Number(c.qty) || 1 })),
+        cart.filter((c) => !isMembershipLine(c.id) && !String(c.id).startsWith('bundle5:')).map((c) => ({ id: c.id, price: dbPriceById.get(String(c.id)) ?? 0, qty: Number(c.qty) || 1 })),
         email ?? null,
       );
       if (!validation.ok) return json({ error: validation.error }, 400);
@@ -157,7 +163,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Pre-compute the product subtotal so we can pro-rate fixed-$ discounts
     const productSubtotal = cart.reduce((s, c) => {
-      if (String(c.id).startsWith('membership:')) return s;
+      if (isMembershipLine(c.id)) return s;
       const p = (products || []).find((x: any) => x.id === c.id);
       if (!p) return s;
       return s + Number(p.price_usd) * Math.max(1, Number(c.qty) || 1);
@@ -232,7 +238,8 @@ export const POST: APIRoute = async ({ request }) => {
         let unit = Number(p.price_usd);
         // Gift cards are never discounted: a discounted card would still mint a
         // coupon for its full face value (guaranteed loss).
-        const isGiftCard = String(p.slug || '').startsWith('gift-card-');
+        // Membership products are priced like membership plans: full price, always.
+        const isGiftCard = String(p.slug || '').startsWith('gift-card-') || membershipProductIds.has(String(p.id));
         // Scoped coupon: lines outside the coupon's scope keep full price.
         const inScope = !couponEligible || couponEligible.has(String(c.id));
         if (discountPercent && !isGiftCard && (inScope || !couponMeta)) unit = applyDiscount(unit, discountPercent);

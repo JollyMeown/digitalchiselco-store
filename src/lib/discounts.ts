@@ -70,6 +70,22 @@ export async function validateCoupon(rawCode: string, cart: CartLine[], email: s
     if (owned?.length) return { ok: false, error: 'You already own this design.' };
   }
 
+  // ── Memberships never take a code (owner rule 2026-09-06) ───────────────
+  // Plan lines ("membership:<slug>") and membership PRODUCTS (is_subscription /
+  // membership_plan_slug) are dropped before scope, minimum and amount checks,
+  // so a code can neither discount them nor be unlocked by their price.
+  {
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const ids = cart.map((l) => String(l.id)).filter((id) => uuidRe.test(id));
+    const memberIds = new Set<string>();
+    if (ids.length) {
+      const { data: mp } = await db.from('products').select('id').in('id', ids).or('is_subscription.eq.true,membership_plan_slug.not.is.null');
+      for (const r of mp || []) memberIds.add(String(r.id));
+    }
+    cart = cart.filter((l) => !String(l.id).startsWith('membership:') && !memberIds.has(String(l.id)));
+    if (!cart.length) return { ok: false, error: 'Promo codes do not apply to memberships. The membership is already the best price we offer.' };
+  }
+
   // ── Scope filtering ────────────────────────────────────────────────────
   // If the coupon is scoped to specific categories/products, restrict the
   // cart lines to ones inside that scope BEFORE checking min_items / min_total.
