@@ -21,7 +21,7 @@ const FAQ = [
   { q: 'Can I sell what I carve from it?', a: 'Yes. Custom designs carry the same commercial licence as every design in the shop. You may not resell or share the files themselves.' },
 ];
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: FAQ.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
-const serviceLd = { '@context': 'https://schema.org', '@type': 'Service', name: 'Custom bas-relief STL from your photo', provider: { '@type': 'Organization', name: 'DigitalChiselCo', url: 'https://digitalchiselco.com' }, areaServed: 'Worldwide', offers: { '@type': 'Offer', priceCurrency: 'USD', price: FROM, priceSpecification: { '@type': 'PriceSpecification', minPrice: FROM, priceCurrency: 'USD' } }, description: 'Original bas-relief STL and greyscale modelled from your own photo for CNC carving, laser and 3D printing. Quote within 24 hours, pay on approval.' };
+const serviceLd = { '@context': 'https://schema.org', '@type': 'Service', name: 'Custom bas-relief STL from your photo', provider: { '@type': 'Organization', name: 'DigitalChiselCo', url: 'https://digitalchiselco.com' }, areaServed: 'Worldwide', offers: { '@type': 'Offer', priceCurrency: 'USD', price: FROM, priceSpecification: { '@type': 'PriceSpecification', minPrice: FROM, priceCurrency: 'USD' } }, description: 'Bas-relief STL modelled from your own photo, sketch or concept for CNC carving, laser and 3D printing. Quote within 24 hours, pay on approval.' };
 const inputCls = 'w-full px-4 py-2.5 rounded-md border border-bronze-600/30 focus:outline-none focus:border-bronze-600 bg-white text-sm';
 ---
 <Shell
