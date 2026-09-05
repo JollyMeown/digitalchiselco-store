@@ -18,5 +18,10 @@
     "key": "poster",
     "alt": "Laser Studio poster: photos, 3D models and the night sky turned into ready-to-burn laser files on your own machine; 11 output styles, star maps, sundials, tumblers, boxes; 100 percent offline, one-time purchase",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/stl-files-for-laser-engraving-guide/poster.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "The relief design laser engraved as a grayscale burn on pale maple, lying beside the carved wooden version of the same design",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/stl-files-for-laser-engraving-guide/email.jpg"
   }
 ]

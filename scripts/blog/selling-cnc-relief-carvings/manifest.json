@@ -13,5 +13,10 @@
     "key": "photo",
     "alt": "A finished eagle relief being photographed on a plain background with a single lamp raking across it from the side",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/selling-cnc-relief-carvings/photo.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "A finished relief carving wrapped for sale with a kraft box, tissue paper, twine and a small hand-cut card, on a market table",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/selling-cnc-relief-carvings/email.jpg"
   }
 ]

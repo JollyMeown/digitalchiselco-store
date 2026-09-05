@@ -14,5 +14,14 @@
     "alt": "Four identical carvings of the same design side by side, indistinguishable from one another",
     "scene": "FOUR IDENTICAL COPIES of the panel from image 1, each about 22 cm wide, all in the house finish, standing side by side in a neat row on the bench, shot straight on. They are exactly the same design, same size, same finish, same crispness, deliberately indistinguishable from one another, like four prints from one plate. Even soft light, no drama. Nothing else in frame except the bench.",
     "bench": true
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl",
+    "alt": "The finished relief carving on the bench beside a closed laptop, two router cutters and a coiled USB cable",
+    "scene": "THE FILE AND THE RESULT. The finished panel from image 1, in the house finish, stands on the maple bench. Beside it a plain closed laptop, its lid shut so there is no screen visible at all, two router cutters standing in a small wooden block, a coiled black USB cable and a mug of coffee. Warm workshop light. No screens, no logos, no writing anywhere.",
+    "hands": false,
+    "bench": true
   }
 ]

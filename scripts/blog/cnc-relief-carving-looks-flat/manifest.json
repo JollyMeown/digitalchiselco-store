@@ -13,5 +13,10 @@
     "key": "shallow",
     "alt": "Two raw carvings of the same design edge-on: one at full depth, one with the depth crushed to fit a thin board",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-looks-flat/shallow.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "The same design carved twice, one shallow and pale that looks flat, one deep and glazed that reads with real depth",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-looks-flat/email.jpg"
   }
 ]

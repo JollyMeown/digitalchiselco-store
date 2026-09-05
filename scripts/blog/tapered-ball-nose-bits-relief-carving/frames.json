@@ -33,5 +33,15 @@
     "alt": "A snapped straight 1/32 inch ball nose beside an intact tapered ball nose of the same tip size",
     "scene": "MACRO STILL LIFE on the maple bench: two small carbide cutters side by side. LEFT: a STRAIGHT (non-tapered) 1/32 inch ball nose end mill, a very thin uniform rod the whole length of its cutting section, SNAPPED clean off about a centimetre from the shank, the broken stub and the snapped-off tip lying beside it. RIGHT: an intact TAPERED ball nose with the same tiny 1/32 inch tip but a thick conical body widening up to a 1/4 inch shank, clearly far more robust. Both plain unbranded polished carbide, no markings. Raking light from the left, shallow depth of field, fills the frame.",
     "bench": true
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "bald-eagle-head-3d-relief-stl",
+    "alt": "A tapered ball nose cutter finishing the relief, the fine scallop texture visible in raking light",
+    "scene": "MACRO, ON THE MACHINE. A 1/16 inch tapered ball nose cutter is in the collet, resting just above the surface of the design from image 1 in raw pale cherry, no finish yet. The finished two thirds of the surface show the fine even scallop texture of a finishing pass; the last third still shows the coarser stair-step terraces from roughing. Fine sawdust in the recesses. Raking light from the left so the scallops glint. No writing, no brand.",
+    "hands": false,
+    "bench": false,
+    "finish": false
   }
 ]

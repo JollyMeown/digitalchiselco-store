@@ -39,5 +39,14 @@
     "alt": "Carved Highland cow serving tray filled with cheese, grapes and crackers on a dining table",
     "scene": "The carved serving tray from image 1, in the house finish, sits flat on a linen runner on a dark walnut dining table, its compartments filled with cubes of aged cheddar, red grapes, water crackers, dried apricots and walnuts. A small dish of honey with a wooden dipper and two stemmed glasses stand behind it. Warm evening candlelight from the left plus soft overhead light. The tray is fully visible, filling about 65% of the frame, shot from a three-quarter angle above.",
     "bench": false
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "jumping-trout-3d-relief-stl-fly-fishing-mountain-river-scene-panel-cnc-router-ca",
+    "alt": "A finished relief carving being gift wrapped in kraft paper with twine and a sprig of pine",
+    "scene": "A GIFT. The finished panel from image 1, in the house finish, lies on the bench half wrapped in brown kraft paper, a length of natural twine tied in a bow across one corner, a small sprig of pine tucked under the twine, and a blank kraft tag. Two hands are smoothing the paper down. Warm evening light, festive but restrained. No writing anywhere.",
+    "hands": true,
+    "bench": true
   }
 ]

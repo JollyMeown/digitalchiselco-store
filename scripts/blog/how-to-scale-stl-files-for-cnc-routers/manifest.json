@@ -23,5 +23,10 @@
     "key": "test",
     "alt": "A small test tile of the buck's head carved on an offcut, held up against the full panel",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-scale-stl-files-for-cnc-routers/test.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "The same relief design carved at three sizes, small, medium and large, nested on the bench",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-scale-stl-files-for-cnc-routers/email.jpg"
   }
 ]

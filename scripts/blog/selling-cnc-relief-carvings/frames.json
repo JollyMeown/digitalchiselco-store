@@ -27,5 +27,14 @@
     "scene": "PRODUCT PHOTOGRAPHY SETUP, seen from behind the camera's shoulder. THE SUBJECT IS THE CARVED EAGLE MOUNTAIN SCENE FROM IMAGE 1, reproduced exactly (a soaring eagle over mountains and pines), finished in warm satin cherry with the recesses antiqued dark brown so the relief reads, standing on a plain pale grey seamless background on the bench. To the LEFT a single small plain black LED work lamp on a stand rakes light across the panel at a low angle so every carved edge throws a shadow; a white foam board on the right bounces light back. In the near foreground, slightly out of focus, the back of a plain matte-black camera on a tripod with ABSOLUTELY NO brand name, logo, lettering or badge anywhere on it or the lens. The carving is tack sharp. No text anywhere in the image.",
     "bench": true,
     "finish": false
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "alt": "A finished relief carving wrapped for sale with a kraft box, tissue paper, twine and a small hand-cut card, on a market table",
+    "scene": "READY TO SELL. The finished panel from image 1, in the house finish, lies on a linen-covered market table half wrapped in cream tissue paper, a folded kraft gift box and a length of natural twine beside it, and a small blank kraft card tucked under the twine. Soft daylight, a blurred craft-fair marquee in the background, no people, no writing anywhere.",
+    "hands": false,
+    "bench": false
   }
 ]

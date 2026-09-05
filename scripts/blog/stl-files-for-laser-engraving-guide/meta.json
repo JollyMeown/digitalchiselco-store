@@ -7,7 +7,7 @@
   "email": {
     "subject": "Your laser can engrave our relief files. Here is the one step that makes it work",
     "intro": "A laser cannot carve depth. It can fake it beautifully, and the same relief STL files that run on a router will run on an xTool, a Glowforge or an Ortur, as long as you do one conversion step properly.\n\nWe rewrote our laser guide from scratch: how a relief becomes a grayscale depth map, which lasers and materials actually read, LightBurn and xTool settings to start from, and the five mistakes that turn a good file into a muddy burn. Here is the butterfly heart as a burn rather than a carving:",
-    "image": "",
+    "image": "email",
     "drip": true
   }
 }

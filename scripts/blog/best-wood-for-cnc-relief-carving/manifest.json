@@ -48,5 +48,10 @@
     "key": "grid",
     "alt": "The same buck carved in eight woods, labelled: cherry, walnut, maple, basswood, oak, poplar, sapele, pine",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/grid.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "The same relief design carved in four different woods, cherry, walnut, maple and oak, fanned on the bench",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/best-wood-for-cnc-relief-carving/email.jpg"
   }
 ]

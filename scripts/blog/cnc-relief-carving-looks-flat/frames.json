@@ -23,5 +23,14 @@
     "alt": "Two raw carvings of the same design edge-on: one at full depth, one with the depth crushed to fit a thin board",
     "scene": "EDGE-ON COMPARISON, camera almost level with the bench surface, raw pale unfinished cherry, no stain. Two copies of the panel from image 1 lie flat, side by side LEFT and RIGHT, both seen edge-on so their carved surfaces read as silhouettes against a pale background. LEFT copy: carved at FULL depth, about 15 mm, the wolf and the moon standing up boldly in profile with clear separate levels, tall and sculptural. RIGHT copy: the same design carved at ONE QUARTER of that depth, about 4 mm, a barely-there ripple across the surface, flat and lifeless. The height difference between the two profiles must be dramatic and obvious. Raking light from the left.",
     "bench": true
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "alt": "The same design carved twice, one shallow and pale that looks flat, one deep and glazed that reads with real depth",
+    "scene": "SIDE BY SIDE, THE PROBLEM AND THE FIX. Two carvings of the design from image 1 lie together on the bench. LEFT: carved shallow in pale wood with no finish, the forms soft and flat-looking under even light. RIGHT: the same design carved at full depth in the house finish, the recesses dark, the high points warm and crisp, reading with dramatic depth. Raking light from the left so the difference is obvious. Nothing else in frame.",
+    "hands": false,
+    "bench": true
   }
 ]

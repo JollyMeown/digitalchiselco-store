@@ -23,5 +23,10 @@
     "key": "bits",
     "alt": "The three cutters that carve a relief, laid beside the finished panel: a flat end mill, a 1/8 inch tapered ball nose and a 1/16 inch tapered ball nose",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-time/bits.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "A relief panel mid-carve on the machine, half smooth and half still roughed, with the cutter at the boundary",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-time/email.jpg"
   }
 ]

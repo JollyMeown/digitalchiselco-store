@@ -41,5 +41,14 @@
     "alt": "The same small relief printed twice: a grey resin print with crisp detail and an FDM print with visible layer lines",
     "scene": "TWO SMALL RAW PRINTS of the design from image 1 side by side on the bench, each about 8 cm across, both unpainted. LEFT: a RESIN print in matte grey, every fine line crisp and glassy-smooth with no layer lines at all. RIGHT: an FDM print in matte grey PLA, the same design, slightly softer with faint layer lines visible on the curves. Shot from slightly above under bright even light. No text.",
     "bench": true
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "alt": "The relief design being printed flat on an FDM printer bed, the layers visible, with a finished print beside the printer",
+    "scene": "ON THE PRINTER. The design from image 1 is being 3D printed FLAT on the bed of a plain unbranded desktop FDM printer, about two thirds complete, the fine layer lines visible on the raised parts and the nozzle paused just above it. Beside the printer on the bench sits a finished print of the same design in matte grey filament, next to a small tin of primer and a brush. Clean workshop light. The finish swatch applies only to the wooden bench, not the prints.",
+    "hands": false,
+    "bench": true
   }
 ]

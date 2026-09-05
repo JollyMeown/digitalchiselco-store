@@ -38,5 +38,15 @@
     "alt": "The three cutters that carve a relief, laid beside the finished panel: a flat end mill, a 1/8 inch tapered ball nose and a 1/16 inch tapered ball nose",
     "scene": "STILL LIFE on the bench. The panel from image 1, now FINISHED in the house finish, stands propped at a slight angle at the back. In front of it, laid neatly on the maple bench in a row from thick to thin: a quarter inch two-flute flat end mill, a 1/8 inch tapered ball nose cutter, and a 1/16 inch tapered ball nose cutter, all plain unbranded carbide with polished shanks, each about 6 cm long, lying parallel with a little space between. A small brass-coloured collet beside them. Raking window light from the left so the flutes glint. Tight, calm composition; the panel fills about 50% of the frame behind the tools.",
     "bench": true
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl",
+    "alt": "A relief panel mid-carve on the machine, half smooth and half still roughed, with the cutter at the boundary",
+    "scene": "WHERE THE HOURS GO. The design from image 1, EXACTLY as shown and nothing added to it, on the machine bed in raw cherry, no finish: the LEFT half already smooth from the finishing pass, the RIGHT half still in coarse roughing terraces, a tapered ball nose cutter in the collet exactly at the boundary, sawdust piled on the spoilboard. Bright workshop light. ABSOLUTELY NO LETTERS, WORDS, NUMBERS OR CARVED TEXT anywhere on the panel or in the picture; no timer, no clock, no dial.",
+    "hands": false,
+    "bench": false,
+    "finish": false
   }
 ]

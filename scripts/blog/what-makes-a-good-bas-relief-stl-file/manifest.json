@@ -18,5 +18,10 @@
     "key": "scrap",
     "alt": "A small test carving of the eagle's head on a cheap pine offcut, held beside the finished panel",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/what-makes-a-good-bas-relief-stl-file/scrap.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "Extreme close-up of crisp carved detail on the finished relief under raking light",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/what-makes-a-good-bas-relief-stl-file/email.jpg"
   }
 ]

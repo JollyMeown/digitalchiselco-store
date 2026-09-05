@@ -7,7 +7,7 @@
   "email": {
     "subject": "Printing our relief files: the settings, and the trick that makes plastic look like wood",
     "intro": "A relief STL on a 3D printer is a different animal from the same file on a router: no grain, no fuzz, nothing to soak in, and one decision, the layer height, doing the job the cutter did.\n\nThe new guide covers the whole route: print it flat, at fine layers, with no supports; when to use resin instead; why lettering fails and how to fix it; and the primer, wash and dry-brush finish that makes a grey print pass for carved cherry across a room.",
-    "image": "",
+    "image": "email",
     "drip": true
   }
 }

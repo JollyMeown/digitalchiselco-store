@@ -86,5 +86,14 @@
     "ref": null,
     "alt": "The same buck carved in eight woods, labelled: cherry, walnut, maple, basswood, oak, poplar, sapele, pine",
     "scene": "COMPOSED LOCALLY from the eight species tiles by compose_grid.mjs; do not render."
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-fi",
+    "alt": "The same relief design carved in four different woods, cherry, walnut, maple and oak, fanned on the bench",
+    "scene": "FOUR WOODS, ONE DESIGN. Four small panels of the design from image 1, each about 20 cm, carved identically and finished with the house finish, fanned in a row on the maple bench: cherry (warm salmon-red), black walnut (deep chocolate), hard maple (pale cream) and red oak (open golden grain). The grain and colour of each wood are clearly different; the carving is the same. Soft even daylight, shot from slightly above.",
+    "hands": false,
+    "bench": true
   }
 ]

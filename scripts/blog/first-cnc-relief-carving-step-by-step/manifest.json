@@ -53,5 +53,10 @@
     "key": "plan",
     "alt": "Drawn plan of the three toolpaths seen from above: roughing and semi-finish inside the model outline, the fine pass inside a boundary around the wolf",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/plan.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "The finished first relief carving on the workbench with the three cutters, the test tile and a keyhole hanger laid out in front of it",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/email.jpg"
   }
 ]

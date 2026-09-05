@@ -23,5 +23,10 @@
     "key": "table",
     "alt": "Carved Highland cow serving tray filled with cheese, grapes and crackers on a dining table",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/carved-wood-gift-guide/table.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "A finished relief carving being gift wrapped in kraft paper with twine and a sprig of pine",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/carved-wood-gift-guide/email.jpg"
   }
 ]

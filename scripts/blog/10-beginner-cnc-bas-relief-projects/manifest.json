@@ -18,5 +18,10 @@
     "key": "ladder",
     "alt": "Three finished carvings standing in a row, small to large: a heart, a wolf, and an eagle landscape",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/10-beginner-cnc-bas-relief-projects/ladder.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "Four small beginner relief carvings laid out on the bench, a heart, a feather, a leaf and a small animal",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/10-beginner-cnc-bas-relief-projects/email.jpg"
   }
 ]

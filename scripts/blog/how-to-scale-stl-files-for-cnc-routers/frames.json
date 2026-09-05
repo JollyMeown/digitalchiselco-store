@@ -40,5 +40,14 @@
     "scene": "A hand holds up a small square TEST TILE, about 8 cm square, cut from an offcut of the same cherry, raw pale unfinished wood, fresh from the machine. Carved on the tile is an EXACT CROP of the buck's head from image 1: THE SAME head, THE SAME pose, THE SAME antlers, ears and eye, at the same angle, as if a square had been cut out of the big panel's design around the head and carved on its own. It must be recognisably the identical animal, not a different deer. Behind the tile, slightly out of focus, stands the full finished panel from image 1 in the house finish, so the viewer can compare the head on the tile with the same head on the panel. The tile is tack sharp and fills about a third of the frame. Workshop light from the left.",
     "hands": true,
     "bench": true
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-file-deer-head-forest-",
+    "alt": "The same relief design carved at three sizes, small, medium and large, nested on the bench",
+    "scene": "ONE FILE, THREE SIZES. Three carvings of the design from image 1, all in the house finish, arranged in a row on the maple bench: a small one about 10 cm, a medium one about 20 cm, a large one about 40 cm. The detail on all three is equally crisp; only the size changes. A steel rule lies along the front edge of the bench. Soft even daylight, shot from slightly above.",
+    "hands": false,
+    "bench": true
   }
 ]

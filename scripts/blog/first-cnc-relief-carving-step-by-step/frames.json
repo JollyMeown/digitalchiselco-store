@@ -98,5 +98,14 @@
     "finish": false,
     "alt": "Drawn plan of the three toolpaths seen from above: roughing and semi-finish inside the model outline, the fine pass inside a boundary around the wolf",
     "scene": "DRAWN locally by toolpath_diagram.mjs; do not render."
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "alt": "The finished first relief carving on the workbench with the three cutters, the test tile and a keyhole hanger laid out in front of it",
+    "scene": "THE WHOLE GUIDE IN ONE FRAME. The finished panel from image 1, in the house finish, stands propped against the wall at the back of the maple bench. Laid out neatly in front of it, left to right: three plain unmarked router cutters lying loose on the bench (a flat end mill and two tapered ball noses of different tip sizes), a small square test tile of raw cherry carved with just the head of the same design, a soft brass brush, a folded cotton rag, and a brass keyhole hanger with two screws. Warm window light from the left, the mood of a job well done. NO labels, NO printed sizes, NO letters or numbers anywhere in the picture.",
+    "hands": false,
+    "bench": true
   }
 ]

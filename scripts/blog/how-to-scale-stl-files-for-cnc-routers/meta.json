@@ -7,7 +7,7 @@
   "email": {
     "subject": "Why a scaled-down carving looks like mud, and the three numbers that fix it",
     "intro": "Scaling a relief STL down by half sounds harmless. Carve it, and every face has the same expression and every petal looks like a thumbprint. The file was fine. The scaling was wrong.\n\nWe have rewritten our scaling guide from the ground up: the depth rule, the bit-to-feature rule, the floor you must leave in the board, a size table you can pin to the wall, and where every setting lives in Aspire, VCarve, Carveco and Fusion. Here is the same buck carved at three sizes:",
-    "image": "",
+    "image": "email",
     "drip": true
   }
 }

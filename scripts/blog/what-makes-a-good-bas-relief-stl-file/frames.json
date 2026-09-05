@@ -31,5 +31,14 @@
     "scene": "A hand holds up a small rectangular TEST CUT, about 10 by 8 cm, on a cheap pale pine offcut with visible soft grain, on which only the eagle's head from image 1 has been carved, raw and unfinished, a little fuzzy at the edges as pine is. Behind it and slightly out of focus stands the full finished panel from image 1 in the house finish. The test piece is tack sharp and fills about a third of the frame. Workshop light from the left.",
     "hands": true,
     "bench": true
+  },
+  {
+    "key": "email",
+    "aspect": "16:9",
+    "ref": "face-of-jesus-crucifixion-3d-relief-stl-crown-of-thorns-cross-wood-grain-carving",
+    "alt": "Extreme close-up of crisp carved detail on the finished relief under raking light",
+    "scene": "CLOSE-UP OF QUALITY. A close-up of the most detailed and RECOGNISABLE part of the finished panel from image 1 in the house finish, the face and eyes, filling about two thirds of the frame with the rest of the carving falling softly out of focus around it: crisp clean edges, fine overlapping detail, no tearing, no fuzz, the surface catching hard raking light from the left so every ridge throws a small shadow. The subject must be clearly identifiable as the design in image 1, not an abstract texture.",
+    "hands": false,
+    "bench": false
   }
 ]

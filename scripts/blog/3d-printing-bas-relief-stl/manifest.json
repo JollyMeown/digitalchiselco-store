@@ -23,5 +23,10 @@
     "key": "resin",
     "alt": "The same small relief printed twice: a grey resin print with crisp detail and an FDM print with visible layer lines",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3d-printing-bas-relief-stl/resin.jpg"
+  },
+  {
+    "key": "email",
+    "alt": "The relief design being printed flat on an FDM printer bed, the layers visible, with a finished print beside the printer",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3d-printing-bas-relief-stl/email.jpg"
   }
 ]
