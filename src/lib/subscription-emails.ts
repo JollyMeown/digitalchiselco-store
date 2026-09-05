@@ -107,6 +107,11 @@ function bonusSection(d: DropEmailData): string {
       <p style="text-align:center;margin:14px 0 0;">${btn(d.bonusLink, '&#11088; Download the bonus files', false)}</p>
     </div>`;
   }
+  if (d.isPremium && !d.bonusLink) {
+    // A Premium member whose pack month predates the bonus bundles (for
+    // example a September 2026 first pack): say so instead of staying silent.
+    return `<p style="margin:18px 0 0;font-size:12.5px;line-height:1.6;color:#8a7a68;">&#11088; Your Premium bonus designs begin with ${d.nextPackLabel ? `the <strong>${esc(d.nextPackLabel)}</strong> pack` : 'your next pack'}, two extra designs every month on top of the eight above.</p>`;
+  }
   if (!d.isPremium && d.hasBonus) {
     return `<p style="margin:18px 0 0;font-size:12.5px;line-height:1.6;color:#8a7a68;">Premium members also received two bonus designs this month. <a href="${SITE}/membership" style="color:${BRONZE};">See the 12-month Premium plan</a>.</p>`;
   }

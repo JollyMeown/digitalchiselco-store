@@ -37,7 +37,7 @@ export const MEMBER_FAQ: QA[] = [
     a: 'Yes. Tell us the email you used and we add your term here with its original start date and the packs you already received, so you get only the months still owed and nothing twice. Your packs then live in your account like everyone else\'s.' },
 
   { group: 'Premium', q: 'What does the 12-month Premium plan add?',
-    a: 'Two extra designs every month in a separate bonus bundle, on top of the standard eight, plus the lowest monthly price of any plan. The Premium plan is available from October 2026.' },
+    a: 'Two extra designs every month in a separate bonus bundle, on top of the standard eight, plus the lowest monthly price of any plan and a 10% member discount on every single design in the catalogue while your term runs. Bonus bundles ship with every pack from October 2026 onwards; a Premium member whose first pack is an earlier month gets that pack\'s standard designs and the bonus starts with the next one.' },
   { group: 'Premium', q: 'I am on a standard plan. Can I get the bonus designs?',
     a: 'Upgrade to Premium from your account or the membership page. Your upgrade starts immediately, your remaining standard months are carried over, and the next pack email includes the bonus bundle.' },
 
