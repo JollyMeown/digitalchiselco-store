@@ -2,7 +2,9 @@
 import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { getMembershipPlans } from '../lib/queries';
-const plans = await getMembershipPlans();
+// ?preview=1 shows plans whose launch date has not arrived (owner testing).
+const preview = Astro.url.searchParams.get('preview') === '1';
+const plans = await getMembershipPlans({ preview });
 const featured = plans.find((p) => p.highlight) || plans[0];
 ---
 <Shell title="Become a Member · DigitalChiselCo" description="CNC STL membership — 8 fresh bas-relief STL designs every month, 24 carving files for $20. Instant first pack, commercial use, no recurring charge." scrollPastBanner={true}>

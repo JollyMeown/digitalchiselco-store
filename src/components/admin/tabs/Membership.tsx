@@ -219,6 +219,7 @@ function PlanForm({ open, onClose, onSaved, existing }: any) {
       months: Number(f.months) || 0, files_per_month: Number(f.files_per_month) || 0,
       price_usd: Number(f.price_usd) || 0, original_price_usd: Number(f.original_price_usd) || null,
       features, active: !!f.active, sort_order: Number(f.sort_order) || 0, highlight: !!f.highlight,
+      available_from: f.available_from ? String(f.available_from).slice(0, 10) : null,
     };
     const { error } = existing
       ? await supabase.from('membership_plans').update(payload).eq('id', existing.id)
@@ -237,6 +238,7 @@ function PlanForm({ open, onClose, onSaved, existing }: any) {
         <div><label className={labelCls}>Retail value (strikethrough)</label><input type="number" step="0.01" value={f.original_price_usd} onChange={(e) => setF({ ...f, original_price_usd: e.target.value })} className={inputCls} /></div>
         <div className="md:col-span-2"><label className={labelCls}>Features (one per line)</label><textarea rows={5} value={f.features_text} onChange={(e) => setF({ ...f, features_text: e.target.value })} className={inputCls} /></div>
         <div><label className={labelCls}>Sort</label><input type="number" value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} className={inputCls} /></div>
+        <div><label className={labelCls}>Public from <span className="text-ink-700/40">(blank = now; hidden from the plan picker before this date, still buyable via /membership?preview=1)</span></label><input type="date" value={f.available_from ? String(f.available_from).slice(0, 10) : ''} onChange={(e) => setF({ ...f, available_from: e.target.value || null })} className={inputCls} /></div>
         <div className="flex items-end gap-4">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Active</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.highlight} onChange={(e) => setF({ ...f, highlight: e.target.checked })} /> Featured</label>

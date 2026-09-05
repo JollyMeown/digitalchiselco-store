@@ -289,14 +289,20 @@ export type MembershipPlan = {
   price_usd: number; original_price_usd: number | null; features: string[];
   highlight: boolean; sort_order: number;
 };
-export async function getMembershipPlans(): Promise<MembershipPlan[]> {
+// A plan with available_from in the future stays off the public picker until
+// that day (the 12-month Premium launches 2027-01-01). `preview` shows it
+// anyway, for testing the purchase path before launch.
+export async function getMembershipPlans(opts: { preview?: boolean } = {}): Promise<MembershipPlan[]> {
   try {
     const { data, error } = await supabase
       .from('membership_plans')
-      .select('id,slug,name,months,files_per_month,price_usd,original_price_usd,features,highlight,sort_order')
+      .select('id,slug,name,months,files_per_month,price_usd,original_price_usd,features,highlight,sort_order,available_from')
       .eq('active', true).order('sort_order');
     if (error) throw error;
-    return (data ?? []).map((p: any) => ({ ...p, features: Array.isArray(p.features) ? p.features : [] })) as MembershipPlan[];
+    const today = new Date().toISOString().slice(0, 10);
+    return (data ?? [])
+      .filter((p: any) => opts.preview || !p.available_from || String(p.available_from) <= today)
+      .map((p: any) => ({ ...p, features: Array.isArray(p.features) ? p.features : [] })) as MembershipPlan[];
   } catch (e) { console.error('getMembershipPlans failed:', e); return []; }
 }
 
