@@ -6,6 +6,7 @@
 // token. BRS already holds that key (it writes the site's tables with it), so
 // this adds no new secret anywhere. Nothing else is accepted.
 import type { APIRoute } from 'astro';
+import crypto from 'node:crypto';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { telegramOwner } from '../../../lib/notify';
 
@@ -18,7 +19,8 @@ const esc = (s: string) => String(s || '').replace(/[&<>]/g, (c) => ({ '&': '&am
 export const POST: APIRoute = async ({ request }) => {
   const auth = request.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  if (!SERVICE_KEY || !token || token !== SERVICE_KEY) return json({ error: 'unauthorized' }, 401);
+  const A = Buffer.from(token), B = Buffer.from(SERVICE_KEY);
+  if (!SERVICE_KEY || !token || A.length !== B.length || !crypto.timingSafeEqual(A, B)) return json({ error: 'unauthorized' }, 401);
   let body: any = {};
   try { body = await request.json(); } catch { return json({ error: 'bad json' }, 400); }
   const kind = String(body.kind || 'brs').slice(0, 40);
