@@ -102,6 +102,7 @@ export const TEMPLATE_HEADINGS: Record<string, string> = {
   refundWinback: 'Fancy another try? 🪵',
   picks: 'Picked just for you 🪵',
   wishlistReminder: 'Saved, not forgotten ❤️',
+  customPitch: 'A design made from your own photo 🪵',
 };
 
 function shell(subject: string, heading: string, bodyHtml: string, email: string): string {
@@ -509,6 +510,83 @@ export function etsyWelcomeEmail(d: {
     <p style="font-size:14px;line-height:1.6;margin:18px 0 4px;color:${INK};">Happy carving,<br><b>Jolly</b> · DigitalChiselCo</p>`;
   const text = `Thank you for your Etsy purchase! Welcome to digitalchiselco.com, where every one of our bas-relief designs lives in one place, new ones weekly, instant downloads.\n\nYour welcome gift: 10% off your first order with code ${code} (paste it in the checkout promo box).\n\nBrowse the collection: ${SITE}/catalog\n\nHappy carving, Jolly, DigitalChiselCo\n\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'Welcome to the workshop 🪵', body, d.email), text };
+}
+
+// ── Custom-design pitch (people who asked us to copy another shop's design) ──
+// Page 1: we do not copy, but we make originals from YOUR photo, from $30,
+// quoted first, paid only on approval, with the /custom-design upload link.
+// Page 2: the designs released this week (product-page links only).
+// No em dashes (owner rule). Signed Jolly.
+export const CUSTOM_DESIGN_URL = `${SITE}/custom-design`;
+export function customDesignPitchEmail(d: {
+  email: string; name?: string | null; note?: string | null; products: MiniProduct[]; totalNew?: number; fromPrice?: number;
+}): Out {
+  const from = d.fromPrice ?? 30;
+  const first = (d.name || '').trim().split(/\s+/)[0];
+  const hi = first ? `Hi ${esc(first)},` : 'Hi there,';
+  const n = d.products.length;
+  const total = d.totalNew ?? n;
+  const rows: string[] = [];
+  for (let i = 0; i < Math.min(12, n); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  const step = (num: string, title: string, body: string) => `
+    <tr><td style="padding:10px 0;border-top:1px solid #EFE7DA;vertical-align:top;width:42px;">
+      <div style="width:30px;height:30px;border-radius:15px;background:${BRONZE_DARK};color:${CREAM};font-family:Georgia,serif;font-size:15px;line-height:30px;text-align:center;">${num}</div></td>
+      <td style="padding:10px 0 10px 8px;border-top:1px solid #EFE7DA;vertical-align:top;">
+      <div style="font-size:14px;font-weight:600;color:${INK};">${title}</div>
+      <div style="font-size:13px;line-height:1.55;color:#666;margin-top:2px;">${body}</div></td></tr>`;
+  const subject = `About your custom design request: we can make an original from your photo, from $${from}`;
+  const body = `
+    <p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">${hi}</p>
+    <p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">
+      Thank you for writing to us about a custom design. We had to say no to reproducing another shop's work, because every design we sell is our own and we keep it that way. But we did not want to leave it there, because what you actually need is a relief that carves the way you imagine it.
+    </p>
+    ${d.note ? `<p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">${esc(d.note)}</p>` : ''}
+    <div style="background:${CREAM};border:1px solid #E5DDD0;border-radius:10px;padding:18px 20px;margin:18px 0;">
+      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${BRONZE};margin-bottom:6px;">Original custom design</div>
+      <div style="font-family:Georgia,serif;font-size:21px;line-height:1.3;color:${BRONZE_DARK};">Send us a photo, we model the relief.</div>
+      <div style="font-size:14px;line-height:1.6;color:#555;margin-top:8px;">A pet, a portrait, your logo, a family crest, a scene from your own picture. You get a carve-ready STL made from scratch, yours alone, with the same commercial licence as every design in the shop.</div>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:14px;">
+        <tr><td style="font-size:13px;color:#555;padding:4px 0;">Starting price</td><td align="right" style="font-size:15px;font-weight:700;color:${BRONZE_DARK};padding:4px 0;">from $${from}</td></tr>
+        <tr><td style="font-size:13px;color:#555;padding:4px 0;">Quote</td><td align="right" style="font-size:13px;color:${INK};padding:4px 0;">within 24 hours, before you pay anything</td></tr>
+        <tr><td style="font-size:13px;color:#555;padding:4px 0;">Delivery</td><td align="right" style="font-size:13px;color:${INK};padding:4px 0;">usually 3 to 5 days</td></tr>
+        <tr><td style="font-size:13px;color:#555;padding:4px 0;">Revisions</td><td align="right" style="font-size:13px;color:${INK};padding:4px 0;">one round included</td></tr>
+        <tr><td style="font-size:13px;color:#555;padding:4px 0;">Files</td><td align="right" style="font-size:13px;color:${INK};padding:4px 0;">STL plus 16-bit greyscale</td></tr>
+      </table>
+    </div>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:4px 0 6px;">
+      ${step('1', 'Post your picture', `Open the custom design page, upload the photo and tell us the size and material you carve.`)}
+      ${step('2', 'Approve the quote', `We reply with a firm price and a delivery date. Nothing is charged until you say yes.`)}
+      ${step('3', 'Carve it', `You receive the STL and greyscale by email and in your account, with one revision if anything needs a tweak.`)}
+    </table>
+    ${btn(CUSTOM_DESIGN_URL, 'Post your picture for a quote')}
+    <p style="text-align:center;font-size:12px;color:#8a7a68;margin:4px 0 0;">Reply to this email if you prefer to talk it through first.</p>
+    ${n ? `
+    <div style="margin:28px 0 0;padding-top:22px;border-top:2px solid ${CREAM};">
+      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${BRONZE};text-align:center;">Released this week</div>
+      <div style="font-family:Georgia,serif;font-size:19px;color:${BRONZE_DARK};text-align:center;margin:4px 0 10px;">${total} new design${total === 1 ? '' : 's'} in the shop</div>
+      ${rows.join('')}
+      <p style="text-align:center;margin:10px 0 0;"><a href="${SITE}/catalog?sort=newest" style="color:${BRONZE};font-size:13px;">See everything new &rarr;</a></p>
+    </div>` : ''}
+    <p style="font-size:14px;line-height:1.6;margin:22px 0 4px;color:${INK};">Happy carving,<br><b>Jolly</b> · DigitalChiselCo</p>`;
+  const text = `${first ? 'Hi ' + first : 'Hi there'},\n\nThank you for writing to us about a custom design. We cannot reproduce another shop's work, but we make ORIGINAL custom reliefs from your own photo, from $${from}.${d.note ? '\n\n' + d.note : ''}\n\nHow it works:\n1. Post your picture: ${CUSTOM_DESIGN_URL}\n2. We quote within 24 hours, before you pay anything.\n3. STL + greyscale in 3 to 5 days, one revision included.\n\n` +
+    (n ? `Released this week (${total} new designs):\n` + d.products.slice(0, 12).map((p) => `${p.title.split('|')[0].trim()} ${SITE}/product/${p.slug}`).join('\n') + '\n\n' : '') +
+    `Happy carving, Jolly, DigitalChiselCo\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, TEMPLATE_HEADINGS.customPitch, body, d.email), text };
+}
+
+// ── Custom request received (transactional confirmation to the requester) ──
+export function customRequestReceivedEmail(d: { email: string; name?: string | null; photoUrl?: string | null; description?: string | null; ref: string }): Out {
+  const first = (d.name || '').trim().split(/\s+/)[0];
+  const subject = 'Got your picture, a quote is on its way';
+  const body = `
+    <p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">${first ? `Hi ${esc(first)},` : 'Hi there,'}</p>
+    <p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">Your custom design request has arrived and I have it in front of me. You will get a firm quote and a delivery date within 24 hours, usually much sooner. Nothing is charged until you approve it.</p>
+    ${d.photoUrl ? `<p style="text-align:center;margin:6px 0 14px;"><img src="${esc(d.photoUrl)}" alt="your picture" width="260" style="max-width:260px;width:100%;border-radius:10px;border:1px solid #E5DDD0;"></p>` : ''}
+    ${d.description ? `<div style="background:${CREAM};border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.55;color:#555;">${esc(d.description).slice(0, 600)}</div>` : ''}
+    <p style="font-size:13px;color:#8a7a68;margin:14px 0 0;">Reference ${esc(d.ref)}. Reply to this email to add anything.</p>
+    <p style="font-size:14px;line-height:1.6;margin:22px 0 4px;color:${INK};">Talk soon,<br><b>Jolly</b> · DigitalChiselCo</p>`;
+  const text = `Your custom design request (${d.ref}) has arrived. You will get a firm quote and delivery date within 24 hours; nothing is charged until you approve it.\n\nReply to this email to add anything.\n\nJolly, DigitalChiselCo`;
+  return { subject, html: shell(subject, 'Your picture is with me 🪵', body, d.email), text };
 }
 
 // ── Product spotlight (send one design to the people interested in it) ──

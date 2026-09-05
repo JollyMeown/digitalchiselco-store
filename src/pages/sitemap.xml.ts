@@ -16,6 +16,7 @@ const STATIC_PATHS: Array<{ path: string; priority: number; changefreq: string }
   { path: '/bundle-builder', priority: 0.8, changefreq: 'weekly' },
   { path: '/gift-cards',  priority: 0.6, changefreq: 'monthly' },
   { path: '/requests',    priority: 0.5, changefreq: 'weekly' },
+  { path: '/custom-design', priority: 0.7, changefreq: 'monthly' },
   { path: '/pricing',     priority: 0.7, changefreq: 'weekly' },
   { path: '/membership',  priority: 0.7, changefreq: 'weekly' },
   { path: '/laser-studio', priority: 0.8, changefreq: 'weekly' },

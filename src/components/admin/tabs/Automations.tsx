@@ -4,6 +4,7 @@ import { Card, btnPrimary, btnGhost, inputCls, Toast } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
 import ArticleEmails from '../ArticleEmails';
 import FilmEmails from '../FilmEmails';
+import CustomPitch from '../CustomPitch';
 
 const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'drip1', label: '1 · Did you carve the free pack?', group: 'Subscriber drip' },
@@ -21,6 +22,7 @@ const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'priceDrop', label: 'Price-drop alert', group: 'Broadcasts' },
   { key: 'referralNudge', label: 'Referral nudge (happy customers)', group: 'Broadcasts' },
   { key: 'etsyWelcome', label: 'Etsy-buyer welcome (one-time)', group: 'Etsy buyers' },
+  { key: 'customPitch', label: 'Custom-design pitch (asked us to copy a design)', group: 'Etsy buyers' },
 ];
 
 // ── Block-based template builder ─────────────────────────────────────
@@ -95,7 +97,7 @@ export default function Automations() {
   useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   useEffect(() => { loadPreview(kind); }, [kind]);
 
-  async function load() {
+  async function load(_silent = false) {
     const [{ data: g }, { data: d }, { data: ac }, { data: sess }] = await Promise.all([
       supabase.from('growth_settings').select('*').eq('id', 1).maybeSingle(),
       supabase.from('subscriber_drip').select('status'),
@@ -281,6 +283,7 @@ export default function Automations() {
       <ArticleEmails />
 
       <FilmEmails />
+      <CustomPitch />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Toggle field="article_drip_enabled" label="Guide emails, one at a time"
@@ -303,6 +306,8 @@ export default function Automations() {
           desc="When a friend orders with someone's REF- share link, email the referrer a 15% reward code. The 15%-off for friends works whether this is on or off." />
         <Toggle field="etsy_welcome_enabled" label="Etsy-buyer welcome"
           desc="One-time welcome to imported Etsy buyers (source 'etsy-buyer'): this week's newest designs + a 10% code. Sent once each, never twice. They skip the free-pack drip, then join the weekly digest like everyone else." />
+        <Toggle field="custom_pitch_enabled" label="Custom-design pitch drip"
+          desc="One-time pitch to people added with 'Add to drip' in the Custom-design pitch card (source 'custom-ask'): originals from their own photo from $30, the /custom-design upload link, plus this week's designs. Never twice; 'Send now' shares the same ledger." />
         <Toggle field="weekly_personalized" label="Personalized weekly digest"
           desc="Orders each subscriber's weekly designs by their own category affinity (from their clicks, browses and buys), so the designs most like what they engage with appear first." />
         <Toggle field="winback_enabled" label="Win-back dormant subscribers"

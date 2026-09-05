@@ -6,7 +6,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { send as sendEmail } from '../../../../lib/resend';
-import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, winbackEmail, priceDropEmail, referralNudgeEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
+import { dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail, weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, customDesignPitchEmail, winbackEmail, priceDropEmail, referralNudgeEmail, applyOverride, TEMPLATE_HEADINGS, type MiniProduct } from '../../../../lib/marketing-emails';
 
 export const prerender = false;
 
@@ -27,7 +27,7 @@ async function isCallerAdmin(request: Request): Promise<boolean> {
   return !!prof?.is_admin;
 }
 
-const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'browse', 'review7', 'arrivals30', 'loyalty', 'weekly', 'etsyWelcome', 'winback', 'priceDrop', 'referralNudge'] as const;
+const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'browse', 'review7', 'arrivals30', 'loyalty', 'weekly', 'etsyWelcome', 'customPitch', 'winback', 'priceDrop', 'referralNudge'] as const;
 
 async function render(kind: string, email: string): Promise<{ subject: string; html: string; text: string }> {
   const db = supabaseAdmin();
@@ -86,6 +86,17 @@ async function render(kind: string, email: string): Promise<{ subject: string; h
     ]);
     const products = (fresh?.length ? fresh : newest || []) as MiniProduct[];
     out = etsyWelcomeEmail({ email, products, totalNew: count || products.length, code: 'THANKYOU10' });
+  }
+  else if (kind === 'customPitch') {
+    const sinceIso = new Date(Date.now() - 7 * 86400000).toISOString();
+    const [{ data: fresh }, { count }] = await Promise.all([
+      db.from('products').select('title, slug, image_url, price_usd').eq('active', true).gte('created_at', sinceIso)
+        .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null).order('created_at', { ascending: false }).limit(12),
+      db.from('products').select('id', { count: 'exact', head: true }).eq('active', true).gte('created_at', sinceIso)
+        .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null),
+    ]);
+    const products = (fresh?.length ? fresh : newest || []) as MiniProduct[];
+    out = customDesignPitchEmail({ email, name: 'Sample Carver', products, totalNew: count || products.length });
   }
   else if (kind === 'winback') out = winbackEmail({ email, products: (bestsellers.length ? bestsellers : newest || []) as MiniProduct[], code: 'WINBACK15' });
   else if (kind === 'priceDrop') {

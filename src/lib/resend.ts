@@ -46,7 +46,7 @@ type SendOptions = {
 // marketing and MUST advertise one-click unsubscribe (Gmail/Yahoo rules).
 // 'membership' = a paying member's pack, reminder or expiry mail: transactional
 // and never deferred by the marketing budget (2026-09-05).
-const TRANSACTIONAL_KINDS = new Set(['order', 'gift', 'ownerReport', 'designScout', 'resendLibrary', 'cartSave', 'payRecovery', 'picks', 'portalGuide', 'auth', 'optin', 'makerNews', 'marketplace', 'membership']);
+const TRANSACTIONAL_KINDS = new Set(['order', 'gift', 'ownerReport', 'designScout', 'resendLibrary', 'cartSave', 'payRecovery', 'picks', 'portalGuide', 'auth', 'optin', 'makerNews', 'marketplace', 'membership', 'custom-request']);
 function marketingHeadersFor(to: string, tags?: { name: string; value: string }[]): Record<string, string> {
   const kind = tags?.find((t) => t.name === 'kind')?.value;
   if (!kind || TRANSACTIONAL_KINDS.has(kind)) return {};
@@ -116,7 +116,7 @@ export function isQuotaExhausted(): boolean {
 //      count reaches CAP - RESERVE, so RESERVE emails are always left for
 //      buyers. Defaults: cap 100 (Resend free tier), reserve 20 — override
 //      with RESEND_DAILY_CAP / RESEND_DAILY_RESERVE.
-const BUYER_CRITICAL = new Set(['order', 'gift', 'resendLibrary', 'auth', 'optin', 'payRecovery', 'membership']);
+const BUYER_CRITICAL = new Set(['order', 'gift', 'resendLibrary', 'auth', 'optin', 'payRecovery', 'membership', 'custom-request']);
 export function isBuyerCritical(tags?: { name: string; value: string }[]): boolean {
   return BUYER_CRITICAL.has(tags?.find((t) => t.name === 'kind')?.value || '');
 }

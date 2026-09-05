@@ -12,7 +12,7 @@ import { supabaseAdmin } from './supabase';
 import { send as sendEmail, sendBatch, isQuotaExhausted, marketingBudgetRemaining } from './resend';
 import {
   articleEmail, dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
-  weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS,
+  weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, customDesignPitchEmail, applyOverride, TEMPLATE_HEADINGS,
   winbackEmail, priceDropEmail, referralNudgeEmail, refundWinbackEmail,
   wishlistReminderEmail, ownerWeeklyReport, filmEmail,
   type MiniProduct, type TemplateOverride,
@@ -52,7 +52,7 @@ const outOfTime = () => Date.now() - RUN_STARTED_AT.t > timeBudgetMs();
 // daily quota is exhausted they are skipped with a visible 'deferred' marker —
 // no doomed API calls, no wasted seconds, and tomorrow they run first thing.
 // (Non-email steps like fx / bundle-of-week / send-time learning still run.)
-const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits', 'makerRecruitDrip', 'makerRecruitDripExtra', 'makerFeeSettlement']);
+const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'customPitch', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits', 'makerRecruitDrip', 'makerRecruitDripExtra', 'makerFeeSettlement']);
 async function step(stats: Record<string, any>, key: string, fn: () => Promise<void>) {
   if (outOfTime()) { stats[key] = 'skipped: time budget (runs next time)'; return; }
   if (EMAIL_STEPS.has(key) && isQuotaExhausted()) { stats[key] = 'deferred: Resend daily quota reached (runs tomorrow)'; return; }
@@ -702,6 +702,58 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       }
     }
     stats.etsyWelcome = s;
+  });
+
+  // ── 4c. Custom-design pitch (one-time) ──────────────────────────────
+  // People who asked us on Etsy to copy another shop's design, added as
+  // subscribers with source 'custom-ask' (Admin > Automations > Custom-design
+  // pitch > "Add to drip"). Each gets ONE pitch: originals from their own
+  // photo from $30 + this week's designs. Ledger = custom_pitch_log (PK email),
+  // shared with the admin "Send now" button, so never twice.
+  stats.customPitch = 'off';
+  await step(stats, 'customPitch', async () => {
+    if (!g.custom_pitch_enabled) return;
+    const s = { candidates: 0, sent: 0, failed: 0 };
+    const { data: asked } = await fetchAll((a, b) => db.from('subscribers').select('email, name')
+      .eq('source', 'custom-ask').is('unsubscribed_at', null).range(a, b)).then((data) => ({ data }));
+    const { data: done } = await fetchAll((a, b) => db.from('custom_pitch_log').select('email').range(a, b)).then((data) => ({ data }));
+    const had = new Set((done || []).map((r) => r.email.toLowerCase()));
+    const TEST = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
+    const seen = new Set<string>();
+    const pending = (asked || []).map((r: any) => ({ email: String(r.email).toLowerCase().trim(), name: r.name || null }))
+      .filter((r) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email) && !TEST.test(r.email) && !had.has(r.email) && !seen.has(r.email) && seen.add(r.email));
+    s.candidates = pending.length;
+    if (pending.length) {
+      const sinceIso = daysAgo(7);
+      const [{ data: fresh }, { count: totalNew }] = await Promise.all([
+        db.from('products').select('title, slug, price_usd, image_url').eq('active', true).gte('created_at', sinceIso)
+          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null).order('created_at', { ascending: false }).limit(12),
+        db.from('products').select('id', { count: 'exact', head: true }).eq('active', true).gte('created_at', sinceIso)
+          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null),
+      ]);
+      let products = (fresh || []) as MiniProduct[];
+      if (!products.length) {
+        const { data: newest } = await db.from('products').select('title, slug, price_usd, image_url').eq('active', true)
+          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null).order('created_at', { ascending: false }).limit(6);
+        products = (newest || []) as MiniProduct[];
+      }
+      const total = totalNew || products.length;
+      const tags = [{ name: 'kind', value: 'custom-pitch' }];
+      for (let c = 0; c < pending.length; c += 100) {
+        const batch = pending.slice(c, c + 100);
+        const chunk = batch.map((r) => {
+          const { subject, html, text } = withOvr('customPitch', customDesignPitchEmail({ email: r.email, name: r.name, products, totalNew: total }), r.email);
+          return { to: r.email, subject, html, text, tags };
+        });
+        const idem = 'custom-pitch:' + createHash('sha256').update(batch.map((r) => r.email).sort().join(',')).digest('hex').slice(0, 32);
+        const res = await sendBatch(chunk, idem);
+        if (res.ok) {
+          s.sent += res.sent;
+          await db.from('custom_pitch_log').upsert(batch.map((r) => ({ email: r.email, source: 'drip' })), { onConflict: 'email', ignoreDuplicates: true });
+        } else s.failed += batch.length;
+      }
+    }
+    stats.customPitch = s;
   });
 
   // ── 7. Price-drop alerts (a design they liked got cheaper) ───────────
