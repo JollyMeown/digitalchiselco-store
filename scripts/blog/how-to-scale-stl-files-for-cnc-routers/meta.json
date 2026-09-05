@@ -1,0 +1,13 @@
+{
+  "title": "How to Scale STL Files for CNC Routers Without Ruining the Detail",
+  "excerpt": "Scaling a relief STL to fit your board is where most disappointing carvings begin. The three numbers that matter, the depth rule, the bit-to-feature rule, the board-thickness floor, and exactly where each setting lives in Aspire, VCarve, Carveco and Fusion.",
+  "seo_title": "How to Scale STL Files for CNC Carving (Depth, Size and Bit Rules)",
+  "seo_description": "How to scale a bas-relief STL for a CNC router without losing detail: scale Z with X and Y, match the bit to the smallest feature, leave a floor in the board, and where each setting lives in Aspire, VCarve, Carveco and Fusion 360.",
+  "cover": "hero",
+  "email": {
+    "subject": "Why a scaled-down carving looks like mud, and the three numbers that fix it",
+    "intro": "Scaling a relief STL down by half sounds harmless. Carve it, and every face has the same expression and every petal looks like a thumbprint. The file was fine. The scaling was wrong.\n\nWe have rewritten our scaling guide from the ground up: the depth rule, the bit-to-feature rule, the floor you must leave in the board, a size table you can pin to the wall, and where every setting lives in Aspire, VCarve, Carveco and Fusion. Here is the same buck carved at three sizes:",
+    "image": "hero",
+    "drip": true
+  }
+}

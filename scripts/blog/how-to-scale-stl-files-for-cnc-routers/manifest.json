@@ -1,0 +1,27 @@
+[
+  {
+    "key": "hero",
+    "alt": "The same whitetail buck relief carved at three sizes, large, medium and small, standing side by side on a workbench",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-scale-stl-files-for-cnc-routers/hero.jpg"
+  },
+  {
+    "key": "depth",
+    "alt": "Two copies of the same relief seen edge-on: one carved at full depth with clear layers, one flattened so the layers collapse",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-scale-stl-files-for-cnc-routers/depth.jpg"
+  },
+  {
+    "key": "bit",
+    "alt": "Macro of a carved eye with a tiny tapered ball nose cutter held beside it for scale",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-scale-stl-files-for-cnc-routers/bit.jpg"
+  },
+  {
+    "key": "thickness",
+    "alt": "A carved panel photographed from the side on a thick board, showing how much wood is left under the deepest cut",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-scale-stl-files-for-cnc-routers/thickness.jpg"
+  },
+  {
+    "key": "test",
+    "alt": "A small test tile of the buck's head carved on an offcut, held up against the full panel",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-scale-stl-files-for-cnc-routers/test.jpg"
+  }
+]

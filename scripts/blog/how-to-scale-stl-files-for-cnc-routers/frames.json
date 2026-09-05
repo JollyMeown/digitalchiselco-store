@@ -1,0 +1,44 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-file-deer-head-forest-",
+    "alt": "The same whitetail buck relief carved at three sizes, large, medium and small, standing side by side on a workbench",
+    "scene": "THREE COPIES OF THE SAME CARVING AT THREE SIZES, wide magazine shot. The exact panel from image 1, finished in the house finish, appears three times standing upright side by side on the bench, left to right: a large one about 60 cm wide, a medium one about 40 cm wide, and a small one about 22 cm wide. All three are the identical design, identical finish, identical proportions, only the size differs, like a family of nesting prints. The large one is razor sharp with every hair and leaf readable; the smallest still reads clearly but its finest antler tines and leaf veins are visibly softer. A steel rule lies along the front edge of the bench. Warm window light from the left. Nothing overlaps; all three fully visible.",
+    "bench": true
+  },
+  {
+    "key": "depth",
+    "aspect": "4:3",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-file-deer-head-forest-",
+    "alt": "Two copies of the same relief seen edge-on: one carved at full depth with clear layers, one flattened so the layers collapse",
+    "scene": "EDGE-ON COMPARISON. Two copies of the panel from image 1, both in the house finish, lie flat on the bench and are photographed from a very low angle almost level with the surface, so their carved profiles read as silhouettes against soft light. The NEAR panel is carved at FULL depth: the buck's head stands up proud, roughly 14 mm above the background, with the antlers, the ears and the forest behind clearly stepped at different heights, like a mountain range in profile. The FAR panel is the same design carved at ONE THIRD the depth: everything is squashed into a shallow ripple, the layers have collapsed together and it looks flat and lifeless from this angle. A small steel depth gauge stands beside the near panel. Raking light from the left exaggerates the difference.",
+    "bench": true
+  },
+  {
+    "key": "bit",
+    "aspect": "4:3",
+    "ref": "face-of-jesus-crucifixion-3d-relief-stl-crown-of-thorns-cross-wood-grain-carving",
+    "alt": "Macro of a carved eye with a tiny tapered ball nose cutter held beside it for scale",
+    "scene": "EXTREME MACRO on the eye and brow of the carved face from image 1, finished in the house finish, with the tip of a tiny 1/16 inch tapered ball nose cutter held horizontally right beside the eye by a hand entering from the right, so the cutter's ball tip and the eye's finest carved lines can be compared at the same scale: the lash line and the crease of the lid are only a little wider than the ball. Very shallow depth of field, the eye and the cutter tip tack sharp, everything else soft. Raking light from the left.",
+    "hands": true,
+    "bench": true
+  },
+  {
+    "key": "thickness",
+    "aspect": "4:3",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-file-deer-head-forest-",
+    "alt": "A carved panel photographed from the side on a thick board, showing how much wood is left under the deepest cut",
+    "scene": "SIDE VIEW OF THE BOARD. The panel from image 1, in the house finish, stands on its long edge on the bench so the camera looks straight at its END GRAIN edge and along the carved surface at a shallow angle. The board is visibly thick, about 25 mm, and you can see the carved relief dipping down into it from the top face while a solid, uncarved floor of wood, at least 8 mm, remains underneath the deepest point. A brass-cased digital caliper is clamped gently on the edge reading the thickness. Warm light from the left, the bench soft behind.",
+    "bench": true
+  },
+  {
+    "key": "test",
+    "aspect": "4:3",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-file-deer-head-forest-",
+    "alt": "A small test tile of the buck's head carved on an offcut, held up against the full panel",
+    "scene": "A hand holds up a small square TEST TILE, about 8 cm square, cut from an offcut of the same cherry, on which ONLY the buck's head and eye from image 1 have been carved, raw pale unfinished wood, fresh from the machine. Behind it, slightly out of focus, stands the full finished panel from image 1 in the house finish for comparison. The tile is tack sharp and fills about a third of the frame; the test cut on it is clean and crisp. Workshop light from the left.",
+    "hands": true,
+    "bench": true
+  }
+]

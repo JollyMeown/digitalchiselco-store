@@ -1,0 +1,166 @@
+<p>There is a quiet truth in the digital download world: most of the bas-relief STL files for sale on the big marketplaces have never been carved by the person selling them. They look fine in a 3D viewer. They look great in the listing picture. They fall apart on a real router, usually around hour two, and the buyer blames their machine.</p>
+
+<p>This guide is how to tell the difference before you spend the money, and, more importantly, before you spend a board and a Saturday. It covers the four things a file has to do, the one signal that predicts a good carve better than anything else, how to inspect a file in five minutes with free tools, and the seven red flags you can spot from the listing alone.</p>
+
+<figure>
+  <img src="{{IMG:hero}}" alt="A carved Face of Christ relief seen from a three-quarter angle under raking light, showing the thorns, hair, face and background at clearly different depths" loading="lazy" />
+  <figcaption>This is what depth looks like when a file has it. Thorns, hair, face, cross, ground: five levels, each throwing its own shadow. A poor file puts all five in the same 3 mm.</figcaption>
+</figure>
+
+<h2 id="contents">In this guide</h2>
+<ul>
+  <li><a href="#four">The four things a good file does</a></li>
+  <li><a href="#depth">Depth grading: the one signal that predicts the carve</a></li>
+  <li><a href="#feature">Feature size versus the bit</a></li>
+  <li><a href="#mesh">Mesh density: why more triangles is not better</a></li>
+  <li><a href="#watertight">Watertight geometry, and what happens when it is not</a></li>
+  <li><a href="#undercut">Undercuts: the file must be a height map</a></li>
+  <li><a href="#ai">The AI question, honestly</a></li>
+  <li><a href="#flags">Seven red flags you can see on the listing</a></li>
+  <li><a href="#inspect">How to inspect a file you already own, in five minutes</a></li>
+  <li><a href="#standard">The standard we hold ourselves to</a></li>
+  <li><a href="#faq">Questions people ask</a></li>
+</ul>
+
+<h2 id="four">The four things a good file does</h2>
+
+<p>A bas-relief STL is doing its job when:</p>
+
+<ol>
+  <li><strong>It opens in your CAM without errors or warnings.</strong> Not "opens after you click through three dialogs". Opens.</li>
+  <li><strong>The preview matches the listing picture.</strong> Same proportions, same depth, same level of detail. If the listing shows crisp feathers and the CAM shows a smooth blob, one of them is lying, and it is never the CAM.</li>
+  <li><strong>It carves cleanly at the listed size with the bits the seller recommends.</strong> Which requires the seller to have listed a size and a bit.</li>
+  <li><strong>The geometry is watertight.</strong> No holes, no flipped triangles, no internal walls. These are what make a cutter dive through your panel at hour two.</li>
+</ol>
+
+<p>That is the whole standard. Four conditions. Most marketplace files fail at least one, and the rest of this article is how each failure looks up close.</p>
+
+<h2 id="depth">Depth grading: the one signal that predicts the carve</h2>
+
+<figure>
+  <img src="{{IMG:profile}}" alt="Two carvings of the same design seen edge-on: one with clear stepped depth layers, one a smooth shallow bump" loading="lazy" />
+  <figcaption>The profile test. Near: a well-graded file, and you can count the levels from the side. Far: the same design from a poor file, one smooth bump. From the front the far one will look flat no matter what you do.</figcaption>
+</figure>
+
+<p>If you learn one thing here, learn this. Open the file in any viewer and rotate it until you are looking along the surface, almost edge-on. A good relief has <strong>distinct, countable levels</strong>: sky behind mountains behind trees behind the subject, each visibly separated in Z. A bad relief is a smooth hill. Everything blends into everything else, and the "deepest" point is 2 mm below the "highest" on a panel that should have 12.</p>
+
+<p>Depth grading is the difference between a carving that reads from across the room and one that needs you to squint. It is also the thing you cannot fix. You can scale a flat file deeper, but you are stretching noise; the layers were never modelled, so there is nothing to stretch. <a href="/blog/how-to-scale-stl-files-for-cnc-routers#depth">The depth rule in our scaling guide</a> assumes the file had layers to begin with.</p>
+
+<p><strong>Numbers to expect.</strong> A wall panel 300 to 500 mm wide should carry 10 to 16 mm of total relief, and within that, the main subject should stand at least 4 or 5 mm proud of whatever is behind it. A face needs 8 mm or more of its own. A file whose entire Z range is under 5 mm at 400 mm wide is not a relief. It is an embossing.</p>
+
+<h2 id="feature">Feature size versus the bit</h2>
+
+<p>A file can be beautifully graded and still carve badly if its finest features are smaller than any cutter can render at your size. The rule of thumb: <strong>the smallest feature you want to see must be at least 2.5 times the tip diameter of your finishing bit.</strong> A 1/16 inch tapered ball cleanly renders features of 4 mm and up; a 1/32 inch, 2 mm and up.</p>
+
+<p>Good files are modelled with this in mind. Hair is grouped into locks rather than strands. Feathers have real width. Text has stroke. Bad files, and most AI-generated ones, are covered in sub-millimetre noise that looks like detail in a render and turns to fuzz under a cutter. If a listing's close-up shows individual hairs, ask yourself what bit is going to cut them.</p>
+
+<h2 id="mesh">Mesh density: why more triangles is not better</h2>
+
+<p>Triangle count is the number sellers love to quote and the least useful one. A 50,000-triangle file authored by someone who understands form carves better than a 500,000-triangle mess.</p>
+
+<ul>
+  <li><strong>Under 20,000 triangles</strong> is a red flag for wall art. Faces and flowers cannot be described with so few facets without visible polygon edges at any carving size.</li>
+  <li><strong>60,000 to 180,000</strong> is the useful range for a 300 to 600 mm panel. Enough for crisp toolpaths, fast enough to preview.</li>
+  <li><strong>Over 500,000</strong> is usually detail below what any bit can cut, and it slows the CAM to a crawl. Good studios decimate intelligently before release; a huge file often means nobody looked at it after export.</li>
+</ul>
+
+<p>Density also has to be <em>even</em>. A file with a million triangles in the face and a thousand in the background will show faceting in the sky. Rotate the model with a wireframe on and look for that.</p>
+
+<h2 id="watertight">Watertight geometry, and what happens when it is not</h2>
+
+<figure>
+  <img src="{{IMG:gouge}}" alt="A raw relief carving on the machine with a deep accidental gouge torn through the background where the cutter dived" loading="lazy" />
+  <figcaption>The cost of a hole in the mesh. The CAM saw a gap, decided the surface was 8 mm lower there, and the cutter obeyed. This happens two hours in, on the good board.</figcaption>
+</figure>
+
+<p>An STL describes a surface, and the CAM treats that surface as the top of a solid. That only works if the surface is closed: no holes, no overlapping triangles, no triangles facing the wrong way, no stray shells floating inside. A mesh like that is called watertight, or manifold.</p>
+
+<p>When a file is not watertight, one of two things happens. The kind outcome is that your CAM refuses it. The unkind outcome is that it accepts it and generates a toolpath that includes a plunge through the stock wherever the geometry has a hole, because from the CAM's point of view the surface really is 8 mm lower there. You find out at hour two, on the good board.</p>
+
+<p>Checking is free and takes a minute, and a file that fails is not worth repairing yourself. Tools are in the <a href="#inspect">inspection section</a> below.</p>
+
+<h2 id="undercut">Undercuts: the file must be a height map</h2>
+
+<p>A three-axis router cuts straight down. It cannot reach under anything. So a relief for a router must be a <em>height map</em>: for every point on the panel, exactly one surface height. A leaf curling over so that its edge hangs above the background is fine as a sculpture and impossible as a relief; the cutter will either ignore the underside or, worse, chew straight through the leaf to reach it.</p>
+
+<p>Files converted from full 3D models, and many AI-generated files, are full of these. The test is simple: look at the model straight down from above. If any part of the surface is hidden behind another part, that hidden part cannot be carved. Good relief modellers flatten and fake those overlaps on purpose; the eye reads them as depth anyway.</p>
+
+<h2 id="ai">The AI question, honestly</h2>
+
+<p>You will see listings dismissed as "AI files", and you will see files that deserve it: one smooth blob, no depth grading, noise instead of detail, undercuts everywhere, never opened in a CAM. That is not an AI problem. That is a nobody-checked problem, and hand-modelled files that nobody checked fail the same way.</p>
+
+<p>Modern relief modelling uses software assistance at almost every step, in every studio, including ours. What decides whether a file carves is not how the first surface was made. It is whether someone then graded the depth, sized the features to a real bit, removed the undercuts, made the mesh watertight, opened it in a CAM, and put a size range on the listing. Judge the file by the four conditions at the top of this page. They are the same whatever made it.</p>
+
+<h2 id="flags">Seven red flags you can see on the listing</h2>
+
+<ol>
+  <li><strong>The preview is a glossy render, not a CAM screenshot or a carved photo.</strong> Renders hide flat depth. A seller who has carved the file shows a carve, or at least the toolpath preview.</li>
+  <li><strong>No recommended size range.</strong> "Scale to any size" means "we never tested it at any size". A tested file says something like "carves cleanly between 250 and 600 mm wide".</li>
+  <li><strong>No bit recommendation.</strong> Knowing which bit is half of carving. Sellers who have done it say so.</li>
+  <li><strong>Individual hairs and pores in the close-up.</strong> Detail smaller than any bit is decoration for the render, and fuzz for you.</li>
+  <li><strong>Adjectives instead of numbers.</strong> "Premium, stunning, exclusive" versus "14 mm relief, 120k triangles, tested in VCarve". Makers describe geometry.</li>
+  <li><strong>Priced at a dollar or two.</strong> A relief modelled and checked to a real standard takes hours of work. At that price either the work was not done or the file was taken from someone who did it.</li>
+  <li><strong>Nobody to email.</strong> When a file misbehaves you want a reply. Marketplace sellers are often gone before your CAM finishes loading.</li>
+</ol>
+
+<h2 id="inspect">How to inspect a file you already own, in five minutes</h2>
+
+<figure>
+  <img src="{{IMG:scrap}}" alt="A small test carving of the eagle's head on a cheap pine offcut, held beside the finished panel" loading="lazy" />
+  <figcaption>The last step. Ten minutes of machine time on a scrap of pine tells you more than an hour in a viewer, and it costs nothing.</figcaption>
+</figure>
+
+<p>Every tool here is free.</p>
+
+<ol>
+  <li><strong>Open it in your CAM and read the import dialog.</strong> Warnings about open edges, flipped normals or multiple shells are the file telling you it is broken.</li>
+  <li><strong>Rotate to the profile view.</strong> Count the depth levels. If you cannot, stop here; nothing downstream fixes it.</li>
+  <li><strong>Check it is watertight.</strong> Windows' built-in 3D Builder flags problems on open and offers a repair. Meshmixer's Analysis → Inspector highlights holes and non-manifold edges in red. PrusaSlicer, Bambu Studio and Cura all run a mesh check on import and will say "errors detected". Blender's 3D-Print Toolbox lists them.</li>
+  <li><strong>Look straight down for undercuts.</strong> Anything hidden beneath something else will not carve.</li>
+  <li><strong>Check the triangle count and its evenness.</strong> Any of the tools above shows it. 60,000 to 180,000, spread evenly, for a wall panel.</li>
+  <li><strong>Generate a finishing toolpath at your size and simulate it.</strong> The simulation, unlike the model render, knows how big your bit is. If the eye disappears in the simulation it will disappear in the wood. <a href="/blog/how-to-scale-stl-files-for-cnc-routers#tile">The test tile method</a> is the extension of this.</li>
+  <li><strong>Carve the most detailed 80 mm on scrap.</strong> Ten minutes on pine. If it reads there, it reads on walnut.</li>
+</ol>
+
+<h2 id="standard">The standard we hold ourselves to</h2>
+
+<p>Every file in the <a href="/catalog">catalogue</a> is checked for watertight geometry before it goes on the site, is opened and toolpathed in a real CAM, and carries a recommended size range on its product page that comes from that check rather than from marketing. Designs that have been through our full verification carry a Verified badge on the listing. When a file misbehaves in your CAM, that is our problem: <a href="/contact">send it over</a> with the software and the size, and you will get a working version back, not a form reply.</p>
+
+<p>If you want to test all of the above against a real file, the <a href="{{URL:face-of-jesus}}">{{TITLE:face-of-jesus}}</a> is the hardest honest test in the catalogue: a face, deep grading, and detail that is sized for a 1/16 inch bit at 300 mm and a 1/32 inch below that.</p>
+
+<p><a class="dl-btn" href="{{URL:face-of-jesus}}">Download the Face of Christ panel · {{PRICE:face-of-jesus}}</a></p>
+
+<p>For a scene with clear layering to practise the profile test on, the <a href="{{URL:bald-eagle-mountain}}">{{TITLE:bald-eagle-mountain}}</a> has sky, mountains, trees and the bird at four distinct depths.</p>
+
+<p><a class="dl-btn" href="{{URL:bald-eagle-mountain}}">Download the Bald Eagle Mountain panel · {{PRICE:bald-eagle-mountain}}</a></p>
+
+<h2 id="faq">Questions people ask</h2>
+
+<h3>What is the single best sign of a good relief STL?</h3>
+<p>Depth grading. Look at it edge-on. If you can count the levels, the file was modelled by someone who understood relief. If it is one smooth bump, nothing you do will make it read.</p>
+
+<h3>How many triangles should a relief STL have?</h3>
+<p>60,000 to 180,000 for a wall panel, spread evenly. Fewer shows facets; far more is wasted below the bit and slows your CAM.</p>
+
+<h3>What does watertight mean?</h3>
+<p>A closed surface: no holes, no flipped triangles, no internal shells. A CAM treats a hole as a drop in the surface and sends the cutter through your panel.</p>
+
+<h3>Can I repair a bad file?</h3>
+<p>Holes and flipped normals, sometimes, with 3D Builder or Meshmixer. Flat depth grading and undercuts, no. Those were decisions made when the file was modelled.</p>
+
+<h3>How do I check a file for free?</h3>
+<p>3D Builder (Windows), Meshmixer, PrusaSlicer, Bambu Studio, Cura or Blender all flag mesh errors on import. Your CAM's toolpath simulation tells you whether the detail survives your bit.</p>
+
+<h3>Are AI-generated STL files bad?</h3>
+<p>Unchecked files are bad, whatever made them. Judge a file by depth grading, feature size, watertightness and undercuts, and by whether the seller lists a size and a bit. Those four things predict the carve; the tool that made the first surface does not.</p>
+
+<h3>Why does the listing picture look sharper than my carve?</h3>
+<p>Because renders do not have a bit. Simulate the toolpath at your size, or carve 80 mm of it on scrap, and you will see what the wood will show.</p>
+
+<hr />
+
+<p>Four conditions, one profile test, seven red flags, and a scrap of pine. That is enough to never lose a board to a bad file again. If a file passes and still disappoints, the answer is nearly always in <a href="/blog/how-to-scale-stl-files-for-cnc-routers">scaling</a> or <a href="/blog/how-to-finish-cnc-relief-carvings">finishing</a>, and both of those are fixable.</p>
+
+<p>The <a href="/free">free starter pack</a> is the cheapest way to run every check in this article against files that were made to pass them.</p>
+
+<p><em>Jolly, DigitalChiselCo</em></p>

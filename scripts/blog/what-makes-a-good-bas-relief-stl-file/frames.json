@@ -1,0 +1,35 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "face-of-jesus-crucifixion-3d-relief-stl-crown-of-thorns-cross-wood-grain-carving",
+    "alt": "A carved Face of Christ relief seen from a three-quarter angle under raking light, showing the thorns, hair, face and background at clearly different depths",
+    "scene": "THREE-QUARTER VIEW UNDER HARD RAKING LIGHT, wide magazine shot. The panel from image 1, in the house finish, stands propped on the bench and is photographed from about 45 degrees to the side and slightly above, with a single strong light skimming across it from the far left, so that every change in depth throws a long shadow: the crown of thorns stands highest, the hair and beard below it, the face below that, the cross and clouds lower still, and the chip-carved ground deepest. The layering of depth must be obvious from the shadows, like a landscape at sunset. Background falls to darkness.",
+    "bench": true
+  },
+  {
+    "key": "profile",
+    "aspect": "4:3",
+    "ref": "whitetail-deer-buck-3d-relief-stl-cnc-router-wood-carving-file-deer-head-forest-",
+    "alt": "Two carvings of the same design seen edge-on: one with clear stepped depth layers, one a smooth shallow bump",
+    "scene": "EDGE-ON PROFILE COMPARISON, camera almost level with the bench. Two copies of the panel from image 1 lie flat, one behind the other, both in the house finish, photographed from a very low angle so their carved surfaces read as silhouettes against a soft pale background. The NEAR one is a well-made file: its profile is a skyline of clearly distinct levels, the antlers and head standing tall, the forest stepping down behind, the ground lowest. The FAR one is the same design from a poor file: a single smooth low bump with no distinct levels, barely 3 mm of relief, like a hill in fog. Raking light from the left.",
+    "bench": true
+  },
+  {
+    "key": "gouge",
+    "aspect": "4:3",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl",
+    "alt": "A raw relief carving on the machine with a deep accidental gouge torn through the background where the cutter dived",
+    "scene": "ON THE MACHINE, raw pale unfinished wood, no stain. The panel from image 1 is clamped to the spoilboard, mostly carved and clean, but with ONE obvious defect: a deep, ragged, straight-sided GOUGE about 8 mm deep and 30 mm long torn through the smooth background sky beside the eagle, with splintered fibres at its edges and a curl of torn wood beside it, exactly where a cutter plunged where it should not have. The rest of the carving is fine, which makes the gouge worse. The tapered ball nose cutter hangs above. Bright, even workshop light so the damage is unmistakable.",
+    "bench": false
+  },
+  {
+    "key": "scrap",
+    "aspect": "4:3",
+    "ref": "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl",
+    "alt": "A small test carving of the eagle's head on a cheap pine offcut, held beside the finished panel",
+    "scene": "A hand holds up a small rectangular TEST CUT, about 10 by 8 cm, on a cheap pale pine offcut with visible soft grain, on which only the eagle's head from image 1 has been carved, raw and unfinished, a little fuzzy at the edges as pine is. Behind it and slightly out of focus stands the full finished panel from image 1 in the house finish. The test piece is tack sharp and fills about a third of the frame. Workshop light from the left.",
+    "hands": true,
+    "bench": true
+  }
+]

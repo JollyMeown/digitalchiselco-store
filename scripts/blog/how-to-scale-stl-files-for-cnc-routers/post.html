@@ -1,0 +1,240 @@
+<p>Scaling a bas-relief STL down by half sounds harmless. Carve it, though, and you often get a muddy panel where every face has the same expression and every petal looks like a thumbprint. The geometry was fine. The scaling was wrong.</p>
+
+<p>Nearly every "this file is bad" message we receive traces back to one of three numbers: the depth was not scaled with the width, the finishing bit was bigger than the smallest feature, or the board was too thin for the relief and the depth got crushed to fit. This guide is about those three numbers, with the rules of thumb, a size table you can pin to the wall, and exactly where each setting lives in Aspire, VCarve, Carveco and Fusion 360.</p>
+
+<figure>
+  <img src="{{IMG:hero}}" alt="The same whitetail buck relief carved at three sizes, large, medium and small, standing side by side on a workbench" loading="lazy" />
+  <figcaption>The same design at 60, 40 and 22 cm. All three read, but look at the antler tips and the leaf veins on the smallest. That softening is not the file. It is the bit.</figcaption>
+</figure>
+
+<h2 id="contents">In this guide</h2>
+<ul>
+  <li><a href="#not-image">Why STL scaling is not image scaling</a></li>
+  <li><a href="#three">The three numbers that decide the carve</a></li>
+  <li><a href="#depth">Number one: depth scales with width</a></li>
+  <li><a href="#bit">Number two: the bit must be smaller than the smallest feature</a></li>
+  <li><a href="#floor">Number three: the board needs a floor</a></li>
+  <li><a href="#table">The size table</a></li>
+  <li><a href="#software">Where each setting lives: Aspire, VCarve, Carveco, Fusion</a></li>
+  <li><a href="#stretch">Cropping, stretching and mirroring</a></li>
+  <li><a href="#mesh">Mesh density and the CAM that will not stop thinking</a></li>
+  <li><a href="#never">When not to scale, and what to do instead</a></li>
+  <li><a href="#flat">Diagnosing "the carving looks flat"</a></li>
+  <li><a href="#tile">The five-minute test tile</a></li>
+  <li><a href="#faq">Questions people ask</a></li>
+</ul>
+
+<h2 id="not-image">Why STL scaling is not image scaling</h2>
+
+<p>When you shrink a photograph, every pixel shrinks with it and the picture stays readable until it is a thumbnail. An STL is not a picture. It is a mesh of triangles describing a surface with three independent dimensions, and your router reproduces that surface with a physical cutter of a fixed size. Two things follow.</p>
+
+<p>First, the three axes do not have to move together. Shrink X and Y but leave Z alone and the relief becomes proportionally deeper, a sculpture in a shallow frame. Shrink Z but not X and Y and it flattens until the detail is gone. Most people scale uniformly, and most of the time that is right. Knowing when it is not right is what this guide is for.</p>
+
+<p>Second, a cutter cannot reproduce a feature narrower than roughly two and a half times its tip diameter. A 1/16 inch (1.6 mm) tapered ball nose renders a 4 mm feature cleanly and a 2 mm feature as a soft bump. An eyebrow, a leaf vein, the gap between two feathers: at full size they are 4 mm wide and they carve. At half size they are 2 mm and they vanish. The file did not change. The relationship between the feature and the bit did.</p>
+
+<h2 id="three">The three numbers that decide the carve</h2>
+
+<p>Before you scale anything, write down three numbers:</p>
+
+<ol>
+  <li><strong>The width you want.</strong> Usually decided by the board you have or the wall it is going on.</li>
+  <li><strong>The depth that width implies.</strong> Our files ship with a total relief of roughly 10 to 16 mm at their native width; that depth scales with the width, and there is a floor below which faces stop reading.</li>
+  <li><strong>The smallest feature you care about.</strong> On a wildlife piece it is usually an eye or the gap between antler tines. On a face it is the eyelid. On a text panel it is the thinnest stroke of the smallest letter. That feature, at your target size, sets the finishing bit.</li>
+</ol>
+
+<p>Everything below is a way of getting those three numbers to agree with each other.</p>
+
+<h2 id="depth">Number one: depth scales with width</h2>
+
+<figure>
+  <img src="{{IMG:depth}}" alt="Two copies of the same relief seen edge-on: one carved at full depth with clear layers, one flattened so the layers collapse" loading="lazy" />
+  <figcaption>Edge-on. Near: full depth, and you can count the layers. Far: the same file with Z crushed to a third. From the front the far one looks "flat" and nobody can say why. This is why.</figcaption>
+</figure>
+
+<p>The rule is simple. <strong>If you scale X and Y by a factor, scale Z by the same factor.</strong> A file that is 400 mm wide and 14 mm deep becomes 200 mm wide and 7 mm deep. That keeps the proportions you saw in the product picture, which were tuned for that design.</p>
+
+<p>Two refinements:</p>
+
+<ul>
+  <li><strong>If you scale X and Y by different amounts</strong> (which you should avoid, see <a href="#stretch">stretching</a>), scale Z by the <em>smaller</em> of the two factors.</li>
+  <li><strong>There is a floor.</strong> Below about 5 mm of total relief a wall panel stops reading as carved and starts reading as embossed. Faces need more: a portrait needs at least 8 mm of total depth at 300 mm wide, and the eye socket itself needs 1.5 mm of local depth to hold a shadow. If uniform scaling takes you below those, you have scaled too far. Choose a bigger board or a simpler design.</li>
+</ul>
+
+<p>A useful ratio to keep in your head: a good wall relief runs between 1:25 and 1:40, depth to width. A 400 mm panel at 12 mm is 1:33. If your numbers come out at 1:60 the carving will look like a rubbing. If they come out at 1:15 it will look like a sculpture and take all night to rough. Both can be intentional. Neither should be an accident.</p>
+
+<h2 id="bit">Number two: the bit must be smaller than the smallest feature</h2>
+
+<figure>
+  <img src="{{IMG:bit}}" alt="Macro of a carved eye with a tiny tapered ball nose cutter held beside it for scale" loading="lazy" />
+  <figcaption>A 1/16 inch ball beside a carved eye. The lid crease is barely wider than the ball. Scale this face down by half and that crease is narrower than the cutter, and it will not exist in the carving.</figcaption>
+</figure>
+
+<p>The cutter is a physical object, and the relationship between it and the smallest feature is the honest limit of detail. Rule of thumb: <strong>the smallest feature you want to read should be at least 2.5 times the tip diameter of your finishing bit.</strong></p>
+
+<table>
+  <thead><tr><th>Finishing bit tip</th><th>Cleanly renders features down to</th><th>Typical use</th></tr></thead>
+  <tbody>
+    <tr><td>1/8 inch (3.2 mm) ball</td><td>8 mm</td><td>Backgrounds, large panels, semi-finish everywhere</td></tr>
+    <tr><td>1/16 inch (1.6 mm) tapered ball</td><td>4 mm</td><td>Most wildlife and scene detail at 300 mm and up</td></tr>
+    <tr><td>1/32 inch (0.8 mm) tapered ball</td><td>2 mm</td><td>Faces under 250 mm, small text, ornament</td></tr>
+    <tr><td>0.5 mm tapered ball</td><td>1.2 mm</td><td>Jewellery scale, tiny portraits. Fragile and slow.</td></tr>
+  </tbody>
+</table>
+
+<p>So the question "can I carve this at 150 mm?" has a precise answer: measure the smallest feature that matters at 150 mm, divide by 2.5, and that is the largest bit that will render it. If the answer is a 0.3 mm cutter, the honest answer is no, not at that size.</p>
+
+<p>Bit choice also drives machine time. A smaller tip needs a finer stepover, which multiplies the passes. <a href="/blog/cnc-relief-carving-time">Our carve-time guide</a> covers how to keep the fine bit inside a boundary around the detail so the whole panel does not pay for the eye.</p>
+
+<h2 id="floor">Number three: the board needs a floor</h2>
+
+<figure>
+  <img src="{{IMG:thickness}}" alt="A carved panel photographed from the side on a thick board, showing how much wood is left under the deepest cut" loading="lazy" />
+  <figcaption>Look at the edge. The relief dips into the board from the top; the solid wood beneath the deepest cut is the floor. Under 8 mm and the panel will cup, split, or show light through the thin spots.</figcaption>
+</figure>
+
+<p>This is the number people forget until the board is on the machine. The deepest point of the relief plus a solid floor must fit inside the board:</p>
+
+<ul>
+  <li><strong>Leave at least 8 mm of uncarved wood</strong> under the deepest point. Less and the panel cups as it dries, or the background flexes and chatters under the cutter.</li>
+  <li><strong>A 3/4 inch (19 mm) board</strong> therefore holds about 11 mm of relief. Good for most panels up to 400 mm.</li>
+  <li><strong>A 1 inch (25 mm) board</strong> holds about 17 mm. Right for anything with a face or a deep foreground.</li>
+  <li><strong>Trays and boards with pockets</strong> need the floor under the pocket, not the relief, so they want 30 mm or more.</li>
+</ul>
+
+<p>If the board is thinner than the relief wants, do not crush Z to fit. That is the single most common cause of a flat carving. Either accept a slightly shallower relief within the floor rule, or glue up a thicker blank.</p>
+
+<h2 id="table">The size table</h2>
+
+<p>Pin this to the wall. It assumes a typical wildlife or scene relief with a face-sized main subject. Faces alone want the next row down; plain ornament can use the row up.</p>
+
+<table>
+  <thead><tr><th>Target width</th><th>Total relief depth</th><th>Board thickness</th><th>Finishing bit (detail)</th><th>Stepover on detail</th></tr></thead>
+  <tbody>
+    <tr><td>600 mm and up</td><td>16 to 22 mm</td><td>32 mm (1 1/4 inch)</td><td>1/16 inch tapered ball</td><td>10%</td></tr>
+    <tr><td>400 to 600 mm</td><td>12 to 16 mm</td><td>25 mm (1 inch)</td><td>1/16 inch tapered ball</td><td>8 to 10%</td></tr>
+    <tr><td>300 to 400 mm</td><td>10 to 12 mm</td><td>25 mm (1 inch)</td><td>1/16 inch tapered ball</td><td>8%</td></tr>
+    <tr><td>200 to 300 mm</td><td>7 to 10 mm</td><td>19 mm (3/4 inch)</td><td>1/32 inch tapered ball</td><td>8%</td></tr>
+    <tr><td>150 to 200 mm</td><td>5 to 7 mm</td><td>19 mm (3/4 inch)</td><td>1/32 inch tapered ball</td><td>6 to 8%</td></tr>
+    <tr><td>Under 150 mm</td><td>Choose a design made for it</td><td>12 to 19 mm</td><td>0.5 mm tapered ball</td><td>6%</td></tr>
+  </tbody>
+</table>
+
+<h2 id="software">Where each setting lives</h2>
+
+<p>The steps are the same everywhere; the menus move.</p>
+
+<h3>Aspire and VCarve Pro / Desktop</h3>
+<ol>
+  <li><strong>Job Setup first.</strong> Set the material width, height and thickness before you import anything. Importing, eyeballing it, then resizing after toolpaths exist is the most common mistake in the whole workflow.</li>
+  <li><strong>Modeling tab → Import a Component or 3D Model.</strong> Choose the STL. In the import window, set the orientation so the carved face points up and the flat back sits on the material surface.</li>
+  <li><strong>Lock the proportions</strong> (the padlock beside the size fields), then type the width. Height and depth follow.</li>
+  <li><strong>Check "Model Height" in the component properties.</strong> This is Z. If you locked proportions it is already right. If you must reduce it to fit the board, this is where, and you already know the floor rule.</li>
+  <li><strong>Preview with "Render with material".</strong> If the detail is about to disappear into noise, it shows here before you cut anything.</li>
+</ol>
+
+<h3>Carveco Maker and Maker Plus</h3>
+<ol>
+  <li>Create the model with the board's dimensions.</li>
+  <li><strong>Relief → Import 3D Model</strong>, orient, and use <strong>Scale Relief</strong> with proportions linked.</li>
+  <li><strong>Relief Height</strong> (Z) is a separate field. Carveco is happy to let you type any number in it, so check it against the table.</li>
+</ol>
+
+<h3>Fusion 360</h3>
+<ol>
+  <li><strong>Insert → Insert Mesh</strong>, then <strong>Modify → Scale</strong> with Uniform selected. Hold Shift on the manipulator if you prefer dragging.</li>
+  <li>Set the stock in the Manufacturing workspace to the board, not to the mesh's bounding box, so the floor is explicit.</li>
+  <li>Fusion treats the STL as an arbitrary mesh body rather than a relief, so there is no "model height" field. The Z size of the body is the depth; check it in the Measure tool.</li>
+</ol>
+
+<h3>Easel and Carbide Create</h3>
+<p>Easel cannot import an STL at all, and Carbide Create needs the Pro tier to carve one. If either is what you run, the file has to be converted to a grayscale depth map first, and scaling then behaves like an image, which brings back all the problems above without the tools to fix them. <a href="/blog/aspire-vcarve-carveco-fusion-360-comparison">Our comparison of the CAM packages</a> covers the honest options.</p>
+
+<h2 id="stretch">Cropping, stretching and mirroring</h2>
+
+<p><strong>Never stretch.</strong> A relief scaled 120% in X and 100% in Y gives every animal a long face and every letter a fat stroke, and the eye catches it immediately even when it cannot say why. If the file's proportions do not match the board, <strong>crop</strong> instead: scale uniformly until the file fills the board's shorter dimension, then let the CAM's material boundary trim the overhang, or add a plain border to fill the difference. Most of our scenes are designed with sky or foliage at the edges for exactly this reason.</p>
+
+<p><strong>Mirroring is free.</strong> Flip a design so the subject faces into the room rather than out of it. Every CAM has a mirror command and it costs nothing in detail. Do not mirror text.</p>
+
+<h2 id="mesh">Mesh density and the CAM that will not stop thinking</h2>
+
+<p>Scaling does not change the triangle count. A 200,000-triangle file at 150 mm wide has the same 200,000 triangles, now describing a surface far finer than any bit can cut, and some CAM packages crawl. If previews freeze or toolpaths take twenty minutes to calculate:</p>
+
+<ul>
+  <li>Decimate to 60,000 to 120,000 triangles. Aspire and Carveco have it built in; Meshmixer and MeshLab are free.</li>
+  <li>Decimate <em>after</em> you have decided the size, never before, and keep the original.</li>
+  <li>If detail visibly softens in the preview, you went too far. Back off.</li>
+</ul>
+
+<p><a href="/blog/what-makes-a-good-bas-relief-stl-file">What makes a good bas-relief STL</a> explains why triangle count is a poor quality signal on its own, and what to look at instead.</p>
+
+<h2 id="never">When not to scale, and what to do instead</h2>
+
+<p>Some designs do not survive being shrunk, however carefully:</p>
+
+<ul>
+  <li><strong>Faces under 100 mm.</strong> Likeness lives in lash lines and lip transitions that sit below any practical bit at that size. Want a 60 mm portrait? Look for a file <em>designed</em> at ornament scale rather than a wall-art file at 25%.</li>
+  <li><strong>Text panels under 200 mm wide.</strong> Stroke widths need to stay readable and the serifs chip out. Cut the text as a separate V-carve toolpath at any size instead.</li>
+  <li><strong>Layered scenes.</strong> Mountains behind trees behind a subject rely on Z separation. Crush Z and the layers stack visually instead of receding. Choose the single-subject variant of the design if there is one.</li>
+</ul>
+
+<p>The <a href="{{URL:whitetail-deer-buck}}">{{TITLE:whitetail-deer-buck}}</a> scales gracefully from 22 to 60 cm because the subject is large and the forest is a background. The <a href="{{URL:face-of-jesus}}">{{TITLE:face-of-jesus}}</a> is superb at 300 mm and above and should not be attempted below 200. The <a href="{{URL:the-last-supper}}">{{TITLE:the-last-supper}}</a> is thirteen small faces in a row and wants 600 mm or more. Every product page lists a recommended range; it is the result of a test pass, not a marketing line.</p>
+
+<p><a class="dl-btn" href="{{URL:whitetail-deer-buck}}">Download the Whitetail Buck panel · {{PRICE:whitetail-deer-buck}}</a></p>
+
+<h2 id="flat">Diagnosing "the carving looks flat"</h2>
+
+<p>If the finished piece looks softer than the product picture, walk this list before blaming the file. In our experience the answer is in the first three about nine times in ten.</p>
+
+<ol>
+  <li><strong>Was Z scaled with X and Y?</strong> Measure the deepest point with a depth gauge and compare it to what the CAM said. If the CAM says 12 mm and the panel says 6, the depth was crushed, usually to fit a thin board.</li>
+  <li><strong>Was the finishing bit smaller than the smallest feature?</strong> Divide the smallest feature at your size by 2.5. Compare to the bit you used.</li>
+  <li><strong>Was the stepover under 10% on the detail?</strong> A 20% stepover with a fine bit leaves a corduroy that reads as blur from a metre away.</li>
+  <li><strong>Was the wood the problem?</strong> Pine, poplar and basswood collapse under fine bits and fuzz over the detail. <a href="/blog/how-to-finish-cnc-relief-carvings#wood">The species table in the finishing guide</a> is blunt about which woods hold detail.</li>
+  <li><strong>Was it finished?</strong> Raw wood is one colour and only shadow gives it shape. A dark glaze wiped back off the high points makes a carving that looked flat off the machine read from across the room. <a href="/blog/how-to-finish-cnc-relief-carvings#glaze">That step is here</a>.</li>
+</ol>
+
+<p>If all five check out and it still looks flat, the file is the problem, and it is usually a file that was authored at a small size or with very little Z range to begin with.</p>
+
+<h2 id="tile">The five-minute test tile</h2>
+
+<figure>
+  <img src="{{IMG:test}}" alt="A small test tile of the buck's head carved on an offcut, held up against the full panel" loading="lazy" />
+  <figcaption>The head only, on an offcut, at the exact scale and with the exact bit you intend to use. Five minutes of machine time answers every question in this article for your specific setup.</figcaption>
+</figure>
+
+<p>Before you commit a board, crop the design to its most detailed 80 mm and carve that on an offcut of the same wood, at the exact scale and with the exact bit and stepover you plan to use. It takes five to ten minutes. If the eye reads on the tile it will read on the panel. If it does not, you have just saved a day and a board, and you know which of the three numbers to change.</p>
+
+<p>Try it on a design with a clear subject. The <a href="{{URL:face-of-jesus}}">{{TITLE:face-of-jesus}}</a> is the hardest honest test of a bit and a size you can run.</p>
+
+<p><a class="dl-btn" href="{{URL:face-of-jesus}}">Download the Face of Christ panel · {{PRICE:face-of-jesus}}</a></p>
+
+<h2 id="faq">Questions people ask</h2>
+
+<h3>Do I scale Z when I scale the width?</h3>
+<p>Yes, by the same factor, unless the board cannot take it, in which case choose a shallower relief within the floor rule rather than crushing Z to fit.</p>
+
+<h3>What is the smallest size I can carve a face?</h3>
+<p>About 200 mm wide for a full face with a 1/32 inch bit; 250 to 300 mm with a 1/16 inch. Under 100 mm, use a design made for that scale.</p>
+
+<h3>How deep should a relief be?</h3>
+<p>Between 1:25 and 1:40 of the width. A 400 mm panel wants 10 to 16 mm. Faces want the deep end of that range.</p>
+
+<h3>How thick a board do I need?</h3>
+<p>Relief depth plus at least 8 mm of floor. 3/4 inch stock holds about 11 mm of relief; 1 inch holds about 17.</p>
+
+<h3>Can I stretch a design to fit a board?</h3>
+<p>No. Crop it or add a border. Stretching distorts every face and letter in ways the eye catches immediately.</p>
+
+<h3>Does a higher triangle count mean more detail?</h3>
+<p>Not on its own. Triangle count above what the bit can cut is wasted, and it slows the CAM. 60,000 to 180,000 is the useful range for wall art.</p>
+
+<h3>Why does my CAM preview look sharper than the carving?</h3>
+<p>Because the preview does not know how big your bit is. Preview with the toolpath simulation, not the model render, and the answer changes.</p>
+
+<hr />
+
+<p>Three numbers. Depth scales with width; the bit must be smaller than the smallest feature; the board needs a floor. Get those to agree, carve a test tile, and scaling stops being the thing that ruins a good file and becomes what it should be: a way to put the same design on any wall in the house.</p>
+
+<p>Every file in the <a href="/catalog">catalogue</a> lists its recommended size range on its product page, and the <a href="/free">free starter pack</a> is the cheapest way to prove your bit and your board before buying anything.</p>
+
+<p><em>Jolly, DigitalChiselCo</em></p>
