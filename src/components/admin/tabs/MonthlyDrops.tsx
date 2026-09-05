@@ -10,6 +10,7 @@ import { useLiveRefresh } from '../useLiveRefresh';
 type Pack = {
   id: string; month: string; title: string | null; preview_note: string | null; standard_drive_link: string | null; bonus_drive_link: string | null;
   cover_image_url: string | null; items: { title: string; slug?: string | null; image_url?: string | null }[]; bonus_items: { title: string; slug?: string | null; image_url?: string | null }[]; file_count: number | null; built_by: string | null; notes: string | null; created_at: string;
+  link_history: { standard_drive_link?: string | null; bonus_drive_link?: string | null; title?: string | null; built_by?: string | null; replaced_at?: string | null }[];
 };
 type Sub = { id: string; email: string; status: string; start_date: string; total_drops: number; tier: string };
 type Log = { subscription_id: string; email_type: string; drop_month: string; status: string; provider_id: string | null };
@@ -43,7 +44,7 @@ export default function MonthlyDrops() {
       supabase.from('pack_downloads').select('subscription_id, month').limit(5000),
       supabase.from('growth_settings').select('membership_reminder_days, membership_winback_days, membership_winback_coupon, membership_pack_alert_days').eq('id', 1).maybeSingle(),
     ]);
-    setRows(((pk ?? []) as any[]).map((p) => ({ ...p, items: Array.isArray(p.items) ? p.items : [], bonus_items: Array.isArray(p.bonus_items) ? p.bonus_items : [] })) as Pack[]);
+    setRows(((pk ?? []) as any[]).map((p) => ({ ...p, items: Array.isArray(p.items) ? p.items : [], bonus_items: Array.isArray(p.bonus_items) ? p.bonus_items : [], link_history: Array.isArray(p.link_history) ? p.link_history : [] })) as Pack[]);
     setSubs((sb ?? []) as Sub[]); setLogs((lg ?? []) as Log[]); setDls((dl ?? []) as Dl[]); setSettings(gs || {});
     const ids = [...new Set((lg || []).map((l: any) => l.provider_id).filter(Boolean))] as string[];
     const op = new Set<string>();
@@ -153,6 +154,22 @@ export default function MonthlyDrops() {
                     {r.standard_drive_link ? <a href={r.standard_drive_link} target="_blank" rel="noreferrer" className="text-bronze-700 underline">standard link ↗</a> : <span className="text-red-600">standard link missing</span>}
                     {r.bonus_drive_link ? <a href={r.bonus_drive_link} target="_blank" rel="noreferrer" className="text-bronze-700 underline">bonus link ↗</a> : <span className="text-ink-700/40">no bonus link</span>}
                   </div>
+                  {r.link_history.length > 0 && (
+                    <details className="mt-1.5 text-[11px]">
+                      <summary className="cursor-pointer text-ink-700/60 hover:text-ink-900">Previous links ({r.link_history.length}) kept for reference</summary>
+                      <ul className="mt-1 space-y-0.5 pl-3 border-l border-[#F1D9A6]">
+                        {[...r.link_history].reverse().map((h, i) => (
+                          <li key={i} className="flex flex-wrap gap-2 items-baseline">
+                            <span className="text-ink-700/50">{h.replaced_at ? new Date(h.replaced_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
+                            {h.title && <span className="text-ink-700/70">{h.title}</span>}
+                            {h.built_by && <span className="text-[10px] bg-cream-100 px-1 rounded">{h.built_by}</span>}
+                            {h.standard_drive_link && <a href={h.standard_drive_link} target="_blank" rel="noreferrer" className="text-bronze-700 underline">old standard ↗</a>}
+                            {h.bonus_drive_link && <a href={h.bonus_drive_link} target="_blank" rel="noreferrer" className="text-bronze-700 underline">old bonus ↗</a>}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1 items-end">
                   <div className="flex gap-1">
