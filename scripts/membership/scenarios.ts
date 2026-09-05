@@ -4,6 +4,7 @@
 // at the end. Time is simulated by passing `today` into the engine.
 //
 //   node --env-file=.env --import tsx scripts/membership/scenarios.ts
+export {};                                             // module: top-level await
 process.env.RESEND_API_KEY = '';                       // never send during tests
 process.env.TELEGRAM_BOT_TOKEN = '';
 
@@ -34,11 +35,12 @@ try {
     s1.created && a.drops_sent === 1 && a.next_drop_date === S.addMonths(today, 1) && a.end_date === S.addMonths(today, 3) && (await types(a.id)).includes('first_pack:' + S.toYM(today)),
     `drops ${a.drops_sent}, next ${a.next_drop_date}, end ${a.end_date}`);
 
-  // S2 new member whose start month has NO pack (July 2026): welcome now, pack later
-  const s2 = await S.createSubscriptionForPurchase({ email: T('s2'), plan: PLAN3, startDate: '2026-07-06', source: 'etsy' });
+  // S2 new member whose start month has NO pack (May 2026; June/July were added 2026-09-06): welcome now, pack later
+  // (6-month plan so the term is still running today; a 3-month one from May would already have expired)
+  const s2 = await S.createSubscriptionForPurchase({ email: T('s2'), plan: { slug: '6-month', name: '6-Month CNC STL Membership', months: 6, files_per_month: 8, price_usd: 39.99 }, startDate: '2026-05-06', source: 'etsy' });
   a = await sub(s2.subscriptionId!);
   const t2 = await types(a.id);
-  check('S2 missing month: welcome sent, nothing else, member held (not skipped)', a.drops_sent === 0 && t2.length === 1 && t2[0] === 'welcome:2026-07', t2.join(', '));
+  check('S2 missing month: welcome sent, nothing else, member held (not skipped)', a.drops_sent === 0 && t2.length === 1 && t2[0] === 'welcome:2026-05', t2.join(', '));
 
   // S3 backdated Etsy add (start 6 Aug): catch-up sends August AND September in one go
   const s3 = await S.createSubscriptionForPurchase({ email: T('s3'), plan: PLAN3, startDate: '2026-08-01', source: 'etsy' });
@@ -48,7 +50,12 @@ try {
   // S3b import from the old system: started 1 August, already received 2 packs there: nothing re-sent, next pack October
   const s3b = await S.createSubscriptionForPurchase({ email: T('s3b'), plan: PLAN3, startDate: '2026-08-01', source: 'import', dropsAlreadySent: 2 });
   a = await sub(s3b.subscriptionId!);
-  check('S3b imported member with 2 packs already received: nothing re-sent, next pack October', a.drops_sent === 2 && a.next_drop_date === '2026-10-01' && (await logs(a.id)).length === 0, `drops ${a.drops_sent}, next ${a.next_drop_date}, logs ${(await logs(a.id)).length}`);
+  {
+    const l3b = await logs(a.id);
+    const imported = l3b.filter((l) => l.email_type === 'imported').map((l) => l.drop_month).sort().join(',');
+    const emailed = l3b.filter((l) => l.email_type !== 'imported').length;
+    check('S3b imported member with 2 packs already received: nothing re-sent, both months pinned, next pack October', a.drops_sent === 2 && a.next_drop_date === '2026-10-01' && emailed === 0 && imported === '2026-08,2026-09', `drops ${a.drops_sent}, next ${a.next_drop_date}, emailed ${emailed}, pinned ${imported}`);
+  }
 
   // S4 month arrives: drop sent once, second run same day is a no-op
   await run(s1.subscriptionId!, '2026-10-06');

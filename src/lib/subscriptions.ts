@@ -66,13 +66,30 @@ export function daysUntil(from: string, to: string): number {
 // /api/member/pack?s=<sub>&m=<YYYY-MM>&k=standard|bonus&v=email|portal&t=<sig>
 // The signature binds the subscription and month, so a link cannot be edited
 // into another member's pack, and the route logs the click before redirecting.
-function linkSecret(): string {
-  const s = process.env.ACCOUNT_TOKEN_SECRET || (import.meta as any).env?.ACCOUNT_TOKEN_SECRET
-    || process.env.SUPABASE_SERVICE_ROLE_KEY || (import.meta as any).env?.SUPABASE_SERVICE_ROLE_KEY || 'dev-only';
-  return s;
+// Every secret a link may have been signed with. Production signs with
+// ACCOUNT_TOKEN_SECRET; a pack sent from the owner's machine (scripts, the
+// scenario harness) is signed with the service key because that machine has no
+// ACCOUNT_TOKEN_SECRET. Verification accepts any of them so a button never
+// fails just because of where the email was sent from (2026-09-06 incident:
+// the 2099-01 test email answered "invalid link" on the live site).
+function linkSecrets(): string[] {
+  const all = [
+    process.env.ACCOUNT_TOKEN_SECRET, (import.meta as any).env?.ACCOUNT_TOKEN_SECRET,
+    process.env.SUPABASE_SERVICE_ROLE_KEY, (import.meta as any).env?.SUPABASE_SERVICE_ROLE_KEY,
+  ].filter((s): s is string => typeof s === 'string' && s.length > 0);
+  return all.length ? [...new Set(all)] : ['dev-only'];
+}
+function sigWith(secret: string, subId: string, ym: string, kind: string): string {
+  return crypto.createHmac('sha256', secret).update(`${subId}|${ym}|${kind}`).digest('base64url').slice(0, 24);
 }
 export function packLinkSig(subId: string, ym: string, kind: string): string {
-  return crypto.createHmac('sha256', linkSecret()).update(`${subId}|${ym}|${kind}`).digest('base64url').slice(0, 24);
+  return sigWith(linkSecrets()[0], subId, ym, kind);
+}
+/** True when the token matches the signature under ANY known secret (constant-time per candidate). */
+export function packLinkValid(token: string, subId: string, ym: string, kind: string): boolean {
+  if (!token) return false;
+  const t = Buffer.from(token);
+  return linkSecrets().some((sec) => { const e = Buffer.from(sigWith(sec, subId, ym, kind)); return e.length === t.length && crypto.timingSafeEqual(e, t); });
 }
 export function packLink(subId: string, ym: string, kind: 'standard' | 'bonus', via: 'email' | 'portal'): string {
   return `${SITE}/api/member/pack?s=${encodeURIComponent(subId)}&m=${ym}&k=${kind}&v=${via}&t=${packLinkSig(subId, ym, kind)}`;
@@ -533,8 +550,7 @@ export async function sendReminderNow(subscriptionId: string): Promise<{ ok: boo
 export async function resolvePackClick(q: { s: string; m: string; k: string; v: string; t: string; ua?: string }): Promise<{ url: string } | { error: string; status: number }> {
   const kind = q.k === 'bonus' ? 'bonus' : 'standard';
   if (!q.s || !/^\d{4}-\d{2}$/.test(q.m)) return { error: 'bad link', status: 400 };
-  const expected = packLinkSig(q.s, q.m, kind);
-  if (!q.t || q.t.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(q.t), Buffer.from(expected))) return { error: 'invalid link', status: 403 };
+  if (!packLinkValid(q.t, q.s, q.m, kind)) return { error: 'invalid link', status: 403 };
   const db = supabaseAdmin();
   // The admin "test to me" email signs its buttons with the all-zero
   // membership id: valid signature, no member. Open the pack, log nothing.
