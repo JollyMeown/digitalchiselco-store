@@ -3,5 +3,11 @@
   "excerpt": "A 20 by 12 inch relief on a single 1/8 inch ball nose can run for six days. The same panel with a roughing pass, a bit ladder and a boundary around the fine detail runs in an afternoon. The method, the maths and the settings.",
   "seo_title": "How Long Does CNC Relief Carving Take? Cut 3D Carving Time by 80%",
   "seo_description": "Why 3D relief carvings take days on a CNC router and how to cut the time by 80%: roughing passes, the bit ladder, stepover maths, finishing boundaries, feeds for hobby machines, and a time estimator.",
-  "cover": "hero"
+  "cover": "hero",
+  "email": {
+    "subject": "Why your relief carving takes three days, and how to make it three hours",
+    "intro": "A maker on the Onefinity forum posted the number that stops people buying relief files: over six days of machine time for one 20 by 12 inch carving. Another had a 55 hour estimate. He changed three settings and it ran in 13.\n\nNothing was wrong with either file. One small ball nose cutter was being asked to do the entire job, from hogging out the background to polishing the eye, at the tiny stepover only the eye needed.\n\nThe new guide is the fix: a roughing pass, a three-cutter ladder, a boundary around the fine detail, and a back-of-the-envelope formula that predicts any raster pass to within about 20%. Here is the eagle panel, half roughed and half finished, on the machine:",
+    "image": "hero",
+    "drip": true
+  }
 }

@@ -11,7 +11,7 @@ import { fetchAll } from './fetch-all';
 import { supabaseAdmin } from './supabase';
 import { send as sendEmail, sendBatch, isQuotaExhausted, marketingBudgetRemaining } from './resend';
 import {
-  dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
+  articleEmail, dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
   weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, applyOverride, TEMPLATE_HEADINGS,
   winbackEmail, priceDropEmail, referralNudgeEmail, refundWinbackEmail,
   wishlistReminderEmail, ownerWeeklyReport,
@@ -26,6 +26,10 @@ const DRIP_GAP_DAYS = 4;
 // invocation. Every step is idempotent + ledgered, so anything not reached
 // today is simply picked up tomorrow — smaller batches, zero loss.
 const DRIP_MAX_PER_RUN = 25;
+// Article drip: each subscriber gets every drip-enabled guide, one per gap.
+const ARTICLE_DRIP_MAX_PER_RUN = 60;
+// Sends made before the generic article sender existed, mapped to their article.
+const LEGACY_ARTICLE_KINDS: Record<string, string> = { guideCampaign: 'how-to-finish-cnc-relief-carvings', drip6: 'how-to-finish-cnc-relief-carvings' };
 const FOLLOWUP_MAX_PER_RUN = 15;
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
@@ -412,13 +416,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       const { data: fb } = await db.from('products').select('title, slug, image_url, price_usd').eq('active', true).order('created_at', { ascending: false }).limit(3);
       bestsellers = (fb || []) as MiniProduct[];
     }
-    // make sure the stage-5 coupon exists (15%, 60 days). Stage 6 is the
-    // finishing guide, which sells nothing and needs no coupon.
+    // make sure the stage-5 coupon exists (15%, 60 days)
     const { data: cv } = await db.from('coupons').select('id').ilike('code', 'CARVE15').maybeSingle();
     if (!cv) await db.from('coupons').insert({ code: 'CARVE15', percent_off: 15, active: true, expires_at: new Date(Date.now() + 60 * 86400000).toISOString() });
 
     const { data: due } = await db.from('subscriber_drip')
-      .select('email, stage, last_sent_at').eq('status', 'active').lt('stage', 6)
+      .select('email, stage, last_sent_at').eq('status', 'active').lt('stage', 5)
       .or(`last_sent_at.is.null,last_sent_at.lte.${daysAgo(DRIP_GAP_DAYS)}`)
       .order('enrolled_at').limit(DRIP_MAX_PER_RUN);
     for (const r of due || []) {
@@ -432,13 +435,59 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
           dripEmail(stage, { email: r.email, bestsellers, bundle: bundle as MiniProduct | null, plan: plan as any, couponCode: 'CARVE15' }), r.email);
         const res = await sendEmail({ to: r.email, subject, html, text, idempotencyKey: `drip:${r.email}:${stage}`, tags: [{ name: 'kind', value: `drip${stage}` }] });
         if (res.ok) {
-          await db.from('subscriber_drip').update({ stage, last_sent_at: new Date().toISOString(), ...(stage >= 6 ? { status: 'done' } : {}) }).eq('email', r.email);
+          await db.from('subscriber_drip').update({ stage, last_sent_at: new Date().toISOString(), ...(stage >= 5 ? { status: 'done' } : {}) }).eq('email', r.email);
           s.sent++;
         } else if (res.quota) { (s as any).note = 'stopped: daily budget reached (resumes tomorrow)'; break; }
         else s.failed++;
       } catch { s.failed++; }
     }
     stats.drip = s;
+  });
+
+  // ── 1b. Article drip: every guide, one at a time, to everyone ────────
+  // Each subscriber receives every drip-enabled article in publish order, one
+  // per gap. It runs for the whole list, not just new joiners, so an article
+  // published today reaches the people who were already here without anyone
+  // pressing the broadcast button. The ledger says who has had what.
+  stats.articleDrip = 'off';
+  await step(stats, 'articleDrip', async () => {
+    if (!g.article_drip_enabled) return;
+    const gap = Number(g.article_drip_gap_days) || 4;
+    const s = { candidates: 0, sent: 0, failed: 0 };
+    const posts = await fetchAll((a, b) => db.from('posts')
+      .select('slug, title, excerpt, body, cover_image_url, email_subject, email_intro, email_image_url, published_at')
+      .eq('status', 'published').eq('email_in_drip', true).order('published_at', { ascending: true }).range(a, b));
+    if (!posts.length) return;
+    const subs = await fetchAll((a, b) => db.from('subscribers').select('email, confirmed_at, unsubscribed_at, suppressed_at').range(a, b));
+    const people = [...new Set(subs.filter((r: any) => r.email && r.confirmed_at && !r.unsubscribed_at && !r.suppressed_at)
+      .map((r: any) => String(r.email).toLowerCase().trim()))] as string[];
+    const log = await fetchAll((a, b) => db.from('email_send_log').select('kind, batch_key, recipient, sent_at')
+      .in('kind', ['articleCampaign', 'articleDrip', 'guideCampaign', 'drip6']).eq('status', 'sent').range(a, b));
+    const had = new Map<string, Set<string>>(); const lastAt = new Map<string, number>();
+    for (const r of log) {
+      const em = String(r.recipient || '').toLowerCase().trim();
+      const m = /^article:([^:]+):/.exec(String(r.batch_key || ''));
+      const slug = m ? m[1] : LEGACY_ARTICLE_KINDS[r.kind];
+      if (!slug) continue;
+      if (!had.has(em)) had.set(em, new Set());
+      had.get(em)!.add(slug);
+      const t = new Date(r.sent_at).getTime();
+      if ((lastAt.get(em) || 0) < t) lastAt.set(em, t);
+    }
+    const cutoff = Date.now() - gap * 86400000;
+    for (const em of people) {
+      if (s.sent >= ARTICLE_DRIP_MAX_PER_RUN) break;
+      if ((lastAt.get(em) || 0) > cutoff) continue;            // had one recently
+      const next = posts.find((p: any) => !had.get(em)?.has(p.slug));
+      if (!next) continue;                                      // had them all
+      s.candidates++;
+      const { subject, html, text } = articleEmail({ email: em, post: next as any });
+      const res = await sendEmail({ to: em, subject, html, text, idempotencyKey: `article:${next.slug}:drip:${em}`, tags: [{ name: 'kind', value: 'articleDrip' }] });
+      if (res.ok) s.sent++;
+      else if (res.quota) { (s as any).note = 'stopped: daily budget reached (resumes tomorrow)'; break; }
+      else s.failed++;
+    }
+    stats.articleDrip = s;
   });
 
   // ── 2. abandoned-cart reminders ─────────────────────────────────────

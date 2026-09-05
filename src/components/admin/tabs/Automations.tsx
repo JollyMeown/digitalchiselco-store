@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, btnPrimary, btnGhost, inputCls, Toast } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
-import GuideBroadcast from '../GuideBroadcast';
+import ArticleEmails from '../ArticleEmails';
 
 const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'drip1', label: '1 · Did you carve the free pack?', group: 'Subscriber drip' },
@@ -10,7 +10,6 @@ const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'drip3', label: '3 · Bundle spotlight', group: 'Subscriber drip' },
   { key: 'drip4', label: '4 · Membership pitch', group: 'Subscriber drip' },
   { key: 'drip5', label: '5 · CARVE15 coupon', group: 'Subscriber drip' },
-  { key: 'drip6', label: '6 · The finishing guide', group: 'Subscriber drip' },
   { key: 'cart', label: 'Abandoned-cart reminder', group: 'Cart recovery' },
   { key: 'browse', label: 'Abandoned-browse reminder', group: 'Cart recovery' },
   { key: 'review7', label: 'Review request (+7 days)', group: 'Post-purchase' },
@@ -278,9 +277,11 @@ export default function Automations() {
         🛡 <b>Review-first:</b> each system starts OFF — a <b>green</b> toggle means it's <b>ON</b>. Preview each email (right) and test-send it to yourself before enabling. The daily cron (08:00 UTC) does the actual sending, so the counters below stay at <b>0</b> until it next runs and there's activity to report — that's normal, not "off".
       </div>
 
-      <GuideBroadcast />
+      <ArticleEmails />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Toggle field="article_drip_enabled" label="Guide emails, one at a time"
+          desc="Every published guide marked for the drip goes to every subscriber in turn, one every few days. New subscribers get them all automatically." />
         <Toggle field="drip_enabled" label="Subscriber nurture drip"
           desc="5 emails, ~4 days apart, to double-opt-in free subscribers. Stops automatically when someone buys."
           stat={`${drip.active} active · ${drip.done} completed · ${drip.converted} converted · ${drip.stopped} unsubscribed`} />
@@ -746,7 +747,7 @@ const EMAIL_KIND_LABELS: Record<string, string> = {
   'optin': 'Opt-in confirmations', 'resendLibrary': 'Library re-sends', 'payRecovery': 'Payment recovery',
   'portalGuide': 'Portal guide', 'weekly-digest': 'Weekly digest', 'drip1': 'Nurture drip 1',
   'drip2': 'Nurture drip 2', 'drip3': 'Nurture drip 3', 'drip4': 'Nurture drip 4', 'drip5': 'Nurture drip 5',
-  'drip6': 'Finishing guide', 'guideCampaign': 'Finishing guide broadcast',
+  'drip6': 'Finishing guide (old drip)', 'guideCampaign': 'Finishing guide broadcast', 'articleDrip': 'Guide drip', 'articleCampaign': 'Guide broadcast',
   'cartSave': 'Cart reminders', 'browse': 'Browse reminders', 'winback': 'Win-back',
   'priceDrop': 'Price-drop alerts', 'referralNudge': 'Referral nudges', 'etsyWelcome': 'Etsy welcome',
   'wishlistReminder': 'Wishlist reminders', 'refundWinback': 'Refund win-back', 'picks': 'Hand-picked designs',

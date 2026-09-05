@@ -189,11 +189,6 @@ export function dripEmail(stage: number, d: {
       ${btn(SITE + '/#membership', 'See membership plans')}`;
     return { subject, html: shell(subject, 'The membership pays for itself', body, e), text: `Membership: ${SITE}/#membership\nUnsubscribe: ${unsubUrl(e)}` };
   }
-  // Stage 6 closes the sequence with the finishing guide. Every earlier stage
-  // asks for something; this one only gives, which is why it goes last and why
-  // it is the one people reply to.
-  if (stage >= 6) return guideEmail({ email: e });
-
   const code = d.couponCode || 'CARVE15';
   const subject = `A 15% thank-you, just for you (code ${code})`;
   const body = `
@@ -281,6 +276,58 @@ export function guideEmail(d: { email: string; name?: string | null }): Out {
   ].join('\n');
 
   return { subject, html: shell(subject, 'How to finish a relief carving', body, e), text };
+}
+
+// ── Any published article ─────────────────────────────────────────────
+// The finishing guide email, generalised. Renders from the post itself: the
+// cover as the opening photograph, one chosen inside photograph, and the
+// section headings as the "what is inside" list. Subject and opener come from
+// the post's email_* columns (editable in Admin > Automations) with fallbacks
+// to the title and excerpt, so every guide goes out the same way the finishing
+// guide did without anyone writing a new template.
+export type ArticlePost = {
+  slug: string; title: string; excerpt?: string | null; body?: string | null;
+  cover_image_url?: string | null; email_subject?: string | null; email_intro?: string | null;
+  email_image_url?: string | null;
+};
+
+const stripTags = (s: string) => s.replace(/<[^>]+>/g, '')
+  .replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ').trim();
+
+export function articleEmail(d: { email: string; post: ArticlePost }): Out {
+  const e = d.email, p = d.post;
+  const url = `${SITE}/blog/${p.slug}?utm_source=email&utm_medium=newsletter&utm_campaign=article-${p.slug}`;
+  const subject = String(p.email_subject || p.title).slice(0, 120);
+  const heading = p.title.split(':')[0].trim();
+  const body = String(p.body || '');
+  const imgs = [...body.matchAll(/<img[^>]+src="([^"]+)"/g)].map((m) => m[1]);
+  const inside = p.email_image_url || imgs.find((u) => u !== p.cover_image_url) || null;
+  // Section headings become the list. Navigation and FAQ headings are noise.
+  const headings = [...body.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/g)].map((m) => stripTags(m[1]))
+    .filter((h) => !/^(what this guide covers|in this article|contents|who are you giving to\??|questions people ask|common questions)$/i.test(h))
+    .slice(0, 7);
+  const intro = String(p.email_intro || p.excerpt || '').split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  const P = 'margin:0 0 14px;font-size:15px;line-height:1.65;color:#555;';
+
+  const html = shell(subject, heading, `
+    ${p.cover_image_url ? `<a href="${url}" style="text-decoration:none;"><img src="${esc(p.cover_image_url)}" width="544" alt="${esc(p.title)}" style="width:100%;max-width:544px;border-radius:10px;display:block;margin:0 0 20px;"></a>` : ''}
+    ${intro.map((t) => `<p style="${P}">${esc(t)}</p>`).join('')}
+    ${inside ? `<img src="${esc(inside)}" width="544" alt="" style="width:100%;max-width:544px;border-radius:10px;display:block;margin:6px 0 20px;">` : ''}
+    ${headings.length ? `<p style="${P}">Inside:</p>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 18px;">
+      ${headings.map((h) => `<tr><td style="padding:5px 0;font-size:14.5px;line-height:1.5;color:#555;">${esc(h)}</td></tr>`).join('')}
+    </table>` : ''}
+    ${btn(url, 'Read the full guide')}
+    <p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#666;">It is free and there is nothing to sign up for. If something in your shop is not behaving, reply to this and ask. Real questions are how these guides get written.</p>
+    <p style="margin:18px 0 0;font-size:13px;color:#777;">Jolly, DigitalChiselCo</p>`, e);
+
+  const text = [
+    ...intro, '', ...(headings.length ? ['Inside:', ...headings.map((h) => `  - ${h}`), ''] : []),
+    `Read it: ${url}`, '',
+    'It is free and there is nothing to sign up for. If something in your shop is not behaving, reply and ask.',
+    '', 'Jolly, DigitalChiselCo', `Unsubscribe: ${unsubUrl(e)}`,
+  ].join('\n');
+  return { subject, html, text };
 }
 
 // ── Abandoned cart (one reminder, ~20h later) ────────────────────────

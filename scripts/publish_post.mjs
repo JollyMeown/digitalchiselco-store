@@ -79,6 +79,14 @@ const post = {
   seo_title: meta.seo_title,
   seo_description: meta.seo_description,
   updated_at: new Date().toISOString(),
+  // Optional meta.email: { subject, intro, image: "<frame key>", drip: true }
+  // becomes the article's email in Admin > Automations.
+  ...(meta.email ? {
+    email_subject: meta.email.subject || null,
+    email_intro: meta.email.intro || null,
+    email_image_url: meta.email.image ? (img[meta.email.image] || null) : null,
+    email_in_drip: !!meta.email.drip,
+  } : {}),
 };
 
 const existing = await fetch(`${URL_BASE}/rest/v1/posts?select=id&slug=eq.${SLUG}`, { headers: H }).then((r) => r.json());

@@ -3,5 +3,11 @@
   "excerpt": "Twenty-five relief designs that make gifts people keep, sorted by who you are giving to, with the wood, the size and the time each one really takes. Plus the Christmas calendar that tells you when to start.",
   "seo_title": "CNC Carved Wood Gift Ideas: The Relief Carving Gift Guide",
   "seo_description": "Carved wood gift ideas by recipient: fishing, cabin and hunting, faith, wedding and anniversary, horses, Celtic, serving trays, pet memorials. Wood, size and carve time for each, and when to start for Christmas.",
-  "cover": "hero"
+  "cover": "hero",
+  "email": {
+    "subject": "The carved wood gift guide: 25 designs, sorted by who you are giving to",
+    "intro": "Somebody who owns a CNC router has an unfair advantage in December. Everyone else is choosing between a scarf and a gift card. You can put a piece of carved wood in someone's hands that they will hang on a wall and keep for thirty years, and it cost you a board, an evening, and a file.\n\nThe catch is choosing the right design for the right person, and starting early enough that it is dry and finished before the day. So we wrote the guide: twenty-five designs sorted by who you are giving to, with the wood, the size and the time each one really takes, and the calendar that tells you the last safe day to start.\n\nIt was built from what people actually search for on our site. Fishing first, by a distance. Then wedding gifts, cabins, bears, ducks, horses, Celtic, trays.",
+    "image": "family",
+    "drip": true
+  }
 }

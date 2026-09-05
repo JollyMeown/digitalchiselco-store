@@ -27,7 +27,7 @@ async function isCallerAdmin(request: Request): Promise<boolean> {
   return !!prof?.is_admin;
 }
 
-const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'drip6', 'cart', 'browse', 'review7', 'arrivals30', 'loyalty', 'weekly', 'etsyWelcome', 'winback', 'priceDrop', 'referralNudge'] as const;
+const KINDS = ['drip1', 'drip2', 'drip3', 'drip4', 'drip5', 'cart', 'browse', 'review7', 'arrivals30', 'loyalty', 'weekly', 'etsyWelcome', 'winback', 'priceDrop', 'referralNudge'] as const;
 
 async function render(kind: string, email: string): Promise<{ subject: string; html: string; text: string }> {
   const db = supabaseAdmin();
