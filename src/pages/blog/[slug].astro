@@ -17,6 +17,16 @@ try {
   post = data;
 } catch {}
 
+// Articles from the old landing-page site still rank on page one (Search
+// Console, 2026-09-05: positions 5 to 8) but their slugs no longer exist,
+// so send that authority to the guide that covers the same ground instead
+// of a 404. Permanent redirects, so Google transfers the ranking.
+const LEGACY: Record<string, string> = {
+  'how-to-scale-relief-stl-files-without-losing-detail': 'how-to-scale-stl-files-for-cnc-routers',
+  'roughing-vs-finishing-toolpaths-cnc-bas-relief': 'cnc-relief-carving-time',
+  'photo-to-3d-bas-relief-good-source-image': 'what-makes-a-good-bas-relief-stl-file',
+};
+if (!post && slug && LEGACY[slug]) return Astro.redirect(`/blog/${LEGACY[slug]}`, 301);
 if (!post) return Astro.rewrite('/404');
 
 // Reading time and "updated" only when the article was materially revised

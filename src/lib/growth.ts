@@ -1157,7 +1157,10 @@ ${ideasHtml}
   await step(stats, 'searchConsole', async () => {
     const { gscConfigured, syncSearchConsole } = await import('./search-console');
     if (!gscConfigured()) { stats.searchConsole = 'not configured (add GOOGLE_SA_* env)'; return; }
-    stats.searchConsole = await syncSearchConsole(14);
+    // first run (or a thin table) gets the whole 16-month history; the
+    // background function has the budget for it, the admin button does not
+    const { count } = await db.from('gsc_daily').select('day', { count: 'exact', head: true });
+    stats.searchConsole = await syncSearchConsole((count || 0) < 120 ? 480 : 14);
   });
 
   // ── Cut Local maker automations (gated) ──────────────────────────────
