@@ -242,6 +242,14 @@ export async function processSubscription(db: DB, s: any, ctx: Ctx): Promise<voi
       if (ym >= '2090' && !isTestTerm) break;        // test months never reach real members
       const pack = await getPack(db, ym);
       if (!hasFiles(pack)) {
+        // A brand-new member must still hear from us: a welcome now, with the
+        // pack email following the moment the month is uploaded. Once per term.
+        if (dropsSent === 0) {
+          const data = dropData(s, ym, pack, 1, plan, logoUrl, false, settings.makerInvite);
+          const r = await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: 'welcome', drop_month: ym }, () => firstPackEmail(data));
+          if (r === 'sent') stats.notes.push(`welcome sent to ${s.email} (pack ${ym} pending)`);
+          if (r === 'failed') stats.failures++;
+        }
         stats.skippedNoPack++;
         if (!stats.missingPacks.includes(ym)) stats.missingPacks.push(ym);
         break;                                   // wait for the upload; retry next run

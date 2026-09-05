@@ -124,8 +124,10 @@ const pending = `<div style="background:#FFFBF4;border-left:3px solid ${BRONZE};
 
 /** First pack, sent the moment a membership starts. */
 export function firstPackEmail(d: DropEmailData): { subject: string; html: string; text: string } {
-  const subject = `Welcome! Your first STL pack is ready: ${d.monthLabel}`;
   const hasFiles = !!(d.standardLink || d.bonusLink);
+  const subject = hasFiles
+    ? `Welcome! Your first STL pack is ready: ${d.monthLabel}`
+    : `Welcome to the membership. Your ${d.monthLabel} pack arrives shortly`;
   const body = `
     ${greet(d.customerName)}
     <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#555;">Welcome to the <strong>${esc(d.planName)}</strong>. You will receive <strong>${d.totalDrops} monthly packs</strong> of fresh bas-relief STL files, and this is pack <strong>1 of ${d.totalDrops}</strong>.</p>
