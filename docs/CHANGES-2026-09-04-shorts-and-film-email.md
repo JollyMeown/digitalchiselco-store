@@ -166,6 +166,29 @@ BRS side kept: every Cut renders two files, `FINAL.mp4` for the website (caption
 branded end card) and `FINAL_yt.mp4` for YouTube and Pinterest (no captions, no end
 card). Uploads pick `FINAL_yt.mp4`.
 
+## 5. Membership Pack Builder handover (2026-09-05)
+
+BRS now builds the monthly member packs (a thin layer on its Universal Bundle
+Maker) and hands each approved month to this site:
+
+- **`monthly_files`** upsert with `Prefer: resolution=merge-duplicates` on
+  `?on_conflict=month`: `month`, `title`, `preview_note`, `standard_drive_link`,
+  `bonus_drive_link` (null unless a 12-month plan is active), `cover_image_url`
+  (uploaded to `site-media/membership/<YYYY-MM>/cover.jpg`), `items`
+  `[{title, slug, image_url}]`, `file_count`, `zip_size_mb`, `built_by = 'brs'`,
+  `notes`. The site's existing membership flow emails the pack; BRS never mails
+  a member. BRS never touches a month that already has links unless the owner
+  presses Rebuild, and it starts after the last month that has a pack (packs
+  existed through 2027-02 when this shipped).
+- **`POST /api/admin/brs-notify`** (new): BRS → owner alert. Bearer token must
+  equal `SUPABASE_SERVICE_ROLE_KEY` (BRS already holds it; no new secret). Writes
+  an `owner_alerts` row and pushes Telegram via `telegramOwner`. Used for
+  "Draft ready for review", "pack live", and failures.
+
+Verified end to end on the test month 2099-01 (draft, swap, approve, zip, PDF
+with 8 working buttons, Drive links viewable signed out, row visible to Admin →
+Monthly Drops), then removed everywhere.
+
 ## Still open
 
 - `cults3d-retag.log` sits untracked in the repo root. It looks like a stray log
