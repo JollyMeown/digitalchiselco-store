@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { framePrompt } from './blog/_style.mjs';
+import { framePrompt, SHOT, NO_BRAND, BENCH, HANDS } from './blog/_style.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -139,7 +139,14 @@ for (const f of queue) {
     const which = `ATTACHED IMAGES: image 1${n > 2 ? ` to ${n - 1}` : ''} = the real product(s), THE SUBJECT of the photograph. `
       + `Image ${n} = a material swatch of wood and finish only; it is NOT an object and must not appear as one.\n`;
     const scene = which + f.scene.replace(/image 2/g, `image ${n}`);
-    const raw = await gemini(framePrompt(scene, { hands: !!f.hands, bench: f.bench !== false }), refs, f.aspect);
+    // No product attached: drop the compositing preamble entirely, or the model
+    // invents a carved panel to satisfy "image 1 shows a carved product".
+    const prompt = refs.length
+      ? framePrompt(scene, { hands: !!f.hands, bench: f.bench !== false, finish: f.finish !== false })
+      : `${f.scene}
+
+${SHOT}${NO_BRAND}${f.bench !== false ? BENCH : ''}${f.hands ? HANDS : ''}`;
+    const raw = await gemini(prompt, refs, f.aspect);
     if (!raw) { console.log('FAILED'); failed++; continue; }
     fs.writeFileSync(local, await sharp(raw).jpeg({ quality: 88, mozjpeg: true }).toBuffer());
     console.log(`ok → ${path.basename(local)}`);

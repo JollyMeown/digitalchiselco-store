@@ -37,11 +37,21 @@
 
 <h2 id="s2">2. Choose the board</h2>
 
+<figure>
+  <img src="{{IMG:board}}" alt="A plain one inch cherry board, 300 by 350 mm, standing on edge on the workbench with a steel rule beside it" loading="lazy" />
+  <figcaption>The whole shopping list for a first carving. One inch cherry, no knots in the face, left to sit in the shop for a few days before it is cut.</figcaption>
+</figure>
+
 <p><strong>Cherry, 1 inch thick, 300 by 350 mm.</strong> That is the whole answer for a first carving. Cherry carves cleanly, holds detail, takes oil beautifully and is not expensive. One inch gives you 12 mm of relief and the 8 mm floor beneath it that the board needs to stay flat. Basswood if you want something softer and cheaper for a very first go; walnut if you want the easiest finish and can afford it. Not pine, not oak, not plywood.</p>
 
 <p><a href="/blog/best-wood-for-cnc-relief-carving">The wood guide</a> shows the same design carved in eight species so you can see why. Let the board sit in the workshop for a few days before you cut it, and look it over for knots in the area that will be carved.</p>
 
 <h2 id="s3">3. Choose the three cutters</h2>
+
+<figure>
+  <img src="{{IMG:cutters}}" alt="The three cutters for a first relief carving: a quarter inch flat end mill, a 1/16 inch tapered ball nose and a 1/32 inch tapered ball nose" loading="lazy" />
+  <figcaption>Three cutters. The flat one roughs, the 1/16 forms the surface, the 1/32 does the wolf's eye and nothing else.</figcaption>
+</figure>
 
 <ul>
   <li><strong>1/4 inch two-flute flat end mill</strong>, for roughing.</li>
@@ -54,6 +64,13 @@
 <h2 id="s4">4. Set up the job in your CAM</h2>
 
 <p>The order matters, and it is the same in Aspire, VCarve, Carveco and Fusion; only the menus move.</p>
+
+<figure>
+  <img src="{{IMG:plan}}" alt="Drawn plan of the three toolpaths seen from above: roughing and semi-finish inside the model outline, the fine pass inside a boundary around the wolf" loading="lazy" />
+  <figcaption>The plan, from above. Two passes run inside the model outline; the fine pass runs only inside the dashed boundary around the wolf. Clamps stay outside all of it.</figcaption>
+</figure>
+
+
 
 <ol>
   <li><strong>Material first.</strong> Type the board's real width, height and thickness, measured with a rule, before you import anything. Set the origin at the front-left corner and Z zero at the top of the material.</li>
@@ -68,6 +85,11 @@
 <p><a href="/blog/cnc-relief-carving-time">The carve-time guide</a> has feeds, RPM and the reasons behind each of those numbers. <a href="/blog/aspire-vcarve-carveco-fusion-360-comparison">The software comparison</a> has where each setting lives.</p>
 
 <h2 id="s5">5. Cut a test tile</h2>
+
+<figure>
+  <img src="{{IMG:tile}}" alt="A small test tile with the wolf's head carved on a cherry offcut, held beside the blank board" loading="lazy" />
+  <figcaption>Ten minutes on an offcut. If the eye reads here, the whole panel will.</figcaption>
+</figure>
 
 <p>Before the board goes on, cut the wolf's head alone, cropped to about 80 mm, on an offcut of the same cherry with the exact fine cutter and stepover you set up. It takes ten minutes. If the eye reads, everything downstream will work. If it does not, you have learned that on a scrap, and <a href="/blog/how-to-scale-stl-files-for-cnc-routers#tile">the test tile section</a> tells you which number to change.</p>
 
@@ -96,9 +118,19 @@
 
 <h2 id="s8">8. The finishing passes</h2>
 
+<figure>
+  <img src="{{IMG:semi}}" alt="The wolf relief mid semi-finish on the machine, a tapered ball nose smoothing the roughed terraces into the finished surface" loading="lazy" />
+  <figcaption>The semi-finish pass, two thirds done. Left: the surface formed. Right: still terraces from roughing. This is the pass that makes the carving.</figcaption>
+</figure>
+
 <p>Change to the 1/16 inch tapered ball, <strong>re-zero Z</strong> on the top of an uncut area of the board, load 02-semi and run it. An hour or so at 15%. Then change to the 1/32 inch, re-zero Z again, load 03-fine and run it over the wolf only; another hour. The whole carve is under three hours on most hobby machines. Without the roughing pass and the boundary it would have been a day and a half.</p>
 
 <h2 id="s9">9. Off the machine: fuzz, sanding, sealing</h2>
+
+<figure>
+  <img src="{{IMG:fuzz}}" alt="A soft brass brush lifting the machining fuzz off the raw wolf carving, the brushed half visibly cleaner" loading="lazy" />
+  <figcaption>Half brushed. A soft brass brush with the grain takes the fuzz off without touching the detail.</figcaption>
+</figure>
 
 <p>It will come off the machine pale, fuzzy and disappointing. That is normal and it is not the file. In order:</p>
 
@@ -110,6 +142,11 @@
 </ol>
 
 <h2 id="s10">10. Glaze, oil, wax</h2>
+
+<figure>
+  <img src="{{IMG:glaze}}" alt="Dark glaze being wiped back off the wolf carving with a rag, the wiped half showing the finished contrast" loading="lazy" />
+  <figcaption>Half wiped. Left: glaze pulled back off the high points, dark left in the recesses. Right: not yet. This is the step people skip, and it is the one that matters most.</figcaption>
+</figure>
 
 <p>The step that turns a carving that looks flat into one that reads across the room. Flood the whole panel with a dark gel stain or glaze, let it flash for a few minutes, then wipe it back off the raised surfaces with a rag; the dark stays in the recesses. Leave it a full day. Then two or three thin coats of Danish oil a day apart, coming back after ten minutes each time with a dry brush to lift any pooled oil out of the corners. Then a dark paste wax buffed with a shoe brush. <a href="/blog/how-to-finish-cnc-relief-carvings">The finishing guide</a> is the long version with products and photographs of every step.</p>
 

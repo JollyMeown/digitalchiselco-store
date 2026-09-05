@@ -34,5 +34,69 @@
     "scene": "The finished panel from image 1 lies FACE DOWN on the bench so its plain oiled back fills the frame: a clean keyhole hanger slot routed at the top centre, two small brown felt bumpers at the bottom corners, and a small burned mark near the bottom edge that is a simple abstract maker's mark (a tiny carved-chisel symbol, no letters). Beside it a hand holds a brass sawtooth hanger for comparison. Bright soft light. No words anywhere.",
     "hands": true,
     "bench": true
+  },
+  {
+    "key": "board",
+    "aspect": "4:3",
+    "ref": null,
+    "finish": false,
+    "bench": true,
+    "alt": "A plain one inch cherry board, 300 by 350 mm, standing on edge on the workbench with a steel rule beside it",
+    "scene": "A single plain, completely UNCARVED, flat rectangular board of cherry, about 300 by 350 mm and 25 mm thick, pale salmon-pink with fine even straight grain, freshly planed on all faces, no knots, NO carving, NO frame, NO texture cut into it: just a smooth blank plank. It stands on its long edge on the maple bench, leaning slightly against a plain wall. A steel rule lies on the bench in front of it. Warm window light from the left. The blank board is the whole subject."
+  },
+  {
+    "key": "cutters",
+    "aspect": "4:3",
+    "ref": null,
+    "finish": false,
+    "bench": true,
+    "alt": "The three cutters for a first relief carving: a quarter inch flat end mill, a 1/16 inch tapered ball nose and a 1/32 inch tapered ball nose",
+    "scene": "MACRO STILL LIFE on the maple bench, NOTHING ELSE IN FRAME but the tools: exactly THREE router cutters laid parallel on the bare bench with a little space between, left to right a quarter inch two-flute FLAT end mill (square-ended spiral flutes), a 1/16 inch TAPERED ball nose (long slim cone narrowing to a small round tip), and a 1/32 inch TAPERED ball nose (cone narrowing to an even tinier tip), all plain unbranded polished carbide with 1/4 inch shanks about 6 cm long, plus a small brass collet at the end of the row. No carving, no panel, no frame, no wood object in the picture. Raking light from the left so the flutes glint. No writing anywhere."
+  },
+  {
+    "key": "tile",
+    "aspect": "4:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "finish": false,
+    "bench": true,
+    "hands": true,
+    "alt": "A small test tile with the wolf's head carved on a cherry offcut, held beside the blank board",
+    "scene": "A hand holds up a small square TEST TILE about 8 cm across, cut from an offcut of the same pale cherry, raw and unfinished, on which ONLY the wolf's head from image 1 has been carved as an exact crop: the same howling head, the same angle, the same fur, crisp and clean. Behind it, out of focus, the plain uncarved cherry board leans on the bench. Workshop light from the left."
+  },
+  {
+    "key": "semi",
+    "aspect": "4:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "finish": false,
+    "bench": false,
+    "alt": "The wolf relief mid semi-finish on the machine, a tapered ball nose smoothing the roughed terraces into the finished surface",
+    "scene": "ON THE MACHINE, MID SEMI-FINISH PASS. The panel from image 1 in raw pale cherry, no finish: its LEFT two thirds are already smooth and fully formed by the tapered ball nose, wolf, moon and trees crisp with a faint fine corduroy texture; its RIGHT third still shows the coarse stair-step terraces left by roughing. A 1/16 inch tapered ball nose cutter is in the collet right at the boundary, fine sawdust in the recesses. Bright workshop light."
+  },
+  {
+    "key": "fuzz",
+    "aspect": "4:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "finish": false,
+    "bench": true,
+    "hands": true,
+    "alt": "A soft brass brush lifting the machining fuzz off the raw wolf carving, the brushed half visibly cleaner",
+    "scene": "The raw, unfinished pale cherry panel from image 1 lies flat on the bench, straight off the machine. A hand works a small soft BRASS hand brush along the wolf's fur with the grain: the LEFT half of the wolf has been brushed and is clean and crisp; the RIGHT half still carries pale fuzz standing up along every carved edge. Only a folded cotton cloth and a small loose nylon abrasive wheel (no drill, no power tool, no battery pack) lie beside the panel. Fine dust in the raking light from the left. NO tools with brand names or labels anywhere in frame."
+  },
+  {
+    "key": "glaze",
+    "aspect": "4:3",
+    "ref": "howling-wolf-moon-3d-relief-stl",
+    "bench": true,
+    "hands": true,
+    "alt": "Dark glaze being wiped back off the wolf carving with a rag, the wiped half showing the finished contrast",
+    "scene": "THE KEY FRAME, SPLIT DOWN THE MIDDLE. The panel from image 1 lies flat on the bench, sealed and flooded with dark brown glaze. A hand drags a folded cotton rag across it, wiping the glaze back OFF the raised surfaces. The wiped LEFT half is transformed: wolf, moon and trees are clean warm cherry again while the recesses and the chip-carved ground stay near black, reading with dramatic depth in the house finish. The unwiped RIGHT half is still flat, muddy, dark brown all over. The difference between the halves must be striking. An open plain tin of dark glaze and a blue shop towel beside it."
+  },
+  {
+    "key": "plan",
+    "aspect": "4:3",
+    "ref": null,
+    "finish": false,
+    "alt": "Drawn plan of the three toolpaths seen from above: roughing and semi-finish inside the model outline, the fine pass inside a boundary around the wolf",
+    "scene": "DRAWN locally by toolpath_diagram.mjs; do not render."
   }
 ]

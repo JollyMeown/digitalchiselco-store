@@ -18,5 +18,40 @@
     "key": "back",
     "alt": "The back of the finished panel with a keyhole slot, felt bumpers and the maker's initials burned in",
     "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/back.jpg"
+  },
+  {
+    "key": "board",
+    "alt": "A plain one inch cherry board, 300 by 350 mm, standing on edge on the workbench with a steel rule beside it",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/board.jpg"
+  },
+  {
+    "key": "cutters",
+    "alt": "The three cutters for a first relief carving: a quarter inch flat end mill, a 1/16 inch tapered ball nose and a 1/32 inch tapered ball nose",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/cutters.jpg"
+  },
+  {
+    "key": "tile",
+    "alt": "A small test tile with the wolf's head carved on a cherry offcut, held beside the blank board",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/tile.jpg"
+  },
+  {
+    "key": "semi",
+    "alt": "The wolf relief mid semi-finish on the machine, a tapered ball nose smoothing the roughed terraces into the finished surface",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/semi.jpg"
+  },
+  {
+    "key": "fuzz",
+    "alt": "A soft brass brush lifting the machining fuzz off the raw wolf carving, the brushed half visibly cleaner",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/fuzz.jpg"
+  },
+  {
+    "key": "glaze",
+    "alt": "Dark glaze being wiped back off the wolf carving with a rag, the wiped half showing the finished contrast",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/glaze.jpg"
+  },
+  {
+    "key": "plan",
+    "alt": "Drawn plan of the three toolpaths seen from above: roughing and semi-finish inside the model outline, the fine pass inside a boundary around the wolf",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/first-cnc-relief-carving-step-by-step/plan.jpg"
   }
 ]
