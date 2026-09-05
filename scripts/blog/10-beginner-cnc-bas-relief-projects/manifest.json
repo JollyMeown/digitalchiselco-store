@@ -1,0 +1,22 @@
+[
+  {
+    "key": "hero",
+    "alt": "Four small carved relief panels laid out on a workbench in order of difficulty: a magnolia, a butterfly heart, a howling wolf and a raven",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/10-beginner-cnc-bas-relief-projects/hero.jpg"
+  },
+  {
+    "key": "first",
+    "alt": "A first relief carving of magnolia blossoms coming off the machine in raw pale basswood",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/10-beginner-cnc-bas-relief-projects/first.jpg"
+  },
+  {
+    "key": "kit",
+    "alt": "The four cutters a beginner needs, laid beside a finished butterfly heart carving",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/10-beginner-cnc-bas-relief-projects/kit.jpg"
+  },
+  {
+    "key": "ladder",
+    "alt": "Three finished carvings standing in a row, small to large: a heart, a wolf, and an eagle landscape",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/10-beginner-cnc-bas-relief-projects/ladder.jpg"
+  }
+]

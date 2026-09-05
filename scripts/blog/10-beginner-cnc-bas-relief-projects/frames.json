@@ -1,0 +1,36 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "blue-magnolia-flower-3d-relief-stl-for-cnc-router-floral-w",
+    "extraRefs": ["butterfly-heart-stl-relief-3d-carving-file-for-cnc-router-floral-romantic-wall-a", "howling-wolf-moon-3d-relief-stl-cnc-router-wood-carving-file-wolf-head-feather-d", "raven-bird-3d-relief-stl-gothic-crow-moon-forest-wall-art-"],
+    "alt": "Four small carved relief panels laid out on a workbench in order of difficulty: a magnolia, a butterfly heart, a howling wolf and a raven",
+    "scene": "FOUR SMALL FINISHED CARVINGS ON THE BENCH, wide magazine shot from slightly above. Laid out in a neat row left to right, each about 15 to 25 cm across and each in the house finish: the magnolia panel from image 1, the butterfly heart from image 2, the howling wolf from image 3, and the raven from image 4. Each is exactly its own design from its own reference image; do not blend them. They sit on the maple bench with a little space between them, a folded cotton cloth and a small tin of wax at the far end. Warm window light from the left. All four fully visible.",
+    "bench": true
+  },
+  {
+    "key": "first",
+    "aspect": "4:3",
+    "ref": "blue-magnolia-flower-3d-relief-stl-for-cnc-router-floral-w",
+    "alt": "A first relief carving of magnolia blossoms coming off the machine in raw pale basswood",
+    "scene": "ON THE MACHINE, raw pale unfinished basswood, no stain. A small panel about 15 by 10 cm carrying the magnolia design from image 1, just finished carving, still clamped on the spoilboard with a tapered ball nose cutter hanging above and fresh fine sawdust around it. The carving is clean and crisp but bare wood. Bright, even workshop light. The piece fills about half the frame.",
+    "bench": false
+  },
+  {
+    "key": "kit",
+    "aspect": "4:3",
+    "ref": "butterfly-heart-stl-relief-3d-carving-file-for-cnc-router-floral-romantic-wall-a",
+    "alt": "The four cutters a beginner needs, laid beside a finished butterfly heart carving",
+    "scene": "STILL LIFE. The butterfly heart panel from image 1, finished in the house finish, stands propped at a slight angle at the back. In front of it, laid parallel on the maple bench from thick to thin: a quarter inch two-flute flat end mill, a 2 mm tapered ball nose, a 1 mm tapered ball nose and a 0.5 mm tapered ball nose, all plain unbranded carbide with polished shanks, and a small brass collet beside them. Raking window light from the left so the flutes glint. Calm, tight composition.",
+    "bench": true
+  },
+  {
+    "key": "ladder",
+    "aspect": "4:3",
+    "ref": "butterfly-heart-stl-relief-3d-carving-file-for-cnc-router-floral-romantic-wall-a",
+    "extraRefs": ["howling-wolf-moon-3d-relief-stl-cnc-router-wood-carving-file-wolf-head-feather-d", "bald-eagle-mountain-stl-relief-flying-eagle-3d-carving-file-for-cnc-router-wildl"],
+    "alt": "Three finished carvings standing in a row, small to large: a heart, a wolf, and an eagle landscape",
+    "scene": "THREE FINISHED PANELS STANDING IN A ROW, increasing in size and difficulty left to right, all in the house finish: the small butterfly heart from image 1 (about 18 cm), the medium howling wolf from image 2 (about 30 cm), and the large eagle mountain scene from image 3 (about 50 cm wide). Each is exactly its own design from its own image. They lean against the wall behind the bench with a little overlap allowed only at their edges, main subjects fully visible. Warm late light from the left.",
+    "bench": true
+  }
+]

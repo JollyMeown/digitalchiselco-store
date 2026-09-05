@@ -57,7 +57,9 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 const heroCache = new Map();
 async function heroFor(slug) {
   if (heroCache.has(slug)) return heroCache.get(slug);
-  const r = await fetch(`${URL_BASE}/rest/v1/products?select=image_url,title&slug=eq.${encodeURIComponent(slug)}&limit=1`, { headers: H }).then((x) => x.json());
+  // Prefix match, best seller first: frames.json may carry a slug that was
+  // copied from a truncated listing, and an exact match would silently fail.
+  const r = await fetch(`${URL_BASE}/rest/v1/products?select=image_url,title,slug&active=eq.true&slug=like.${encodeURIComponent(slug + '*')}&order=etsy_sales_365.desc&limit=1`, { headers: H }).then((x) => x.json());
   const url = r?.[0]?.image_url;
   if (!url) throw new Error(`no hero image for product "${slug}"`);
   const buf = Buffer.from(await (await fetch(url)).arrayBuffer());
