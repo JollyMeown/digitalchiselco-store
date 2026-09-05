@@ -124,38 +124,50 @@ function addMonthsYM(startYMD: string, n: number): string {
 }
 function ymLabel(ym: string): string { const [y, m] = ym.split('-').map(Number); return `${_MONTHS[m - 1]} ${y}`; }
 
-type EntitledPack = { monthYM: string; monthLabel: string; accessible: boolean; dropNumber: number; title: string | null; standard: string | null; bonus: string | null };
-type MemberBlock = { planName: string; status: string; dropsSent: number; totalDrops: number; tier: string; packs: EntitledPack[] };
+type EntitledPack = { monthYM: string; monthLabel: string; accessible: boolean; dropNumber: number; title: string | null; note: string | null; cover: string | null; items: { title: string; image_url?: string | null; slug?: string | null }[]; standard: string | null; bonus: string | null; sentAt: string | null; downloaded: number };
+type MemberBlock = { id: string; planName: string; status: string; dropsSent: number; totalDrops: number; tier: string; startLabel: string; endLabel: string; daysLeft: number; renewed: boolean; packs: EntitledPack[] };
 let memberBlocks: MemberBlock[] = [];
 
 if (session?.email) {
   const db = supabaseAdmin();
+  const { packLink, ymdLabel: ymdL, daysUntil, todayYMD } = await import('../../lib/subscriptions');
   const { data: subs } = await db
     .from('member_subscriptions')
-    .select('id, plan_slug, months, tier, status, start_date, end_date, total_drops, drops_sent')
+    .select('id, plan_slug, months, tier, status, start_date, end_date, total_drops, drops_sent, renewed_to')
     .eq('email', session.email)
     .order('start_date', { ascending: false });
   if (subs && subs.length) {
-    const [{ data: plans }, { data: packs }] = await Promise.all([
+    const ids = subs.map((s: any) => s.id);
+    const [{ data: plans }, { data: packs }, { data: sent }, { data: dls }] = await Promise.all([
       db.from('membership_plans').select('slug, name'),
-      db.from('monthly_files').select('month, title, standard_drive_link, bonus_drive_link'),
+      db.from('monthly_files').select('month, title, preview_note, standard_drive_link, bonus_drive_link, cover_image_url, items'),
+      db.from('subscription_email_logs').select('subscription_id, drop_month, email_type, sent_at').in('subscription_id', ids).in('email_type', ['first_pack', 'monthly_drop']).eq('status', 'sent'),
+      db.from('pack_downloads').select('subscription_id, month').in('subscription_id', ids),
     ]);
     const planName = (slug: string) => (plans || []).find((p: any) => p.slug === slug)?.name || 'CNC STL Membership';
     const packByMonth = new Map((packs || []).map((p: any) => [p.month, p]));
     const currentYM = new Date().toISOString().slice(0, 7);
+    const today = todayYMD();
     memberBlocks = subs.map((s: any) => {
       const list: EntitledPack[] = [];
       for (let k = 1; k <= s.total_drops; k++) {
         const ym = addMonthsYM(s.start_date, k - 1);
         const pack: any = packByMonth.get(ym) || null;
+        const sentRow = (sent || []).find((l: any) => l.subscription_id === s.id && String(l.drop_month).split('#')[0] === ym);
         list.push({
           monthYM: ym, monthLabel: ymLabel(ym), accessible: ym <= currentYM, dropNumber: k,
-          title: pack?.title || null,
-          standard: pack?.standard_drive_link || null,
-          bonus: s.tier === 'premium' ? (pack?.bonus_drive_link || null) : null,
+          title: pack?.title || null, note: pack?.preview_note || null, cover: pack?.cover_image_url || null,
+          items: Array.isArray(pack?.items) ? pack.items.slice(0, 8) : [],
+          standard: pack?.standard_drive_link ? packLink(s.id, ym, 'standard', 'portal') : null,
+          bonus: s.tier === 'premium' && pack?.bonus_drive_link ? packLink(s.id, ym, 'bonus', 'portal') : null,
+          sentAt: sentRow?.sent_at || null,
+          downloaded: (dls || []).filter((d: any) => d.subscription_id === s.id && d.month === ym).length,
         });
       }
-      return { planName: planName(s.plan_slug), status: s.status, dropsSent: s.drops_sent, totalDrops: s.total_drops, tier: s.tier, packs: list };
+      return {
+        id: s.id, planName: planName(s.plan_slug), status: s.status, dropsSent: s.drops_sent, totalDrops: s.total_drops, tier: s.tier,
+        startLabel: ymdL(s.start_date), endLabel: ymdL(s.end_date), daysLeft: daysUntil(today, s.end_date), renewed: !!s.renewed_to, packs: list,
+      };
     });
   }
 }
@@ -346,34 +358,79 @@ if (session?.email) {
             <h2 class="font-serif text-2xl text-bronze-800 mb-1">Your membership packs</h2>
             <p class="text-sm text-ink-700/60 mb-4">A fresh pack unlocks each month of your term. Files never expire — they're always here.</p>
             {memberBlocks.map((m) => (
-              <div class="bg-white border border-black/10 rounded-xl p-5 mb-4">
-                <div class="flex flex-wrap justify-between items-baseline gap-2 mb-3">
+              <div class="bg-white border border-black/10 rounded-xl p-5 mb-4" data-membership={m.id}>
+                <div class="flex flex-wrap justify-between items-baseline gap-2 mb-1">
                   <div class="font-medium text-ink-800">{m.planName}{m.tier === 'premium' && <span class="ml-2 text-[10px] uppercase tracking-wide bg-[#FAC775] text-bronze-900 px-1.5 py-0.5 rounded align-middle">Premium</span>}</div>
                   <div class="text-xs text-ink-700/60">{m.dropsSent} of {m.totalDrops} delivered · <span class="capitalize">{m.status}</span></div>
                 </div>
+                <div class="text-xs text-ink-700/60 mb-3">{m.startLabel} to {m.endLabel}
+                  {m.status === 'active' && !m.renewed && m.daysLeft >= 0 && <span> · <b class={10 >= m.daysLeft ? 'text-amber-700' : 'text-ink-800'}>{m.daysLeft === 0 ? 'ends today' : `${m.daysLeft} day${m.daysLeft === 1 ? '' : 's'} left`}</b></span>}
+                  {m.renewed && <span class="text-green-700"> · renewed, your next term follows on</span>}
+                </div>
+                {m.status === 'active' && !m.renewed && 14 >= m.daysLeft && (
+                  <div class="mb-3 rounded-lg bg-[#FAEEDA] border border-bronze-600/25 px-4 py-3 flex flex-wrap items-center gap-3">
+                    <div class="text-sm text-ink-800 flex-1">Renew now and your new term starts the day this one ends, so the monthly packs continue without a gap.</div>
+                    <a href="/membership?renew=1" class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-4 py-2 rounded text-sm">Renew membership</a>
+                  </div>
+                )}
+                {m.status === 'expired' && !m.renewed && (
+                  <div class="mb-3 rounded-lg bg-cream/60 border border-black/10 px-4 py-3 flex flex-wrap items-center gap-3">
+                    <div class="text-sm text-ink-800 flex-1">This term has ended. Your packs stay here for good. Start a new term and the monthly drops pick straight back up.</div>
+                    <a href="/membership?renew=1" class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-4 py-2 rounded text-sm">Start a new term</a>
+                  </div>
+                )}
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {m.packs.map((p) => (
-                    <div class={`rounded-lg border p-3 ${p.accessible && (p.standard || p.bonus) ? 'border-bronze-600/30 bg-cream/30' : 'border-black/10'}`}>
-                      <div class="flex justify-between items-baseline">
-                        <div class="text-sm font-medium text-ink-800">{p.monthLabel}</div>
-                        <div class="text-[11px] text-ink-700/50">Pack {p.dropNumber}</div>
-                      </div>
-                      {p.title && <div class="text-xs text-ink-700/70 mt-0.5">{p.title}</div>}
-                      {!p.accessible ? (
-                        <div class="text-xs text-ink-700/50 italic mt-2">🔒 Arrives {p.monthLabel}</div>
-                      ) : (p.standard || p.bonus) ? (
-                        <div class="flex flex-wrap gap-2 mt-2">
-                          {p.standard && <a href={p.standard} target="_blank" rel="noopener" class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-3 py-1.5 rounded text-xs transition">⬇ Open pack</a>}
-                          {p.bonus && <a href={p.bonus} target="_blank" rel="noopener" class="inline-flex items-center border border-bronze-600 text-bronze-700 hover:bg-cream px-3 py-1.5 rounded text-xs transition">⭐ Bonus files</a>}
+                    <div class={`rounded-lg border overflow-hidden ${p.accessible && (p.standard || p.bonus) ? 'border-bronze-600/30 bg-cream/30' : 'border-black/10'}`}>
+                      {p.accessible && p.cover && <img src={p.cover} alt={p.title || p.monthLabel} loading="lazy" class="w-full aspect-[16/9] object-cover" />}
+                      <div class="p-3">
+                        <div class="flex justify-between items-baseline">
+                          <div class="text-sm font-medium text-ink-800">{p.monthLabel}</div>
+                          <div class="text-[11px] text-ink-700/50">Pack {p.dropNumber}</div>
                         </div>
-                      ) : (
-                        <div class="text-xs text-ink-700/50 italic mt-2">Being prepared — check back soon.</div>
-                      )}
+                        {p.title && <div class="text-xs text-ink-700/80 mt-0.5 font-medium">{p.title}</div>}
+                        {p.accessible && p.note && <div class="text-[11px] text-ink-700/60 mt-0.5">{p.note}</div>}
+                        {p.accessible && p.items.length > 0 && (
+                          <div class="flex gap-1 mt-2 overflow-x-auto">
+                            {p.items.map((it) => it.image_url ? <img src={it.image_url} alt={it.title} title={it.title} loading="lazy" class="w-11 h-11 object-cover rounded border border-black/10 shrink-0" /> : null)}
+                          </div>
+                        )}
+                        {!p.accessible ? (
+                          <div class="text-xs text-ink-700/50 italic mt-2">🔒 Arrives {p.monthLabel}</div>
+                        ) : (p.standard || p.bonus) ? (
+                          <div class="mt-2">
+                            <div class="flex flex-wrap gap-2">
+                              {p.standard && <a href={p.standard} target="_blank" rel="noopener" class="inline-flex items-center bg-bronze-600 hover:bg-bronze-700 text-cream px-3 py-1.5 rounded text-xs transition">⬇ Download pack</a>}
+                              {p.bonus && <a href={p.bonus} target="_blank" rel="noopener" class="inline-flex items-center border border-bronze-600 text-bronze-700 hover:bg-cream px-3 py-1.5 rounded text-xs transition">⭐ Bonus files</a>}
+                              <button type="button" data-resend-pack data-sub={m.id} data-month={p.monthYM} class="inline-flex items-center text-xs text-bronze-700 underline px-1">✉ email me this pack</button>
+                            </div>
+                            <div class="text-[10px] text-ink-700/45 mt-1">
+                              {p.sentAt ? `emailed ${new Date(p.sentAt).toLocaleDateString()}` : 'not emailed yet'}{p.downloaded ? ` · downloaded ${p.downloaded}×` : ''}
+                            </div>
+                          </div>
+                        ) : (
+                          <div class="text-xs text-ink-700/50 italic mt-2">Being prepared. You will get an email the moment it is live.</div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             ))}
+            <script is:inline>
+              // "email me this pack" buttons: one request, plain feedback in place
+              document.querySelectorAll('[data-resend-pack]').forEach(function (b) {
+                b.addEventListener('click', async function () {
+                  b.disabled = true; var old = b.textContent; b.textContent = 'sending…';
+                  try {
+                    var r = await fetch('/api/member/resend-pack', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ subscription: b.dataset.sub, month: b.dataset.month }) });
+                    var j = await r.json();
+                    b.textContent = j.ok ? '✓ sent, check your inbox' : (j.error || 'could not send');
+                  } catch (e) { b.textContent = 'could not send'; }
+                  setTimeout(function () { b.textContent = old; b.disabled = false; }, 6000);
+                });
+              });
+            </script>
           </section>
         )}
 
