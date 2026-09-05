@@ -173,7 +173,9 @@ export async function createSubscriptionForPurchase(input: {
   source?: string;        // 'paddle' | 'etsy' | 'manual' | 'import' | 'website'
   notes?: string | null;
   couponCode?: string | null;
-}): Promise<{ created: boolean; subscriptionId?: string; reason?: string; chainedFrom?: string | null; startDate?: string }> {
+  /** Migration from the old system: packs the member already received there. Those months are not re-sent. */
+  dropsAlreadySent?: number;
+}): Promise<{ created: boolean; subscriptionId?: string; reason?: string; chainedFrom?: string | null; upgradedFrom?: string | null; creditMonths?: number; startDate?: string }> {
   const db = supabaseAdmin();
   const email = input.email.toLowerCase().trim();
   const months = input.plan.months;
@@ -183,25 +185,42 @@ export async function createSubscriptionForPurchase(input: {
   // Renewal chaining: a purchase while a term is still running starts when
   // that term ends, so the member never pays for overlapping months.
   const { data: priorRows } = await db.from('member_subscriptions')
-    .select('id, status, end_date').ilike('email', email).order('end_date', { ascending: false }).limit(5);
+    .select('id, status, end_date, start_date, months, tier, drops_sent, total_drops').ilike('email', email).order('end_date', { ascending: false }).limit(5);
   const prior = priorRows || [];
   const isRenewal = prior.length > 0;
   const running = prior.find((p: any) => p.status === 'active' && p.end_date > today) as any;
   let start = input.startDate && /^\d{4}-\d{2}-\d{2}$/.test(input.startDate) ? input.startDate : today;
   let chainedFrom: string | null = null;
-  if (running && !input.startDate) { start = running.end_date; chainedFrom = running.id; }
-  const end = addMonths(start, months);
+  let upgradedFrom: string | null = null;
+  let creditMonths = 0;
+  if (running && !input.startDate) {
+    // Upgrade (longer plan or higher tier): starts now, the unsent months of
+    // the old term are added to the end so nothing paid for is lost, and the
+    // old term is closed as "upgraded". Otherwise a renewal chains after.
+    const isUpgrade = months > Number(running.months) || (tier === 'premium' && running.tier !== 'premium');
+    if (isUpgrade) {
+      upgradedFrom = running.id;
+      creditMonths = Math.max(0, Number(running.total_drops) - Number(running.drops_sent));
+    } else { start = running.end_date; chainedFrom = running.id; }
+  }
+  const end = addMonths(start, months + creditMonths);
 
   const row = {
     email, customer_name: input.customerName || null,
     plan_slug: input.plan.slug, months, files_per_month: input.plan.files_per_month ?? 8,
     tier, status: 'active', start_date: start, end_date: end,
     // the cron sends drop 1 when start arrives (future start) or catches up now
-    next_drop_date: start, drops_sent: 0, total_drops: months, price_usd: input.plan.price_usd ?? null,
+    // an imported member may already have received some packs in the old
+    // system: start counting from there so nothing is sent twice
+    drops_sent: Math.max(0, Math.min(months + creditMonths, Number(input.dropsAlreadySent) || 0)),
+    next_drop_date: (Number(input.dropsAlreadySent) || 0) >= months + creditMonths ? null : addMonths(start, Math.max(0, Number(input.dropsAlreadySent) || 0)),
+    total_drops: months + creditMonths, price_usd: input.plan.price_usd ?? null,
     is_renewal: isRenewal, order_id: input.orderId || null,
     paddle_transaction_id: input.paddleTransactionId || null,
-    source: input.source || 'paddle', notes: input.notes || null, coupon_code: input.couponCode || null,
-    renewed_from: chainedFrom,
+    source: input.source || 'paddle',
+    notes: [input.notes, creditMonths ? `upgrade: ${creditMonths} unused month(s) of the previous term carried over` : null].filter(Boolean).join(' · ') || null,
+    coupon_code: input.couponCode || null,
+    renewed_from: chainedFrom || upgradedFrom,
   };
   const { data: inserted, error } = await db.from('member_subscriptions').insert(row).select('id').single();
   if (error) {
@@ -210,16 +229,22 @@ export async function createSubscriptionForPurchase(input: {
   }
   const subId = inserted.id as string;
   if (chainedFrom) await db.from('member_subscriptions').update({ renewed_to: subId }).eq('id', chainedFrom);
+  if (upgradedFrom) await db.from('member_subscriptions').update({ renewed_to: subId, status: 'upgraded', next_drop_date: null }).eq('id', upgradedFrom);
 
   // Deliver whatever is already due (pack 1 today, or every past month of a
   // backdated add). A future-dated renewal sends nothing yet.
   const { data: s } = await db.from('member_subscriptions').select('*').eq('id', subId).single();
   if (s) await processSubscription(db, s, { today, logoUrl: await getLogoUrl(db), settings: await getSettings(db), stats: newStats() });
-  return { created: true, subscriptionId: subId, chainedFrom, startDate: start };
+  return { created: true, subscriptionId: subId, chainedFrom, upgradedFrom, creditMonths, startDate: start };
 }
 
 // ── per-member processing (cron and admin "deliver now") ──────────────
-export type RunStats = { processed: number; drops: number; preExpiry: number; expired: number; winback: number; skippedNoPack: number; failures: number; missingPacks: string[]; notes: string[] };
+/** A run context for driving processSubscription() one member at a time (tests, admin). */
+export async function makeRunContext(today?: string): Promise<Ctx> {
+  const db = supabaseAdmin();
+  return { today: today || todayYMD(), logoUrl: await getLogoUrl(db), settings: await getSettings(db), stats: newStats() };
+}
+export type RunStats ={ processed: number; drops: number; preExpiry: number; expired: number; winback: number; skippedNoPack: number; failures: number; missingPacks: string[]; notes: string[] };
 export const newStats = (): RunStats => ({ processed: 0, drops: 0, preExpiry: 0, expired: 0, winback: 0, skippedNoPack: 0, failures: 0, missingPacks: [], notes: [] });
 type Ctx = { today: string; logoUrl: string | null; settings: Awaited<ReturnType<typeof getSettings>>; stats: RunStats };
 

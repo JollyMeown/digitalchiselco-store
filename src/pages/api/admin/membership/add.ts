@@ -35,6 +35,8 @@ export const POST: APIRoute = async ({ request }) => {
   const priceOverride = body.price != null && body.price !== '' ? Number(body.price) : null;
   const couponCode = body.coupon_code ? String(body.coupon_code).trim().toUpperCase() : null;
   const notes = body.notes ? String(body.notes).trim() : null;
+  // migration from the old system: packs already received there are not re-sent
+  const packsReceived = Math.max(0, Math.min(60, Number(body.packs_received) || 0));
 
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Valid email required.' }, 400);
   if (!planSlug) return json({ error: 'Plan is required.' }, 400);
@@ -47,9 +49,9 @@ export const POST: APIRoute = async ({ request }) => {
     const r = await createSubscriptionForPurchase({
       email, customerName: name,
       plan: { slug: plan.slug, name: plan.name, months: plan.months, files_per_month: plan.files_per_month, price_usd: priceOverride != null && !Number.isNaN(priceOverride) ? priceOverride : plan.price_usd },
-      startDate, source, notes, couponCode,
+      startDate, source, notes, couponCode, dropsAlreadySent: packsReceived,
     });
-    return json({ ok: true, created: r.created, subscriptionId: r.subscriptionId, reason: r.reason });
+    return json({ ok: true, created: r.created, subscriptionId: r.subscriptionId, reason: r.reason, chainedFrom: r.chainedFrom, upgradedFrom: r.upgradedFrom });
   } catch (e: any) {
     console.error('[admin/membership/add] failed:', e);
     return json({ error: e?.message || 'Failed to add member.' }, 500);

@@ -18,7 +18,7 @@ type Dl = { subscription_id: string; month: string; kind: string; via: string | 
 
 const STATUS_COLORS: Record<string, string> = {
   active: 'bg-green-100 text-green-800', paused: 'bg-amber-100 text-amber-800',
-  cancelled: 'bg-red-100 text-red-700', expired: 'bg-gray-100 text-gray-600',
+  cancelled: 'bg-red-100 text-red-700', expired: 'bg-gray-100 text-gray-600', upgraded: 'bg-blue-50 text-blue-800',
 };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const ymLabel = (ym: string) => { const [y, m] = ym.split('-').map(Number); return `${MONTHS[m - 1]} ${y}`; };
@@ -41,6 +41,7 @@ export default function MemberSubs() {
   const [status, setStatus] = useState('all');
   const [plans, setPlans] = useState<any[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
@@ -151,6 +152,7 @@ export default function MemberSubs() {
           <div className="ml-auto flex gap-2">
             <button className={btnGhost} disabled={!!busy} onClick={() => { if (confirm('Send every pack and reminder that is due right now, to all active members?')) act({ action: 'deliver' }, 'deliver'); }}>{busy === 'deliver' ? 'Delivering…' : '⚡ Deliver everything due now'}</button>
             <button className={btnGhost} onClick={exportCsv}>Export CSV</button>
+            <button className={btnGhost} onClick={() => setImportOpen(true)}>⇪ Import from old system</button>
             <button className={btnPrimary} onClick={() => setAddOpen(true)}>+ Add member</button>
           </div>
         </div>
@@ -222,6 +224,9 @@ export default function MemberSubs() {
 
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add member (Etsy / manual)">
         <AddMemberForm plans={plans} onDone={() => { setAddOpen(false); load(); }} />
+      </Modal>
+      <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Import members from the old system" wide>
+        <ImportForm plans={plans} onDone={() => { setImportOpen(false); load(); }} />
       </Modal>
     </div>
   );
@@ -311,6 +316,46 @@ function Timeline({ s, logs, events, downloads, packs, busy, act, onSaved }: { s
   );
 }
 
+// Paste rows from the old system: email, name, plan, start date, packs already
+// received. Dry run first, then import. Nothing already sent is sent again;
+// months the member is owed since then go out immediately.
+function ImportForm({ plans, onDone }: { plans: any[]; onDone: () => void }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [report, setReport] = useState<any>(null);
+  const parse = () => text.split('\n').map((l) => l.trim()).filter(Boolean).filter((l) => !/^email\b/i.test(l)).map((l) => {
+    const c = l.split(/[,\t;]/).map((x) => x.trim());
+    return { email: c[0], name: c[1] || null, plan_slug: /^\d+$/.test(c[2] || '') ? null : c[2], months: /^\d+$/.test(c[2] || '') ? Number(c[2]) : null, start_date: c[3], packs_received: Number(c[4]) || 0, notes: c[5] || null };
+  });
+  async function go(dry: boolean) {
+    const rows = parse();
+    if (!rows.length) return;
+    if (!dry && !confirm(`Import ${rows.length} member(s)? Months they are owed since their start date are emailed right away.`)) return;
+    setBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch('/api/admin/membership/import', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ rows, dry }) }).then((x) => x.json()).catch(() => ({ error: 'bad response' }));
+    setBusy(false); setReport(r);
+    if (!dry && r?.ok) setTimeout(onDone, 1500);
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-[12px] text-ink-700/70">One member per line: <code>email, name, plan, start date, packs already received</code>. Plan = a plan slug ({plans.map((p) => p.slug).join(', ')}) or just the number of months. Start date as YYYY-MM-DD. Header line optional.</p>
+      <textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} className={inputCls + ' font-mono text-xs w-full'} placeholder={'jane@example.com, Jane Doe, 3-month, 2026-07-15, 2\nbob@example.com, , 6, 2026-05-01, 4'} />
+      <div className="flex items-center gap-2">
+        <button className={btnGhost} disabled={busy || !text.trim()} onClick={() => go(true)}>{busy ? '…' : 'Dry run'}</button>
+        <button className={btnPrimary} disabled={busy || !text.trim()} onClick={() => go(false)}>{busy ? '…' : 'Import'}</button>
+        {report && !report.error && <span className="text-xs text-ink-700/70">{report.dry ? 'Would create' : 'Created'} {report.created} · skipped {report.skipped} · failed {report.failed}</span>}
+        {report?.error && <span className="text-xs text-red-600">{report.error}</span>}
+      </div>
+      {report?.rows && (
+        <div className="max-h-56 overflow-y-auto text-[12px] space-y-0.5">
+          {report.rows.map((r: any, i: number) => <div key={i} className={/created|would create/.test(r.result) ? 'text-green-700' : /skipped|already/.test(r.result) ? 'text-ink-700/60' : 'text-red-600'}>{r.email}: {r.result}</div>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AddMemberForm({ plans, onDone }: { plans: any[]; onDone: () => void }) {
   const today = new Date().toISOString().slice(0, 10);
   const [email, setEmail] = useState('');
@@ -321,6 +366,7 @@ function AddMemberForm({ plans, onDone }: { plans: any[]; onDone: () => void }) 
   const [price, setPrice] = useState('');
   const [coupon, setCoupon] = useState('');
   const [notes, setNotes] = useState('');
+  const [packs, setPacks] = useState('0');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
   useEffect(() => { if (!planSlug && plans[0]) setPlanSlug(plans[0].slug); }, [plans]);
@@ -332,7 +378,7 @@ function AddMemberForm({ plans, onDone }: { plans: any[]; onDone: () => void }) 
     const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch('/api/admin/membership/add', {
       method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token || ''}` },
-      body: JSON.stringify({ email, name, plan_slug: planSlug, start_date: startDate, source, price: price || null, coupon_code: coupon || null, notes: notes || null }),
+      body: JSON.stringify({ email, name, plan_slug: planSlug, start_date: startDate, source, price: price || null, coupon_code: coupon || null, notes: notes || null, packs_received: Number(packs) || 0 }),
     });
     const data = await res.json().catch(() => ({}));
     setBusy(false);
@@ -360,6 +406,9 @@ function AddMemberForm({ plans, onDone }: { plans: any[]; onDone: () => void }) 
       <div className="grid grid-cols-2 gap-3">
         <div><label className={labelCls}>Coupon <span className="text-ink-700/40">(internal note)</span></label><input value={coupon} onChange={(e) => setCoupon(e.target.value)} className={inputCls} /></div>
         <div><label className={labelCls}>Notes</label><input value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} placeholder="Etsy order number, etc." /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className={labelCls}>Packs already received <span className="text-ink-700/40">(moving from the old system: those months are not sent again)</span></label><input type="number" min={0} value={packs} onChange={(e) => setPacks(e.target.value)} className={inputCls} /></div>
       </div>
       <div className="flex items-center gap-3 border-t border-black/10 pt-3">
         <button disabled={busy} onClick={save} className={btnPrimary}>{busy ? 'Working…' : 'Add & send'}</button>
