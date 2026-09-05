@@ -7,7 +7,7 @@
   "email": {
     "subject": "How to tell a good relief STL from a bad one before you waste a board",
     "intro": "Most relief STL files for sale have never been carved by the person selling them. They look fine in a viewer. They look great in the listing picture. They fall apart on a real router, usually around hour two.\n\nWe rewrote our guide to judging a file before you buy it, or before you commit a board to one you already own: the one signal that predicts a good carve, the five-minute inspection with free tools, and the seven red flags you can see on the listing alone. This is what depth looks like when a file has it:",
-    "image": "hero",
+    "image": "",
     "drip": true
   }
 }

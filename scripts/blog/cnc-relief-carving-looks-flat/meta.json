@@ -7,7 +7,7 @@
   "email": {
     "subject": "Your carving looks flat. It is probably not the file",
     "intro": "\"The carving looks nothing like the picture.\" It is the message we get most, and nine times in ten the file is fine. The panel is raw, or lit from the wrong side, or the depth was crushed to fit a thin board, or the bit was bigger than the eye.\n\nThe new guide lists the seven causes in the order to check them, with a photograph of what each one looks like and the fix. Most take an hour. Here is the same wolf, raw and finished, under the same light:",
-    "image": "hero",
+    "image": "",
     "drip": true
   }
 }

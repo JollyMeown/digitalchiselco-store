@@ -305,8 +305,15 @@ export function articleEmail(d: { email: string; post: ArticlePost }): Out {
   // article is the hero, which is the cover's twin even when the URL differs
   // (owner, 2026-09-05: "two similar pictures"). So skip the first figure as
   // well and take the next one, which is a step photo, not another hero.
-  const candidates = imgs.filter((u) => u !== p.cover_image_url);
-  const inside = p.email_image_url || candidates[candidates.length > 2 ? 1 : 0] || null;
+  // Compare by file name, not full URL: the cover is often a re-hosted copy of
+  // the hero figure (different bucket path, same picture).
+  const stem = (u: string) => String(u || '').split('?')[0].split('/').pop()!.replace(/-(\d{2,4}w|email|poster|thumb)\.(jpe?g|png|webp)$/i, '').replace(/\.(jpe?g|png|webp)$/i, '').toLowerCase();
+  const coverStem = stem(p.cover_image_url || '');
+  const candidates = imgs.filter((u, i, all) => u !== p.cover_image_url && stem(u) !== coverStem && all.indexOf(u) === i);
+  // A chosen inside photo that is itself the cover (several articles were
+  // published with email.image pointing at the hero) is ignored the same way.
+  const chosen = p.email_image_url && stem(p.email_image_url) !== coverStem ? p.email_image_url : null;
+  const inside = chosen || candidates[candidates.length > 2 ? 1 : 0] || null;
   // Section headings become the list, each linking to its section. The
   // contents heading itself and the FAQ heading are navigation, not content.
   const sections = [...body.matchAll(/<h2([^>]*)>([\s\S]*?)<\/h2>/g)].map((m) => ({
