@@ -35,9 +35,10 @@
   <figcaption>Left: the depth map. White is high, black is low, nothing else. Right: the burn. If the map is good the burn is good; if the map is muddy, no setting rescues it.</figcaption>
 </figure>
 
-<p>You need a grayscale PNG where brightness equals height. Four ways to get one, all free:</p>
+<p>You need a grayscale PNG where brightness equals height. Five ways to get one, all free:</p>
 
 <ol>
+  <li><strong>STL2PNG in your browser, nothing to install.</strong> <a href="https://fenrus75.github.io/FenrusCNCtools/javascript/stl2png.html" target="_blank" rel="noopener">STL2PNG</a> is a free page that turns an STL into a true heightmap PNG: choose the Top view, set the resolution to match your engraving, adjust the depth offset if the background is not landing on black, and download. Everything runs inside your browser, so the file never leaves your computer, and there is no account. It was written for Carbide Create Pro users, and the heightmap it makes is exactly what a laser wants. A caution about other "STL to PNG" sites: several of the popular ones simply take a <em>screenshot</em> of the model in a 3D viewer. That is a shaded picture, not a depth map, and burned into wood it gives you a rendering with lighting baked in rather than relief. If a converter shows you a rotating model and asks where you want the camera, it is the wrong kind.</li>
   <li><strong>LightBurn itself, from a mesh.</strong> Recent versions of LightBurn can import an STL and render it to a depth map directly, which is the fewest steps if you already own it. Set the resolution to match your engraving DPI, not higher.</li>
   <li><strong>STL2PNG and similar converters.</strong> Small, free tools that read an STL and write the height map. Set the output size to the pixel count you will actually engrave at; more is wasted.</li>
   <li><strong>A resin slicer.</strong> Most resin 3D-print slicers can export a depth map of a model lying flat. Import, orient the carved face up, export.</li>
