@@ -317,8 +317,14 @@ export default function Shorts() {
               </div>
               <div className="mt-4">
                 <div className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium mb-1">Channel views per day (bronze) and net subscribers (blue), finalised</div>
-                <AreaLine rows={cwin.rows} keyA="views" keyB="net" labelA="views" labelB="net subscribers" />
-                <div className="text-[10px] text-ink-700/45 mt-1">{channel?.through ? `finalised through ${channel.through}` : ''} · YouTube publishes analytics two to three days behind; the KPIs above use finalised days only</div>
+                {cwin.rows.some((r) => r.views > 0 || r.net !== 0) ? (
+                  <AreaLine rows={cwin.rows} keyA="views" keyB="net" labelA="views" labelB="net subscribers" />
+                ) : (
+                  <div className="text-xs text-ink-700/50 bg-cream/50 rounded-md px-3 py-6 text-center">
+                    {channel?.note ? 'The chart draws itself once the analytics permission is granted and the next hourly sync runs.' : 'No finalised analytics days in this window yet.'}
+                  </div>
+                )}
+                <div className="text-[10px] text-ink-700/45 mt-1">{channel?.through && cwin.rows.some((r) => r.views > 0) ? `finalised through ${channel.through} · ` : ''}YouTube publishes analytics two to three days behind; the KPIs above use finalised days only</div>
               </div>
               {channel && (
                 <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 border-t border-black/10 pt-3">
