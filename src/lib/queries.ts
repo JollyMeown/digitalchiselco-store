@@ -4,20 +4,9 @@ export type ProductCard = {
   id: string; title: string; slug: string; price_usd: number;
   image_url: string | null; is_bundle: boolean; link_status: string;
   rating_avg?: number | null; rating_count?: number | null;
-  // public YouTube Shorts for this design (BRS writes youtube_stats; RLS shows
-  // only privacy = 'public' to the storefront, migration 099)
-  youtube_stats?: { video_id: string; privacy: string; published_at?: string | null }[] | null;
 };
 
-const CARD = 'id,title,slug,price_usd,image_url,is_bundle,link_status,rating_avg,rating_count,youtube_stats(video_id,privacy,published_at)';
-
-/** The newest public Short for a card, or null. */
-export function youtubeId(p: Pick<ProductCard, 'youtube_stats'>): string | null {
-  const rows = (p.youtube_stats || []).filter((y) => y && y.privacy === 'public');
-  if (!rows.length) return null;
-  rows.sort((a, b) => String(b.published_at || '').localeCompare(String(a.published_at || '')));
-  return rows[0].video_id;
-}
+const CARD = 'id,title,slug,price_usd,image_url,is_bundle,link_status,rating_avg,rating_count';
 
 export type SiteSettings = {
   donation_total: number; rating: number; reviews_count: number;
@@ -188,15 +177,12 @@ export async function getCategoryBySlug(slug: string) {
   } catch (e) { console.error('getCategoryBySlug failed:', e); return null; }
 }
 
-export async function getProducts(page = 1, perPage = 48, ytOnly = false) {
+export async function getProducts(page = 1, perPage = 48) {
   const from = (page - 1) * perPage;
   try {
-    // ytOnly: the main-menu "only products with a YouTube film" switch. An inner
-    // join on the public Shorts keeps just the designs that have one.
-    const sel = ytOnly ? CARD.replace('youtube_stats(', 'youtube_stats!inner(') : CARD;
-    let q = supabase.from('products').select(sel, { count: 'exact' }).eq('active', true);
-    if (ytOnly) q = q.eq('youtube_stats.privacy', 'public');
-    const { data, count, error } = await q.order('title').range(from, from + perPage - 1);
+    const { data, count, error } = await supabase
+      .from('products').select(CARD, { count: 'exact' })
+      .eq('active', true).order('title').range(from, from + perPage - 1);
     if (error) throw error;
     return { products: (data ?? []) as ProductCard[], total: count ?? 0, page, perPage };
   } catch (e) { console.error('getProducts failed:', e); return { products: [], total: 0, page, perPage }; }
