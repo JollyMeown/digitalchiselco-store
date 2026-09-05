@@ -9,6 +9,7 @@ import { useLiveRefresh } from '../useLiveRefresh';
 
 type Pack = {
   id: string; month: string; title: string | null; preview_note: string | null; standard_drive_link: string | null; bonus_drive_link: string | null;
+  admin_zip_link: string | null; bonus_zip_link: string | null;
   cover_image_url: string | null; items: { title: string; slug?: string | null; image_url?: string | null }[]; bonus_items: { title: string; slug?: string | null; image_url?: string | null }[]; file_count: number | null; built_by: string | null; notes: string | null; created_at: string;
   link_history: { standard_drive_link?: string | null; bonus_drive_link?: string | null; title?: string | null; built_by?: string | null; replaced_at?: string | null }[];
 };
@@ -154,8 +155,10 @@ export default function MonthlyDrops() {
                     </div>
                   )}
                   <div className="flex flex-wrap gap-3 text-[11px] mt-1.5">
-                    {r.standard_drive_link ? <a href={r.standard_drive_link} target="_blank" rel="noreferrer" className="text-bronze-700 underline">standard link ↗</a> : <span className="text-red-600">standard link missing</span>}
-                    {r.bonus_drive_link ? <a href={r.bonus_drive_link} target="_blank" rel="noreferrer" className="text-bronze-700 underline">bonus link ↗</a> : <span className="text-ink-700/40">no bonus link</span>}
+                    {r.standard_drive_link ? <a href={r.standard_drive_link} target="_blank" rel="noreferrer" className="text-bronze-700 underline">member PDF ↗</a> : <span className="text-red-600">member PDF link missing</span>}
+                    {r.bonus_drive_link ? <a href={r.bonus_drive_link} target="_blank" rel="noreferrer" className="text-bronze-700 underline">bonus PDF ↗</a> : <span className="text-ink-700/40">no bonus PDF</span>}
+                    {r.admin_zip_link ? <a href={r.admin_zip_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 bg-bronze-800 text-cream px-2 py-0.5 rounded text-[11px]" title="All design pictures + the PDF. Admin only, never sent to members.">⬇ ZIP: pictures + PDF</a> : <span className="text-ink-700/40" title="BRS writes admin_zip_link on the next hand-over">no admin ZIP yet</span>}
+                    {r.bonus_zip_link && <a href={r.bonus_zip_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 border border-bronze-800 text-bronze-800 px-2 py-0.5 rounded text-[11px]">⬇ bonus ZIP</a>}
                   </div>
                   {heldOld(r) > 0 && (
                     <div className="mt-1.5 text-[11px] text-ink-700/70">🔒 {heldOld(r)} member{heldOld(r) === 1 ? '' : 's'} received an earlier version of this pack and keep it in their account; members who get this month from now on receive the current files.</div>
@@ -235,6 +238,8 @@ function PackForm({ p, onDone }: { p: Pack | null; onDone: () => void }) {
   const [note, setNote] = useState(p?.preview_note || '');
   const [std, setStd] = useState(p?.standard_drive_link || '');
   const [bonus, setBonus] = useState(p?.bonus_drive_link || '');
+  const [zip, setZip] = useState(p?.admin_zip_link || '');
+  const [bonusZip, setBonusZip] = useState(p?.bonus_zip_link || '');
   const [cover, setCover] = useState(p?.cover_image_url || '');
   const toLines = (list: { title: string; slug?: string | null; image_url?: string | null }[]) => (list || []).map((i) => [i.title, i.slug || '', i.image_url || ''].join(' | ')).join('\n');
   const [items, setItems] = useState(toLines(p?.items || []));
@@ -250,6 +255,7 @@ function PackForm({ p, onDone }: { p: Pack | null; onDone: () => void }) {
     const payload: any = {
       month, title: title.trim() || null, preview_note: note.trim() || null,
       standard_drive_link: std.trim() || null, bonus_drive_link: bonus.trim() || null,
+      admin_zip_link: zip.trim() || null, bonus_zip_link: bonusZip.trim() || null,
       cover_image_url: cover.trim() || null, items: parse(items), bonus_items: parse(bonusItems), notes: notes.trim() || null, updated_at: new Date().toISOString(),
     };
     if (!p) payload.built_by = 'manual';
@@ -267,8 +273,12 @@ function PackForm({ p, onDone }: { p: Pack | null; onDone: () => void }) {
         <div><label className={labelCls}>Title <span className="text-ink-700/40">(shown in the email and portal)</span></label><input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="e.g. September 2026: Woodland Wildlife" /></div>
       </div>
       <div><label className={labelCls}>Preview note <span className="text-ink-700/40">(one sentence)</span></label><input value={note} onChange={(e) => setNote(e.target.value)} className={inputCls} placeholder="Eight fresh wildlife reliefs, from a whitetail buck to a pair of loons." /></div>
-      <div><label className={labelCls}>Standard Drive link <span className="text-ink-700/40">(all members)</span></label><input value={std} onChange={(e) => setStd(e.target.value)} className={inputCls} placeholder="https://drive.google.com/…" /></div>
-      <div><label className={labelCls}>Bonus Drive link <span className="text-ink-700/40">(Premium / 12-month only)</span></label><input value={bonus} onChange={(e) => setBonus(e.target.value)} className={inputCls} placeholder="https://drive.google.com/…" /></div>
+      <div><label className={labelCls}>Member download: pack PDF link <span className="text-ink-700/40">(all members; the PDF only, never a zip or folder)</span></label><input value={std} onChange={(e) => setStd(e.target.value)} className={inputCls} placeholder="https://drive.google.com/uc?export=download&id=…" /></div>
+      <div><label className={labelCls}>Member download: bonus PDF link <span className="text-ink-700/40">(Premium / 12-month only)</span></label><input value={bonus} onChange={(e) => setBonus(e.target.value)} className={inputCls} placeholder="https://drive.google.com/uc?export=download&id=…" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className={labelCls}>Admin ZIP link <span className="text-ink-700/40">(all pictures + PDF, never sent to members)</span></label><input value={zip} onChange={(e) => setZip(e.target.value)} className={inputCls} placeholder="https://drive.google.com/…" /></div>
+        <div><label className={labelCls}>Admin bonus ZIP link</label><input value={bonusZip} onChange={(e) => setBonusZip(e.target.value)} className={inputCls} placeholder="https://drive.google.com/…" /></div>
+      </div>
       <div><label className={labelCls}>Cover image URL <span className="text-ink-700/40">(shown at the top of the pack email)</span></label><input value={cover} onChange={(e) => setCover(e.target.value)} className={inputCls} placeholder="https://…jpg" /></div>
       <div><label className={labelCls}>Designs inside, one per line: <code>Title | product-slug | image url</code> <span className="text-ink-700/40">(the BRS pack builder fills this automatically)</span></label><textarea rows={5} value={items} onChange={(e) => setItems(e.target.value)} className={inputCls + ' font-mono text-xs'} /></div>
       <div><label className={labelCls}>⭐ Premium bonus designs, same format <span className="text-ink-700/40">(shown to 12-month members in the pack email and portal, with the Bonus link above)</span></label><textarea rows={2} value={bonusItems} onChange={(e) => setBonusItems(e.target.value)} className={inputCls + ' font-mono text-xs'} placeholder={'Bald Eagle Head | bald-eagle-head-3d-relief-stl | https://…jpg\nHowling Wolf | howling-wolf-moon-3d-relief-stl | https://…jpg'} /></div>
