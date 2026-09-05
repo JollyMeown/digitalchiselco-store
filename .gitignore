@@ -16,6 +16,8 @@ drive_token.txt
 drive_stls.json
 drive_folders.json
 *.html
+# article sources are the one kind of HTML that belongs in the repo
+!scripts/blog/**/post.html
 
 # secrets / handoff doc — NEVER commit
 PROJECT_HANDOFF.md

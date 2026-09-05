@@ -1,0 +1,57 @@
+[
+  {
+    "key": "cover",
+    "alt": "Finished relief carving on a workbench beside the oils, waxes and brushes used to finish it",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/cover.jpg"
+  },
+  {
+    "key": "raw",
+    "alt": "CNC relief carving straight off the machine, pale and fuzzy with visible tool marks",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/raw.jpg"
+  },
+  {
+    "key": "defuzz",
+    "alt": "Removing machining fuzz from a relief carving with a soft brass brush",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/defuzz.jpg"
+  },
+  {
+    "key": "sand",
+    "alt": "Sanding only the high points of a bas relief carving with a fine sanding sponge",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/sand.jpg"
+  },
+  {
+    "key": "seal",
+    "alt": "Brushing dewaxed shellac sealer onto a carved cherry panel before staining",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/seal.jpg"
+  },
+  {
+    "key": "glaze-on",
+    "alt": "Dark glaze applied over the whole relief carving before it is wiped back",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/glaze-on.jpg"
+  },
+  {
+    "key": "glaze-wipe",
+    "alt": "Wiping dark glaze back off the high points so the relief depth reads, half done",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/glaze-wipe.jpg"
+  },
+  {
+    "key": "recess",
+    "alt": "Pulling pooled finish out of the deep recesses of a carving with a dry brush",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/recess.jpg"
+  },
+  {
+    "key": "oil",
+    "alt": "Wiping Danish oil onto a carved relief panel with a cloth",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/oil.jpg"
+  },
+  {
+    "key": "wax",
+    "alt": "Buffing dark paste wax on a finished relief carving with a shoe brush",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/wax.jpg"
+  },
+  {
+    "key": "final",
+    "alt": "Finished cherry relief carving with dark antiqued recesses and satin high points",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/finishing/final.jpg"
+  }
+]

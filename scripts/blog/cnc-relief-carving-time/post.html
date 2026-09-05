@@ -1,0 +1,245 @@
+<p>A maker on the Onefinity forum posted a number that stops people buying relief files: his controller estimated <strong>over six days</strong> of machine time for a 20 by 12 inch carving. Another, on a different forum, had a 55 hour estimate for a similar job. He changed three settings and it ran in 13. Same design, same machine, same wood.</p>
+
+<p>Nothing was wrong with either file. What was wrong was the toolpath: one small ball nose cutter asked to do the entire job, from hogging out the background to polishing the eye, at the tiny stepover only the eye needed. That is like painting a house with a nail-art brush. This article is about painting the walls with a roller first.</p>
+
+<p>Every number below is either cited to the maker who reported it or worked from first principles you can check yourself. There is a time estimator in the middle you can do on the back of an envelope.</p>
+
+<figure>
+  <img src="{{IMG:hero}}" alt="A relief carving of an eagle half finished on a CNC router bed, the left half still stepped from roughing, the right half smooth" loading="lazy" />
+  <figcaption>Left half: after the roughing pass, coarse terraces. Right half: after finishing. The roughing pass removed most of the wood in a fraction of the time the finishing cutter would have taken.</figcaption>
+</figure>
+
+<h2 id="contents">In this article</h2>
+<ul>
+  <li><a href="#why">Where the hours actually go</a></li>
+  <li><a href="#maths">The stepover maths (why 8% costs double what 15% does)</a></li>
+  <li><a href="#ladder">The three-pass bit ladder</a></li>
+  <li><a href="#rough">Pass 1: Roughing with a flat cutter</a></li>
+  <li><a href="#semi">Pass 2: Semi-finishing with a 1/8 inch tapered ball nose</a></li>
+  <li><a href="#fine">Pass 3: Fine detail, inside a boundary only</a></li>
+  <li><a href="#estimate">The back-of-the-envelope time estimator</a></li>
+  <li><a href="#feeds">Feeds and speeds that are actually achievable on a hobby machine</a></li>
+  <li><a href="#settings">Eleven settings that quietly waste hours</a></li>
+  <li><a href="#software">Where each setting lives in Aspire, VCarve, Carveco and Fusion</a></li>
+  <li><a href="#worked">A worked example: the eagle panel, 6 days to 4 hours</a></li>
+  <li><a href="#faq">Questions people ask</a></li>
+</ul>
+
+<h2 id="why">Where the hours actually go</h2>
+
+<p>A 3D finishing toolpath is a raster. The cutter sweeps back and forth across the panel in parallel lines, and each line is one <em>stepover</em> away from the last. The total distance the cutter travels is simply the panel's area divided by the stepover. That is the whole story of machine time, and it explains three things people find surprising:</p>
+
+<ul>
+  <li><strong>The stepover controls time, not the depth.</strong> Halving the stepover doubles the lines, which doubles the distance, which doubles the time. Depth barely matters to a finishing pass, because the cutter is only skimming the last fraction of a millimetre.</li>
+  <li><strong>The background costs as much as the subject.</strong> A raster does not know that the flat sky behind the eagle has no detail in it. It sweeps the sky at the same fine stepover as the eye. On most panels the background is more than half the area.</li>
+  <li><strong>A finishing cutter is a terrible roughing cutter.</strong> A 1/8 inch ball nose cutting 12 mm deep in one line takes tiny bites, has to slow down to survive, and still spends hours doing what a 1/4 inch flat end mill does in twenty minutes.</li>
+</ul>
+
+<p>Fix those three and the six-day carve becomes an afternoon. Everything else in this article is detail.</p>
+
+<h2 id="maths">The stepover maths</h2>
+
+<p>Stepover is written as a percentage of the cutter's diameter. For a 1/8 inch (3.175 mm) ball nose:</p>
+
+<table>
+  <thead><tr><th>Stepover</th><th>In mm</th><th>Lines per 300 mm panel</th><th>Relative time</th><th>Surface</th></tr></thead>
+  <tbody>
+    <tr><td>25%</td><td>0.79</td><td>380</td><td>1x</td><td>Obvious scallops. Roughing only.</td></tr>
+    <tr><td>15%</td><td>0.48</td><td>630</td><td>1.7x</td><td>Fine corduroy. Good for backgrounds; sands out in minutes.</td></tr>
+    <tr><td>10%</td><td>0.32</td><td>945</td><td>2.5x</td><td>Barely visible. The general-purpose finish.</td></tr>
+    <tr><td>8%</td><td>0.25</td><td>1,180</td><td>3.1x</td><td>Invisible after a brush. Faces, eyes, feathers.</td></tr>
+    <tr><td>5%</td><td>0.16</td><td>1,890</td><td>5x</td><td>Wasted on wood. The grain is coarser than this.</td></tr>
+  </tbody>
+</table>
+
+<p>Read that last column carefully. Going from 15% to 8% costs almost double. Going from 8% to 5% costs another 60% and produces a surface no one will ever see, because wood fibres are bigger than the scallops you are removing. The 8% figure that gets repeated in every forum is correct <em>for the parts of the panel that need it</em>. It is a disaster applied to the whole thing.</p>
+
+<h2 id="ladder">The three-pass bit ladder</h2>
+
+<figure>
+  <img src="{{IMG:bits}}" alt="The three cutters that carve a relief, laid beside the finished panel: a flat end mill, a 1/8 inch tapered ball nose and a 1/16 inch tapered ball nose" loading="lazy" />
+  <figcaption>Three cutters, three jobs. Each one removes only what the previous one could not.</figcaption>
+</figure>
+
+<p>Professional shops do not carve reliefs with one cutter. They use a ladder, each rung doing what the previous one cannot, and each one faster than the one below it:</p>
+
+<ol>
+  <li><strong>A flat end mill roughs.</strong> 1/4 inch on a hobby machine, 3/8 or 1/2 on a rigid one. It clears the bulk of the waste in coarse terraces and leaves a thin, even skin of stock.</li>
+  <li><strong>A 1/8 inch tapered ball nose semi-finishes.</strong> It removes the terraces and forms the actual surface at a medium stepover, everywhere.</li>
+  <li><strong>A 1/16 inch tapered ball nose finishes the fine detail only</strong>, at a fine stepover, inside a boundary you draw around the parts that need it.</li>
+</ol>
+
+<p>Tapered matters. A tapered ball nose has a thick shank behind a fine tip, so it is far stiffer than a straight 1/16 inch cutter and can run faster without chattering or snapping. The taper angle limits how steep a wall it can follow, but relief carvings rarely have vertical walls, and the roughing pass has already cut those.</p>
+
+<h2 id="rough">Pass 1: Roughing with a flat cutter</h2>
+
+<figure>
+  <img src="{{IMG:rough}}" alt="Roughing pass on a relief carving: a flat end mill has cut the design as coarse stepped terraces" loading="lazy" />
+  <figcaption>After roughing. It looks like a contour map, which is exactly what it is. Every one of those steps was a minute the finishing cutter no longer has to spend.</figcaption>
+</figure>
+
+<p>The roughing pass exists to remove wood quickly and leave a skin for the next cutter. The settings that matter:</p>
+
+<ul>
+  <li><strong>Cutter:</strong> 1/4 inch two-flute flat (or downcut, for a cleaner top surface).</li>
+  <li><strong>Strategy:</strong> Z-level or "raster in levels". The cutter clears one horizontal slice of the whole panel, drops, clears the next. Aspire and Carveco call this the 3D roughing toolpath; Fusion calls it Adaptive Clearing, which is faster still because it keeps the cutter engaged constantly.</li>
+  <li><strong>Depth per pass:</strong> 3 to 4 mm in hardwood on a hobby machine, more if the machine is rigid.</li>
+  <li><strong>Stepover:</strong> 40 to 50% of the cutter. This is not a finish.</li>
+  <li><strong>Machining allowance (the "leave stock" setting):</strong> 0.5 to 1.0 mm. This is the skin the ball nose will remove. Leave too much and the semi-finish takes longer; too little and the flat cutter starts gouging the actual surface.</li>
+</ul>
+
+<p>Roughing a 400 by 300 mm panel 15 mm deep in cherry with a 1/4 inch cutter takes 20 to 40 minutes. The same material removal with a 1/8 inch ball nose on a single-pass raster is several hours, and most of those hours are spent with the cutter buried, at feed rates it can barely survive.</p>
+
+<h2 id="semi">Pass 2: Semi-finishing with a 1/8 inch tapered ball nose</h2>
+
+<figure>
+  <img src="{{IMG:semi}}" alt="Semi-finishing pass with a 1/8 inch tapered ball nose leaving a fine visible scallop pattern across the relief" loading="lazy" />
+  <figcaption>The semi-finish forms the whole surface. The faint corduroy it leaves is the scallop pattern of a 12 to 15% stepover, and it sands away in minutes on the high points.</figcaption>
+</figure>
+
+<p>This pass does most of the actual carving. It runs across the whole panel and turns the terraces into the finished surface:</p>
+
+<ul>
+  <li><strong>Cutter:</strong> 1/8 inch tapered ball nose. A 1/16 inch tip with a 1/8 or 1/4 inch shank is the most useful tapered cutter in relief work; a 1/32 inch tip only earns its place on very small or very fine pieces.</li>
+  <li><strong>Strategy:</strong> Raster (parallel). Angle it 45 degrees to the grain if the design has a lot of long horizontal features, or run it <em>with</em> the grain to reduce tear-out on softer woods. Some CAM offers a "3D offset" or spiral strategy that follows the shapes; it looks nice but is rarely faster.</li>
+  <li><strong>Stepover:</strong> 12 to 15%. This is the setting people get wrong. The background, the sky, the water, the plain border: all of it is finished right here at 15%, and nobody will see the difference.</li>
+  <li><strong>Boundary:</strong> the whole model.</li>
+</ul>
+
+<p>On a hobby machine a 400 by 300 mm semi-finish at 15% and 3,000 mm/min runs in about 70 minutes. At 8% it is 140. That difference is the whole argument.</p>
+
+<h2 id="fine">Pass 3: Fine detail, inside a boundary only</h2>
+
+<figure>
+  <img src="{{IMG:finish}}" alt="Final finishing pass with a 1/16 inch tapered ball nose confined to the eagle's head, sharp beside the scalloped background" loading="lazy" />
+  <figcaption>The fine pass ran only inside a vector drawn around the head. The eye is glass-smooth; the mountains beside it still carry the semi-finish texture, which the finish will hide.</figcaption>
+</figure>
+
+<p>Now the trick that separates a four hour carve from a twelve hour one. Draw a closed vector around the parts of the design that actually need fine detail: the face, the eye, the feathers on the near wing, the lettering. Set the finishing toolpath to machine <strong>inside that boundary only</strong>, with the small cutter at the fine stepover.</p>
+
+<ul>
+  <li><strong>Cutter:</strong> 1/16 inch tapered ball nose (a 1/32 inch tip for jewellery-scale work).</li>
+  <li><strong>Stepover:</strong> 8%. This is where the number belongs.</li>
+  <li><strong>Boundary:</strong> your vector. In Aspire and VCarve, select the vector before creating the toolpath and choose "selected vectors" as the boundary. In Carveco, the same. In Fusion, use a Machining Boundary set to a sketch.</li>
+  <li><strong>Raster angle:</strong> 90 degrees to the semi-finish, so the two scallop patterns cross rather than stack.</li>
+</ul>
+
+<p>On a typical wildlife panel the fine detail is 15 to 25% of the area. Machining only that at 8% instead of the whole panel is the single biggest saving available, bigger even than the roughing pass.</p>
+
+<h2 id="estimate">The back-of-the-envelope time estimator</h2>
+
+<p>You can estimate any raster pass before you run it, to within about 20%:</p>
+
+<blockquote><p><strong>Time (minutes) = (Width × Height) ÷ (Stepover × Feed rate)</strong>, with everything in the same units.</p></blockquote>
+
+<p>Example, in millimetres. A 400 by 300 mm panel, 1/8 inch cutter at 15% stepover (0.48 mm), feed 3,000 mm/min:</p>
+<ul>
+  <li>Area = 400 × 300 = 120,000 mm²</li>
+  <li>Distance = 120,000 ÷ 0.48 = 250,000 mm of travel</li>
+  <li>Time = 250,000 ÷ 3,000 = 83 minutes, plus 10 to 15% for retracts and the ends of each line</li>
+</ul>
+
+<p>Now the same panel at 8% (0.25 mm): 480,000 mm of travel, 160 minutes. And the same panel with a 1/16 inch cutter at 8% (0.13 mm): 940,000 mm, over five hours. That is what a single-cutter, single-pass, 8% strategy on a 1/16 inch cutter costs, and it is why the forum estimates read in days.</p>
+
+<p>Run the formula for each rung of the ladder separately and add them up. For the eagle panel below that comes to roughly four hours. For the same panel done the naive way it comes to two and a half days, and the forum posts confirm it.</p>
+
+<h2 id="feeds">Feeds and speeds that are actually achievable on a hobby machine</h2>
+
+<p>Every feed chart online was written for an industrial machine with a 3 kW spindle and a cast frame. On a Shapeoko, X-Carve, Onefinity, LongMill, or a Chinese 3018 with a decent spindle, use these as a starting point in cherry, walnut or maple, and back off 20% in oak:</p>
+
+<table>
+  <thead><tr><th>Cutter</th><th>Pass</th><th>RPM</th><th>Feed</th><th>Depth per pass</th><th>Stepover</th></tr></thead>
+  <tbody>
+    <tr><td>1/4 inch flat, 2 flute</td><td>Roughing</td><td>18,000</td><td>2,500 to 3,500 mm/min (100 to 140 ipm)</td><td>3 to 4 mm</td><td>40 to 50%</td></tr>
+    <tr><td>1/8 inch tapered ball nose</td><td>Semi-finish</td><td>18,000 to 20,000</td><td>2,500 to 3,500 mm/min</td><td>skin only</td><td>12 to 15%</td></tr>
+    <tr><td>1/16 inch tapered ball nose</td><td>Fine detail</td><td>20,000 to 24,000</td><td>1,500 to 2,500 mm/min (60 to 100 ipm)</td><td>skin only</td><td>8%</td></tr>
+  </tbody>
+</table>
+
+<p>Two honest cautions. Belt-driven machines flex, and a flexing machine at 3,500 mm/min leaves a rougher surface than a rigid one at 2,500, so the fastest feed is not always the fastest finish once you add sanding time. And in softwoods, a faster feed with a sharp cutter leaves <em>less</em> fuzz than a slow one, because the fibres are cut rather than pushed; if you are fighting fuzz, speed up before you slow down. <a href="/blog/how-to-finish-cnc-relief-carvings#fuzz">The finishing guide</a> covers what to do with the fuzz that remains.</p>
+
+<h2 id="settings">Eleven settings that quietly waste hours</h2>
+
+<ol>
+  <li><strong>Machining the whole model area instead of the model's outline.</strong> If the relief is a circle on a square board, set the boundary to the circle. The corners are air.</li>
+  <li><strong>Safe Z set to 25 mm.</strong> Every retract climbs to it. Set it to 3 to 5 mm above the highest point of the stock. On a raster with thousands of line ends this alone is worth 10 to 15%.</li>
+  <li><strong>Rapid rate left at the default.</strong> Check your machine's actual rapid speed is being used for moves between cuts, not the feed rate.</li>
+  <li><strong>Raster at 0 degrees on a wide panel.</strong> Long lines are efficient; short lines are all retract and reverse. Run the raster along the panel's long axis.</li>
+  <li><strong>Roughing allowance too generous.</strong> 2 mm of skin doubles the semi-finish load. 0.5 to 1 mm is right.</li>
+  <li><strong>No roughing pass at all.</strong> The original sin. See above.</li>
+  <li><strong>Fine stepover on the whole panel.</strong> The second sin. Draw the boundary.</li>
+  <li><strong>"Ramp" and "lead-in" moves on a finishing pass.</strong> Needed for a flat cutter plunging into solid stock, pointless on a ball nose skimming a skin. Turn them off on passes 2 and 3.</li>
+  <li><strong>Depth of cut limit on the finishing pass.</strong> Some CAM defaults to multiple depth passes on a finish toolpath. There is only a skin to remove; set it to one pass.</li>
+  <li><strong>Carving a model with more depth than it needs.</strong> A 25 mm deep relief takes longer to rough than a 12 mm one and rarely looks better on a wall. <a href="/blog/how-to-scale-stl-files-for-cnc-routers">Scaling</a> covers how to set depth without flattening the design.</li>
+  <li><strong>A dull cutter.</strong> It forces you to slow the feed, it burnishes rather than cuts, and it leaves fuzz you will spend an hour removing. A tapered ball nose is a consumable. Budget for it.</li>
+</ol>
+
+<h2 id="software">Where each setting lives</h2>
+
+<table>
+  <thead><tr><th>Setting</th><th>Aspire / VCarve Pro</th><th>Carveco</th><th>Fusion 360</th></tr></thead>
+  <tbody>
+    <tr><td>Roughing pass</td><td>3D Roughing toolpath (Z level or 3D raster)</td><td>Machine Relief → Roughing (Z-slice)</td><td>3D Adaptive Clearing</td></tr>
+    <tr><td>Leave stock</td><td>Machining allowance</td><td>Allowance</td><td>Stock to leave (radial / axial)</td></tr>
+    <tr><td>Finishing raster</td><td>3D Finishing toolpath → Raster</td><td>Machine Relief → Finishing → Raster</td><td>Parallel</td></tr>
+    <tr><td>Stepover</td><td>Tool database → Stepover (% or absolute)</td><td>Stepover in the tool</td><td>Stepover under Passes</td></tr>
+    <tr><td>Boundary</td><td>Toolpath boundary → Selected vectors</td><td>Boundary vector</td><td>Machining boundary → Selection</td></tr>
+    <tr><td>Rest machining</td><td>Not built in (use a boundary)</td><td>Rest machining option</td><td>Rest machining checkbox</td></tr>
+    <tr><td>Safe Z</td><td>Material Setup → Rapid Z gaps</td><td>Material setup → Safe Z</td><td>Heights → Clearance / Retract</td></tr>
+  </tbody>
+</table>
+
+<p>Two notes. VCarve Desktop (not Pro) can import and carve a single relief model with all of the above, and it is the cheapest way into proper 3D toolpaths. Easel cannot open an STL at all, so if that is what you run, the file has to be converted to a grayscale depth map first, and the roughing strategy is not available. <a href="/blog/aspire-vcarve-carveco-fusion-360-comparison">Our comparison of the four packages</a> goes into what each one can and cannot do with relief models.</p>
+
+<h2 id="worked">A worked example: the eagle panel</h2>
+
+<p>The panel in the photographs is <a href="{{URL:bald-eagle-mountain}}">{{TITLE:bald-eagle-mountain}}</a>, carved at 400 by 300 mm and 14 mm deep in cherry. The naive plan, one 1/16 inch tapered ball nose at 8% over the whole panel with no roughing, estimates at 2 days and 7 hours on a hobby machine. Here is the ladder:</p>
+
+<table>
+  <thead><tr><th>Pass</th><th>Cutter</th><th>Stepover</th><th>Boundary</th><th>Time</th></tr></thead>
+  <tbody>
+    <tr><td>1. Roughing</td><td>1/4 inch flat</td><td>45%</td><td>Model outline</td><td>32 min</td></tr>
+    <tr><td>2. Semi-finish</td><td>1/8 inch tapered ball nose</td><td>15%</td><td>Model outline</td><td>1 h 25 min</td></tr>
+    <tr><td>3. Fine detail</td><td>1/16 inch tapered ball nose</td><td>8%</td><td>Vector around the eagle only (about 22% of the area)</td><td>1 h 10 min</td></tr>
+    <tr><td colspan="4"><strong>Total</strong></td><td><strong>about 3 h 10 min</strong>, plus two cutter changes</td></tr>
+  </tbody>
+</table>
+
+<p><a class="dl-btn" href="{{URL:bald-eagle-mountain}}">Download the Bald Eagle Mountain panel · {{PRICE:bald-eagle-mountain}}</a></p>
+
+<p>Fifty-five hours to thirteen, from the forum post at the top, is the same ratio applied to a bigger panel. This is not a trick and it is not a compromise on quality. The eagle's head in the fine pass is sharper than it would be from a single tired cutter that has been running for two days, and the background at 15% disappears completely under a brush and a coat of oil.</p>
+
+<p>If you want a design to try this on, the <a href="{{URL:whitetail-deer-buck}}">{{TITLE:whitetail-deer-buck}}</a> is the panel most people carve first, and it has a clear subject-and-background split that makes the boundary obvious. <a href="/blog/10-beginner-cnc-bas-relief-projects">Ten beginner projects</a> lists more.</p>
+
+<p><a class="dl-btn" href="{{URL:whitetail-deer-buck}}">Download the Whitetail Buck panel · {{PRICE:whitetail-deer-buck}}</a></p>
+
+<h2 id="faq">Questions people ask</h2>
+
+<h3>How long should a relief carving take?</h3>
+<p>With a roughing pass and a bit ladder: two to five hours for a panel up to 400 mm wide on a hobby machine, six to twelve for something the size of a door panel. Without them, multiply by three to six.</p>
+
+<h3>What is the best stepover for 3D carving?</h3>
+<p>12 to 15% for the semi-finish across the whole model, 8% for the fine pass inside a boundary around the detail. 5% is wasted on wood.</p>
+
+<h3>Do I really need a roughing pass?</h3>
+<p>Yes, on anything deeper than about 5 mm. It removes the bulk of the wood ten times faster than a ball nose, and it lets the finishing cutters run at proper feeds because they are only skimming.</p>
+
+<h3>Tapered or straight ball nose?</h3>
+<p>Tapered, almost always. The thick shank makes it stiff enough to run fast without deflecting, and it lasts far longer than a straight 1/16 inch cutter, which snaps if you look at it wrong.</p>
+
+<h3>Which cutter for faces?</h3>
+<p>A 1/16 inch tapered ball nose at 8%, inside a boundary around the face. A 1/32 inch tip only if the face is under 60 mm tall.</p>
+
+<h3>Why does my CAM estimate say 40 hours when the machine finished in 12?</h3>
+<p>Most CAM time estimates ignore acceleration and use the programmed feed for the whole path. They overestimate rasters badly. The formula above is closer to reality; the controller's own estimate, once the job is loaded, is closer still.</p>
+
+<h3>Does a bigger machine carve faster?</h3>
+<p>Rigidity matters more than size. A rigid machine holds a higher feed at the same finish, and more importantly it can take a deeper roughing cut. The stepover maths is the same on every machine.</p>
+
+<hr />
+
+<p>Three passes, three cutters, one boundary. That is the whole method, and it turns a relief carving from a weekend you had to plan around into an afternoon you can start after lunch. If your machine is currently on hour nine of a raster, let it finish, and set the next one up this way.</p>
+
+<p>Questions about a specific machine or a stubborn design? <a href="/contact">Send them over</a>. Real questions are how these guides get written.</p>
+
+<p><em>Jolly, DigitalChiselCo</em></p>

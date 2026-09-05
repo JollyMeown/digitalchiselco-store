@@ -37,12 +37,52 @@ if (!post) return Astro.rewrite('/404');
         {post.published_at && <span> · {new Date(post.published_at).toLocaleDateString()}</span>}
       </div>
     </header>
-    <div class="prose prose-lg max-w-none text-ink-700 leading-relaxed" set:html={xss(post.body || '', {
-      // Long guides need a contents list that jumps, so headings keep their id.
-      // Everything else stays on the library's default allowlist.
-      whiteList: { ...(xss as any).whiteList, h2: ['id'], h3: ['id'], h4: ['id'], section: ['id'] },
+    <div class="post-body prose prose-lg max-w-none text-ink-700 leading-relaxed" set:html={xss(post.body || '', {
+      // Long guides need a contents list that jumps, so headings keep their id,
+      // and a small set of class names survive so an article can mark a link
+      // as a button. Everything else stays on the library's default allowlist.
+      whiteList: {
+        ...(xss as any).whiteList,
+        h2: ['id'], h3: ['id'], h4: ['id'], section: ['id', 'class'],
+        a: ['target', 'href', 'title', 'class'], p: ['class'], div: ['class'], span: ['class'], figure: ['class'],
+      },
     })} />
   </article>
+
+  <style is:global>
+    /* Article body styling lives here rather than in the HTML, because the
+       sanitizer strips styling from stored content. Every article, past and
+       future, gets the same treatment (owner request, 2026-09-05). */
+    .post-body a { color: #633806; text-decoration: underline; text-decoration-color: rgba(133, 79, 11, .35); text-underline-offset: 3px; }
+    .post-body a:hover { color: #412402; text-decoration-color: #854F0B; }
+    .post-body ul > li::marker, .post-body ol > li::marker { color: #854F0B; font-weight: 600; }
+
+    /* The contents list: the <ul> directly after the "contents" heading. */
+    .post-body h2#contents { font-size: 1.05rem; letter-spacing: .04em; text-transform: uppercase; color: #854F0B; margin-bottom: .5rem; }
+    .post-body h2#contents + ul { list-style: none; padding: .9rem 1.1rem; margin: 0 0 2rem;
+      background: #FAEEDA; border: 1px solid rgba(133, 79, 11, .18); border-radius: .75rem;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .15rem 1.5rem; }
+    .post-body h2#contents + ul > li { margin: 0; padding: .2rem 0 .2rem 1.1rem; position: relative; font-size: .95rem; line-height: 1.5; }
+    .post-body h2#contents + ul > li::before { content: '▸'; position: absolute; left: 0; top: .2rem; color: #854F0B; }
+    .post-body h2#contents + ul > li a { text-decoration: none; color: #633806; }
+    .post-body h2#contents + ul > li a:hover { text-decoration: underline; }
+
+    /* Download button under a featured design. */
+    .post-body a.dl-btn { display: inline-block; margin: .1rem 0 1.4rem; padding: .6rem 1.1rem; border-radius: .6rem;
+      background: #633806; color: #FAEEDA; font-weight: 600; font-size: .95rem; text-decoration: none; line-height: 1.2;
+      box-shadow: 0 1px 2px rgba(65, 36, 2, .25); transition: background .15s, transform .15s; }
+    .post-body a.dl-btn:hover { background: #412402; color: #FAEEDA; transform: translateY(-1px); }
+    .post-body a.dl-btn::after { content: ' →'; }
+
+    /* Pictures: a linked product picture should read as clickable. */
+    .post-body figure { margin: 1.6rem 0; }
+    .post-body figure img { border-radius: .75rem; width: 100%; box-shadow: 0 6px 24px rgba(65, 36, 2, .12); }
+    .post-body figure a img { transition: transform .2s; }
+    .post-body figure a:hover img { transform: scale(1.01); }
+    .post-body figcaption { font-size: .85rem; color: rgba(42, 26, 14, .6); margin-top: .5rem; text-align: center; }
+    .post-body table { font-size: .92rem; }
+    .post-body thead th { background: #FAEEDA; color: #412402; }
+  </style>
 
   <script type="application/ld+json" set:html={jsonLd({
     '@context': 'https://schema.org', '@type': 'BlogPosting',
