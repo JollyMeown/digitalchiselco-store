@@ -1,0 +1,26 @@
+[
+  {
+    "key": "hero",
+    "aspect": "16:9",
+    "ref": "butterfly-heart-stl-relief-3d-carving-file-for-cnc-router-floral-romantic-wall-a",
+    "alt": "The butterfly heart design laser engraved as a grayscale relief on pale maple, with a diode laser head above it",
+    "scene": "LASER ENGRAVED, NOT CARVED. The design from image 1 rendered as a LASER ENGRAVING on a flat, smooth panel of pale maple plywood about 25 by 20 cm: the surface is completely flat with no carved depth at all; instead the design appears as a photographic sepia-brown burn whose tone varies smoothly from pale untouched wood on the highest parts of the design to deep dark brown in the deepest parts, exactly like a grayscale depth map burned into wood, with crisp edges and a slightly satin sheen where the burn is darkest. The panel lies on the honeycomb bed of a small desktop diode laser engraver, plain and unbranded, with the laser module hanging a few centimetres above it and a faint wisp of smoke. Wide magazine shot, bright workshop light. The finish swatch applies only to the colour of bare maple and the warm brown of the burn.",
+    "bench": false
+  },
+  {
+    "key": "depthmap",
+    "aspect": "4:3",
+    "ref": "butterfly-heart-stl-relief-3d-carving-file-for-cnc-router-floral-romantic-wall-a",
+    "alt": "A printed grayscale depth map of the design on paper lying beside the finished laser engraving of it",
+    "scene": "SIDE BY SIDE ON THE BENCH, shot from directly above. On the LEFT, a sheet of white paper printed with the design from image 1 as a pure GRAYSCALE DEPTH MAP: a black background, the raised parts of the design in pale grey to white, the lower parts in darker greys, no colour, no shading, no lines, just tone equals height, like a heightmap. On the RIGHT, the same design LASER ENGRAVED into a flat pale maple panel as a sepia burn whose darkness follows that map. The two match exactly in composition. A pencil and a small pair of calipers lie between them. Bright even light.",
+    "bench": true
+  },
+  {
+    "key": "materials",
+    "aspect": "4:3",
+    "ref": "butterfly-heart-stl-relief-3d-carving-file-for-cnc-router-floral-romantic-wall-a",
+    "alt": "The same design laser engraved on four materials: pale maple, figured walnut, black slate and tan leather",
+    "scene": "FOUR SMALL SQUARES OF DIFFERENT MATERIALS IN A ROW, each about 10 cm, each laser engraved with the same design from image 1 as a flat tonal burn (no carved depth): far left, pale maple plywood where the burn reads cleanly in warm sepia; second, heavily figured walnut where the wild grain visibly fights the image and the design is harder to read; third, black slate where the engraving appears as pale grey-white against the dark stone; far right, tan full-grain leather where the burn is dark brown and crisp. Laid on the bench, shot from above, bright even light, a small laser-cut offcut beside them.",
+    "bench": true
+  }
+]

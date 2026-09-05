@@ -1,0 +1,13 @@
+{
+  "title": "STL Files for Laser Engraving: How to Turn a Relief File Into a Photo-Depth Burn",
+  "excerpt": "A laser cannot carve depth, but it can fake it beautifully. How a relief STL becomes a grayscale depth map, which lasers and materials work, LightBurn and xTool settings to start from, and the mistakes that turn a good file into a muddy burn.",
+  "seo_title": "STL Files for Laser Engraving: Depth Maps, Settings and Materials",
+  "seo_description": "How to laser engrave a bas-relief STL: convert it to a grayscale depth map, choose diode or CO2, pick materials that read (maple, slate, leather), LightBurn 3D sliced and grayscale settings, and the mistakes to avoid.",
+  "cover": "hero",
+  "email": {
+    "subject": "Your laser can engrave our relief files. Here is the one step that makes it work",
+    "intro": "A laser cannot carve depth. It can fake it beautifully, and the same relief STL files that run on a router will run on an xTool, a Glowforge or an Ortur, as long as you do one conversion step properly.\n\nWe rewrote our laser guide from scratch: how a relief becomes a grayscale depth map, which lasers and materials actually read, LightBurn and xTool settings to start from, and the five mistakes that turn a good file into a muddy burn. Here is the butterfly heart as a burn rather than a carving:",
+    "image": "hero",
+    "drip": true
+  }
+}

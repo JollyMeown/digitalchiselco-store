@@ -1,0 +1,206 @@
+<p>If you searched for "STL files for laser engraving" hoping to find files made specifically for lasers, you will have noticed they mostly do not exist. They do not need to. A laser cannot carve depth, but it can fake it beautifully, and the same bas-relief STL that runs on a router will run on an xTool, a Glowforge or an Ortur once you do one conversion step properly.</p>
+
+<p>This is the guide we wish had existed when laser owners started writing to ask "will these work on mine?" The answer is yes. The workflow is different from carving, a few things that work on a router fail on a laser, and the conversion step, which most tutorials wave past, is where the result is decided.</p>
+
+<figure>
+  <img src="{{IMG:hero}}" alt="The butterfly heart design laser engraved as a grayscale relief on pale maple, with a diode laser head above it" loading="lazy" />
+  <figcaption>No depth at all, and it still reads as relief. The laser varied its burn from pale to dark according to the height in the file, and the eye does the rest.</figcaption>
+</figure>
+
+<h2 id="contents">In this guide</h2>
+<ul>
+  <li><a href="#how">What a laser is actually doing with a relief file</a></li>
+  <li><a href="#depthmap">The conversion: STL to grayscale depth map</a></li>
+  <li><a href="#lasers">Diode, CO2 or fibre</a></li>
+  <li><a href="#materials">Materials that read, and materials that fight you</a></li>
+  <li><a href="#modes">Grayscale versus 3D sliced mode</a></li>
+  <li><a href="#settings">Settings to start from</a></li>
+  <li><a href="#mistakes">Five mistakes that turn a good file into mud</a></li>
+  <li><a href="#files">Which designs work best on a laser</a></li>
+  <li><a href="#faq">Questions people ask</a></li>
+</ul>
+
+<h2 id="how">What a laser is actually doing with a relief file</h2>
+
+<p>A router carves a relief by removing wood to different depths: high points stay tall, low points get cut away. A laser removes almost nothing. What it varies is <em>intensity</em>: more power or slower travel burns darker, less burns lighter, and it can do that thousands of times across a panel.</p>
+
+<p>That is why relief files work on a laser at all. A bas-relief STL is, underneath, a height map: every point on the surface has a height. Turn height into brightness, so the highest points are white and the lowest are black, and you have a grayscale image. Burn that image with the laser's power following the tone, and the eye reads the shaded result as relief, even though the surface is flat. Look at the picture above. Nothing on that maple is more than a few hundredths of a millimetre deep.</p>
+
+<p>Two consequences follow. Detail that depends on a shadow cast by real depth is gone, so the file has to carry its depth in tone. And the conversion from height to tone is everything: do it carelessly and a file with twelve distinct depth layers becomes a burn with three.</p>
+
+<h2 id="depthmap">The conversion: STL to grayscale depth map</h2>
+
+<figure>
+  <img src="{{IMG:depthmap}}" alt="A printed grayscale depth map of the design on paper lying beside the finished laser engraving of it" loading="lazy" />
+  <figcaption>Left: the depth map. White is high, black is low, nothing else. Right: the burn. If the map is good the burn is good; if the map is muddy, no setting rescues it.</figcaption>
+</figure>
+
+<p>You need a grayscale PNG where brightness equals height. Four ways to get one, all free:</p>
+
+<ol>
+  <li><strong>LightBurn itself, from a mesh.</strong> Recent versions of LightBurn can import an STL and render it to a depth map directly, which is the fewest steps if you already own it. Set the resolution to match your engraving DPI, not higher.</li>
+  <li><strong>STL2PNG and similar converters.</strong> Small, free tools that read an STL and write the height map. Set the output size to the pixel count you will actually engrave at; more is wasted.</li>
+  <li><strong>A resin slicer.</strong> Most resin 3D-print slicers can export a depth map of a model lying flat. Import, orient the carved face up, export.</li>
+  <li><strong>Blender.</strong> Point an orthographic camera straight down at the model and render the Z depth pass. More control than any of the above, and a steeper hill to climb.</li>
+</ol>
+
+<p>Whichever tool you use, check three things in the result before you burn anything:</p>
+
+<ul>
+  <li><strong>The background is true black and the highest point is true white.</strong> If the map only uses the middle greys, the burn will be flat. Most converters have a "normalise" or "stretch" option; use it.</li>
+  <li><strong>The gradient is smooth, not banded.</strong> Export at 16-bit if your tool offers it, or at least at 8-bit without compression. JPEG a depth map and you will burn the compression blocks.</li>
+  <li><strong>Resolution matches the job.</strong> A 300 mm panel at 254 lines per inch is about 3,000 pixels wide. A 6,000-pixel map does not add detail; it adds hours.</li>
+</ul>
+
+<h2 id="lasers">Diode, CO2 or fibre</h2>
+
+<h3>Diode lasers (xTool D1 and S1, Ortur, Atomstack, Longer, Sculpfun)</h3>
+<p>The most common laser in a home shop and perfectly capable of relief work. A modern 10 to 40 W diode has more than enough resolution for a smooth gradient. Its limits are speed (it is slow on big panels) and material: it wants light woods, leather and slate, and it struggles on anything reflective or very dark.</p>
+
+<h3>CO2 lasers (Glowforge, OMTech, Thunder, Boss, Aeon)</h3>
+<p>More power and a smoother tonal range, so more distinct "steps" of depth per burn. Faster on large panels. Happy on hardwoods, plywood, hardboard, leather, acrylic and anodised aluminium. If you own one, relief engraving is one of the best things it does.</p>
+
+<h3>Fibre and MOPA lasers</h3>
+<p>Fibre lasers on metal can do genuine deep engraving, removing material layer by layer to reproduce a relief three-dimensionally in steel or brass. That is closer to machining than to engraving, and it is a topic for another day, but yes, it works, and coins and medallions cut this way are remarkable.</p>
+
+<h2 id="materials">Materials that read, and materials that fight you</h2>
+
+<figure>
+  <img src="{{IMG:materials}}" alt="The same design laser engraved on four materials: pale maple, figured walnut, black slate and tan leather" loading="lazy" />
+  <figcaption>Same file, same map, four materials. Maple, slate and leather read cleanly. Figured walnut fights the image; the grain is louder than the burn.</figcaption>
+</figure>
+
+<p>A relief engraving is a tonal image, so the material has to be quiet enough for tone to show.</p>
+
+<table>
+  <thead><tr><th>Material</th><th>Reads?</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Maple, birch plywood, basswood</td><td>Excellent</td><td>Pale, even, fine grain. The default choice.</td></tr>
+    <tr><td>Cherry, alder</td><td>Very good</td><td>Warm base tone; burns to a rich brown.</td></tr>
+    <tr><td>Bamboo</td><td>Good</td><td>Even, but the nodes show through big panels.</td></tr>
+    <tr><td>Slate coasters</td><td>Excellent</td><td>Engraving goes pale on dark stone, so invert the map (see below).</td></tr>
+    <tr><td>Full-grain leather</td><td>Excellent</td><td>Crisp and dark. Burns aggressively; start at low power.</td></tr>
+    <tr><td>Hardboard, MDF</td><td>Good</td><td>Perfectly even and cheap. Ventilate; the glue smokes.</td></tr>
+    <tr><td>Figured walnut, oak, ash</td><td>Poor</td><td>The grain competes with the image. If you must, sand to 320 and seal first.</td></tr>
+    <tr><td>Pine and softwoods</td><td>Poor</td><td>Early and late growth burn at different rates and stripe the image.</td></tr>
+    <tr><td>Anodised aluminium (CO2 or fibre)</td><td>Good</td><td>Engraving strips the colour to bare metal, so invert the map.</td></tr>
+  </tbody>
+</table>
+
+<p><strong>On flatness.</strong> A depth burn on a 400 mm panel needs the surface flat to within about half a millimetre across its whole width, or the focus drifts and the high spots come out faint. Clamp it, or shim it, and check with a straightedge before you start. A warped board is the most common cause of a burn that fades on one side.</p>
+
+<h2 id="modes">Grayscale versus 3D sliced mode</h2>
+
+<p>Laser software offers two different ways to turn a depth map into a burn, and they suit different jobs.</p>
+
+<p><strong>Grayscale (photo) mode</strong> varies power continuously with the tone of the map. One pass, fast, and it produces the shaded, photographic result in the pictures on this page. On wood this is nearly always what you want. Turn dithering <em>off</em> for a depth map, or set it to pass-through: dithering is for reproducing photographs with dots, and it turns a smooth height gradient into noise.</p>
+
+<p><strong>3D sliced mode</strong> (LightBurn calls it exactly that) treats the map as a stack of layers and engraves it in several passes, going deeper where the map is darker. It genuinely removes material and produces a shallow physical relief, which is spectacular on a CO2 or fibre machine and on materials like acrylic, hardboard and leather. It is much slower, and on a diode it is usually not worth it. If you use it, remember the map's meaning flips: LightBurn removes more where the image is darker, so enable the Negative Image option or invert the map so that your <em>low</em> areas are dark.</p>
+
+<p>xTool Creative Space and Glowforge's own software both have a depth or "3D engrave" mode that behaves like grayscale with power mapped to tone. Same rules apply: no dithering, full black to full white in the map, and a test square first.</p>
+
+<h2 id="settings">Settings to start from</h2>
+
+<p>Every material and every machine differs, so these are starting points for a 50 mm test square, not a promise. Move one variable at a time.</p>
+
+<h3>10 W diode on birch plywood, grayscale mode</h3>
+<ul>
+  <li>Speed: 3,000 mm/min (50 mm/s)</li>
+  <li>Max power: 100%, min power: 0%</li>
+  <li>Lines per inch: 200 to 254</li>
+  <li>Dithering: off / pass-through</li>
+</ul>
+
+<h3>40 to 60 W CO2 on cherry or maple, grayscale mode</h3>
+<ul>
+  <li>Speed: 300 to 400 mm/s</li>
+  <li>Power: 60 to 70% max, 8 to 10% min</li>
+  <li>Lines per inch: 254 to 300</li>
+  <li>Dithering: off</li>
+</ul>
+
+<h3>CO2 on full-grain leather</h3>
+<ul>
+  <li>Speed: 400 mm/s</li>
+  <li>Power: 25 to 35% max. Leather burns fast and smells worse.</li>
+  <li>Lines per inch: 220</li>
+</ul>
+
+<h3>3D sliced mode, CO2 on hardboard or acrylic</h3>
+<ul>
+  <li>Number of passes: 8 to 15. More passes, finer depth steps, longer job.</li>
+  <li>Power per pass: low enough that a single pass barely marks; the depth comes from the count.</li>
+  <li>Negative image: on, so dark areas of your map cut deepest.</li>
+</ul>
+
+<p>Lines per inch matters more than most people expect. Above about 300 on a diode you get overburn: the passes overlap, the edges blur and the detail goes. Below 150 you see the scan lines. The 200 to 270 band is where relief work lives.</p>
+
+<h2 id="mistakes">Five mistakes that turn a good file into mud</h2>
+
+<ol>
+  <li><strong>Burning without a test square.</strong> Every material takes tone differently. Fifty millimetres of scrap costs two minutes and saves a panel.</li>
+  <li><strong>Leaving dithering on.</strong> A depth map is a smooth gradient, not a photograph. Dithering turns your carefully graded depth into a field of dots.</li>
+  <li><strong>A map that does not use the full range.</strong> If the darkest grey in your map is 40% and the lightest is 70%, the burn will look flat no matter what the laser does. Stretch it to black and white before you export.</li>
+  <li><strong>Dirty optics.</strong> A tonal engrave shows every flaw in the beam as a band. Clean the lens before any serious burn.</li>
+  <li><strong>The wrong wood.</strong> Figured grain, knots and softwood stripes all show through a burn. Choose a quiet material, or sand to 320 and seal it, and the same file looks like a different file.</li>
+</ol>
+
+<h2 id="files">Which designs work best on a laser</h2>
+
+<p>A laser has no shadows to help it, so the file has to carry its depth in tone. The designs that convert best have:</p>
+
+<ul>
+  <li><strong>Strong depth separation between subject and background</strong>, so the map has real contrast to work with.</li>
+  <li><strong>One dominant subject</strong> rather than a busy multi-layer scene. Busy scenes go muddy in a burn.</li>
+  <li><strong>Bold shapes</strong>: a portrait, a symbol, a single animal, a heart, a sign.</li>
+</ul>
+
+<p>Three to start with, all of which we have seen burned well:</p>
+
+<figure>
+  <a href="{{URL:heart}}"><img src="{{MOCK:heart}}" alt="{{TITLE:heart}}" loading="lazy" /></a>
+</figure>
+<p>The <a href="{{URL:heart}}">{{TITLE:heart}}</a> is the one in the photographs: a clean silhouette, strong subject-to-background contrast, and small enough to test on a coaster.</p>
+<p><a class="dl-btn" href="{{URL:heart}}">Download the butterfly heart · {{PRICE:heart}}</a></p>
+
+<figure>
+  <a href="{{URL:eagle}}"><img src="{{MOCK:eagle}}" alt="{{TITLE:eagle}}" loading="lazy" /></a>
+</figure>
+<p>The <a href="{{URL:eagle}}">{{TITLE:eagle}}</a> is a single bold subject with a graded background, which is exactly the shape a laser wants. Feathers burn beautifully in tone.</p>
+<p><a class="dl-btn" href="{{URL:eagle}}">Download the eagle head · {{PRICE:eagle}}</a></p>
+
+<figure>
+  <a href="{{URL:carp}}"><img src="{{MOCK:carp}}" alt="{{TITLE:carp}}" loading="lazy" /></a>
+</figure>
+<p>The <a href="{{URL:carp}}">{{TITLE:carp}}</a> was modelled with laser and print in mind: overlapping scales that read as tone as well as they read as depth.</p>
+<p><a class="dl-btn" href="{{URL:carp}}">Download the carp · {{PRICE:carp}}</a></p>
+
+<p>Beyond those, the <a href="/collections/wildlife-wall-art-stl">wildlife portraits</a>, <a href="/collections/religious-christian">religious panels</a> and <a href="/collections/floral-botanical">floral collection</a> convert well. Wide landscapes and multi-figure scenes are possible but need more tuning; <a href="/blog/what-makes-a-good-bas-relief-stl-file#depth">the depth-grading test</a> in our file-quality guide is a good predictor of how a file will burn.</p>
+
+<h2 id="faq">Questions people ask</h2>
+
+<h3>Can a laser engraver use STL files?</h3>
+<p>Yes, once the STL is converted to a grayscale depth map. The laser engraves the map with power following the tone, and the result reads as relief.</p>
+
+<h3>What is the best laser for relief engraving?</h3>
+<p>Any modern diode of 10 W and up will do it on light woods, leather and slate. A CO2 machine is faster and gives a smoother tonal range, and can also run 3D sliced mode to cut real depth.</p>
+
+<h3>Which wood is best for laser engraving a relief?</h3>
+<p>Maple, birch plywood or basswood: pale, even, fine-grained. Avoid figured walnut, oak and pine, whose grain competes with the image.</p>
+
+<h3>Should I use dithering?</h3>
+<p>No. Dithering is for photographs. A depth map is a smooth gradient and should be engraved in grayscale or pass-through mode.</p>
+
+<h3>What lines-per-inch setting for a depth engraving?</h3>
+<p>200 to 270. Higher on a diode causes overburn and blur; lower shows scan lines.</p>
+
+<h3>What is 3D sliced mode?</h3>
+<p>A multi-pass mode that treats the depth map as layers and removes more material where the map is darker, producing a shallow physical relief. Best on CO2 and fibre machines and on materials like acrylic, hardboard and leather.</p>
+
+<hr />
+
+<p>Lasers and routers solve the same problem from opposite ends. The router carves real depth; the laser paints it in tone. Both start from the same file, and both live or die on the same thing: how much depth the file really has. Convert it carefully, burn a test square, and choose a quiet material, and the results are hard to tell from a carving at arm's length.</p>
+
+<p>The <a href="/free">free starter pack</a> is a good set to work out your settings on before you buy anything, and the <a href="/catalog">full catalogue</a> is here when you have.</p>
+
+<p><em>Jolly, DigitalChiselCo</em></p>
