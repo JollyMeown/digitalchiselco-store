@@ -16,6 +16,18 @@ type Row = {
   product_id: string | null; synced_at: string | null;
 };
 type Day = { video_id: string; day: string; views: number };
+// the WHY: YouTube Analytics API per video, written by BRS (lags 2-3 days)
+type Deep = {
+  video_id: string; through: string | null; views: number; engaged_views: number;
+  avg_view_secs: number; avg_view_pct: number; likes: number; shares: number;
+  traffic: [string, number, number][]; retention: [number, number, number][];
+  exit_secs: number | null; verdict: string | null; synced_at: string;
+};
+const SRC: Record<string, string> = {
+  SHORTS: 'Shorts feed', YT_SEARCH: 'search', BROWSE: 'browse', PLAYLIST: 'playlist',
+  EXT_URL: 'external', NOTIFICATION: 'notification', SUBSCRIBER: 'subscribers',
+  RELATED_VIDEO: 'suggested', CHANNEL: 'channel page', YT_OTHER_PAGE: 'other',
+};
 
 const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n);
 const ago = (iso: string | null) => {
@@ -26,9 +38,49 @@ const ago = (iso: string | null) => {
   return `${Math.round(h / 24)} days ago`;
 };
 
+function DeepRow({ d, duration }: { d: Deep; duration: number }) {
+  const has = d.views > 0;
+  const eng = has && d.engaged_views ? Math.round((d.engaged_views / d.views) * 100) : null;
+  const ret = (d.retention || []).filter((p) => p && p.length >= 2);
+  return (
+    <div className="mt-2 rounded-md bg-cream/50 px-3 py-2 text-[12px]">
+      {!has ? (
+        <span className="text-ink-500">
+          Deep analytics: waiting for YouTube to finalise (runs 2–3 days behind)
+          {d.through ? `, data through ${d.through}` : ''}.
+        </span>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {eng !== null && <span><b>{eng}%</b> chose to watch</span>}
+            <span><b>{Math.round(d.avg_view_pct)}%</b> watched on average
+              <span className="text-ink-500"> ({Math.round(d.avg_view_secs)}s of {duration}s)</span></span>
+            {d.exit_secs != null && <span>half gone by <b>{d.exit_secs}s</b></span>}
+            {!!d.shares && <span><b>{d.shares}</b> shares</span>}
+            {(d.traffic || []).slice(0, 3).map((t) => (
+              <span key={t[0]} className="text-ink-600">{SRC[t[0]] || t[0]}: {fmt(t[1])}</span>
+            ))}
+          </div>
+          {ret.length > 4 && (
+            <div className="mt-1.5 flex items-end gap-px h-8" title="audience retention across the film">
+              {ret.map((p, i) => (
+                <div key={i} className="flex-1 bg-amber-700/70 rounded-sm"
+                     style={{ height: `${Math.max(4, Math.min(100, p[1] * 100))}%` }} />
+              ))}
+            </div>
+          )}
+          {d.verdict && <p className="mt-1.5 text-ink-700">{d.verdict}</p>}
+          <div className="text-[10px] text-ink-500 mt-1">analytics through {d.through || '—'}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Shorts() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [days, setDays] = useState<Day[]>([]);
+  const [deep, setDeep] = useState<Record<string, Deep>>({});
   const [err, setErr] = useState('');
 
   async function load() {
@@ -40,6 +92,11 @@ export default function Shorts() {
     const { data: d } = await supabase.from('youtube_stats_daily')
       .select('video_id, day, views').gte('day', since).order('day');
     setDays((d || []) as Day[]);
+    // migration 098; tolerate its absence so the tab keeps working either way
+    const { data: a } = await supabase.from('youtube_analytics').select('*');
+    const m: Record<string, Deep> = {};
+    for (const row of (a || []) as Deep[]) m[row.video_id] = row;
+    setDeep(m);
   }
   useEffect(() => { load(); }, []);
 
@@ -139,6 +196,10 @@ export default function Shorts() {
                 <span><b>{fmt(r.likes)}</b> <span className="text-ink-500">likes</span></span>
                 <span><b>{fmt(r.comments)}</b> <span className="text-ink-500">comments</span></span>
               </div>
+              {/* the WHY: engaged (chose to watch), % watched, exit second, traffic, verdict */}
+              {deep[r.video_id] && (
+                <DeepRow d={deep[r.video_id]} duration={r.duration_s || 0} />
+              )}
             </div>
           </div>
         </Card>

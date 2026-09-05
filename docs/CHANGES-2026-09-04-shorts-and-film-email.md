@@ -134,6 +134,26 @@ units per sync against a 10,000/day allowance.
 
 ---
 
+## 3. Deep analytics: why a Short stalled (added 2026-09-05)
+
+`098_youtube_analytics.sql` adds `youtube_analytics`, one row per public Short from
+the **YouTube Analytics API** (not the Data API): engaged views (chose to watch
+rather than swipe), average percentage viewed, the retention curve, traffic
+sources, countries, day-by-day views, the second at which half the audience is
+gone, and a written **verdict** that applies the Shorts playbook (hook problem /
+story problem / ending problem / not served in the feed).
+
+BRS pulls it in the same 3-hourly sync and on demand (`/api/video/youtube-deep`).
+The Analytics API finalises data two to three days late, so a fresh upload shows
+"waiting for YouTube to finalise" in Admin until then; realtime counts stay in
+`youtube_stats`.
+
+`Shorts.tsx` renders a `DeepRow` under each video: engaged %, watched %, exit
+second, top traffic sources, a small retention bar chart and the verdict.
+
+Required once on the Google Cloud project that owns the OAuth client: **enable
+the YouTube Analytics API** (done 2026-09-05).
+
 ## Still open
 
 - `cults3d-retag.log` sits untracked in the repo root. It looks like a stray log
