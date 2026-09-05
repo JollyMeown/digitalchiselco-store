@@ -1,0 +1,27 @@
+[
+  {
+    "key": "hero",
+    "alt": "A relief carving of an eagle half finished on a CNC router bed, the left half still stepped from roughing, the right half smooth",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-time/hero.jpg"
+  },
+  {
+    "key": "rough",
+    "alt": "Roughing pass on a relief carving: a flat end mill has cut the design as coarse stepped terraces",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-time/rough.jpg"
+  },
+  {
+    "key": "semi",
+    "alt": "Semi-finishing pass with a 1/8 inch tapered ball nose leaving a fine visible scallop pattern across the relief",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-time/semi.jpg"
+  },
+  {
+    "key": "finish",
+    "alt": "Final finishing pass with a 1/16 inch tapered ball nose confined to the eagle's head, sharp beside the scalloped background",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-time/finish.jpg"
+  },
+  {
+    "key": "bits",
+    "alt": "The three cutters that carve a relief, laid beside the finished panel: a flat end mill, a 1/8 inch tapered ball nose and a 1/16 inch tapered ball nose",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-carving-time/bits.jpg"
+  }
+]
