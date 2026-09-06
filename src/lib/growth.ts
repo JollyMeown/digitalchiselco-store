@@ -405,6 +405,29 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     }
     s.enrolled = enrolledNow;
 
+    // Etsy buyers join the drip AFTER their one-time welcome (3+ days later),
+    // starting at stage 1 already done: they never get "did you carve the free
+    // pack", they go straight to bestsellers, bundle, membership, coupon.
+    // (Owner 2026-09-06: the drip's later stages are the best-converting
+    // emails we have; 1,962 imported buyers should see them.)
+    let buyersEnrolled = 0;
+    for (let from = 0; ; from += 1000) {
+      const { data: wl } = await db.from('etsy_welcome_log').select('email, sent_at').lte('sent_at', daysAgo(3)).order('email').range(from, from + 999);
+      const welcomedEmails = (wl || []).map((r) => String(r.email).toLowerCase());
+      if (!welcomedEmails.length) break;
+      for (let i = 0; i < welcomedEmails.length; i += 200) {
+        const slice = welcomedEmails.slice(i, i + 200);
+        const { data: ok } = await db.from('subscribers').select('email').in('email', slice).eq('source', 'etsy-buyer')
+          .not('confirmed_at', 'is', null).is('unsubscribed_at', null).is('suppressed_at', null);
+        const rows = (ok || []).map((r) => ({ email: String(r.email).toLowerCase(), stage: 1, last_sent_at: (wl || []).find((w) => String(w.email).toLowerCase() === String(r.email).toLowerCase())?.sent_at || null }));
+        if (!rows.length) continue;
+        const { count } = await db.from('subscriber_drip').upsert(rows, { onConflict: 'email', ignoreDuplicates: true, count: 'exact' });
+        buyersEnrolled += count || 0;
+      }
+      if (welcomedEmails.length < 1000) break;
+    }
+    (s as any).buyersEnrolled = buyersEnrolled;
+
     // context shared by every send this run
     const [{ data: best }, { data: bundle }, { data: plan }] = await Promise.all([
       db.from('products').select('title, slug, image_url, price_usd').eq('active', true).eq('is_bestseller', true).limit(3),
@@ -665,9 +688,15 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     const { data: done } = await fetchAll((a, b) => db.from('etsy_welcome_log').select('email').range(a, b)).then((data) => ({ data }));
     const welcomed = new Set((done || []).map((r) => r.email.toLowerCase()));
     const TEST = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
-    const pending = [...new Set((buyers || []).map((r) => r.email.toLowerCase().trim()))]
+    // Warm-up: a big import (1,962 buyers on 2026-09-06) must not hit the
+    // sending domain all at once; at most this many welcomes per night, the
+    // rest follow on the next nights automatically.
+    const ETSY_WELCOME_MAX_PER_RUN = 400;
+    const pendingAll = [...new Set((buyers || []).map((r) => r.email.toLowerCase().trim()))]
       .filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !TEST.test(e) && !welcomed.has(e));
-    s.candidates = pending.length;
+    const pending = pendingAll.slice(0, ETSY_WELCOME_MAX_PER_RUN);
+    s.candidates = pendingAll.length;
+    if (pendingAll.length > pending.length) (s as any).note = `${pendingAll.length - pending.length} more welcomes wait for the next nights (warm-up, ${ETSY_WELCOME_MAX_PER_RUN}/night)`;
     if (pending.length) {
       // this week's newest designs (up to 12 shown) + total count for the link
       const sinceIso = daysAgo(7);

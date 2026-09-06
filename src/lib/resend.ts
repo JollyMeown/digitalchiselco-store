@@ -176,6 +176,10 @@ export async function overMailed(recipients: string[], kind: string | null): Pro
       }
     }
     for (const [email, n] of counts) if (n >= maxPerWeek) out.add(email);
+    if (out.size) {
+      // visible in Admin > Automations > Email performance
+      await db.from('email_holds').insert([...out].map((recipient) => ({ recipient, kind }))).then(() => null, () => null);
+    }
   } catch { /* ledger unavailable: do not block sending */ }
   return out;
 }

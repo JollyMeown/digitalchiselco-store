@@ -5,6 +5,7 @@ import { useLiveRefresh } from '../useLiveRefresh';
 import ArticleEmails from '../ArticleEmails';
 import FilmEmails from '../FilmEmails';
 import CustomPitch from '../CustomPitch';
+import EmailPerformance from '../EmailPerformance';
 
 const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'drip1', label: '1 · Did you carve the free pack?', group: 'Subscriber drip' },
@@ -276,6 +277,7 @@ export default function Automations() {
       <CronHealth />
       <CronSchedule />
       <TodayEmailStats />
+      <EmailPerformance />
       <div className="text-xs text-ink-700/70 bg-cream/40 border border-bronze-600/15 rounded-lg px-3 py-2">
         🛡 <b>Review-first:</b> each system starts OFF — a <b>green</b> toggle means it's <b>ON</b>. Preview each email (right) and test-send it to yourself before enabling. The daily cron (08:00 UTC) does the actual sending, so the counters below stay at <b>0</b> until it next runs and there's activity to report — that's normal, not "off".
       </div>

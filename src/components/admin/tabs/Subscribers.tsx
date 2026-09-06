@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls, labelCls, Toast } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
+import EtsyBuyerHarvest from '../EtsyBuyerHarvest';
 
 type Sub = { id: string; email: string; source: string | null; created_at: string };
 
@@ -43,6 +44,7 @@ export default function Subscribers() {
 
   return (
     <div className="space-y-4">
+      <EtsyBuyerHarvest />
       <PortalGuideSender subscribers={rows} />
       <Card>
         <div className="flex flex-wrap items-center gap-3">
