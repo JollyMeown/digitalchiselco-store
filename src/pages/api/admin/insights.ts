@@ -13,6 +13,7 @@ import { fetchAll } from '../../../lib/fetch-all';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { send as sendEmail, sendBatch } from '../../../lib/resend';
 import { productSpotlightEmail, type MiniProduct } from '../../../lib/marketing-emails';
+import { engagementRows, segmentStats } from '../../../lib/segments';
 
 export const prerender = false;
 
@@ -313,7 +314,7 @@ const chunk = <T,>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let 
 async function sendableFor(db: ReturnType<typeof supabaseAdmin>, productId: string, slug: string, seg: { clicked: boolean; browsed: boolean; bought: boolean }) {
   const want = new Map<string, boolean>();
   const add = (e?: string | null) => { const em = (e || '').toLowerCase().trim(); if (em) want.set(em, true); };
-  const jobs: Promise<any>[] = [];
+  const jobs: PromiseLike<any>[] = [];   // PostgREST builders are PromiseLike, not Promise
   if (seg.clicked) jobs.push(db.from('email_events').select('email').eq('event', 'clicked').ilike('url', `%/product/${slug}%`).limit(10000).then((r) => (r.data || []).forEach((x: any) => add(x.email))));
   if (seg.browsed) jobs.push(db.from('browse_events').select('email').eq('product_id', productId).limit(10000).then((r) => (r.data || []).forEach((x: any) => add(x.email))));
   if (seg.bought) jobs.push(db.from('order_items').select('order_id').eq('product_id', productId).limit(10000).then(async (r) => {
@@ -386,6 +387,21 @@ async function segmentCandidates(db: ReturnType<typeof supabaseAdmin>, productId
   return [...emails];
 }
 
+// ── Responsiveness segments (owner 2026-09-06) ─────────────────────────
+// One definition for the dashboard AND for the send-to-audience tool:
+//   hot   clicked an email or bought in the last 30 days
+//   warm  opened in the last 30 days
+//   cool  opened before that (31 to 180 days)
+//   new   never opened and fewer than 6 emails so far (too early to judge)
+//   cold  never opened after 6+ emails, or no open for 180+ days
+// Unsubscribed, suppressed, bounced or complaining people are never in a segment.
+async function segments() { return segmentStats(supabaseAdmin()); }
+async function segmentEmails(url: URL) {
+  const tier = String(url.searchParams.get('tier') || '');
+  const rows = await engagementRows(supabaseAdmin());
+  return { tier, emails: rows.filter((r) => r.tier === tier).map((r) => r.email).sort() };
+}
+
 async function blast(request: Request, url: URL) {
   const db = supabaseAdmin();
   const body = await request.json().catch(() => ({}));
@@ -408,9 +424,13 @@ async function blast(request: Request, url: URL) {
   // Quick-segment override: body.segment picks a one-click audience instead of
   // the product's own interest signals; same hygiene + per-product dedupe.
   const segmentKind = String(body.segment || '');
-  const recipients = ['carted_no_buy', 'category_fans', 'category_buyers'].includes(segmentKind)
-    ? await hygieneFilter(db, productId, await segmentCandidates(db, productId, segmentKind))
-    : await sendableFor(db, productId, p.slug, seg);
+  // responsiveness tiers ("tier:hot" etc.) come from the same definition as the Segments dashboard
+  const tierPick = segmentKind.startsWith('tier:') ? segmentKind.slice(5) : '';
+  const recipients = tierPick
+    ? await hygieneFilter(db, productId, (await engagementRows(db)).filter((r) => r.tier === tierPick).map((r) => r.email))
+    : ['carted_no_buy', 'category_fans', 'category_buyers'].includes(segmentKind)
+      ? await hygieneFilter(db, productId, await segmentCandidates(db, productId, segmentKind))
+      : await sendableFor(db, productId, p.slug, seg);
   if (!body.confirm) return { sendable: recipients.length, sample: recipients.slice(0, 8) };  // preview
   if (!recipients.length) return { sent: 0, note: 'nobody eligible (already sent, or not a confirmed subscriber)' };
 
@@ -451,6 +471,8 @@ export const GET: APIRoute = async ({ request, url }) => {
     else if (view === 'products') out = await products(url);
     else if (view === 'product') out = await productAudience(url);
     else if (view === 'leads') out = await leads(url);
+    else if (view === 'segments') out = await segments();
+    else if (view === 'segment_emails') out = await segmentEmails(url);
     else if (view === 'referrals') out = await referrals();
     else if (view === 'related') out = await related(url);
     else return json({ error: 'unknown view' }, 400);

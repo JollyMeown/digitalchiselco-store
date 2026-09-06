@@ -42,10 +42,103 @@ function tierOf(r: any): { label: string; cls: string } {
   return { label: 'New', cls: 'bg-ink-700/10 text-ink-700/60' };
 }
 
-type Sub = 'people' | 'products' | 'leads' | 'referrals';
+type Sub = 'segments' | 'people' | 'products' | 'leads' | 'referrals';
+
+// ── Responsiveness segments: who responds, by tier, source and join month ──
+const TIER_META: Record<string, { label: string; cls: string; hint: string }> = {
+  hot: { label: '🔥 Hot', cls: 'bg-green-100 text-green-800', hint: 'clicked or bought in the last 30 days' },
+  warm: { label: '🌤 Warm', cls: 'bg-amber-100 text-amber-800', hint: 'opened in the last 30 days' },
+  cool: { label: '🌥 Cool', cls: 'bg-sky-100 text-sky-800', hint: 'opened 1 to 6 months ago' },
+  new: { label: '🆕 New', cls: 'bg-ink-700/10 text-ink-700/70', hint: 'fewer than 6 emails so far, no open yet' },
+  cold: { label: '❄️ Cold', cls: 'bg-slate-200 text-slate-700', hint: 'never opened after 6+ emails, or silent 6+ months' },
+};
+function Segments() {
+  const [d, setD] = useState<any>(null);
+  const [busy, setBusy] = useState('');
+  const [note, setNote] = useState('');
+  useEffect(() => { api({ view: 'segments' }).then((r) => r.ok && setD(r)); }, []);
+  if (!d) return <Card><div className="text-sm text-ink-700/60">Computing segments…</div></Card>;
+  const mailable = d.total - d.out;
+  const pctOf = (n: number) => (mailable ? Math.round((100 * n) / mailable) : 0);
+  async function grab(tier: string, mode: 'copy' | 'csv') {
+    setBusy(tier + mode); setNote('');
+    const r = await api({ view: 'segment_emails', tier });
+    setBusy('');
+    if (!r.ok) { setNote(r.error || 'failed'); return; }
+    if (mode === 'copy') { await navigator.clipboard.writeText(r.emails.join('\n')); setNote(`${r.emails.length} ${tier} addresses copied`); }
+    else {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['email\n' + r.emails.join('\n') + '\n'], { type: 'text/csv' }));
+      a.download = `segment-${tier}-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); setNote(`${r.emails.length} ${tier} addresses exported`);
+    }
+  }
+  const Rate = ({ v, good }: { v: number; good: number }) => <span className={v >= good ? 'text-green-700 font-medium' : v < good / 2 ? 'text-red-700' : ''}>{v}%</span>;
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+          <h3 className="font-medium text-ink-900 text-sm">🎯 Who responds</h3>
+          <span className="text-xs text-ink-700/55">{mailable.toLocaleString()} people you can email · {d.out} excluded (unsubscribed, bounced, complained or suppressed)</span>
+          {note && <span className="ml-auto text-xs text-bronze-800">{note}</span>}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {d.tiers.map((t: any) => (
+            <div key={t.tier} className="rounded-lg border border-black/10 bg-white p-3">
+              <span className={`text-[11px] px-1.5 py-0.5 rounded ${TIER_META[t.tier].cls}`}>{TIER_META[t.tier].label}</span>
+              <div className="text-2xl font-extrabold text-bronze-800 mt-1">{t.count}<span className="text-xs font-medium text-ink-700/50"> · {pctOf(t.count)}%</span></div>
+              <div className="text-[11px] text-ink-700/60">{TIER_META[t.tier].hint}</div>
+              <div className="text-[11px] text-ink-700/70 mt-1.5">open {t.openRate}% · click {t.clickRate}%<br />{t.buyers} buyer{t.buyers === 1 ? '' : 's'} · ${t.revenue.toFixed(0)}</div>
+              <div className="flex gap-1 mt-2">
+                <button className="text-[11px] px-2 py-0.5 rounded border border-black/15 hover:bg-cream" disabled={!!busy} onClick={() => grab(t.tier, 'copy')}>{busy === t.tier + 'copy' ? '…' : 'Copy'}</button>
+                <button className="text-[11px] px-2 py-0.5 rounded border border-black/15 hover:bg-cream" disabled={!!busy} onClick={() => grab(t.tier, 'csv')}>{busy === t.tier + 'csv' ? '…' : 'CSV'}</button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-ink-700/55 mt-3">To email a segment a hand-picked design: open <b>Product interest</b>, pick the design, and choose the segment in the "Audience" list of the send panel. Hygiene (unsubscribed, already sent, frequency cap) is applied there automatically.</p>
+      </Card>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card>
+          <h3 className="font-medium text-ink-900 text-sm mb-2">By source</h3>
+          <table className="w-full text-xs">
+            <thead className="text-ink-700/60 text-left"><tr><th className="p-1.5">Source</th><th className="p-1.5 text-right">People</th><th className="p-1.5 text-right" title="opens per 100 emails sent; repeat opens count, so it can pass 100">Opens/100</th><th className="p-1.5 text-right" title="clicks per 100 emails sent">Clicks/100</th><th className="p-1.5 text-right">Hot+Warm</th><th className="p-1.5 text-right">Buyers</th><th className="p-1.5 text-right">Revenue</th></tr></thead>
+            <tbody>{d.sources.map((s: any) => (
+              <tr key={s.source} className="border-t border-black/5"><td className="p-1.5">{s.source}</td><td className="p-1.5 text-right">{s.count}</td><td className="p-1.5 text-right"><Rate v={s.openRate} good={30} /></td><td className="p-1.5 text-right"><Rate v={s.clickRate} good={5} /></td><td className="p-1.5 text-right">{s.responsive}%</td><td className="p-1.5 text-right">{s.buyers}</td><td className="p-1.5 text-right">${s.revenue.toFixed(0)}</td></tr>
+            ))}</tbody>
+          </table>
+        </Card>
+        <Card>
+          <h3 className="font-medium text-ink-900 text-sm mb-2">By month joined <span className="text-xs text-ink-700/50 font-normal">(is each new batch responding?)</span></h3>
+          <table className="w-full text-xs">
+            <thead className="text-ink-700/60 text-left"><tr><th className="p-1.5">Joined</th><th className="p-1.5 text-right">People</th><th className="p-1.5 text-right" title="opens per 100 emails sent; repeat opens count, so it can pass 100">Opens/100</th><th className="p-1.5 text-right" title="clicks per 100 emails sent">Clicks/100</th><th className="p-1.5 text-right">Hot+Warm</th><th className="p-1.5 text-right">Buyers</th></tr></thead>
+            <tbody>{d.cohorts.map((c: any) => (
+              <tr key={c.month} className="border-t border-black/5"><td className="p-1.5">{c.month}</td><td className="p-1.5 text-right">{c.count}</td><td className="p-1.5 text-right"><Rate v={c.openRate} good={30} /></td><td className="p-1.5 text-right"><Rate v={c.clickRate} good={5} /></td><td className="p-1.5 text-right">{c.responsive}%</td><td className="p-1.5 text-right">{c.buyers}</td></tr>
+            ))}</tbody>
+          </table>
+        </Card>
+      </div>
+
+      <Card>
+        <h3 className="font-medium text-ink-900 text-sm mb-2">Top responders <span className="text-xs text-ink-700/50 font-normal">(clicks x3 + opens + orders x5, recent click bonus)</span></h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="text-ink-700/60 text-left"><tr><th className="p-1.5">Email</th><th className="p-1.5">Source</th><th className="p-1.5">Tier</th><th className="p-1.5 text-right">Sent</th><th className="p-1.5 text-right">Opens</th><th className="p-1.5 text-right">Clicks</th><th className="p-1.5 text-right">Orders</th><th className="p-1.5 text-right">Spent</th><th className="p-1.5">Last click</th></tr></thead>
+            <tbody>{d.top.map((r: any) => (
+              <tr key={r.email} className="border-t border-black/5">
+                <td className="p-1.5 font-mono">{r.email}</td><td className="p-1.5">{r.source || '—'}</td>
+                <td className="p-1.5"><span className={`text-[10px] px-1.5 py-0.5 rounded ${TIER_META[r.tier]?.cls || ''}`}>{TIER_META[r.tier]?.label || r.tier}</span></td>
+                <td className="p-1.5 text-right">{r.sent}</td><td className="p-1.5 text-right">{r.opened}</td><td className="p-1.5 text-right font-medium">{r.clicked}</td><td className="p-1.5 text-right">{r.orders}</td><td className="p-1.5 text-right">${Number(r.revenue).toFixed(0)}</td><td className="p-1.5">{ago(r.last_clicked_at)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
 
 export default function Insights() {
-  const [sub, setSub] = useState<Sub>('people');
+  const [sub, setSub] = useState<Sub>('segments');
   const [ov, setOv] = useState<any>(null);
   const [hot, setHot] = useState<any>(null);   // product opened from the hot-list
 
@@ -95,7 +188,7 @@ export default function Insights() {
       {ov?.health && <HealthCard health={ov.health} onChange={() => api({ view: 'overview' }).then((d) => d.ok && setOv(d))} />}
 
       <div className="flex gap-2 flex-wrap">
-        {([['people', '👤 People'], ['products', '🎯 Product interest'], ['leads', '🔥 Hot leads'], ['referrals', '🎁 Referrals']] as [Sub, string][]).map(([k, label]) => (
+        {([['segments', '🎯 Segments'], ['people', '👤 People'], ['products', '🖼 Product interest'], ['leads', '🔥 Hot leads'], ['referrals', '🎁 Referrals']] as [Sub, string][]).map(([k, label]) => (
           <button key={k} onClick={() => setSub(k)}
             className={`text-sm px-3 py-1.5 rounded-lg border ${sub === k ? 'bg-bronze-600 text-cream border-bronze-600' : 'border-black/10 text-ink-700 hover:bg-cream'}`}>
             {label}
@@ -103,6 +196,7 @@ export default function Insights() {
         ))}
       </div>
 
+      {sub === 'segments' && <Segments />}
       {sub === 'people' && <People />}
       {sub === 'products' && <Products topFromOverview={ov?.topProducts} />}
       {sub === 'leads' && <Leads />}
@@ -468,6 +562,10 @@ function AudienceModal({ product, onClose }: { product: any; onClose: () => void
               <span className="text-xs text-ink-700/60">Audience:</span>
               <select value={segment} onChange={(e) => setSegment(e.target.value)} className="text-xs border border-black/15 rounded px-2 py-1 bg-white">
                 <option value="">🎯 Interested in this design (pick signals)</option>
+                <option value="tier:hot">🔥 Hot: clicked or bought in the last 30 days</option>
+                <option value="tier:warm">🌤 Warm: opened in the last 30 days</option>
+                <option value="tier:cool">🌥 Cool: opened 1 to 6 months ago</option>
+                <option value="tier:new">🆕 New: fewer than 6 emails so far</option>
                 <option value="carted_no_buy">🛒 Built a cart, never bought (any design)</option>
                 <option value="category_fans">👁 Fans of this design's categories</option>
                 <option value="category_buyers">✅ Bought from this design's categories</option>
