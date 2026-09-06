@@ -5,8 +5,10 @@ import { getSettings, getMembershipPlans } from '../lib/queries';
 const s = await getSettings();
 const plans = await getMembershipPlans();
 const discount = s.discount_percent || 20;
+const cheapest = plans.length ? Math.min(...plans.map((p) => Number(p.price_usd) || Infinity)) : null;
+const fromLabel = cheapest && Number.isFinite(cheapest) ? `membership plans from $${Number.isInteger(cheapest) ? cheapest : cheapest.toFixed(2)}` : 'membership plans';
 ---
-<Shell title="Pricing · DigitalChiselCo" description="CNC STL file pricing — individual files from $3.99, membership plans from $20. Instant download, commercial use included.">
+<Shell title="Pricing · DigitalChiselCo" description={`CNC STL file pricing — individual files from $3.99, ${fromLabel}. Instant download, commercial use included.`}>
   <Breadcrumbs crumbs={[{ label: 'Pricing' }]} />
 
   <article class="max-w-3xl">

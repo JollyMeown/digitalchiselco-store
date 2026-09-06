@@ -224,13 +224,11 @@ export const POST: APIRoute = async ({ request }) => {
         const slug = String(c.id).slice('membership:'.length);
         const plan = (plans || []).find((p: any) => p.slug === slug);
         if (!plan) continue;
-        // Catalog price_ids are USD — a Paddle transaction is single-currency,
-        // so when charging in another currency memberships go ad-hoc too.
-        if (plan.paddle_price_id && chargeCcy === 'USD') {
-          items.push({ price_id: plan.paddle_price_id, quantity: qty });
-        } else {
-          items.push(adhocItem(plan.name, Number(plan.price_usd), qty));
-        }
+        // ALWAYS ad-hoc at the website price: membership_plans.price_usd is the
+        // single source of truth (owner rule 2026-09-06). A Paddle catalogue
+        // price_id would silently charge whatever Paddle last synced, so it is
+        // no longer used here; the webhook maps the line by its cart marker.
+        items.push(adhocItem(plan.name, Number(plan.price_usd), qty));
         sentIds.push(String(c.id)); sentCustomizations.push(customizations[ci] ?? null);
       } else {
         const p = (products || []).find((x: any) => x.id === c.id);

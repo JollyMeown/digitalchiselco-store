@@ -44,8 +44,11 @@ const SETTINGS_FALLBACK: SiteSettings = {
   banner_image_url: null,
   logo_image_url: null, favicon_image_url: null,
   membership_image_url: null,
-  membership_title: 'Become a Member — $6.70/month',
-  membership_subtitle: 'Get 8 fresh bas-relief STL designs every month — 24 carving files for $20. Lock in your low price now.',
+  // {price} {per_month} {months} {files} {total_files} {retail} {pct_off} are
+  // filled from the featured plan at render time (src/lib/membership-facts.ts),
+  // so the homepage never quotes a stale membership price.
+  membership_title: 'Become a Member — {per_month}/month',
+  membership_subtitle: 'Get {files} fresh bas-relief STL designs every month — {total_files} carving files for {price}. Lock in your low price now.',
   free_image_url: null, welfare_image_url: null,
   welfare_text: "Half of every sale builds something bigger than a shop. We donate 50% of our profits to families in need and to animal welfare. Every time you download a file, you're helping us make that happen.",
   trust_badges: [

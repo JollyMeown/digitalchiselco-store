@@ -15,6 +15,7 @@ import {
   getBestSellers, getLatestProducts, getReviews, getFaqs, getMembershipPlans,
   getPremiumBundles, MARQUEE_DEFAULTS,
 } from '../lib/queries';
+import { fillPlanTokens, planFeatureLines } from '../lib/membership-facts';
 import { jsonLd } from '../lib/jsonld';
 
 const s = await getSettings();
@@ -343,10 +344,10 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
         <div class="grid md:grid-cols-2 gap-6 items-center">
           <div>
             <p class="text-xs tracking-widest text-bronze-600 mb-2">★ MOST POPULAR PLAN</p>
-            <h2 class="font-serif text-3xl text-bronze-800 leading-tight">{s.membership_title}</h2>
-            <p class="mt-3 text-ink-700/85 leading-relaxed">{s.membership_subtitle}</p>
+            <h2 class="font-serif text-3xl text-bronze-800 leading-tight">{fillPlanTokens(s.membership_title, featuredPlan)}</h2>
+            <p class="mt-3 text-ink-700/85 leading-relaxed">{fillPlanTokens(s.membership_subtitle, featuredPlan)}</p>
             <ul class="mt-4 text-sm text-ink-700 space-y-1.5">
-              {featuredPlan.features.slice(0, 4).map((f) => (
+              {planFeatureLines(featuredPlan).slice(0, 4).map((f) => (
                 <li class="flex gap-2"><span class="text-bronze-600">✓</span>{f}</li>
               ))}
             </ul>

@@ -3,13 +3,17 @@ import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { getMembershipPlans } from '../lib/queries';
 import { MEMBER_FAQ } from '../lib/membership-faq';
+import { planFacts, planFeatureLines } from '../lib/membership-facts';
 const faqGroups = [...new Set(MEMBER_FAQ.map((x) => x.group))];
 // ?preview=1 shows plans whose launch date has not arrived (owner testing).
 const preview = Astro.url.searchParams.get('preview') === '1';
 const plans = await getMembershipPlans({ preview });
 const featured = plans.find((p) => p.highlight) || plans[0];
+// Every number on this page comes from the featured plan row (Admin > Membership),
+// so a price change there changes the page. Nothing below is typed by hand.
+const F = featured ? planFacts(featured) : planFacts({ months: 3, files_per_month: 8, price_usd: 0 });
 ---
-<Shell title="Become a Member · DigitalChiselCo" description="CNC STL membership — 8 fresh bas-relief STL designs every month, 24 carving files for $20. Instant first pack, commercial use, no recurring charge." scrollPastBanner={true}>
+<Shell title="Become a Member · DigitalChiselCo" description={`CNC STL membership — ${F.files} fresh bas-relief STL designs every month, ${F.totalFiles} carving files for ${F.priceLabel}. Instant first pack, commercial use, no recurring charge.`} scrollPastBanner={true}>
   <Breadcrumbs crumbs={[{ label: 'Membership' }]} />
 
   <!-- HERO -->
@@ -19,9 +23,9 @@ const featured = plans.find((p) => p.highlight) || plans[0];
       🔥 Stop wasting your weekends searching for CNC files.
     </h1>
     <p class="mt-4 text-lg text-ink-700 max-w-2xl leading-relaxed">
-      Your next 3 months of carving projects are already waiting. Get a premium 3-Month CNC STL Membership with <strong>8 fresh bas-relief STL designs delivered every month</strong> — 24 total carving files for only <span class="text-bronze-700 font-semibold">$20</span>.
+      Your next {F.monthsLabel} of carving projects are already waiting. Get the {featured?.name || 'CNC STL Membership'} with <strong>{F.files} fresh bas-relief STL designs delivered every month</strong> — {F.totalFiles} total carving files for only <span class="text-bronze-700 font-semibold">{F.priceLabel}</span>.
     </p>
-    <p class="mt-2 text-bronze-700">That's roughly <strong>$192 worth of CNC STL files for just $20</strong> — about <strong>90% off retail</strong>. ✅</p>
+    <p class="mt-2 text-bronze-700">That's roughly <strong>{F.retailLabel} worth of CNC STL files for just {F.priceLabel}</strong> — about <strong>{F.pctOff}% off retail</strong>. ✅</p>
   </section>
 
   <!-- PLAN PICKER -->
@@ -42,7 +46,7 @@ const featured = plans.find((p) => p.highlight) || plans[0];
             </div>
           </div>
           <ul class="text-sm text-ink-700 space-y-1.5 mt-3">
-            {p.features.map((f) => <li class="flex gap-2"><span class="text-bronze-600">✓</span>{f}</li>)}
+            {planFeatureLines(p).map((f) => <li class="flex gap-2"><span class="text-bronze-600">✓</span>{f}</li>)}
           </ul>
         </label>
       ))}
@@ -52,7 +56,7 @@ const featured = plans.find((p) => p.highlight) || plans[0];
   <!-- SIGN-UP FORM -->
   <section class="mb-14 border border-black/10 rounded-xl p-6 md:p-8 bg-cream/30">
     <h2 class="font-serif text-2xl mb-1">Reserve your spot</h2>
-    <p class="text-sm text-ink-700/70 mb-5">Tell us where to send your first 8-file pack.</p>
+    <p class="text-sm text-ink-700/70 mb-5">Tell us where to send your first {F.files}-file pack.</p>
     <form id="member-form" class="grid sm:grid-cols-2 gap-3 max-w-xl">
       <div>
         <label class="text-xs block mb-1 font-medium" for="m-name">Name</label>
@@ -68,24 +72,24 @@ const featured = plans.find((p) => p.highlight) || plans[0];
       </div>
       <p id="m-msg" class="sm:col-span-2 text-sm hidden"></p>
     </form>
-    <p class="text-xs text-ink-700/50 mt-3">One $20 order covers the full 3 months. No recurring charge. No surprise payment later.</p>
+    <p class="text-xs text-ink-700/50 mt-3">One {F.priceLabel} order covers the full {F.monthsLabel}. No recurring charge. No surprise payment later.</p>
   </section>
 
   <!-- WHY -->
   <section class="mb-14 grid md:grid-cols-2 gap-10">
     <div>
       <h2 class="font-serif text-2xl mb-3">✨ Why this membership is a smart buy</h2>
-      <p class="text-ink-700 leading-relaxed">You get new CNC-ready designs without searching, guessing, or buying files one by one. Your first pack starts right away, and a new themed set arrives each month for 3 months.</p>
+      <p class="text-ink-700 leading-relaxed">You get new CNC-ready designs without searching, guessing, or buying files one by one. Your first pack starts right away, and a new themed set arrives each month for {F.monthsLabel}.</p>
     </div>
     <div class="border border-bronze-600/20 rounded-lg p-5 bg-cream/40">
       <h3 class="font-medium text-bronze-700 mb-3">⭐ The math</h3>
       <ul class="text-sm text-ink-700 space-y-1.5">
-        <li>• 8 files per month</li>
-        <li>• 24 total STL files over 3 months</li>
-        <li>• Around $64 value every month</li>
-        <li>• Roughly $192 total retail value</li>
-        <li>• Your price: <strong>only $20</strong></li>
-        <li>• About 90% off retail</li>
+        <li>• {F.files} files per month</li>
+        <li>• {F.totalFiles} total STL files over {F.monthsLabel}</li>
+        <li>• Around {F.retailPerMonthLabel} value every month</li>
+        <li>• Roughly {F.retailLabel} total retail value</li>
+        <li>• Your price: <strong>only {F.priceLabel}</strong></li>
+        <li>• About {F.pctOff}% off retail</li>
       </ul>
     </div>
   </section>
@@ -93,12 +97,12 @@ const featured = plans.find((p) => p.highlight) || plans[0];
   <!-- HOW IT WORKS -->
   <section class="mb-14">
     <h2 class="font-serif text-2xl mb-4">🚀 How it works — instant start</h2>
-    <p class="text-ink-700 leading-relaxed">Order today and receive your first 8 bas-relief STL files within minutes through your member access link / welcome email.</p>
+    <p class="text-ink-700 leading-relaxed">Order today and receive your first {F.files} bas-relief STL files within minutes through your member access link / welcome email.</p>
     <ul class="mt-4 text-sm text-ink-700 space-y-1.5">
       <li>✓ No waiting for a billing cycle</li>
       <li>✓ No recurring charge</li>
       <li>✓ No surprise payment later</li>
-      <li>✓ One $20 order covers the full 3 months</li>
+      <li>✓ One {F.priceLabel} order covers the full {F.monthsLabel}</li>
     </ul>
   </section>
 
@@ -106,7 +110,7 @@ const featured = plans.find((p) => p.highlight) || plans[0];
   <section class="mb-14">
     <h2 class="font-serif text-2xl mb-4">📦 What you get each month</h2>
     <ul class="text-ink-700 space-y-2 leading-relaxed">
-      <li>• 8 professionally finished bas-relief STL files</li>
+      <li>• {F.files} professionally finished bas-relief STL files</li>
       <li>• Fresh monthly themes such as wildlife, florals, patriotic, seasonal, rustic decor, animals, wall art, and more</li>
       <li>• CNC-ready STL files for VCarve, Aspire, Fusion 360, and compatible CAM software</li>
       <li>• Scalable designs to fit your material, router size, and project style</li>
@@ -129,7 +133,7 @@ const featured = plans.find((p) => p.highlight) || plans[0];
     <div>
       <h2 class="font-serif text-2xl mb-3">📁 File format &amp; delivery</h2>
       <p class="text-ink-700 leading-relaxed">Files are delivered in <strong>.STL</strong> format — the standard format for CNC bas-relief carving.</p>
-      <p class="mt-3 text-ink-700">Your first pack is available after checkout. The next 8-file packs arrive monthly for 3 months through your member access link.</p>
+      <p class="mt-3 text-ink-700">Your first pack is available after checkout. The next {F.files}-file packs arrive monthly for {F.monthsLabel} through your member access link.</p>
     </div>
   </section>
 
@@ -166,7 +170,7 @@ const featured = plans.find((p) => p.highlight) || plans[0];
 
   <!-- FINAL CTA -->
   <section class="mb-12 text-center border border-bronze-600/30 rounded-xl p-8 bg-gradient-to-br from-cream to-white">
-    <p class="font-serif text-2xl md:text-3xl text-bronze-800">👉 24 files. $192 value. Only $20.</p>
+    <p class="font-serif text-2xl md:text-3xl text-bronze-800">👉 {F.totalFiles} files. {F.retailLabel} value. Only {F.priceLabel}.</p>
     <p class="mt-3 text-ink-700">Add to cart now — your first CNC carving pack is waiting.</p>
     <a href="#plans" class="mt-5 inline-block bg-bronze-600 text-cream px-8 py-3 rounded-md text-sm hover:bg-bronze-700 transition shadow">Choose my plan ↑</a>
     <p class="text-xs text-ink-700/60 mt-5">💬 Questions first? <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">Send a message anytime</a>. A real person reads and replies.</p>

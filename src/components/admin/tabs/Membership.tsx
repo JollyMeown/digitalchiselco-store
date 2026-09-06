@@ -13,6 +13,9 @@ type PurchaseRow = {
   created_at: string;
   paddle_transaction_id: string | null;
   plan_titles: string[];
+  /** what was paid for the membership line(s) themselves; total is the whole order */
+  membership_amount: number;
+  other_items: number;
 };
 
 export default function Membership() {
@@ -24,7 +27,7 @@ export default function Membership() {
 
   useEffect(() => { load(); }, []);
   useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
-  async function load() {
+  async function load(_silent = false) {
     const [{ data: p }, { data: l }] = await Promise.all([
       supabase.from('membership_plans').select('*').order('sort_order'),
       supabase.from('membership_leads').select('*').order('created_at', { ascending: false }).limit(200),
@@ -36,31 +39,45 @@ export default function Membership() {
     // matches one of our membership plan names. The webhook normalises the
     // title to the plan's canonical name for membership items.
     const planNames = planRows.map((x: any) => x.name).filter(Boolean);
-    if (planNames.length) {
-      const { data: items } = await supabase
-        .from('order_items')
-        .select('title, order_id, orders(id, email, customer_name, total, currency, status, created_at, paddle_transaction_id)')
-        .in('title', planNames)
-        .limit(500);
+    // Memberships are bought two ways: the plan itself (line title = plan name)
+    // or a catalogue PRODUCT that maps to a plan (products.membership_plan_slug).
+    // Both count here, and the membership amount is shown apart from the order
+    // total, because members often add designs to the same order.
+    const { data: mprods } = await supabase.from('products').select('id, membership_plan_slug').not('membership_plan_slug', 'is', null);
+    const planByProduct = new Map<string, string>((mprods || []).map((r: any) => [r.id, planRows.find((p: any) => p.slug === r.membership_plan_slug)?.name || r.membership_plan_slug]));
+    if (planNames.length || planByProduct.size) {
+      const sel = 'title, price_usd, qty, product_id, order_id, orders(id, email, customer_name, total, currency, status, created_at, paddle_transaction_id)';
+      const [{ data: byTitle }, { data: byProduct }] = await Promise.all([
+        planNames.length ? supabase.from('order_items').select(sel).in('title', planNames).limit(500) : Promise.resolve({ data: [] as any[] }),
+        planByProduct.size ? supabase.from('order_items').select(sel).in('product_id', [...planByProduct.keys()]).limit(500) : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const seen = new Set<string>();
+      const items = [...(byTitle || []), ...(byProduct || [])].filter((it: any) => { const k = `${it.order_id}|${it.title}|${it.product_id}`; if (seen.has(k)) return false; seen.add(k); return true; });
       const byOrder = new Map<string, PurchaseRow>();
-      for (const it of items || []) {
-        const o = (it as any).orders;
+      for (const it of items as any[]) {
+        const o = it.orders;
         if (!o) continue;
+        const planTitle = (it.product_id && planByProduct.get(it.product_id)) || it.title;
+        const amount = Number(it.price_usd) * Math.max(1, Number(it.qty) || 1);
         const existing = byOrder.get(o.id);
         if (existing) {
-          if (!existing.plan_titles.includes(it.title)) existing.plan_titles.push(it.title);
+          if (!existing.plan_titles.includes(planTitle)) existing.plan_titles.push(planTitle);
+          existing.membership_amount += amount;
         } else {
           byOrder.set(o.id, {
-            order_id: o.id,
-            email: o.email,
-            customer_name: o.customer_name,
-            total: Number(o.total),
-            currency: o.currency,
-            status: o.status,
-            created_at: o.created_at,
-            paddle_transaction_id: o.paddle_transaction_id,
-            plan_titles: [it.title],
+            order_id: o.id, email: o.email, customer_name: o.customer_name,
+            total: Number(o.total), currency: o.currency, status: o.status, created_at: o.created_at,
+            paddle_transaction_id: o.paddle_transaction_id, plan_titles: [planTitle], membership_amount: amount, other_items: 0,
           });
+        }
+      }
+      // how many non-membership lines rode along in each order
+      const orderIds = [...byOrder.keys()];
+      if (orderIds.length) {
+        const { data: allLines } = await supabase.from('order_items').select('order_id, product_id, title').in('order_id', orderIds).limit(2000);
+        for (const l of allLines || []) {
+          const isMember = (l.product_id && planByProduct.has(l.product_id)) || planNames.includes(l.title);
+          if (!isMember) { const r = byOrder.get(l.order_id); if (r) r.other_items++; }
         }
       }
       const sorted = [...byOrder.values()].sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -142,7 +159,8 @@ export default function Membership() {
                   <th className="p-2">Name</th>
                   <th className="p-2">Email</th>
                   <th className="p-2">Plan</th>
-                  <th className="p-2 text-right">Total</th>
+                  <th className="p-2 text-right">Membership</th>
+                  <th className="p-2 text-right">Order total</th>
                   <th className="p-2">Status</th>
                 </tr>
               </thead>
@@ -153,7 +171,8 @@ export default function Membership() {
                     <td className="p-2">{p.customer_name || '—'}</td>
                     <td className="p-2"><a href={`mailto:${p.email}`} className="text-bronze-700 hover:underline">{p.email}</a></td>
                     <td className="p-2 text-xs">{p.plan_titles.join(' + ')}</td>
-                    <td className="p-2 text-right">${p.total.toFixed(2)} {p.currency || 'USD'}</td>
+                    <td className="p-2 text-right">${p.membership_amount.toFixed(2)}</td>
+                    <td className="p-2 text-right whitespace-nowrap">${p.total.toFixed(2)} {p.currency || 'USD'}{p.other_items > 0 && <span className="block text-[10px] text-ink-700/50">+ {p.other_items} other design{p.other_items === 1 ? '' : 's'}, tax incl.</span>}</td>
                     <td className="p-2 text-xs">
                       <span className={
                         p.status === 'paid' ? 'text-green-700' :
@@ -236,7 +255,7 @@ function PlanForm({ open, onClose, onSaved, existing }: any) {
         <div><label className={labelCls}>Files per month</label><input type="number" value={f.files_per_month} onChange={(e) => setF({ ...f, files_per_month: e.target.value })} className={inputCls} /></div>
         <div><label className={labelCls}>Price (USD)</label><input type="number" step="0.01" value={f.price_usd} onChange={(e) => setF({ ...f, price_usd: e.target.value })} className={inputCls} /></div>
         <div><label className={labelCls}>Retail value (strikethrough)</label><input type="number" step="0.01" value={f.original_price_usd} onChange={(e) => setF({ ...f, original_price_usd: e.target.value })} className={inputCls} /></div>
-        <div className="md:col-span-2"><label className={labelCls}>Features (one per line)</label><textarea rows={5} value={f.features_text} onChange={(e) => setF({ ...f, features_text: e.target.value })} className={inputCls} /></div>
+        <div className="md:col-span-2"><label className={labelCls}>Features (one per line) <span className="text-ink-700/40">(lines with a price, file count, retail value or % off are generated from the numbers above and shown first; type only the wording that has no number in it)</span></label><textarea rows={5} value={f.features_text} onChange={(e) => setF({ ...f, features_text: e.target.value })} className={inputCls} /></div>
         <div><label className={labelCls}>Sort</label><input type="number" value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} className={inputCls} /></div>
         <div><label className={labelCls}>Public from <span className="text-ink-700/40">(blank = now; hidden from the plan picker before this date, still buyable via /membership?preview=1)</span></label><input type="date" value={f.available_from ? String(f.available_from).slice(0, 10) : ''} onChange={(e) => setF({ ...f, available_from: e.target.value || null })} className={inputCls} /></div>
         <div className="flex items-end gap-4">
