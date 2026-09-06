@@ -40,7 +40,9 @@ export function autoFeatureLines(p: PlanLike): string[] {
 }
 /** A stored feature line that quotes a number the plan already knows (price, file count, retail value, % off). */
 export function isNumericFeature(line: string): boolean {
-  return /\$\s?\d|\bretail\b|\btotal files\b|\bfiles? over\b|\d+\s*%\s*off|\bper month\b|\/mo\b|\bdesigns? every month\b|\bin a year\b/i.test(line);
+  // a digit plus a price/count/value word = a line the plan row already knows;
+  // "10% member discount" and "2 extra bonus designs" carry no such word and stay
+  return /\d/.test(line) && /\$|\bfresh\b|\btotal\b|\bover \d|\bretail\b|%\s*off|\bper month\b|\/mo\b|\bper file\b|\beach\b|\bin a year\b/i.test(line);
 }
 /** Stored, human feature lines (numeric ones replaced by the generated set). */
 export function planFeatureLines(p: PlanLike): string[] {
