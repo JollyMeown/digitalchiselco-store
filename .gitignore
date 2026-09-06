@@ -72,3 +72,6 @@ scripts/.etsy-welcome-preview.html
 cults3d-retag.log
 scripts/.etsy_img_hashes.json
 scripts/.video_duplicates.json
+.gmail_client.json
+.gmail_token_*.json
+etsy_buyers_*.csv
