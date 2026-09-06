@@ -128,8 +128,22 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json().catch(() => ({}));
     const kind = String(body.kind || '');
     const to = String(body.to || '').toLowerCase().trim();
-    if (!KINDS.includes(kind as any)) return json({ error: 'unknown kind' }, 400);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return json({ error: 'valid "to" email required' }, 400);
+    // "one of everything": every template, rendered with live data, to one
+    // inbox, sequentially, each subject numbered so nothing is missed
+    if (kind === 'all') {
+      const results: { kind: string; ok: boolean; error?: string }[] = [];
+      for (let i = 0; i < KINDS.length; i++) {
+        const k = KINDS[i];
+        try {
+          const { subject, html, text } = await render(k, to);
+          const res = await sendEmail({ to, subject: `[TEST ${i + 1}/${KINDS.length} · ${k}] ${subject}`, html, text, tags: [{ name: 'kind', value: 'template-test' }], idempotencyKey: `template-test:${to}:${k}:${new Date().toISOString().slice(0, 13)}` });
+          results.push({ kind: k, ok: !!res.ok, error: res.ok ? undefined : (res.error || 'send failed') });
+        } catch (e: any) { results.push({ kind: k, ok: false, error: e?.message || 'render failed' }); }
+      }
+      return json({ ok: true, sent: results.filter((r) => r.ok).length, results });
+    }
+    if (!KINDS.includes(kind as any)) return json({ error: 'unknown kind' }, 400);
     const { subject, html, text } = await render(kind, to);
     const res = await sendEmail({ to, subject: `[TEST] ${subject}`, html, text });
     return res.ok ? json({ ok: true, sent: to }) : json({ error: res.error || 'send failed' }, 502);
