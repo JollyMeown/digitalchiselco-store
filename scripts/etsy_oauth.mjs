@@ -19,7 +19,8 @@ import { KEYSTRING, saveTokens } from './etsy_client.mjs';
 
 const PORT = 3003;
 const REDIRECT = `http://localhost:${PORT}/callback`;
-const SCOPES = 'listings_r listings_w shops_r transactions_r';
+// email_r: receipts carry buyer_email only with this scope (import_etsy_receipts.mjs)
+const SCOPES = 'listings_r listings_w shops_r transactions_r email_r';
 
 if (!KEYSTRING) { console.error('ETSY_API_KEY missing from .env'); process.exit(1); }
 

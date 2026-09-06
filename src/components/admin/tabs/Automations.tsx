@@ -767,8 +767,8 @@ type Light = { state: 'green' | 'amber' | 'red'; label: string; detail: string }
 function TodayEmailStats() {
   const [rows, setRows] = useState<{ kind: string; sent: number; failed: number }[] | null>(null);
   const [tot, setTot] = useState({ sent: 0, failed: 0, lastFailErr: '' });
-  const [cfg, setCfg] = useState<{ cap: number; reserve: number; monthCap: number } | null>(null);
-  const [edit, setEdit] = useState<{ cap: number; reserve: number; monthCap: number } | null>(null);
+  const [cfg, setCfg] = useState<{ cap: number; reserve: number; monthCap: number; maxWeek: number } | null>(null);
+  const [edit, setEdit] = useState<{ cap: number; reserve: number; monthCap: number; maxWeek: number } | null>(null);
   const [monthSent, setMonthSent] = useState(0);
   const [saving, setSaving] = useState(false);
   const [lights, setLights] = useState<Light[]>([]);
@@ -777,7 +777,7 @@ function TodayEmailStats() {
     const today = new Date().toISOString().slice(0, 10);
     const [{ data: sends }, { data: gs }, { data: runs }, { data: weeks }] = await Promise.all([
       supabase.from('email_send_log').select('kind, status, error, sent_at').gte('sent_at', today + 'T00:00:00Z').limit(20000),
-      supabase.from('growth_settings').select('email_daily_cap, email_daily_reserve, email_monthly_cap').eq('id', 1).maybeSingle(),
+      supabase.from('growth_settings').select('email_daily_cap, email_daily_reserve, email_monthly_cap, email_max_per_week').eq('id', 1).maybeSingle(),
       supabase.from('cron_runs').select('ran_at, ok, error').order('ran_at', { ascending: false }).limit(1),
       supabase.from('weekly_digest_log').select('week_key, queued_count, last_drain_at').order('week_key', { ascending: false }).limit(1),
     ]);
@@ -794,8 +794,9 @@ function TodayEmailStats() {
     const cap = Number(gs?.email_daily_cap) || 180;
     const reserve = Number(gs?.email_daily_reserve) ?? 20;
     const monthCap = Number(gs?.email_monthly_cap) || 3000;
-    setCfg({ cap, reserve, monthCap });
-    setEdit((e) => e || { cap, reserve, monthCap });
+    const maxWeek = Number.isFinite(Number(gs?.email_max_per_week)) ? Number(gs?.email_max_per_week) : 4;
+    setCfg({ cap, reserve, monthCap, maxWeek });
+    setEdit((e) => e || { cap, reserve, monthCap, maxWeek });
     // month-to-date sends (for the monthly plan-quota light)
     const monthStart = today.slice(0, 7) + '-01';
     const { count: mSent } = await supabase.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', monthStart + 'T00:00:00Z');
@@ -847,16 +848,17 @@ function TodayEmailStats() {
     const cap = Math.max(20, Math.round(edit.cap));
     const reserve = Math.min(cap, Math.max(0, Math.round(edit.reserve)));
     const monthCap = Math.max(100, Math.round(edit.monthCap));
+    const maxWeek = Math.max(0, Math.min(30, Math.round(edit.maxWeek)));
     setSaving(true);
-    await supabase.from('growth_settings').update({ email_daily_cap: cap, email_daily_reserve: reserve, email_monthly_cap: monthCap }).eq('id', 1);
-    setCfg({ cap, reserve, monthCap }); setEdit({ cap, reserve, monthCap }); setSaving(false);
+    await supabase.from('growth_settings').update({ email_daily_cap: cap, email_daily_reserve: reserve, email_monthly_cap: monthCap, email_max_per_week: maxWeek }).eq('id', 1);
+    setCfg({ cap, reserve, monthCap, maxWeek }); setEdit({ cap, reserve, monthCap, maxWeek }); setSaving(false);
     load();
   }
 
   const marketingLeft = Math.max(0, cfg.cap - cfg.reserve - tot.sent);
   const label = (k: string) => EMAIL_KIND_LABELS[k] || k;
   const dot: Record<string, string> = { green: 'bg-green-500', amber: 'bg-amber-500', red: 'bg-red-500 animate-pulse' };
-  const dirty = edit.cap !== cfg.cap || edit.reserve !== cfg.reserve || edit.monthCap !== cfg.monthCap;
+  const dirty = edit.cap !== cfg.cap || edit.reserve !== cfg.reserve || edit.monthCap !== cfg.monthCap || edit.maxWeek !== cfg.maxWeek;
   const worst = lights.some((l) => l.state === 'red') ? 'red' : lights.some((l) => l.state === 'amber') ? 'amber' : 'green';
 
   return (
@@ -914,6 +916,10 @@ function TodayEmailStats() {
           <label className="block">
             <span className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Daily cap</span>
             <input type="number" min={20} max={5000} value={edit.cap} onChange={(e) => setEdit({ ...edit, cap: Number(e.target.value) })} className={inputCls + ' w-28'} />
+          </label>
+          <label className="block" title="Newsletters, film and guide campaigns, win-back, price drops and similar broadcasts skip anyone who already had this many marketing emails in the last 7 days. Drips and one-time welcomes are never held. 0 = no limit.">
+            <span className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Max per person / week</span>
+            <input type="number" min={0} max={30} value={edit.maxWeek} onChange={(e) => setEdit({ ...edit, maxWeek: Number(e.target.value) })} className={inputCls + ' w-28'} />
           </label>
           <label className="block">
             <span className="text-[10px] uppercase tracking-wide text-ink-700/50 font-medium">Buyer reserve</span>

@@ -512,6 +512,15 @@ async function handleTransactionCompleted(db: any, txn: any) {
   }
   console.log(`Order ${order.id} ${resumeEmailOnly ? 'resumed (email only)' : 'created'} for txn ${txn.id} (${email}, ${total}).`);
 
+  // Every paying customer joins the list (source 'buyer', confirmed by the
+  // purchase itself) so the weekly digest and post-purchase follow-ups reach
+  // them. Never re-subscribes someone who unsubscribed (ignoreDuplicates keeps
+  // the existing row untouched).
+  if (!resumeEmailOnly) {
+    try { await db.from('subscribers').upsert({ email, source: 'buyer', confirmed_at: new Date().toISOString() }, { onConflict: 'email', ignoreDuplicates: true }); }
+    catch (e: any) { console.error('[webhook] buyer subscribe failed:', e?.message); }
+  }
+
   // ── Owner instant alert: a real order just landed 🎉 ─────────────────
   // Gated by growth_settings.owner_alerts_enabled; idempotent per order.
   try {

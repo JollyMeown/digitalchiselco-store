@@ -136,14 +136,48 @@ async function refreshBudget(): Promise<void> {
   const [{ count }, { count: mCount }, { data: gs }] = await Promise.all([
     db.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', day + 'T00:00:00Z'),
     db.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', monthStart),
-    db.from('growth_settings').select('email_daily_cap, email_daily_reserve, email_monthly_cap').eq('id', 1).maybeSingle(),
+    db.from('growth_settings').select('email_daily_cap, email_daily_reserve, email_monthly_cap, email_max_per_week').eq('id', 1).maybeSingle(),
   ]);
   // DB (admin-editable) is PRIMARY so the owner's control always wins; env is
   // only a fallback if the column is somehow missing.
   const cap = Math.max(20, Number(gs?.email_daily_cap) || CAP_ENV || 180);
   const reserve = Math.min(cap, Math.max(0, Number.isFinite(Number(gs?.email_daily_reserve)) ? Number(gs?.email_daily_reserve) : (!Number.isNaN(RESERVE_ENV) ? RESERVE_ENV : 20)));
   const monthCap = Math.max(100, Number(gs?.email_monthly_cap) || 3000);
+  maxPerWeek = Number.isFinite(Number(gs?.email_max_per_week)) ? Math.max(0, Number(gs?.email_max_per_week)) : 4;
   reserveCache = { day, count: count || 0, at: Date.now(), cap, reserve, monthCap, monthCount: mCount || 0 };
+}
+
+// ── Per-person frequency cap (owner 2026-09-06) ─────────────────────────
+// Audit: 348 people were getting 8.5 marketing emails a month on average (one
+// got 37) and 11 unsubscribed in 30 days. Broadcast-type kinds now yield when
+// a person already had `email_max_per_week` marketing emails in the last 7
+// days. Drips and one-time welcomes are never held (they are the relationship),
+// but they count, so broadcasts make room for them. 0 = off.
+let maxPerWeek = 4;
+const BROADCAST_KINDS = new Set(['weekly', 'filmCampaign', 'guideCampaign', 'articleCampaign', 'makerRecruit', 'winback', 'browse', 'price-drop', 'priceDrop', 'wishlistReminder', 'wishlist-reminder', 'referral-nudge', 'referralNudge', 'refundWinback', 'refund-winback', 'product-blast', 'picks']);
+/** Recipients (lower-cased) that must NOT receive a broadcast right now. */
+export async function overMailed(recipients: string[], kind: string | null): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!kind || !BROADCAST_KINDS.has(kind) || !recipients.length) return out;
+  try {
+    await refreshBudget();
+    if (!maxPerWeek) return out;
+    const { supabaseAdmin } = await import('./supabase');
+    const db = supabaseAdmin();
+    const since = new Date(Date.now() - 7 * 86400000).toISOString();
+    const list = [...new Set(recipients.map((r) => r.toLowerCase()))];
+    const counts = new Map<string, number>();
+    for (let i = 0; i < list.length; i += 200) {
+      const { data } = await db.from('email_send_log').select('recipient, kind').in('recipient', list.slice(i, i + 200)).eq('status', 'sent').gte('sent_at', since).limit(20000);
+      for (const r of data || []) {
+        if (!r.kind || TRANSACTIONAL_KINDS.has(r.kind)) continue;
+        const k = String(r.recipient).toLowerCase();
+        counts.set(k, (counts.get(k) || 0) + 1);
+      }
+    }
+    for (const [email, n] of counts) if (n >= maxPerWeek) out.add(email);
+  } catch { /* ledger unavailable: do not block sending */ }
+  return out;
 }
 // Marketing may spend up to the MONTHLY cap minus a buyer cushion (10× the
 // daily reserve, min 200) so order/auth emails keep sending all month even
@@ -210,11 +244,13 @@ async function resendFetch(url: string, headers: Record<string, string>, body: s
   return task;
 }
 
-export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: string; skipped?: boolean; error?: string; quota?: boolean }> {
+export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: string; skipped?: boolean; held?: boolean; error?: string; quota?: boolean }> {
   const critical = isBuyerCritical(opts.tags);
   if (!critical) {
     if (isQuotaExhausted()) return { ok: false, error: 'daily quota exhausted (deferred)', quota: true };
     if (!(await marketingBudgetLeft(1))) return { ok: false, error: 'daily reserve reached (deferred, buyer emails protected)', quota: true };
+    const to0 = Array.isArray(opts.to) ? String(opts.to[0] || '') : String(opts.to);
+    if ((await overMailed([to0], tagOf(opts.tags, 'kind'))).size) return { ok: true, skipped: true, held: true };
   }
   const key = env('RESEND_API_KEY');
   if (!key) {
@@ -276,10 +312,21 @@ export async function send(opts: SendOptions): Promise<{ ok: boolean; id?: strin
 export async function sendBatch(
   emails: SendOptions[],
   idempotencyKey?: string,
-): Promise<{ ok: boolean; sent: number; skipped?: boolean; error?: string; quota?: boolean }> {
+): Promise<{ ok: boolean; sent: number; skipped?: boolean; held?: number; error?: string; quota?: boolean }> {
+  let held = 0;
   if (!emails.some((e) => isBuyerCritical(e.tags))) {
     if (isQuotaExhausted()) return { ok: false, sent: 0, error: 'daily quota exhausted (deferred)', quota: true };
     if (!(await marketingBudgetLeft(Math.min(emails.length, 100)))) return { ok: false, sent: 0, error: 'daily reserve reached (deferred, buyer emails protected)', quota: true };
+    // frequency cap: drop over-mailed recipients from this broadcast batch
+    const kind0 = tagOf(emails[0]?.tags, 'kind');
+    const over = await overMailed(emails.map((e) => (Array.isArray(e.to) ? String(e.to[0] || '') : String(e.to))), kind0);
+    if (over.size) {
+      const before = emails.length;
+      emails = emails.filter((e) => !over.has((Array.isArray(e.to) ? String(e.to[0] || '') : String(e.to)).toLowerCase()));
+      held = before - emails.length;
+      console.log(`[resend] frequency cap held ${held} of ${before} ${kind0} emails (max ${maxPerWeek}/week)`);
+      if (!emails.length) return { ok: true, sent: 0, held };
+    }
   }
   const key = env('RESEND_API_KEY');
   if (!key) {
@@ -327,7 +374,7 @@ export async function sendBatch(
     logSends(batchRows('sent', ids));
     const sentN = Array.isArray(data?.data) ? data.data.length : payload.length;
     noteSent(sentN);
-    return { ok: true, sent: sentN };
+    return { ok: true, sent: sentN, held };
   } catch (e: any) {
     console.error('[resend] batch threw', e);
     logSends(batchRows('failed', undefined, e.message || 'network error'));
