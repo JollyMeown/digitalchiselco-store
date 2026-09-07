@@ -7,6 +7,7 @@ import FilmEmails from '../FilmEmails';
 import CustomPitch from '../CustomPitch';
 import EmailPerformance from '../EmailPerformance';
 import AutomationHealth from '../AutomationHealth';
+import BrsAutomationRuns from '../BrsAutomationRuns';
 
 const KINDS: { key: string; label: string; group: string }[] = [
   { key: 'drip1', label: '1 · Did you carve the free pack?', group: 'Subscriber drip' },
@@ -275,6 +276,7 @@ export default function Automations() {
 
   return (
     <div className="space-y-4">
+      <BrsAutomationRuns />
       <CronHealth />
       <CronSchedule />
       <TodayEmailStats />

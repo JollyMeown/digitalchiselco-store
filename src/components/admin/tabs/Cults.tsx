@@ -38,7 +38,8 @@ export default function Cults() {
   async function loadAlerts() {
     const [{ data: ps }, { data: al }] = await Promise.all([
       supabase.from('poll_status').select('ran_at, ok, note, runner').eq('key', 'cults_sales').maybeSingle(),
-      supabase.from('owner_alerts').select('id, kind, title, body, url, created_at').order('id', { ascending: false }).limit(12),
+      // sales only — BRS automation summaries (kind brs_*) live in Admin > Automations
+      supabase.from('owner_alerts').select('id, kind, title, body, url, created_at').not('kind', 'like', 'brs_%').order('id', { ascending: false }).limit(12),
     ]);
     setPoll(ps || null); setAlerts(al || []);
   }

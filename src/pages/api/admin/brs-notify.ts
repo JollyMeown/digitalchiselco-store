@@ -28,12 +28,18 @@ export const POST: APIRoute = async ({ request }) => {
   const text = String(body.body || '').slice(0, 3000);
   const url = body.url ? String(body.url).slice(0, 500) : null;
   if (!title) return json({ error: 'title required' }, 400);
+  // optional structured payload (BRS automation batch summaries: computer, timing,
+  // per-design outcome) — rendered by Admin > Automations > BRS automation runs
+  let extra: Record<string, unknown> = {};
+  if (body.meta && typeof body.meta === 'object' && !Array.isArray(body.meta)) {
+    try { extra = JSON.parse(JSON.stringify(body.meta).slice(0, 20000)); } catch { extra = {}; }
+  }
 
   const admin = supabaseAdmin();
   let alertId: number | null = null;
   try {
     const { data } = await admin.from('owner_alerts')
-      .insert({ kind, title, body: text || null, url, meta: { source: 'brs' } })
+      .insert({ kind, title, body: text || null, url, meta: { source: 'brs', ...extra } })
       .select('id').maybeSingle();
     alertId = (data as any)?.id ?? null;
   } catch (e: any) { console.error('[brs-notify] owner_alerts', e?.message); }

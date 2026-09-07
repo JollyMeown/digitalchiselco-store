@@ -41,8 +41,9 @@ export default function OrderSoundListener() {
     seenAlerts.current.add(id);
     if (lastAlertId.current == null || id > lastAlertId.current) lastAlertId.current = id;
     if (a.kind === 'website_order') return; // already rung via the `orders` insert
-    const icon = a.kind === 'cults_sale' ? '💶' : a.kind === 'website_order' ? '🛒' : '🔔';
-    playChime();
+    const icon = a.kind === 'cults_sale' ? '💶' : a.kind === 'website_order' ? '🛒' : String(a.kind || '').startsWith('brs_') ? '🤖' : '🔔';
+    // BRS automation summaries are not money: a toast, no cha-ching
+    if (!String(a.kind || '').startsWith('brs_')) playChime();
     pushToast({ id: 'alert-' + id, icon, title: a.title, body: a.body, url: a.url });
     desktopNotify(`${icon} ${a.title}`, a.body, a.url);
     // A sale should also be visible in the tab strip.
