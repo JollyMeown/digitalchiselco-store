@@ -26,6 +26,9 @@ export default function Products() {
     return 'all';
   });
   const [bestsellerOnly, setBestsellerOnly] = useState(false);
+  // 🖥 which BRS computer uploaded the product (products.submitted_by; every BRS
+  // upload names its computer since 2026-09-07) — the owner reviews per computer
+  const [computerFilter, setComputerFilter] = useState('');
   // "Newly added" filter — show only products created within the chosen window,
   // sorted newest-first, with their added date visible.
   const [newOnly, setNewOnly] = useState(false);
@@ -126,9 +129,17 @@ export default function Products() {
     }
   }
 
+  const computers = useMemo(() => {
+    const m = new Map<string, number>();
+    rows.forEach((r) => { const c = String((r as any).submitted_by || '').trim(); if (c) m.set(c, (m.get(c) || 0) + 1); });
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [rows]);
   const visibleRows = useMemo(() => {
-    if (badgeFilter === 'all') return rows;
-    return rows.filter((r) => {
+    const byComputer = computerFilter
+      ? rows.filter((r) => (computerFilter === '__none__' ? !(r as any).submitted_by : String((r as any).submitted_by || '') === computerFilter))
+      : rows;
+    if (badgeFilter === 'all') return byComputer;
+    return byComputer.filter((r) => {
       const dls = r.product_downloads ?? [];
       const anyVerified = dls.some((d) => !!d.verified_at);
       const allVerified = dls.length > 0 && dls.every((d) => !!d.verified_at);
@@ -143,7 +154,7 @@ export default function Products() {
       if (badgeFilter === 'unaudited') return dls.length === 0 || dls.every((d) => !d.audit_status && !d.verified_at);
       return true;
     });
-  }, [rows, badgeFilter]);
+  }, [rows, badgeFilter, computerFilter]);
 
   return (
     <div className="space-y-4">
@@ -159,6 +170,11 @@ export default function Products() {
             <option value="active">Active only</option>
             <option value="inactive">Inactive only</option>
             <option value="pending">🟠 Pending moderation</option>
+          </select>
+          <select value={computerFilter} onChange={(e) => setComputerFilter(e.target.value)} className={inputCls + ' max-w-xs'} title="Which BRS computer uploaded the product (every BRS upload names its computer)">
+            <option value="">🖥 All BRS computers</option>
+            {computers.map(([c, n]) => <option key={c} value={c}>🖥 {c} ({n})</option>)}
+            <option value="__none__">no computer recorded</option>
           </select>
           <select value={badgeFilter} onChange={(e) => setBadgeFilter(e.target.value as any)} className={inputCls + ' max-w-xs'} title="Filter by download-link verification badge">
             <option value="all">All badges</option>
@@ -220,7 +236,10 @@ export default function Products() {
                     {(r as any).is_bestseller && <span className="text-yellow-500 mr-1" title="Best seller">★</span>}
                     <a href={`/product/${r.slug}`} target="_blank" className="text-ink-800 hover:text-bronze-600">{r.title.slice(0, 60)}</a>
                     {(r as any).pending_review && (
-                      <span className="ml-2 text-[10px] bg-amber-100 text-amber-800 border border-amber-400 rounded px-1.5 py-0.5 whitespace-nowrap" title="Uploaded from another shop's BRS — review, set category & price, then approve">🟠 pending{(r as any).submitted_by ? ' · ' + (r as any).submitted_by : ''}</span>
+                      <span className="ml-2 text-[10px] bg-amber-100 text-amber-800 border border-amber-400 rounded px-1.5 py-0.5 whitespace-nowrap" title="Uploaded from a BRS computer — review, set category & price, then approve">🟠 pending{(r as any).submitted_by ? ' · 🖥 ' + (r as any).submitted_by : ''}</span>
+                    )}
+                    {!(r as any).pending_review && (r as any).submitted_by && (
+                      <span className="ml-2 text-[10px] bg-cream text-ink-700/70 border border-bronze-600/20 rounded px-1.5 py-0.5 whitespace-nowrap" title="BRS computer that uploaded this product">🖥 {(r as any).submitted_by}</span>
                     )}
                     {newOnly && (r as any).created_at && (
                       <span className="ml-2 text-[10px] bg-cream text-bronze-700 border border-bronze-600/20 rounded px-1.5 py-0.5 whitespace-nowrap">added {String((r as any).created_at).slice(0, 10)}</span>
