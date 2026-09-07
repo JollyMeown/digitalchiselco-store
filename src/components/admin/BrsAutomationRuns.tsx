@@ -6,7 +6,7 @@
 // it), the text body is the fallback for older rows.
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Card } from './ui';
+import { Card, btnGhost } from './ui';
 import { useLiveRefresh } from './useLiveRefresh';
 
 type Row = { id: number; kind: string; title: string; body: string | null; url: string | null; created_at: string; meta: any };
@@ -36,8 +36,24 @@ export default function BrsAutomationRuns() {
 
   const kindLabel = (k: string) => k === 'brs_pipeline' ? 'Pipeline' : k === 'brs_zbrush' ? 'ZBrush night batch' : k.replace(/^brs_/, '');
 
+  const [busy, setBusy] = useState(false);
+  async function clear(id?: number) {
+    if (!id && !confirm(`Delete all ${rows.length} automation messages? Sale alerts are not touched.`)) return;
+    setBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/brs-alerts-clear', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify(id ? { id } : {}) });
+      const j = await res.json();
+      if (!j.ok) alert('Delete failed: ' + (j.error || res.status));
+      else setRows((r) => (id ? r.filter((x) => x.id !== id) : []));
+    } catch (e: any) { alert(String(e?.message || e)); }
+    setBusy(false);
+  }
+
   return (
-    <Card title="🤖 BRS automation runs">
+    <Card title="🤖 BRS automation runs" action={rows.length > 0 ? (
+      <button type="button" className={btnGhost + ' text-xs'} disabled={busy} onClick={() => clear()} title="Delete every automation message in one click (sale alerts stay)">🗑 Clear all ({rows.length})</button>
+    ) : undefined}>
       <p className="text-xs text-ink-700/60">
         Every finished batch from Bundle Relief Studio, newest first: designs completed, total processing time, and the designs that stopped with the reason. The full report sits in the bundle folder on the computer that ran it.
       </p>
@@ -89,6 +105,7 @@ export default function BrsAutomationRuns() {
                     )}
                     {m.report && <div><b>Report:</b> {m.report}</div>}
                     {!m.timing && a.body && <div>{a.body}</div>}
+                    <div><button type="button" className={btnGhost + ' text-xs'} disabled={busy} onClick={() => clear(a.id)}>🗑 Delete this message</button></div>
                   </div>
                 )}
               </li>
