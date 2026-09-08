@@ -124,7 +124,52 @@ export const GET: APIRoute = async ({ request }) => {
       orders: all.length,
     };
 
-    return json({ ok: true, periods, byMonth, allTime, currency: txns[0]?.ccy || all[0]?.ccy || 'USD', fetchedAt: new Date().toISOString(), transactions: all.length });
+    // Every calendar month of the current year, including the empty ones, so
+    // the shape of the year is honest rather than only the months that sold.
+    const year = now.getFullYear();
+    const calendar = Array.from({ length: 12 }, (_, i) => {
+      const key = `${year}-${String(i + 1).padStart(2, '0')}`;
+      const found = months[key];
+      return {
+        month: key,
+        label: new Date(year, i, 2).toLocaleString('en-US', { month: 'short' }),
+        future: new Date(year, i, 1) > now,
+        gross: +(found?.gross || 0).toFixed(2),
+        tax: +(found?.tax || 0).toFixed(2),
+        fee: +(found?.fee || 0).toFixed(2),
+        earnings: +(found?.earnings || 0).toFixed(2),
+        orders: found?.orders || 0,
+      };
+    });
+
+    // What the numbers mean for the business, not just what they are.
+    const byCcy: Record<string, { orders: number; gross: number }> = {};
+    for (const t of all) {
+      const c = (byCcy[t.chargedCcy] ||= { orders: 0, gross: 0 });
+      c.orders++; c.gross += t.gross;
+    }
+    const sorted = [...all].sort((a, b) => a.gross - b.gross);
+    const feeRate = (rows: Txn[]) => {
+      const g = rows.reduce((s, t) => s + t.gross, 0);
+      return g > 0 ? +((100 * rows.reduce((s, t) => s + t.fee, 0)) / g).toFixed(1) : 0;
+    };
+    const half = Math.max(1, Math.floor(sorted.length / 2));
+    const insights = {
+      avgOrder: all.length ? +(allTime.gross / all.length).toFixed(2) : 0,
+      avgEarnings: all.length ? +(allTime.earnings / all.length).toFixed(2) : 0,
+      avgFee: all.length ? +(allTime.fee / all.length).toFixed(2) : 0,
+      feeRateAll: allTime.gross ? +((100 * allTime.fee) / allTime.gross).toFixed(1) : 0,
+      // Paddle charges a percentage PLUS a fixed amount per transaction, so
+      // small orders are proportionally far more expensive. This proves it.
+      feeRateSmallest: feeRate(sorted.slice(0, half)),
+      feeRateLargest: feeRate(sorted.slice(-half)),
+      smallestAvg: half ? +(sorted.slice(0, half).reduce((s, t) => s + t.gross, 0) / half).toFixed(2) : 0,
+      largestAvg: half ? +(sorted.slice(-half).reduce((s, t) => s + t.gross, 0) / half).toFixed(2) : 0,
+      taxShare: allTime.gross ? +((100 * allTime.tax) / allTime.gross).toFixed(1) : 0,
+      currencies: Object.entries(byCcy).map(([ccy, v]) => ({ ccy, orders: v.orders, gross: +v.gross.toFixed(2) })).sort((a, b) => b.gross - a.gross),
+    };
+
+    return json({ ok: true, periods, byMonth, calendar, allTime, insights, year, currency: txns[0]?.ccy || all[0]?.ccy || 'USD', fetchedAt: new Date().toISOString(), transactions: all.length });
   } catch (e: any) {
     return json({ error: e?.message || 'Paddle query failed' }, 502);
   }

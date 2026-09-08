@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
+import Chart3D from '../Chart3D';
 
 type Daily = { day: string; channel: string; revenue_usd: number; ad_spend_usd: number; fees_usd: number };
 type Gran = 'week' | 'month' | 'year';
@@ -39,30 +40,6 @@ function rollup(rows: Daily[], g: Gran, field: 'revenue_usd' | 'ad_spend_usd', l
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-limit).map(([, v]) => v);
 }
 
-function StackedBars({ buckets, order }: { buckets: { label: string; seg: Record<string, number>; total: number }[]; order: string[] }) {
-  const H = 170, BW = 46;
-  const max = Math.max(1, ...buckets.map((b) => b.total));
-  const W = Math.max(buckets.length * BW, 200);
-  return (
-    <svg viewBox={`0 0 ${W} ${H + 26}`} width="100%" style={{ maxWidth: '100%' }} role="img" aria-label="revenue by period">
-      {[0.25, 0.5, 0.75, 1].map((f) => (
-        <line key={f} x1={0} x2={W} y1={H - f * H} y2={H - f * H} stroke="#e1e0d9" strokeWidth={1} />
-      ))}
-      {buckets.map((b, i) => {
-        let y = H;
-        return (
-          <g key={i}>
-            {order.filter((k) => b.seg[k]).map((k) => {
-              const h = (b.seg[k] / max) * H; y -= h;
-              return <rect key={k} x={i * BW + 10} y={y} width={BW - 20} height={Math.max(0, h)} fill={CHANNELS[k]?.color || '#999'} rx={2}><title>{CHANNELS[k]?.label}: {usd(b.seg[k])}</title></rect>;
-            })}
-            <text x={i * BW + BW / 2} y={H + 16} fontSize={9} textAnchor="middle" fill="#8a7a68">{b.label}</text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
 
 function StatCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
   return (
@@ -78,18 +55,7 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string;
 // Read from Paddle's own transaction records (/api/admin/paddle-stats), not
 // from our orders table, so mixed currencies are already converted and the fee
 // Paddle keeps is visible instead of hidden inside a gross number.
-function PaddleRevenue() {
-  const [d, setD] = useState<any>(null);
-  const [err, setErr] = useState('');
-  async function load() {
-    const { data: { session } } = await supabase.auth.getSession();
-    const r = await fetch('/api/admin/paddle-stats', { headers: { authorization: `Bearer ${session?.access_token || ''}` } })
-      .then((x) => x.json()).catch(() => ({ error: 'bad response' }));
-    if (r?.error) setErr(r.error); else { setD(r); setErr(''); }
-  }
-  useEffect(() => { load(); }, []);
-  useLiveRefresh(load, 120000);
-
+function PaddleRevenue({ d, err }: { d: any; err: string }) {
   return (
     <Card>
       <div className="flex items-baseline gap-2 mb-3 flex-wrap">
@@ -114,6 +80,28 @@ function PaddleRevenue() {
               </div>
             ))}
           </div>
+
+          {/* The year in 3D: revenue, what Paddle took, what is left */}
+          {d.calendar?.length > 0 && (
+            <div className="mt-5">
+              <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+                <h4 className="text-sm font-medium text-ink-900">{d.year} by calendar month</h4>
+                <span className="text-[11px] text-ink-700/55">every month of the year, months still to come are greyed</span>
+              </div>
+              <Chart3D
+                title="Paddle revenue by month"
+                points={d.calendar.map((m: any) => ({
+                  label: m.label, muted: m.future,
+                  values: { gross: m.gross, fee: m.fee + m.tax, earnings: m.earnings },
+                }))}
+                series={[
+                  { key: 'gross', label: 'Revenue (buyers paid)', color: '#2a78d6' },
+                  { key: 'fee', label: 'Paid to Paddle (fee + tax)', color: '#d2544b' },
+                  { key: 'earnings', label: 'Profit (yours)', color: '#1f9254' },
+                ]}
+              />
+            </div>
+          )}
 
           {/* Month by month: what buyers paid, what tax and Paddle took, what is left */}
           {d.byMonth?.length > 0 && (
@@ -164,6 +152,43 @@ function PaddleRevenue() {
             </div>
           )}
 
+          {/* What the numbers mean */}
+          {d.insights && (
+            <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="rounded-lg border border-black/10 bg-cream/30 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Average order</div>
+                <div className="text-lg font-medium text-ink-900">{usd(d.insights.avgOrder)}</div>
+                <div className="text-[11px] text-ink-700/55">you keep {usd(d.insights.avgEarnings)} of it</div>
+              </div>
+              <div className="rounded-lg border border-black/10 bg-cream/30 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Paddle's cut</div>
+                <div className="text-lg font-medium text-ink-900">{d.insights.feeRateAll}%</div>
+                <div className="text-[11px] text-ink-700/55">{usd(d.insights.avgFee)} per order on average</div>
+              </div>
+              <div className="rounded-lg border border-black/10 bg-cream/30 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Tax collected for you</div>
+                <div className="text-lg font-medium text-ink-900">{usd(d.allTime.tax)}</div>
+                <div className="text-[11px] text-ink-700/55">{d.insights.taxShare}% of revenue, remitted by Paddle</div>
+              </div>
+              <div className="rounded-lg border border-black/10 bg-cream/30 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Where buyers pay from</div>
+                <div className="text-lg font-medium text-ink-900">{d.insights.currencies.length} currenc{d.insights.currencies.length === 1 ? 'y' : 'ies'}</div>
+                <div className="text-[11px] text-ink-700/55 truncate">{d.insights.currencies.slice(0, 4).map((c: any) => `${c.ccy} ${c.orders}`).join(' · ')}</div>
+              </div>
+            </div>
+          )}
+
+          {/* The one insight that changes what you sell */}
+          {d.insights && d.insights.feeRateSmallest > d.insights.feeRateLargest && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+              <b>Small orders cost you far more in fees.</b> Paddle charges a percentage plus a fixed amount per
+              transaction, so your cheaper half of orders (averaging {usd(d.insights.smallestAvg)}) loses{' '}
+              <b>{d.insights.feeRateSmallest}%</b> to fees, while the dearer half (averaging {usd(d.insights.largestAvg)}) loses only{' '}
+              <b>{d.insights.feeRateLargest}%</b>. Every bundle, Pick-5 and membership sale you make instead of a single
+              design keeps a bigger share of the money.
+            </div>
+          )}
+
           <p className="text-[11px] text-ink-700/45 mt-3 leading-relaxed">
             Every figure is Paddle's own, converted to {d.currency} by Paddle. A buyer's payment splits three ways:
             sales tax and VAT that Paddle collects and remits for you, Paddle's fee, and your earnings.
@@ -177,16 +202,103 @@ function PaddleRevenue() {
   );
 }
 
+// ── Combined profit across every channel ──────────────────────────────
+// Profit, not revenue, because each platform keeps a different share:
+//   Paddle  earnings after its fee and the tax it remits (from Paddle itself)
+//   Etsy    revenue minus Etsy's fees minus Promoted Listings ad spend
+//   Cults   the designer income Cults credits, already net of its commission
+function CombinedProfit({ daily, paddle }: { daily: Daily[]; paddle: any }) {
+  const year = new Date().getFullYear();
+  const rows = useMemo(() => {
+    const m: Record<string, { etsy: number; cults: number; paddle: number }> = {};
+    for (let i = 0; i < 12; i++) m[`${year}-${String(i + 1).padStart(2, '0')}`] = { etsy: 0, cults: 0, paddle: 0 };
+    for (const r of daily) {
+      const k = String(r.day).slice(0, 7);
+      if (!m[k]) continue;
+      const profit = Number(r.revenue_usd || 0) - Number(r.fees_usd || 0) - Number(r.ad_spend_usd || 0);
+      if (r.channel === 'etsy') m[k].etsy += profit;
+      else if (r.channel === 'cults') m[k].cults += profit;
+    }
+    for (const c of paddle?.calendar || []) if (m[c.month]) m[c.month].paddle = Number(c.earnings || 0);
+    return Object.entries(m).map(([month, v], i) => ({
+      month, label: new Date(year, i, 2).toLocaleString('en-US', { month: 'short' }),
+      future: new Date(year, i, 1) > new Date(),
+      ...v, total: v.etsy + v.cults + v.paddle,
+    }));
+  }, [daily, paddle, year]);
+
+  const tot = rows.reduce((s, r) => ({ etsy: s.etsy + r.etsy, cults: s.cults + r.cults, paddle: s.paddle + r.paddle, total: s.total + r.total }), { etsy: 0, cults: 0, paddle: 0, total: 0 });
+  const share = (v: number) => (tot.total > 0 ? Math.round((100 * v) / tot.total) : 0);
+  const best = rows.filter((r) => !r.future).slice().sort((a, b) => b.total - a.total)[0];
+
+  return (
+    <Card>
+      <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+        <h3 className="font-medium text-ink-900 text-sm">💵 Combined profit · Paddle + Etsy + Cults</h3>
+        <span className="text-xs text-ink-700/55">what you actually keep, after every platform takes its share</span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+          <div className="text-[10px] uppercase tracking-wide text-green-700/70">Total profit {year}</div>
+          <div className="text-2xl font-medium text-green-800">{usd(tot.total)}</div>
+        </div>
+        <div className="rounded-lg border border-black/10 bg-white px-3 py-2.5">
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Etsy</div>
+          <div className="text-xl font-medium" style={{ color: '#eb6834' }}>{usd(tot.etsy)}</div>
+          <div className="text-[11px] text-ink-700/55">{share(tot.etsy)}% of profit</div>
+        </div>
+        <div className="rounded-lg border border-black/10 bg-white px-3 py-2.5">
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Website (Paddle)</div>
+          <div className="text-xl font-medium" style={{ color: '#2a78d6' }}>{usd(tot.paddle)}</div>
+          <div className="text-[11px] text-ink-700/55">{share(tot.paddle)}% of profit</div>
+        </div>
+        <div className="rounded-lg border border-black/10 bg-white px-3 py-2.5">
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Cults3D</div>
+          <div className="text-xl font-medium" style={{ color: '#1baf7a' }}>{usd(tot.cults)}</div>
+          <div className="text-[11px] text-ink-700/55">{share(tot.cults)}% of profit</div>
+        </div>
+      </div>
+      <Chart3D
+        title="Combined profit by month"
+        points={rows.map((r) => ({ label: r.label, muted: r.future, values: { etsy: r.etsy, paddle: r.paddle, cults: r.cults } }))}
+        series={[
+          { key: 'etsy', label: 'Etsy profit', color: '#eb6834' },
+          { key: 'paddle', label: 'Website profit', color: '#2a78d6' },
+          { key: 'cults', label: 'Cults3D profit', color: '#1baf7a' },
+        ]}
+      />
+      {best && best.total > 0 && (
+        <p className="text-[11px] text-ink-700/55 mt-2">
+          Best month so far: <b>{new Date(best.month + '-02').toLocaleString('en-US', { month: 'long' })}</b> at {usd(best.total)} profit.
+        </p>
+      )}
+      <p className="text-[11px] text-ink-700/45 mt-1 leading-relaxed">
+        Profit, not revenue. Etsy is its revenue less Etsy's fees and Promoted Listings spend; the website is Paddle's own
+        earnings figure after its fee and the tax it remits; Cults is the designer income it credits, already net of commission.
+        Etsy and Cults come from the last local sync, the website is live from Paddle.
+      </p>
+    </Card>
+  );
+}
+
 export default function Finance() {
   const [daily, setDaily] = useState<Daily[]>([]);
   const [status, setStatus] = useState<any>({});
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
   const [gran, setGran] = useState<Gran>('month');
   const [loading, setLoading] = useState(true);
+  const [paddle, setPaddle] = useState<any>(null);
+  const [paddleErr, setPaddleErr] = useState('');
 
   const [web30, setWeb30] = useState(0);
-  useEffect(() => { load(); }, []);
-  useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
+  useEffect(() => { load(); loadPaddle(); }, []);
+  useLiveRefresh(() => { load(true); loadPaddle(); }, 60000);   // keep this tab live (silent, pauses while editing)
+  async function loadPaddle() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch('/api/admin/paddle-stats', { headers: { authorization: `Bearer ${session?.access_token || ''}` } })
+      .then((x) => x.json()).catch(() => ({ error: 'bad response' }));
+    if (r?.error) setPaddleErr(r.error); else { setPaddle(r); setPaddleErr(''); }
+  }
   async function load(silent = false) {
     if (!silent) setLoading(true);
     const since = new Date(); since.setUTCFullYear(since.getUTCFullYear() - 1);
@@ -245,7 +357,8 @@ export default function Finance() {
         <StatCard label="Etsy ad spend" value={usd(totalAd)} sub={`Promoted Listings · ${gran === 'year' ? 'shown' : 'total window'}`} accent="#993c1d" />
       </div>
 
-      <PaddleRevenue />
+      <CombinedProfit daily={daily} paddle={paddle} />
+      <PaddleRevenue d={paddle} err={paddleErr} />
 
       {/* Payout / due-date row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -282,13 +395,29 @@ export default function Finance() {
             <span key={k} className="flex items-center gap-1"><span style={{ width: 10, height: 10, borderRadius: 2, background: c.color, display: 'inline-block' }} />{c.label}</span>
           ))}
         </div>
-        {revBuckets.length ? <StackedBars buckets={revBuckets} order={['website', 'etsy', 'cults']} /> : <p className="text-xs text-ink-700/50 py-8 text-center">No revenue in range.</p>}
+        {revBuckets.length ? (
+          <Chart3D
+            title="Revenue by channel"
+            points={revBuckets.map((b) => ({ label: b.label, values: { etsy: b.seg.etsy || 0, website: b.seg.website || 0, cults: b.seg.cults || 0 } }))}
+            series={[
+              { key: 'etsy', label: 'Etsy', color: '#eb6834' },
+              { key: 'website', label: 'Website', color: '#2a78d6' },
+              { key: 'cults', label: 'Cults3D', color: '#1baf7a' },
+            ]}
+          />
+        ) : <p className="text-xs text-ink-700/50 py-8 text-center">No revenue in range.</p>}
       </Card>
 
       {/* Ad spend graph */}
       <Card>
         <div className="text-sm font-medium text-ink-900 mb-2">Etsy ad spend by {gran}</div>
-        {adBuckets.some((b) => b.total > 0) ? <StackedBars buckets={adBuckets.map((b) => ({ ...b, seg: { etsy: b.seg.etsy || 0 } }))} order={['etsy']} /> : <p className="text-xs text-ink-700/50 py-8 text-center">No ad spend recorded in range.</p>}
+        {adBuckets.some((b) => b.total > 0) ? (
+          <Chart3D
+            title="Etsy ad spend"
+            points={adBuckets.map((b) => ({ label: b.label, values: { etsy: b.seg.etsy || 0 } }))}
+            series={[{ key: 'etsy', label: 'Promoted Listings spend', color: '#993c1d' }]}
+          />
+        ) : <p className="text-xs text-ink-700/50 py-8 text-center">No ad spend recorded in range.</p>}
       </Card>
 
       <SubscriptionCosts />
