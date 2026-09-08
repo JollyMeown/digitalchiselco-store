@@ -74,6 +74,58 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string;
   );
 }
 
+// ── Website revenue, straight from Paddle ─────────────────────────────
+// Read from Paddle's own transaction records (/api/admin/paddle-stats), not
+// from our orders table, so mixed currencies are already converted and the fee
+// Paddle keeps is visible instead of hidden inside a gross number.
+function PaddleRevenue() {
+  const [d, setD] = useState<any>(null);
+  const [err, setErr] = useState('');
+  async function load() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch('/api/admin/paddle-stats', { headers: { authorization: `Bearer ${session?.access_token || ''}` } })
+      .then((x) => x.json()).catch(() => ({ error: 'bad response' }));
+    if (r?.error) setErr(r.error); else { setD(r); setErr(''); }
+  }
+  useEffect(() => { load(); }, []);
+  useLiveRefresh(load, 120000);
+
+  return (
+    <Card>
+      <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+        <h3 className="font-medium text-ink-900 text-sm">🌐 Website revenue (Paddle)</h3>
+        <span className="text-xs text-ink-700/55">from Paddle's own records · all currencies converted to {d?.currency || 'USD'}</span>
+        {d?.fetchedAt && <span className="ml-auto text-[11px] text-ink-700/40">{d.transactions} transactions · {new Date(d.fetchedAt).toLocaleTimeString()}</span>}
+      </div>
+      {err && <p className="text-xs text-red-600 mb-2">Could not reach Paddle: {err}</p>}
+      {!d && !err && <p className="text-xs text-ink-700/50">Loading from Paddle…</p>}
+      {d && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {d.periods.map((p: any) => (
+              <div key={p.key} className="rounded-lg border border-black/10 bg-white px-3 py-2.5">
+                <div className="text-[11px] uppercase tracking-wide text-ink-700/50">{p.key}</div>
+                <div className="text-2xl font-medium mt-0.5" style={{ color: '#1f9254' }}>{usd(p.earnings)}</div>
+                <div className="text-[11px] text-ink-700/60">yours after fees</div>
+                <div className="text-[11px] text-ink-700/50 mt-1">
+                  {usd(p.gross)} paid · {usd(p.fee)} fee
+                </div>
+                <div className="text-[11px] text-ink-700/40">
+                  {p.orders} order{p.orders === 1 ? '' : 's'}{p.note ? ` · ${p.note}` : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-ink-700/45 mt-2">
+            The big number is what Paddle pays you after its fee and tax. "Paid" is what buyers were charged, converted from
+            their currency by Paddle. Weeks start Monday; this month, last month and this year are calendar periods; last 3 months is a rolling 90 days.
+          </p>
+        </>
+      )}
+    </Card>
+  );
+}
+
 export default function Finance() {
   const [daily, setDaily] = useState<Daily[]>([]);
   const [status, setStatus] = useState<any>({});
@@ -82,7 +134,6 @@ export default function Finance() {
   const [loading, setLoading] = useState(true);
 
   const [web30, setWeb30] = useState(0);
-  const [webOrders, setWebOrders] = useState<Array<{ total: number; at: number }>>([]);
   useEffect(() => { load(); }, []);
   useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   async function load(silent = false) {
@@ -102,8 +153,6 @@ export default function Finance() {
       webByDay.set(day, (webByDay.get(day) || 0) + (Number(o.total) || 0));
       if (new Date(o.created_at).getTime() >= cut30) w30 += Number(o.total) || 0;
     }
-    // keep the raw paid orders so the Paddle period card can count orders too
-    setWebOrders(((ord || []) as any[]).map((o) => ({ total: Number(o.total) || 0, at: Date.parse(o.created_at) })).filter((o) => o.at));
     const cachedNonWebsite = ((d || []) as Daily[]).filter((r) => r.channel !== 'website');
     const liveWebsite: Daily[] = [...webByDay.entries()].map(([day, rev]) => ({ day, channel: 'website', revenue_usd: rev, ad_spend_usd: 0, fees_usd: 0 }));
     setDaily([...cachedNonWebsite, ...liveWebsite]);
@@ -118,33 +167,6 @@ export default function Finance() {
   const adBuckets = useMemo(() => rollup(daily.filter((x) => x.channel === 'etsy'), gran, 'ad_spend_usd', limit), [daily, gran, limit]);
   const totalRev = useMemo(() => daily.reduce((s, r) => s + Number(r.revenue_usd || 0), 0), [daily]);
   const totalAd = useMemo(() => daily.reduce((s, r) => s + Number(r.ad_spend_usd || 0), 0), [daily]);
-
-  // ── Website (Paddle) by period ────────────────────────────────────────
-  // Straight from paid orders, so a sale made a minute ago is already in it.
-  // Weeks start Monday; "this month", "last month" and "this year" are calendar
-  // periods; "last 3 months" is a rolling 90 days.
-  const paddlePeriods = useMemo(() => {
-    const now = new Date();
-    const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
-    const dow = (now.getDay() + 6) % 7;                             // Monday = 0
-    const weekStart = startOfDay(new Date(now.getTime() - dow * 86400000));
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
-    const yearStart = new Date(now.getFullYear(), 0, 1).getTime();
-    const d90 = now.getTime() - 90 * 86400000;
-    const sum = (from: number, to = Infinity) => {
-      const rows = webOrders.filter((o) => o.at >= from && o.at < to);
-      return { revenue: rows.reduce((s, o) => s + o.total, 0), orders: rows.length };
-    };
-    const label = new Date(lastMonthStart).toLocaleString(undefined, { month: 'long' });
-    return [
-      { key: 'This week', ...sum(weekStart), note: 'since Monday' },
-      { key: 'This month', ...sum(monthStart), note: now.toLocaleString(undefined, { month: 'long' }) },
-      { key: 'Last month', ...sum(lastMonthStart, monthStart), note: label },
-      { key: 'Last 3 months', ...sum(d90), note: 'rolling 90 days' },
-      { key: 'This year', ...sum(yearStart), note: String(now.getFullYear()) },
-    ];
-  }, [webOrders]);
 
   const ch = status.channels || {};
   const web = ch.website || {}, etsy = ch.etsy || {}, cults = ch.cults || {};
@@ -172,30 +194,7 @@ export default function Finance() {
         <StatCard label="Etsy ad spend" value={usd(totalAd)} sub={`Promoted Listings · ${gran === 'year' ? 'shown' : 'total window'}`} accent="#993c1d" />
       </div>
 
-      {/* Website (Paddle) by period — live from paid orders */}
-      <Card>
-        <div className="flex items-baseline gap-2 mb-3 flex-wrap">
-          <h3 className="font-medium text-ink-900 text-sm">🌐 Website revenue (Paddle)</h3>
-          <span className="text-xs text-ink-700/55">paid orders, live, gross before Paddle's fee</span>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {paddlePeriods.map((p) => (
-            <div key={p.key} className="rounded-lg border border-black/10 bg-white px-3 py-2.5">
-              <div className="text-[11px] uppercase tracking-wide text-ink-700/50">{p.key}</div>
-              <div className="text-2xl font-medium mt-0.5" style={{ color: '#2a78d6' }}>{usd(p.revenue)}</div>
-              <div className="text-[11px] text-ink-700/60">
-                {p.orders} order{p.orders === 1 ? '' : 's'}
-                {p.orders > 0 && <> · avg {usd(p.revenue / p.orders)}</>}
-              </div>
-              <div className="text-[11px] text-ink-700/40">{p.note}</div>
-            </div>
-          ))}
-        </div>
-        <p className="text-[11px] text-ink-700/45 mt-2">
-          Weeks start Monday. This month, last month and this year are calendar periods; last 3 months is a rolling 90 days.
-          Figures are what buyers paid; Paddle's fee and tax are deducted before payout.
-        </p>
-      </Card>
+      <PaddleRevenue />
 
       {/* Payout / due-date row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
