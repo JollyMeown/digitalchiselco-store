@@ -75,3 +75,5 @@ scripts/.video_duplicates.json
 .gmail_client.json
 .gmail_token_*.json
 etsy_buyers_*.csv
+scripts/seo/.zero_click_backup.json
+scripts/seo/.google_feed_pruned.json
