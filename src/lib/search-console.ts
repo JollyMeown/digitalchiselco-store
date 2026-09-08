@@ -141,11 +141,22 @@ export async function gscInspectUrl(url: string, token?: string): Promise<UrlSta
   };
 }
 
+// /sitemap.xml is a sitemap INDEX (see src/lib/sitemap.ts), so follow it one
+// level down to reach the page URLs. Still works if it is ever a flat urlset.
 async function sitemapUrls(): Promise<string[]> {
   const site = `https://${gscDomain()}`;
-  const res = await fetch(`${site}/sitemap.xml`, { headers: { 'user-agent': 'dcc-index-audit' } });
-  const xml = await res.text();
-  return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].replace(/&amp;/g, '&'));
+  const ua = { 'user-agent': 'dcc-index-audit' };
+  const locsOf = (xml: string) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].replace(/&amp;/g, '&'));
+  const root = await fetch(`${site}/sitemap.xml`, { headers: ua }).then((r) => r.text());
+  if (!/<sitemapindex/i.test(root)) return locsOf(root);
+  const urls: string[] = [];
+  for (const seg of locsOf(root)) {
+    try {
+      const xml = await fetch(seg, { headers: ua }).then((r) => r.text());
+      urls.push(...locsOf(xml));
+    } catch (e) { console.error('[gsc] sitemap segment failed:', seg, (e as any)?.message); }
+  }
+  return urls;
 }
 
 // Inspect up to `max` sitemap URLs, oldest-inspected first (never-inspected
