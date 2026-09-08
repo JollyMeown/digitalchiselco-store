@@ -14,6 +14,7 @@ import Reviews from './tabs/Reviews';
 import Faqs from './tabs/Faqs';
 import MembershipHub from './tabs/MembershipHub';
 import Finance from './tabs/Finance';
+import AdStrategy from './tabs/AdStrategy';
 import Traffic from './tabs/Traffic';
 import Insights from './tabs/Insights';
 import Automations from './tabs/Automations';
@@ -35,6 +36,7 @@ type Tab = { key: string; label: string; icon: string; Component: any };
 const TABS: Tab[] = [
   { key: 'overview',    label: 'Overview',     icon: '◎', Component: Overview },
   { key: 'finance',     label: 'Finance',      icon: '💰', Component: Finance },
+  { key: 'advertising', label: 'Advertising',  icon: '📣', Component: AdStrategy },
   { key: 'traffic',     label: 'Traffic',      icon: '📊', Component: Traffic },
   { key: 'insights',    label: 'Subscriber Insights', icon: '📈', Component: Insights },
   { key: 'automations', label: 'Automations',  icon: '🤖', Component: Automations },

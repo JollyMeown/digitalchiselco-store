@@ -16,6 +16,8 @@ echo --- link BRS-published products to their Etsy listings by title + fetch vid
 "C:\Program Files\nodejs\node.exe" scripts\etsy_link_videos.mjs >> finance-refresh.log 2>&1
 echo --- pull etsy videos for new products (missing only) --- >> finance-refresh.log
 "C:\Program Files\nodejs\node.exe" scripts\pull_etsy_videos.mjs >> finance-refresh.log 2>&1
+echo --- advertising data: order hours, listing view history, prolist charges --- >> finance-refresh.log
+"C:\Program Files\nodejs\node.exe" scripts\etsy_ads_sync.mjs >> finance-refresh.log 2>&1
 echo --- etsy per-listing stats (views/favorers for Design Scout) --- >> finance-refresh.log
 "C:\Program Files\nodejs\node.exe" scripts\etsy_listing_stats_sync.mjs >> finance-refresh.log 2>&1
 echo --- etsy SEO rewrite: after-snapshot (views/favs/sales per rewritten listing) --- >> finance-refresh.log
