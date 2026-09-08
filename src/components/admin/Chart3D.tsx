@@ -25,13 +25,18 @@ function shade(hex: string, f: number) {
 }
 
 export default function Chart3D({
-  points, series, height = 210, depth = 9, title,
-}: { points: Point[]; series: Series[]; height?: number; depth?: number; title?: string }) {
+  points, series, height = 210, depth = 9, title, showTotal = false,
+}: { points: Point[]; series: Series[]; height?: number; depth?: number; title?: string;
+  /** Print the sum of the series above each group. Only meaningful when the
+   *  series add up to something real (three channels of profit), never when
+   *  one series already contains another (revenue vs fee vs profit). */
+  showTotal?: boolean }) {
   const [hover, setHover] = useState<{ i: number; k: string } | null>(null);
   if (!points.length) return <p className="text-xs text-ink-700/50 py-8 text-center">Nothing to chart yet.</p>;
 
   const H = height;
-  const BAR = 13, GAP = 3, PAD_L = 44, PAD_R = 14, PAD_T = 16;
+  const BAR = 13, GAP = 3, PAD_L = 44, PAD_R = 14;
+  const PAD_T = showTotal ? 30 : 16;   // room for the total printed above a group
   const groupW = series.length * BAR + (series.length - 1) * GAP;
   const slot = groupW + 26;
   const W = PAD_L + points.length * slot + PAD_R;
@@ -74,8 +79,16 @@ export default function Chart3D({
 
         {points.map((p, i) => {
           const x0 = PAD_L + i * slot + 13;
+          const groupTotal = series.reduce((s, k) => s + (p.values[k.key] || 0), 0);
+          const tallest = Math.max(0, ...series.map((s) => p.values[s.key] || 0));
           return (
             <g key={i}>
+              {showTotal && groupTotal > 0 && (
+                <text x={x0 + groupW / 2 + depth / 2} y={y(tallest) - depth * 0.72 - 8} fontSize={10}
+                  textAnchor="middle" fill={p.muted ? '#c3bbae' : '#3a2a1a'} fontWeight={700}>
+                  {money(groupTotal)}
+                </text>
+              )}
               {series.map((s, j) => {
                 const v = p.values[s.key] || 0;
                 const x = x0 + j * (BAR + GAP);

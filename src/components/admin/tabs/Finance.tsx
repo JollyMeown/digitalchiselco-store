@@ -260,6 +260,7 @@ function CombinedProfit({ daily, paddle }: { daily: Daily[]; paddle: any }) {
       </div>
       <Chart3D
         title="Combined profit by month"
+        showTotal
         points={rows.map((r) => ({ label: r.label, muted: r.future, values: { etsy: r.etsy, paddle: r.paddle, cults: r.cults } }))}
         series={[
           { key: 'etsy', label: 'Etsy profit', color: '#eb6834' },
@@ -276,6 +277,84 @@ function CombinedProfit({ daily, paddle }: { daily: Daily[]; paddle: any }) {
         Profit, not revenue. Etsy is its revenue less Etsy's fees and Promoted Listings spend; the website is Paddle's own
         earnings figure after its fee and the tax it remits; Cults is the designer income it credits, already net of commission.
         Etsy and Cults come from the last local sync, the website is live from Paddle.
+      </p>
+    </Card>
+  );
+}
+
+// ── Etsy: ad spend beside the profit it left ──────────────────────────
+// Promoted Listings is the single biggest cost in the business, so the only
+// question that matters is whether each extra dollar of ads is still paying.
+// Profit here is Etsy revenue minus Etsy's fees minus the ad spend itself.
+function EtsyAds({ daily, gran, limit }: { daily: Daily[]; gran: Gran; limit: number }) {
+  const buckets = useMemo(() => {
+    const map = new Map<string, { label: string; rev: number; fee: number; ad: number }>();
+    for (const r of daily) {
+      if (r.channel !== 'etsy') continue;
+      const { key, label } = bucket(r.day, gran);
+      const b = map.get(key) || { label, rev: 0, fee: 0, ad: 0 };
+      b.rev += Number(r.revenue_usd) || 0;
+      b.fee += Number(r.fees_usd) || 0;
+      b.ad += Number(r.ad_spend_usd) || 0;
+      map.set(key, b);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-limit)
+      .map(([, v]) => ({ ...v, profit: v.rev - v.fee - v.ad }));
+  }, [daily, gran, limit]);
+
+  const tot = buckets.reduce((s, b) => ({ rev: s.rev + b.rev, fee: s.fee + b.fee, ad: s.ad + b.ad, profit: s.profit + b.profit }), { rev: 0, fee: 0, ad: 0, profit: 0 });
+  const adShare = tot.rev > 0 ? (100 * tot.ad) / tot.rev : 0;
+  const roas = tot.ad > 0 ? tot.rev / tot.ad : 0;
+  const profitPerAdDollar = tot.ad > 0 ? tot.profit / tot.ad : 0;
+  // is the ad share climbing? compare the latest three periods with the three before
+  const recent = buckets.slice(-3), prior = buckets.slice(-6, -3);
+  const shareOf = (rows: typeof buckets) => { const r = rows.reduce((s, b) => s + b.rev, 0); return r > 0 ? (100 * rows.reduce((s, b) => s + b.ad, 0)) / r : 0; };
+  const trend = recent.length && prior.length ? shareOf(recent) - shareOf(prior) : 0;
+
+  if (!buckets.some((b) => b.ad > 0)) {
+    return <Card><div className="text-sm font-medium text-ink-900 mb-2">Etsy ads by {gran}</div><p className="text-xs text-ink-700/50 py-8 text-center">No ad spend recorded in range.</p></Card>;
+  }
+  return (
+    <Card>
+      <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+        <h3 className="font-medium text-ink-900 text-sm">📣 Etsy ads vs profit by {gran}</h3>
+        <span className="text-xs text-ink-700/55">Promoted Listings is your largest cost, so watch the two together</span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="rounded-lg border border-black/10 bg-white px-3 py-2.5">
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Ad spend</div>
+          <div className="text-xl font-medium" style={{ color: '#993c1d' }}>{usd(tot.ad)}</div>
+          <div className="text-[11px] text-ink-700/55">{adShare.toFixed(0)}% of Etsy revenue</div>
+        </div>
+        <div className="rounded-lg border border-black/10 bg-white px-3 py-2.5">
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Etsy profit</div>
+          <div className="text-xl font-medium" style={{ color: '#1f9254' }}>{usd(tot.profit)}</div>
+          <div className="text-[11px] text-ink-700/55">after fees and ads</div>
+        </div>
+        <div className="rounded-lg border border-black/10 bg-white px-3 py-2.5">
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Return on ad spend</div>
+          <div className="text-xl font-medium text-ink-900">{roas.toFixed(1)}x</div>
+          <div className="text-[11px] text-ink-700/55">{usd(profitPerAdDollar)} profit per $1 of ads</div>
+        </div>
+        <div className={`rounded-lg border px-3 py-2.5 ${trend > 2 ? 'border-red-200 bg-red-50' : trend < -2 ? 'border-green-200 bg-green-50' : 'border-black/10 bg-white'}`}>
+          <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Ad share trend</div>
+          <div className={`text-xl font-medium ${trend > 2 ? 'text-red-700' : trend < -2 ? 'text-green-800' : 'text-ink-900'}`}>
+            {trend > 0 ? '+' : ''}{trend.toFixed(0)} pts
+          </div>
+          <div className="text-[11px] text-ink-700/55">last 3 {gran}s vs the 3 before</div>
+        </div>
+      </div>
+      <Chart3D
+        title="Etsy profit and ad spend"
+        points={buckets.map((b) => ({ label: b.label, values: { profit: Math.max(0, b.profit), ad: b.ad } }))}
+        series={[
+          { key: 'profit', label: 'Etsy profit (after fees and ads)', color: '#1f9254' },
+          { key: 'ad', label: 'Ad spend', color: '#993c1d' },
+        ]}
+      />
+      <p className="text-[11px] text-ink-700/45 mt-2 leading-relaxed">
+        Green is what the {gran} actually left you, red is what you paid Etsy for Promoted Listings. When the red bar grows
+        faster than the green one, the extra advertising is buying revenue that no longer pays for itself.
       </p>
     </Card>
   );
@@ -327,7 +406,6 @@ export default function Finance() {
 
   const limit = gran === 'week' ? 16 : gran === 'month' ? 13 : 5;
   const revBuckets = useMemo(() => rollup(daily, gran, 'revenue_usd', limit), [daily, gran, limit]);
-  const adBuckets = useMemo(() => rollup(daily.filter((x) => x.channel === 'etsy'), gran, 'ad_spend_usd', limit), [daily, gran, limit]);
   const totalRev = useMemo(() => daily.reduce((s, r) => s + Number(r.revenue_usd || 0), 0), [daily]);
   const totalAd = useMemo(() => daily.reduce((s, r) => s + Number(r.ad_spend_usd || 0), 0), [daily]);
 
@@ -408,17 +486,8 @@ export default function Finance() {
         ) : <p className="text-xs text-ink-700/50 py-8 text-center">No revenue in range.</p>}
       </Card>
 
-      {/* Ad spend graph */}
-      <Card>
-        <div className="text-sm font-medium text-ink-900 mb-2">Etsy ad spend by {gran}</div>
-        {adBuckets.some((b) => b.total > 0) ? (
-          <Chart3D
-            title="Etsy ad spend"
-            points={adBuckets.map((b) => ({ label: b.label, values: { etsy: b.seg.etsy || 0 } }))}
-            series={[{ key: 'etsy', label: 'Promoted Listings spend', color: '#993c1d' }]}
-          />
-        ) : <p className="text-xs text-ink-700/50 py-8 text-center">No ad spend recorded in range.</p>}
-      </Card>
+      {/* Etsy: what the ads cost against what they left you, same granularity */}
+      <EtsyAds daily={daily} gran={gran} limit={limit} />
 
       <SubscriptionCosts />
     </div>
