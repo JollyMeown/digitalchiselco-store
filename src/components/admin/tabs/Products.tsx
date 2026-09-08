@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls, linkColor } from '../ui';
 import ImageUpload from '../ImageUpload';
+import Lightbox from '../Lightbox';
 
 type Cat = { id: string; name: string; slug: string };
 type Row = {
@@ -346,6 +347,7 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [autoSlug, setAutoSlug] = useState(true);
+  const [zoom, setZoom] = useState<number | null>(null);   // index into zoomImages being viewed full size
 
   useEffect(() => {
     if (existing) {
@@ -373,6 +375,13 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
       category_ids: (p.product_categories || []).map((pc: any) => pc.category_id),
     });
   }
+
+  // Pictures for the zoom viewer: the gallery, plus the main image in front of
+  // it when that is not part of the gallery (normally main image = gallery[0]).
+  const galleryUrls = useMemo(() => String(f.gallery || '').split('\n').map((u: string) => u.trim()).filter(Boolean), [f.gallery]);
+  const mainUrl = String(f.image_url || '').trim();
+  const zoomImages = useMemo(() => (mainUrl && !galleryUrls.includes(mainUrl) ? [mainUrl, ...galleryUrls] : galleryUrls), [mainUrl, galleryUrls]);
+  const zoomOffset = zoomImages.length > galleryUrls.length ? 1 : 0;
 
   function set(k: string, v: any) {
     setF((s: any) => {
@@ -455,7 +464,9 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
           </select>
         </div>
         <div className="md:col-span-2">
-          <label className={labelCls}>Main image</label>
+          <label className={labelCls}>Main image
+            {mainUrl && <button type="button" className="ml-2 text-xs text-bronze-700 underline font-normal" onClick={() => setZoom(Math.max(0, zoomImages.indexOf(mainUrl)))}>🔍 zoom</button>}
+          </label>
           <ImageUpload value={f.image_url} onChange={(url) => set('image_url', url)} folder="products" />
         </div>
         <div className="md:col-span-2">
@@ -480,12 +491,19 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
                   // keep the site convention: hero (image_url) = gallery[0]
                   setF((s: any) => ({ ...s, gallery: urls.join('\n'), image_url: urls[0] || s.image_url }));
                 }}
-                title={i === 0 ? '⭐ Hero — shown on the catalog card and as the big product photo' : 'Drag to reposition (drop on another picture) — first place = hero'}
+                title={i === 0 ? '⭐ Hero — shown on the catalog card and as the big product photo. Click to zoom.' : 'Click to zoom · drag to reposition (drop on another picture), first place = hero'}
                 className="relative group w-20 h-20 rounded border border-black/10 overflow-hidden flex-shrink-0 cursor-grab active:cursor-grabbing">
                 <img src={url.trim()} className="w-full h-full object-cover pointer-events-none" />
                 {i === 0 && (
                   <span className="absolute bottom-0 left-0 right-0 bg-bronze-600/90 text-cream text-[9px] text-center py-0.5">⭐ HERO</span>
                 )}
+                {/* zoom: a dedicated button, so a click never fights the drag handler */}
+                <button
+                  type="button"
+                  title="Zoom to full size"
+                  onClick={() => setZoom(i + zoomOffset)}
+                  className="absolute bottom-0 left-0 bg-black/70 text-white text-xs w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                >🔍</button>
                 <button
                   type="button"
                   onClick={() => {
@@ -562,6 +580,14 @@ function ProductForm({ open, onClose, onSaved, existing, cats }: any) {
         <button className={btnGhost} onClick={onClose}>Cancel</button>
         <span className={'text-xs ' + (msg.startsWith('✓') ? 'text-green-700' : msg.startsWith('Error') ? 'text-red-600' : 'text-ink-700/60')}>{msg}</span>
       </div>
+      {zoom !== null && zoomImages.length > 0 && (
+        <Lightbox
+          images={zoomImages}
+          index={zoom}
+          onClose={() => setZoom(null)}
+          caption={(n) => (zoomImages[n] === mainUrl ? 'main image / hero' : `gallery picture ${n + 1 - zoomOffset}`)}
+        />
+      )}
     </Modal>
   );
 }

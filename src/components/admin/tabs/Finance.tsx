@@ -82,6 +82,7 @@ export default function Finance() {
   const [loading, setLoading] = useState(true);
 
   const [web30, setWeb30] = useState(0);
+  const [webOrders, setWebOrders] = useState<Array<{ total: number; at: number }>>([]);
   useEffect(() => { load(); }, []);
   useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   async function load(silent = false) {
@@ -101,6 +102,8 @@ export default function Finance() {
       webByDay.set(day, (webByDay.get(day) || 0) + (Number(o.total) || 0));
       if (new Date(o.created_at).getTime() >= cut30) w30 += Number(o.total) || 0;
     }
+    // keep the raw paid orders so the Paddle period card can count orders too
+    setWebOrders(((ord || []) as any[]).map((o) => ({ total: Number(o.total) || 0, at: Date.parse(o.created_at) })).filter((o) => o.at));
     const cachedNonWebsite = ((d || []) as Daily[]).filter((r) => r.channel !== 'website');
     const liveWebsite: Daily[] = [...webByDay.entries()].map(([day, rev]) => ({ day, channel: 'website', revenue_usd: rev, ad_spend_usd: 0, fees_usd: 0 }));
     setDaily([...cachedNonWebsite, ...liveWebsite]);
@@ -116,6 +119,33 @@ export default function Finance() {
   const totalRev = useMemo(() => daily.reduce((s, r) => s + Number(r.revenue_usd || 0), 0), [daily]);
   const totalAd = useMemo(() => daily.reduce((s, r) => s + Number(r.ad_spend_usd || 0), 0), [daily]);
 
+  // ── Website (Paddle) by period ────────────────────────────────────────
+  // Straight from paid orders, so a sale made a minute ago is already in it.
+  // Weeks start Monday; "this month", "last month" and "this year" are calendar
+  // periods; "last 3 months" is a rolling 90 days.
+  const paddlePeriods = useMemo(() => {
+    const now = new Date();
+    const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
+    const dow = (now.getDay() + 6) % 7;                             // Monday = 0
+    const weekStart = startOfDay(new Date(now.getTime() - dow * 86400000));
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+    const yearStart = new Date(now.getFullYear(), 0, 1).getTime();
+    const d90 = now.getTime() - 90 * 86400000;
+    const sum = (from: number, to = Infinity) => {
+      const rows = webOrders.filter((o) => o.at >= from && o.at < to);
+      return { revenue: rows.reduce((s, o) => s + o.total, 0), orders: rows.length };
+    };
+    const label = new Date(lastMonthStart).toLocaleString(undefined, { month: 'long' });
+    return [
+      { key: 'This week', ...sum(weekStart), note: 'since Monday' },
+      { key: 'This month', ...sum(monthStart), note: now.toLocaleString(undefined, { month: 'long' }) },
+      { key: 'Last month', ...sum(lastMonthStart, monthStart), note: label },
+      { key: 'Last 3 months', ...sum(d90), note: 'rolling 90 days' },
+      { key: 'This year', ...sum(yearStart), note: String(now.getFullYear()) },
+    ];
+  }, [webOrders]);
+
   const ch = status.channels || {};
   const web = ch.website || {}, etsy = ch.etsy || {}, cults = ch.cults || {};
 
@@ -127,7 +157,7 @@ export default function Finance() {
       <div className="flex flex-wrap items-center gap-2 text-xs text-ink-700/60">
         <span>💰 USD (Cults €→$ at {cults.eur_usd || '~1.08'}). <b>Website = live</b>; Etsy/Cults from last sync.</span>
         <span className="ml-auto">Etsy/Cults synced: {syncedAt ? new Date(syncedAt).toLocaleString() : 'never'}</span>
-        <button className="underline text-bronze-700" onClick={load}>reload</button>
+        <button className="underline text-bronze-700" onClick={() => load()}>reload</button>
       </div>
 
       {noData && (
@@ -141,6 +171,31 @@ export default function Finance() {
         <StatCard label="Cults3D available" value={eur(cults.available)} sub={`pending ${eur(cults.pending)}`} accent="#1baf7a" />
         <StatCard label="Etsy ad spend" value={usd(totalAd)} sub={`Promoted Listings · ${gran === 'year' ? 'shown' : 'total window'}`} accent="#993c1d" />
       </div>
+
+      {/* Website (Paddle) by period — live from paid orders */}
+      <Card>
+        <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+          <h3 className="font-medium text-ink-900 text-sm">🌐 Website revenue (Paddle)</h3>
+          <span className="text-xs text-ink-700/55">paid orders, live, gross before Paddle's fee</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {paddlePeriods.map((p) => (
+            <div key={p.key} className="rounded-lg border border-black/10 bg-white px-3 py-2.5">
+              <div className="text-[11px] uppercase tracking-wide text-ink-700/50">{p.key}</div>
+              <div className="text-2xl font-medium mt-0.5" style={{ color: '#2a78d6' }}>{usd(p.revenue)}</div>
+              <div className="text-[11px] text-ink-700/60">
+                {p.orders} order{p.orders === 1 ? '' : 's'}
+                {p.orders > 0 && <> · avg {usd(p.revenue / p.orders)}</>}
+              </div>
+              <div className="text-[11px] text-ink-700/40">{p.note}</div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-ink-700/45 mt-2">
+          Weeks start Monday. This month, last month and this year are calendar periods; last 3 months is a rolling 90 days.
+          Figures are what buyers paid; Paddle's fee and tax are deducted before payout.
+        </p>
+      </Card>
 
       {/* Payout / due-date row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
