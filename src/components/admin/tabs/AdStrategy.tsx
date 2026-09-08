@@ -42,10 +42,25 @@ export default function AdStrategy() {
     if (!r?.error) { setBudget(''); setReason(''); load(); }
   }
 
+  // A review is logged whether or not the number changes. A run of correct
+  // holds is evidence, and without this the log would only ever show changes.
+  async function logReview(action: string, note: string) {
+    setBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const n = d.now, r0 = d.recommendation;
+    const r = await fetch('/api/admin/ad-strategy', {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token || ''}` },
+      body: JSON.stringify({ review: { window_days: n.days, rev_per_day: n.revPerDay, ad_per_day: n.adPerDay, profit_per_day: n.profitPerDay, margin: n.revPerDay ? +((100 * n.profitPerDay) / n.revPerDay).toFixed(1) : null, ad_share: n.adShare, recommended: r0.daily, action, note } }),
+    }).then((x) => x.json()).catch(() => ({ error: 'bad response' }));
+    setBusy(false);
+    setMsg(r?.error || `Review logged. Next review ${r.nextReview}.`);
+    if (!r?.error) load();
+  }
+
   if (err) return <Card><p className="text-sm text-red-600">Could not load: {err}</p></Card>;
   if (!d) return <Card><p className="text-sm text-ink-700/60">Reading your advertising history…</p></Card>;
 
-  const rec = d.recommendation, now = d.now, L = d.listings;
+  const rec = d.recommendation, now = d.now, L = d.listings, plan = d.plan, NL = d.newListings;
   const hours = (d.hours || []).filter((h: any) => h.tz === tz).sort((a: any, b: any) => a.hour - b.hour);
   const totalOrders = hours.reduce((s: number, h: any) => s + h.orders, 0);
   const peak = [...hours].sort((a: any, b: any) => b.orders - a.orders).slice(0, 8).map((h: any) => h.hour).sort((a: number, b: number) => a - b);
@@ -59,6 +74,63 @@ export default function AdStrategy() {
         your own history, names the listings taking exposure without selling, and shows when orders really arrive.
         Etsy publishes no per-listing ad spend, so listing waste is measured by views without sales and labelled as such.
       </div>
+
+      {/* THE STANDING PLAN */}
+      <Card>
+        <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+          <h3 className="font-medium text-ink-900 text-sm">🗓️ The plan</h3>
+          <span className="text-xs text-ink-700/55">a budget is a decision with a review date on it, not a setting</span>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="rounded-lg border border-black/10 bg-white px-4 py-3">
+            <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Budget in force</div>
+            <div className="text-2xl font-bold text-ink-900">{plan.current != null ? usd(plan.current) : 'not set'}</div>
+            <div className="text-[11px] text-ink-700/55">
+              {plan.setOn ? `set ${new Date(plan.setOn).toLocaleDateString()}, held ${plan.daysHeld} day${plan.daysHeld === 1 ? '' : 's'}` : 'log the number you have in Etsy'}
+            </div>
+          </div>
+          <div className={`rounded-lg px-4 py-3 border ${plan.due ? 'border-amber-300 bg-amber-50' : 'border-black/10 bg-white'}`}>
+            <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Next review</div>
+            <div className="text-2xl font-medium text-ink-900">{plan.reviewOn ? new Date(plan.reviewOn + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'}</div>
+            <div className="text-[11px] text-ink-700/55">
+              {plan.due ? 'due now' : plan.daysToReview != null ? `in ${plan.daysToReview} days` : ''}
+              {plan.cadence ? `, every ${plan.cadence} days` : ''}
+            </div>
+          </div>
+          <div className="rounded-lg border border-black/10 bg-white px-4 py-3">
+            <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Since the change</div>
+            <div className="text-2xl font-medium" style={{ color: '#1f9254' }}>{plan.sinceChange ? usd(plan.sinceChange.profitPerDay) : '—'}</div>
+            <div className="text-[11px] text-ink-700/55">
+              {plan.sinceChange ? `profit per day over ${plan.sinceChange.days} day${plan.sinceChange.days === 1 ? '' : 's'}, ${plan.sinceChange.margin}% margin` : 'measured from the day it was set'}
+            </div>
+          </div>
+          <div className={`rounded-lg px-4 py-3 border-2 ${plan.action === 'hold' ? 'border-green-300 bg-green-50' : plan.action === 'cut' ? 'border-red-300 bg-red-50' : plan.action === 'wait' ? 'border-amber-300 bg-amber-50' : 'border-sky-300 bg-sky-50'}`}>
+            <div className="text-[10px] uppercase tracking-wide text-ink-700/50">Call today</div>
+            <div className="text-2xl font-bold text-ink-900 capitalize">{plan.action === 'wait' ? 'Leave it' : plan.action}</div>
+            <div className="text-[11px] text-ink-700/60">
+              {plan.action === 'wait' ? `only ${plan.daysHeld} day${plan.daysHeld === 1 ? '' : 's'} at this budget, judge it at the review`
+                : plan.action === 'hold' ? `spend is inside the target band at ${plan.shareSinceChange ?? now.adShare}% of revenue`
+                : plan.action === 'cut' ? `spend has drifted above ${rec.targetShare}% of revenue`
+                : `there is room up to ${usd(plan.ceiling)}/day`}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-bronze-600/20 bg-cream/40 px-3 py-2.5 text-xs text-ink-700/80">
+          <b>How this runs.</b> The budget is set as a share of revenue, never as a fixed sum, because a fixed sum quietly
+          becomes too large the moment sales soften. The guard rails are <b>{usd(plan.floor)} floor</b> and <b>{usd(plan.ceiling)} ceiling</b> at
+          today's {usd(now.revPerDay)}/day of revenue, with {rec.targetShare}% as the aim. On the review date the days since the change are
+          compared with the days before it, the verdict is written into the log below, and the clock restarts. Every review is
+          recorded even when the answer is to leave the number alone, so the log becomes the pattern rather than a list of changes.
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] text-ink-700/55">Log today's review:</span>
+          <button className={btnGhost} disabled={busy} onClick={() => logReview('hold', `held ${usd(plan.current)}/day, ad share ${now.adShare}%`)}>✅ Held it</button>
+          <button className={btnGhost} disabled={busy} onClick={() => logReview('cut', 'cut after review')}>🔻 Cut it</button>
+          <button className={btnGhost} disabled={busy} onClick={() => logReview('raise', 'raised after review')}>🔺 Raised it</button>
+        </div>
+      </Card>
 
       {/* THE DECISION */}
       <Card>
@@ -183,8 +255,15 @@ export default function AdStrategy() {
           zero sales, which is where advertising money goes without returning. Those listings hold{' '}
           <b>{Math.round((100 * L.wasteViews) / Math.max(1, L.totalViews))}%</b> of all your views.
           {L.wasteBasis === 'views' && ' Recent-view tracking starts from today, so this improves after a few days of history.'}
-          {' '}Switch them off in Etsy under Marketing, Etsy Ads, Manage advertised listings.
+          {' '}<b>Edit</b> opens the listing straight in Etsy's editor so advertising can be switched off there.
         </p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <a href="https://www.etsy.com/your/shops/me/advertising" target="_blank" rel="noreferrer" className={btnGhost}>📣 Etsy Ads: manage advertised listings ↗</a>
+          <button className={btnGhost} onClick={() => {
+            const ids = L.waste.map((l: any) => l.listing_id).join('\n');
+            navigator.clipboard.writeText(ids).then(() => setMsg(`${L.waste.length} listing ids copied`), () => setMsg('copy failed'));
+          }}>📋 Copy these listing ids</button>
+        </div>
         <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="text-ink-700/60 text-left sticky top-0 bg-white">
@@ -197,7 +276,11 @@ export default function AdStrategy() {
                   <td className="p-1.5 text-right font-medium text-red-700">{(L.wasteBasis === 'recentViews' ? l.recentViews : l.views)?.toLocaleString?.() ?? 0}</td>
                   <td className="p-1.5 text-right text-ink-700/60">{l.favorers}</td>
                   <td className="p-1.5 text-right">0</td>
-                  <td className="p-1.5"><a href={`https://www.etsy.com/listing/${l.listing_id}`} target="_blank" rel="noreferrer" className="text-bronze-700 underline">open ↗</a></td>
+                  <td className="p-1.5 whitespace-nowrap">
+                    {/* straight into the listing editor, where advertising can be switched off */}
+                    <a href={`https://www.etsy.com/your/shops/me/tools/listings/${l.listing_id}`} target="_blank" rel="noreferrer" className="text-bronze-700 underline font-medium">edit ↗</a>
+                    <a href={`https://www.etsy.com/listing/${l.listing_id}`} target="_blank" rel="noreferrer" className="text-ink-700/50 underline ml-2">view</a>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -230,23 +313,100 @@ export default function AdStrategy() {
         </div>
       </Card>
 
-      {/* HISTORY */}
-      {d.budgets?.length > 0 && (
+      {/* NEW LISTINGS: should advertising go on automatically? */}
+      {NL?.bands?.length > 0 && (
         <Card>
-          <h3 className="font-medium text-ink-900 text-sm mb-2">Budget changes</h3>
-          <table className="w-full text-xs">
-            <thead className="text-ink-700/60 text-left"><tr><th className="p-1.5">When</th><th className="p-1.5 text-right">From</th><th className="p-1.5 text-right">To</th><th className="p-1.5">Why</th></tr></thead>
-            <tbody>
-              {d.budgets.map((b: any) => (
-                <tr key={b.id} className="border-t border-black/5">
-                  <td className="p-1.5">{new Date(b.changed_at).toLocaleDateString()}</td>
-                  <td className="p-1.5 text-right text-ink-700/60">{b.previous_budget != null ? usd(b.previous_budget) : '—'}</td>
-                  <td className="p-1.5 text-right font-medium">{usd(b.daily_budget)}</td>
-                  <td className="p-1.5 text-ink-700/70">{b.reason || ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+            <h3 className="font-medium text-ink-900 text-sm">🌱 Should a new listing be advertised?</h3>
+            <span className="text-xs text-ink-700/55">how listings of each age have actually performed in this shop</span>
+          </div>
+          <p className="text-[11px] text-ink-700/60 mb-3">
+            A sale is worth <b>{usd(NL.netPerOrder)}</b> after Etsy's cut, on a {usd(NL.aov)} average order. A sale takes about{' '}
+            <b>{NL.viewsPerSale} views</b>, so a visit is worth at most <b>{NL.breakevenCpc != null ? '$' + NL.breakevenCpc.toFixed(2) : '—'}</b> on a
+            listing converting like the rest of the shop, and <b>{NL.breakevenCpcWeak != null ? '$' + NL.breakevenCpcWeak.toFixed(2) : '—'}</b> on one
+            converting half as well. Anything above that is paid for out of profit.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-ink-700/60 text-left">
+                <tr><th className="p-1.5">Listing age</th><th className="p-1.5 text-right">Listings</th><th className="p-1.5 text-right">Ever sold</th><th className="p-1.5 text-right">Avg views</th><th className="p-1.5 text-right">Views per sale</th><th className="p-1.5 text-right">Sales each</th></tr>
+              </thead>
+              <tbody>
+                {NL.bands.map((b: any) => (
+                  <tr key={b.band} className="border-t border-black/5">
+                    <td className="p-1.5">{b.band}</td>
+                    <td className="p-1.5 text-right text-ink-700/60">{b.listings}</td>
+                    <td className="p-1.5 text-right font-medium" style={{ color: b.soldPct >= 50 ? '#1f9254' : b.soldPct >= 20 ? '#a16207' : '#b91c1c' }}>{b.soldPct}%</td>
+                    <td className="p-1.5 text-right text-ink-700/60">{b.avgViews.toLocaleString()}</td>
+                    <td className="p-1.5 text-right text-ink-700/60">{b.viewsPerSale ?? '—'}</td>
+                    <td className="p-1.5 text-right">{b.salesPerListing}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-ink-700/60 mt-2">
+            Read the "ever sold" column downwards. If new listings sold at anything like the rate of settled ones, advertising
+            every launch would pay for itself. Where the top rows sit far below the bottom rows, a launch is unproven rather
+            than slow, and the sound approach is a short capped test on each new listing, then budget only for the ones that
+            convert. The test is capped in days and in money so a launch that does nothing stops costing anything.
+          </p>
+        </Card>
+      )}
+
+      {/* HISTORY: every budget with what it actually produced */}
+      {d.history?.length > 0 && (
+        <Card>
+          <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+            <h3 className="font-medium text-ink-900 text-sm">📒 Budget log and what each one produced</h3>
+            <span className="text-xs text-ink-700/55">the pattern builds here, one period at a time</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-ink-700/60 text-left">
+                <tr><th className="p-1.5">Period</th><th className="p-1.5 text-right">Budget</th><th className="p-1.5 text-right">Spent/day</th><th className="p-1.5 text-right">Revenue/day</th><th className="p-1.5 text-right">Profit/day</th><th className="p-1.5 text-right">Margin</th><th className="p-1.5">Why</th></tr>
+              </thead>
+              <tbody>
+                {d.history.map((b: any) => (
+                  <tr key={b.id} className="border-t border-black/5 align-top">
+                    <td className="p-1.5 whitespace-nowrap">
+                      {new Date(b.from + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                      <span className="text-ink-700/40"> to {new Date(b.to + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
+                      <div className="text-[10px] text-ink-700/40">{b.result.days} day{b.result.days === 1 ? '' : 's'}{b.result.thin ? ', too short to judge' : ''}{b.source === 'claude' ? ' · proposed here' : ''}</div>
+                    </td>
+                    <td className="p-1.5 text-right font-medium">
+                      {usd(b.daily_budget)}
+                      {b.previous_budget != null && <div className="text-[10px] text-ink-700/40">from {usd(b.previous_budget)}</div>}
+                    </td>
+                    <td className="p-1.5 text-right text-ink-700/60">{b.result.days ? usd(b.result.adPerDay) : '—'}</td>
+                    <td className="p-1.5 text-right text-ink-700/60">{b.result.days ? usd(b.result.revPerDay) : '—'}</td>
+                    <td className="p-1.5 text-right font-medium" style={{ color: '#1f9254' }}>{b.result.days ? usd(b.result.profitPerDay) : '—'}</td>
+                    <td className="p-1.5 text-right">
+                      {b.result.margin != null ? b.result.margin + '%' : '—'}
+                      {b.vsPrevious && (
+                        <div className="text-[10px]" style={{ color: b.vsPrevious.margin >= 0 ? '#1f9254' : '#b91c1c' }}>
+                          {b.vsPrevious.margin >= 0 ? '+' : ''}{b.vsPrevious.margin} pts
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-1.5 text-ink-700/70">{b.reason || ''}{b.expectation ? <div className="text-[10px] text-ink-700/45">expected: {b.expectation}</div> : null}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {d.reviews?.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-black/10">
+              <div className="text-[10px] uppercase tracking-wide text-ink-700/50 mb-1">Reviews</div>
+              <ul className="text-[11px] text-ink-700/70 space-y-0.5">
+                {d.reviews.map((r: any) => (
+                  <li key={r.id}>
+                    {new Date(r.reviewed_at).toLocaleDateString()} · <b className="capitalize">{r.action}</b> · {usd(r.rev_per_day)}/day revenue, {r.ad_share}% on ads, {r.margin}% margin{r.note ? ` · ${r.note}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Card>
       )}
     </div>

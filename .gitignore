@@ -77,3 +77,4 @@ scripts/.video_duplicates.json
 etsy_buyers_*.csv
 scripts/seo/.zero_click_backup.json
 scripts/seo/.google_feed_pruned.json
+etsy_ads_turn_off.csv

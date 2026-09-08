@@ -14,7 +14,7 @@ console.log(`listing stats: shop ${shop.shop_name} (${shop.shop_id})`);
 
 // Only roll prev← current when the last sync is older than 20h, so re-running
 // the cmd twice in a day never zeroes the deltas.
-const { data: existing } = await db.from('etsy_listing_stats').select('listing_id, views, favorers, updated_at').limit(5000);
+const { data: existing } = await db.from('etsy_listing_stats').select('listing_id, views, favorers, views_prev, favorers_prev, updated_at').limit(5000);
 const prior = new Map((existing || []).map((r) => [Number(r.listing_id), r]));
 const cutoff = Date.now() - 20 * 3600 * 1000;
 
@@ -31,8 +31,15 @@ for (;;) {
       title: String(l.title || '').slice(0, 300),
       views: Number(l.views) || 0,
       favorers: Number(l.num_favorers) || 0,
-      views_prev: old ? (stale ? old.views : undefined) : Number(l.views) || 0,
-      favorers_prev: old ? (stale ? old.favorers : undefined) : Number(l.num_favorers) || 0,
+      // Always send both, never undefined: PostgREST unions the keys across a
+      // batch and writes NULL wherever a row omits one, so a mixed batch of
+      // stale and fresh rows used to fail the not-null constraint outright.
+      // Not stale yet means carry the existing baseline forward unchanged.
+      views_prev: old ? (stale ? old.views : old.views_prev) : Number(l.views) || 0,
+      favorers_prev: old ? (stale ? old.favorers : old.favorers_prev) : Number(l.num_favorers) || 0,
+      // publication date, so age can be separated from performance: an unproven
+      // new listing and a proven-dead old one need opposite decisions
+      listing_created: new Date((l.original_creation_timestamp || l.creation_timestamp || 0) * 1000).toISOString().slice(0, 10),
       updated_at: new Date().toISOString(),
     };
   }).map((r) => Object.fromEntries(Object.entries(r).filter(([, v]) => v !== undefined)));

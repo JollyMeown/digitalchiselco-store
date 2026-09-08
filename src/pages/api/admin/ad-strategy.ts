@@ -75,6 +75,50 @@ function tiers(days: Day[]) {
   }).filter((t) => t.days > 0);
 }
 
+/** Measure what actually happened while each logged budget was in force.
+ *
+ *  A budget is only ever as good as the fortnight that followed it, and memory
+ *  is not evidence. Each log row therefore gets the trading days between its
+ *  own change and the next one, so the log turns into this shop's own record of
+ *  what every level did. Periods shorter than 5 days are marked thin rather
+ *  than hidden, because a short period is still a fact, just a weak one. */
+function periods(budgets: any[], all: Day[]) {
+  const asc = [...budgets].sort((a, b) => String(a.changed_at).localeCompare(String(b.changed_at)));
+  const today = new Date().toISOString().slice(0, 10);
+  const out = asc.map((b, i) => {
+    const from = String(b.changed_at).slice(0, 10);
+    // A budget logged today runs to today, never to yesterday: changed_at is
+    // stamped in UTC while the shop's own clock can already be on the next day.
+    const to = i + 1 < asc.length ? String(asc[i + 1].changed_at).slice(0, 10) : (today > from ? today : from);
+    const rows = all.filter((d) => d.day >= from && d.day < to);
+    const n = rows.length || 1;
+    const rev = rows.reduce((s, d) => s + d.rev, 0);
+    const ad = rows.reduce((s, d) => s + d.ad, 0);
+    const profit = rows.reduce((s, d) => s + d.profit, 0);
+    return {
+      ...b, from, to,
+      result: {
+        days: rows.length,
+        revPerDay: +(rev / n).toFixed(2),
+        adPerDay: +(ad / n).toFixed(2),
+        profitPerDay: +(profit / n).toFixed(2),
+        margin: rev > 0 ? +((100 * profit) / rev).toFixed(1) : null,
+        adShare: rev > 0 ? +((100 * ad) / rev).toFixed(1) : null,
+        thin: rows.length < 5,
+      },
+    };
+  });
+  // compare each period with the one before it, which is the only comparison
+  // that answers "did changing the number help?"
+  for (let i = 1; i < out.length; i++) {
+    const a = out[i - 1].result, b = out[i].result;
+    (out[i] as any).vsPrevious = (a.margin != null && b.margin != null)
+      ? { margin: +(b.margin - a.margin).toFixed(1), profitPerDay: +(b.profitPerDay - a.profitPerDay).toFixed(2), revPerDay: +(b.revPerDay - a.revPerDay).toFixed(2) }
+      : null;
+  }
+  return out.reverse();
+}
+
 export const GET: APIRoute = async ({ request }) => {
   const who = await caller(request);
   if (!who.ok) return json({ error: 'Admin authentication required.' }, 401);
@@ -83,8 +127,8 @@ export const GET: APIRoute = async ({ request }) => {
     const [{ data: fin }, { data: hours }, { data: budgets }, { data: stats }, { data: prods }, { data: hist }] = await Promise.all([
       fetchAll((a, b) => db.from('finance_daily').select('day, revenue_usd, fees_usd, ad_spend_usd').eq('channel', 'etsy').order('day').range(a, b)).then((data) => ({ data })),
       db.from('etsy_order_hours').select('*').then((r) => ({ data: r.data })),
-      db.from('ad_budget_log').select('*').order('changed_at', { ascending: false }).limit(20).then((r) => ({ data: r.data })),
-      fetchAll((a, b) => db.from('etsy_listing_stats').select('listing_id, title, views, favorers').range(a, b)).then((data) => ({ data })),
+      db.from('ad_budget_log').select('*').order('changed_at', { ascending: false }).limit(30).then((r) => ({ data: r.data })),
+      fetchAll((a, b) => db.from('etsy_listing_stats').select('listing_id, title, views, favorers, listing_created').range(a, b)).then((data) => ({ data })),
       fetchAll((a, b) => db.from('products').select('etsy_listing_id, etsy_sales_365, slug').not('etsy_listing_id', 'is', null).range(a, b)).then((data) => ({ data })),
       fetchAll((a, b) => db.from('etsy_listing_history').select('listing_id, day, views').gte('day', new Date(Date.now() - 45 * 86400000).toISOString().slice(0, 10)).range(a, b)).then((data) => ({ data })),
     ]);
@@ -139,6 +183,7 @@ export const GET: APIRoute = async ({ request }) => {
         listing_id: k, title: String(s.title || '').split('|')[0].trim(),
         views, favorers: Number(s.favorers) || 0, sales, slug: p?.slug || null,
         recentViews: grow,
+        ageDays: s.listing_created ? Math.round((Date.now() - Date.parse(s.listing_created + 'T00:00:00Z')) / 86400000) : null,
         // views per sale: how much exposure each sale costs. High with zero
         // sales means the listing takes attention and returns nothing.
         conversion: sales && views ? +((100 * sales) / views).toFixed(2) : 0,
@@ -153,17 +198,118 @@ export const GET: APIRoute = async ({ request }) => {
     const wasteViews = listings.filter((l) => l.sales === 0).reduce((s, l) => s + (haveGrowth ? (l.recentViews || 0) : l.views), 0);
     const totalViews = listings.reduce((s, l) => s + (haveGrowth ? (l.recentViews || 0) : l.views), 0);
 
+    // ── should a brand new listing be advertised? ──
+    // Answered by the shop's own age curve rather than by Etsy's advice. Each
+    // band reports how many listings that old have EVER sold, which is the only
+    // honest way to price the risk of putting money behind an unproven one.
+    // Net per order is what a sale is actually worth after Etsy's cut, so the
+    // breakeven cost per visit follows directly from the views a sale takes.
+    const withAge = listings.filter((l) => l.ageDays != null);
+    const ageBands = [
+      { key: 'Under 30 days', lo: 0, hi: 30 }, { key: '30 to 60 days', lo: 30, hi: 60 },
+      { key: '60 to 90 days', lo: 60, hi: 90 }, { key: '90 to 180 days', lo: 90, hi: 180 },
+      { key: 'Over 180 days', lo: 180, hi: Infinity },
+    ].map((b) => {
+      const g = withAge.filter((l) => (l.ageDays as number) >= b.lo && (l.ageDays as number) < b.hi);
+      const sold = g.filter((l) => (l.sales || 0) > 0).length;
+      const v = g.reduce((s, l) => s + l.views, 0);
+      const sa = g.reduce((s, l) => s + (l.sales || 0), 0);
+      return {
+        band: b.key, listings: g.length,
+        soldPct: g.length ? Math.round((100 * sold) / g.length) : 0,
+        avgViews: g.length ? Math.round(v / g.length) : 0,
+        viewsPerSale: sa ? Math.round(v / sa) : null,
+        salesPerListing: g.length ? +(sa / g.length).toFixed(2) : 0,
+      };
+    }).filter((b) => b.listings > 0);
+    const soldAll = listings.filter((l) => (l.sales || 0) > 0);
+    const viewsPerSale = soldAll.length
+      ? Math.round(soldAll.reduce((s, l) => s + l.views, 0) / Math.max(1, soldAll.reduce((s, l) => s + (l.sales || 0), 0)))
+      : null;
+    const yearDays = all.filter((d) => d.rev > 0);
+    const yearRev = yearDays.reduce((s, d) => s + d.rev, 0);
+    const yearFee = yearDays.reduce((s, d) => s + d.fee, 0);
+    const orders = (hours || []).filter((h: any) => h.tz === 'Asia/Karachi').reduce((s: number, h: any) => s + (h.orders || 0), 0);
+    const aov = orders ? yearRev / orders : 0;
+    const netPerOrder = aov * (yearRev > 0 ? 1 - yearFee / yearRev : 1);
+    const newListings = {
+      bands: ageBands,
+      aov: +aov.toFixed(2),
+      netPerOrder: +netPerOrder.toFixed(2),
+      viewsPerSale,
+      // the most a click can be worth on a listing that converts like the rest
+      // of the shop, and on one that converts half as well
+      breakevenCpc: viewsPerSale ? +(netPerOrder / viewsPerSale).toFixed(3) : null,
+      breakevenCpcWeak: viewsPerSale ? +(netPerOrder / (viewsPerSale * 2)).toFixed(3) : null,
+    };
+
     const winners = listings.filter((l) => (l.sales || 0) >= 3).sort((a, b) => (b.sales || 0) - (a.sales || 0)).slice(0, 40);
     const sold = listings.filter((l) => (l.sales || 0) > 0);
 
+    // ── the standing plan ──
+    // A budget is a decision with a date on it, not a setting. The live row is
+    // the number in force; review_on is when it gets judged. Two weeks is the
+    // shortest window that can separate an ad effect from ordinary day-to-day
+    // noise on 13 orders a day.
+    const { data: reviews } = await db.from('ad_reviews').select('*').order('reviewed_at', { ascending: false }).limit(12);
+    const live = (budgets || [])[0] || null;
+    const today = new Date().toISOString().slice(0, 10);
+    const reviewOn = live?.review_on || null;
+    const daysToReview = reviewOn ? Math.round((new Date(reviewOn + 'T00:00:00Z').getTime() - new Date(today + 'T00:00:00Z').getTime()) / 86400000) : null;
+    const held = live ? all.filter((d) => d.day >= String(live.changed_at).slice(0, 10)) : [];
+    const heldRev = held.reduce((s, d) => s + d.rev, 0);
+    const heldProfit = held.reduce((s, d) => s + d.profit, 0);
+    // What to do at the review. Drift, not the raw gap, is what matters: the
+    // budget is right when spend sits inside the best-margin band, so the
+    // action follows ad share, not dollars.
+    // The call must be made on the days the CURRENT budget has been in force.
+    // The trailing fortnight still carries the previous budget's spending for
+    // two weeks after a change, so reading it would tell the owner to cut a
+    // budget they have only just cut.
+    const shareHeld = heldRev > 0 ? (100 * held.reduce((s, d) => s + d.ad, 0)) / heldRev : null;
+    const shareTrailing = revPerDay ? (100 * adPerDayNow) / revPerDay : 0;
+    const shareNow = shareHeld ?? shareTrailing;
+    const action = !live ? 'set'
+      : held.length < 5 ? 'wait'
+      : shareNow > targetShare + 6 ? 'cut'
+      : shareNow < targetShare - 6 ? 'raise' : 'hold';
+    const plan = {
+      current: live ? Number(live.daily_budget) : null,
+      setOn: live?.changed_at || null,
+      source: live?.source || 'owner',
+      expectation: live?.expectation || null,
+      reviewOn, daysToReview,
+      due: daysToReview != null && daysToReview <= 0,
+      daysHeld: held.length,
+      sinceChange: held.length ? {
+        days: held.length,
+        revPerDay: +(heldRev / held.length).toFixed(2),
+        profitPerDay: +(heldProfit / held.length).toFixed(2),
+        margin: heldRev > 0 ? +((100 * heldProfit) / heldRev).toFixed(1) : null,
+      } : null,
+      action,
+      // which days the call was made on, so the card can say so plainly
+      basis: held.length >= 5 ? 'since the change' : 'not enough days yet',
+      shareSinceChange: shareHeld != null ? +shareHeld.toFixed(1) : null,
+      nextBudget: recommended,
+      // the guard rails the recommendation must always respect
+      floor: Math.max(5, Math.round(0.10 * revPerDay)),
+      ceiling: Math.round(0.25 * revPerDay),
+      cadence: 14,
+    };
+
     return json({
       ok: true,
+      plan,
+      history: periods(budgets || [], all),
+      reviews: reviews || [],
       now: { revPerDay: +revPerDay.toFixed(2), adPerDay: +adPerDayNow.toFixed(2), profitPerDay: +profitPerDayNow.toFixed(2), adShare: revPerDay ? +((100 * adPerDayNow) / revPerDay).toFixed(1) : 0, days: recent.length },
       recommendation: { daily: recommended, targetShare, basedOn: best?.band || null, bestProfitPerDay: best?.profitPerDay ?? null, currentBudget, gap },
       tiers: band,
       budgets: budgets || [],
       hours: hours || [],
       listings: { total: listings.length, sold: sold.length, dead: listings.length - sold.length, wasteViews, totalViews, wasteBasis, waste, winners },
+      newListings,
       historyDays: new Set((hist || []).map((h: any) => h.day)).size,
       fetchedAt: new Date().toISOString(),
     });
@@ -172,23 +318,57 @@ export const GET: APIRoute = async ({ request }) => {
   }
 };
 
-// Record a budget change so the next review can judge it against what followed.
+// Two things get written here, and both matter to the pattern:
+//   a BUDGET CHANGE, stamped with the date it will be judged on, and
+//   a REVIEW, which records the look at the numbers even when the answer was
+//   "leave it alone". Without the second, the log would only ever contain
+//   changes, and a run of correct holds would look like months of inactivity.
 export const POST: APIRoute = async ({ request }) => {
   const who = await caller(request);
   if (!who.ok) return json({ error: 'Admin authentication required.' }, 401);
   try {
     const b = await request.json().catch(() => ({} as any));
+
+    if (b.review) {
+      const db = supabaseAdmin();
+      const { data: live } = await db.from('ad_budget_log').select('id').order('changed_at', { ascending: false }).limit(1);
+      const next = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+      const r = b.review as any;
+      const { error } = await db.from('ad_reviews').insert({
+        budget_id: live?.[0]?.id ?? null,
+        window_days: Number(r.window_days) || 14,
+        rev_per_day: Number(r.rev_per_day) || null,
+        ad_per_day: Number(r.ad_per_day) || null,
+        profit_per_day: Number(r.profit_per_day) || null,
+        margin: Number(r.margin) || null,
+        ad_share: Number(r.ad_share) || null,
+        recommended: Number(r.recommended) || null,
+        action: ['hold', 'raise', 'cut', 'set'].includes(String(r.action)) ? String(r.action) : 'hold',
+        note: String(r.note || '').slice(0, 500) || null,
+        next_review: next,
+      });
+      if (error) return json({ error: error.message }, 500);
+      // push the live budget's next review out, so holding restarts the clock
+      if (live?.[0]?.id) await db.from('ad_budget_log').update({ review_on: next, reviewed_at: new Date().toISOString() }).eq('id', live[0].id);
+      return json({ ok: true, nextReview: next });
+    }
+
     const daily = Number(b.daily_budget);
     if (!Number.isFinite(daily) || daily < 0 || daily > 1000) return json({ error: 'daily_budget must be between 0 and 1000' }, 400);
     const db = supabaseAdmin();
     const { data: prev } = await db.from('ad_budget_log').select('daily_budget').order('changed_at', { ascending: false }).limit(1);
+    // every budget is set with the date it will be judged on, a fortnight out
+    const review = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
     const { error } = await db.from('ad_budget_log').insert({
       daily_budget: daily,
       previous_budget: prev?.[0]?.daily_budget ?? null,
       reason: String(b.reason || '').slice(0, 300) || null,
       set_by: who.email || 'admin',
+      source: b.source === 'claude' ? 'claude' : 'owner',
+      expectation: String(b.expectation || '').slice(0, 300) || null,
+      review_on: review,
     });
     if (error) return json({ error: error.message }, 500);
-    return json({ ok: true });
+    return json({ ok: true, reviewOn: review });
   } catch (e: any) { return json({ error: e?.message || 'failed' }, 500); }
 };
