@@ -211,6 +211,70 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   // GUARANTEED pass: 20 recruit invites before the digest can drain the day.
   stats.makerRecruitDrip = 'off';
   if (g.maker_recruit_drip_enabled) {
+  // ORDER MATTERS (2026-09-09): the one-time welcome runs FIRST. On the
+  // night of 2026-09-08 the weekly digest, maker recruiting and the guide drip
+  // spent the daily budget before this step was reached, so all 400 welcomes
+  // due to newly imported Etsy buyers were deferred. A digest can wait a day,
+  // a first hello to a new buyer cannot.
+  // ── 4b. Etsy-buyer welcome (one-time) ───────────────────────────────
+  // Any imported Etsy buyer we have not welcomed yet gets ONE welcome email
+  // with this week's newest designs + a 10% code. Deduped by etsy_welcome_log
+  // (PK on email), so a retry or the manual script can never double-send.
+  stats.etsyWelcome = 'off';
+  await step(stats, 'etsyWelcome', async () => {
+    if (!g.etsy_welcome_enabled) return;
+    const s = { candidates: 0, sent: 0, failed: 0 };
+    const { data: buyers } = await fetchAll((a, b) => db.from('subscribers').select('email')
+      .eq('source', 'etsy-buyer').not('confirmed_at', 'is', null).is('unsubscribed_at', null).range(a, b)).then((data) => ({ data }));
+    const { data: done } = await fetchAll((a, b) => db.from('etsy_welcome_log').select('email').range(a, b)).then((data) => ({ data }));
+    const welcomed = new Set((done || []).map((r) => r.email.toLowerCase()));
+    const TEST = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
+    // Warm-up: a big import (1,962 buyers on 2026-09-06) must not hit the
+    // sending domain all at once; at most this many welcomes per night, the
+    // rest follow on the next nights automatically.
+    const ETSY_WELCOME_MAX_PER_RUN = 400;
+    const pendingAll = [...new Set((buyers || []).map((r) => r.email.toLowerCase().trim()))]
+      .filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !TEST.test(e) && !welcomed.has(e));
+    const pending = pendingAll.slice(0, ETSY_WELCOME_MAX_PER_RUN);
+    s.candidates = pendingAll.length;
+    if (pendingAll.length > pending.length) (s as any).note = `${pendingAll.length - pending.length} more welcomes wait for the next nights (warm-up, ${ETSY_WELCOME_MAX_PER_RUN}/night)`;
+    if (pending.length) {
+      // this week's newest designs (up to 12 shown) + total count for the link
+      const sinceIso = daysAgo(7);
+      const [{ data: fresh }, { count: totalNew }] = await Promise.all([
+        db.from('products').select('title, slug, price_usd, image_url')
+          .eq('active', true).gte('created_at', sinceIso)
+          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
+          .order('created_at', { ascending: false }).limit(12),
+        db.from('products').select('id', { count: 'exact', head: true })
+          .eq('active', true).gte('created_at', sinceIso)
+          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null),
+      ]);
+      const products = (fresh || []) as MiniProduct[];
+      const total = totalNew || products.length;
+      const tags = [{ name: 'kind', value: 'etsy-welcome' }];
+      for (let c = 0; c < pending.length; c += 100) {
+        const batch = pending.slice(c, c + 100);
+        const chunk = batch.map((email) => {
+          const { subject, html, text } = withOvr('etsyWelcome',
+            etsyWelcomeEmail({ email, products, totalNew: total, code: 'THANKYOU10' }), email);
+          return { to: email, subject, html, text, tags };
+        });
+        // Idempotency key = hash of this batch's recipients (stable across
+        // retries, unique per recipient set, never a positional-index collision).
+        const idem = 'etsy-welcome:' + createHash('sha256').update([...batch].sort().join(',')).digest('hex').slice(0, 32);
+        const res = await sendBatch(chunk, idem);
+        if (res.ok) {
+          s.sent += res.sent;
+          // mark them welcomed so we never send again
+          await db.from('etsy_welcome_log').upsert(batch.map((email) => ({ email })), { onConflict: 'email', ignoreDuplicates: true });
+        } else s.failed += batch.length;
+      }
+    }
+    stats.etsyWelcome = s;
+  });
+
+
     await step(stats, 'makerRecruitDrip', async () => {
       const { marketingBudgetRemaining } = await import('./resend');
       const budget = await marketingBudgetRemaining();
@@ -376,6 +440,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       await runRecruitDrip(target, 'makerRecruitDripExtra');
     });
   }
+
 
 
   // ── 1. nurture drip ─────────────────────────────────────────────────
@@ -673,64 +738,6 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       if (s.loyalty >= 20) break;                                          // safety cap per run
     }
     stats.followups = s;
-  });
-
-  // ── 4b. Etsy-buyer welcome (one-time) ───────────────────────────────
-  // Any imported Etsy buyer we have not welcomed yet gets ONE welcome email
-  // with this week's newest designs + a 10% code. Deduped by etsy_welcome_log
-  // (PK on email), so a retry or the manual script can never double-send.
-  stats.etsyWelcome = 'off';
-  await step(stats, 'etsyWelcome', async () => {
-    if (!g.etsy_welcome_enabled) return;
-    const s = { candidates: 0, sent: 0, failed: 0 };
-    const { data: buyers } = await fetchAll((a, b) => db.from('subscribers').select('email')
-      .eq('source', 'etsy-buyer').not('confirmed_at', 'is', null).is('unsubscribed_at', null).range(a, b)).then((data) => ({ data }));
-    const { data: done } = await fetchAll((a, b) => db.from('etsy_welcome_log').select('email').range(a, b)).then((data) => ({ data }));
-    const welcomed = new Set((done || []).map((r) => r.email.toLowerCase()));
-    const TEST = /fake|mailinator|@example\.|@test\.|\.invalid|localhost/i;
-    // Warm-up: a big import (1,962 buyers on 2026-09-06) must not hit the
-    // sending domain all at once; at most this many welcomes per night, the
-    // rest follow on the next nights automatically.
-    const ETSY_WELCOME_MAX_PER_RUN = 400;
-    const pendingAll = [...new Set((buyers || []).map((r) => r.email.toLowerCase().trim()))]
-      .filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !TEST.test(e) && !welcomed.has(e));
-    const pending = pendingAll.slice(0, ETSY_WELCOME_MAX_PER_RUN);
-    s.candidates = pendingAll.length;
-    if (pendingAll.length > pending.length) (s as any).note = `${pendingAll.length - pending.length} more welcomes wait for the next nights (warm-up, ${ETSY_WELCOME_MAX_PER_RUN}/night)`;
-    if (pending.length) {
-      // this week's newest designs (up to 12 shown) + total count for the link
-      const sinceIso = daysAgo(7);
-      const [{ data: fresh }, { count: totalNew }] = await Promise.all([
-        db.from('products').select('title, slug, price_usd, image_url')
-          .eq('active', true).gte('created_at', sinceIso)
-          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
-          .order('created_at', { ascending: false }).limit(12),
-        db.from('products').select('id', { count: 'exact', head: true })
-          .eq('active', true).gte('created_at', sinceIso)
-          .not('slug', 'like', 'gift-card-%').not('image_url', 'is', null),
-      ]);
-      const products = (fresh || []) as MiniProduct[];
-      const total = totalNew || products.length;
-      const tags = [{ name: 'kind', value: 'etsy-welcome' }];
-      for (let c = 0; c < pending.length; c += 100) {
-        const batch = pending.slice(c, c + 100);
-        const chunk = batch.map((email) => {
-          const { subject, html, text } = withOvr('etsyWelcome',
-            etsyWelcomeEmail({ email, products, totalNew: total, code: 'THANKYOU10' }), email);
-          return { to: email, subject, html, text, tags };
-        });
-        // Idempotency key = hash of this batch's recipients (stable across
-        // retries, unique per recipient set, never a positional-index collision).
-        const idem = 'etsy-welcome:' + createHash('sha256').update([...batch].sort().join(',')).digest('hex').slice(0, 32);
-        const res = await sendBatch(chunk, idem);
-        if (res.ok) {
-          s.sent += res.sent;
-          // mark them welcomed so we never send again
-          await db.from('etsy_welcome_log').upsert(batch.map((email) => ({ email })), { onConflict: 'email', ignoreDuplicates: true });
-        } else s.failed += batch.length;
-      }
-    }
-    stats.etsyWelcome = s;
   });
 
   // ── 4c. Custom-design pitch (one-time) ──────────────────────────────
