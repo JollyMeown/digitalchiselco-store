@@ -106,19 +106,70 @@ function PaddleRevenue() {
               <div key={p.key} className="rounded-lg border border-black/10 bg-white px-3 py-2.5">
                 <div className="text-[11px] uppercase tracking-wide text-ink-700/50">{p.key}</div>
                 <div className="text-2xl font-medium mt-0.5" style={{ color: '#1f9254' }}>{usd(p.earnings)}</div>
-                <div className="text-[11px] text-ink-700/60">yours after fees</div>
-                <div className="text-[11px] text-ink-700/50 mt-1">
-                  {usd(p.gross)} paid · {usd(p.fee)} fee
-                </div>
+                <div className="text-[11px] text-ink-700/60">yours after fee and tax</div>
+                <div className="text-[11px] text-ink-700/50 mt-1">{usd(p.gross)} paid · {usd(p.fee)} fee</div>
                 <div className="text-[11px] text-ink-700/40">
                   {p.orders} order{p.orders === 1 ? '' : 's'}{p.note ? ` · ${p.note}` : ''}
                 </div>
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-ink-700/45 mt-2">
-            The big number is what Paddle pays you after its fee and tax. "Paid" is what buyers were charged, converted from
-            their currency by Paddle. Weeks start Monday; this month, last month and this year are calendar periods; last 3 months is a rolling 90 days.
+
+          {/* Month by month: what buyers paid, what tax and Paddle took, what is left */}
+          {d.byMonth?.length > 0 && (
+            <div className="mt-4">
+              <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
+                <h4 className="text-sm font-medium text-ink-900">Month by month</h4>
+                <span className="text-[11px] text-ink-700/55">what you pay Paddle, and what reaches you</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="text-ink-700/60 text-left">
+                    <tr>
+                      <th className="p-1.5">Month</th>
+                      <th className="p-1.5 text-right">Orders</th>
+                      <th className="p-1.5 text-right">Buyers paid</th>
+                      <th className="p-1.5 text-right">Tax</th>
+                      <th className="p-1.5 text-right">Paddle fee</th>
+                      <th className="p-1.5 text-right">Fee %</th>
+                      <th className="p-1.5 text-right">You earn</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.byMonth.map((m: any) => (
+                      <tr key={m.month} className="border-t border-black/5">
+                        <td className="p-1.5">{new Date(m.month + '-02').toLocaleString('en-US', { month: 'long', year: 'numeric' })}</td>
+                        <td className="p-1.5 text-right">{m.orders}</td>
+                        <td className="p-1.5 text-right">{usd(m.gross)}</td>
+                        <td className="p-1.5 text-right text-ink-700/60">{usd(m.tax)}</td>
+                        <td className="p-1.5 text-right text-red-700">{usd(m.fee)}</td>
+                        <td className="p-1.5 text-right text-ink-700/60">{m.feePct}%</td>
+                        <td className="p-1.5 text-right font-medium text-green-800">{usd(m.earnings)}</td>
+                      </tr>
+                    ))}
+                    {d.allTime && (
+                      <tr className="border-t-2 border-black/15 font-medium">
+                        <td className="p-1.5">All time</td>
+                        <td className="p-1.5 text-right">{d.allTime.orders}</td>
+                        <td className="p-1.5 text-right">{usd(d.allTime.gross)}</td>
+                        <td className="p-1.5 text-right text-ink-700/60">{usd(d.allTime.tax)}</td>
+                        <td className="p-1.5 text-right text-red-700">{usd(d.allTime.fee)}</td>
+                        <td className="p-1.5 text-right text-ink-700/60">{d.allTime.gross ? (100 * d.allTime.fee / d.allTime.gross).toFixed(1) : 0}%</td>
+                        <td className="p-1.5 text-right text-green-800">{usd(d.allTime.earnings)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <p className="text-[11px] text-ink-700/45 mt-3 leading-relaxed">
+            Every figure is Paddle's own, converted to {d.currency} by Paddle. A buyer's payment splits three ways:
+            sales tax and VAT that Paddle collects and remits for you, Paddle's fee, and your earnings.
+            <b> A payout is not a calendar month:</b> Paddle settles on its own schedule and may cover more than one month,
+            so compare a payout against the months above rather than a single one.
+            Weeks start Monday; this month, last month and this year are calendar periods; last 3 months is a rolling 90 days.
           </p>
         </>
       )}

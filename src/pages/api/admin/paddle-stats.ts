@@ -32,7 +32,7 @@ async function isCallerAdmin(request: Request): Promise<boolean> {
   return !!prof?.is_admin;
 }
 
-type Txn = { at: number; gross: number; fee: number; earnings: number; ccy: string; charged: number; chargedCcy: string };
+type Txn = { at: number; gross: number; tax: number; fee: number; earnings: number; ccy: string; charged: number; chargedCcy: string };
 
 async function fetchTransactions(sinceIso: string): Promise<Txn[]> {
   const key = env('PADDLE_API_KEY');
@@ -53,6 +53,7 @@ async function fetchTransactions(sinceIso: string): Promise<Txn[]> {
       out.push({
         at: Date.parse(t.billed_at || t.created_at),
         gross: Number(p?.grand_total ?? tot.grand_total ?? 0) / 100,
+        tax: Number(p?.tax ?? tot.tax ?? 0) / 100,
         fee: Number(p?.fee ?? tot.fee ?? 0) / 100,
         earnings: Number(p?.earnings ?? tot.earnings ?? 0) / 100,
         ccy: String(p?.currency_code || tot.currency_code || 'USD'),
@@ -84,6 +85,7 @@ export const GET: APIRoute = async ({ request }) => {
       const rows = txns.filter((t) => t.at >= from && t.at < to);
       return {
         gross: +rows.reduce((s, t) => s + t.gross, 0).toFixed(2),
+        tax: +rows.reduce((s, t) => s + t.tax, 0).toFixed(2),
         fee: +rows.reduce((s, t) => s + t.fee, 0).toFixed(2),
         earnings: +rows.reduce((s, t) => s + t.earnings, 0).toFixed(2),
         orders: rows.length,
@@ -97,7 +99,32 @@ export const GET: APIRoute = async ({ request }) => {
       { key: 'Last 3 months', note: 'rolling 90 days', ...bucket(d90.getTime()) },
       { key: 'This year', note: String(now.getFullYear()), ...bucket(yearStart.getTime()) },
     ];
-    return json({ ok: true, periods, currency: txns[0]?.ccy || 'USD', fetchedAt: new Date().toISOString(), transactions: txns.length });
+    // Month by month, every month the account has ever billed, so "what do I
+    // pay Paddle" is answerable at a glance and a payout can be reconciled
+    // against the months it covers.
+    const all = await fetchTransactions('2020-01-01T00:00:00Z');
+    const months: Record<string, any> = {};
+    for (const t of all) {
+      const k = new Date(t.at).toISOString().slice(0, 7);
+      const b = (months[k] ||= { month: k, gross: 0, tax: 0, fee: 0, earnings: 0, orders: 0 });
+      b.gross += t.gross; b.tax += t.tax; b.fee += t.fee; b.earnings += t.earnings; b.orders++;
+    }
+    const byMonth = Object.values(months)
+      .map((b: any) => ({
+        ...b,
+        gross: +b.gross.toFixed(2), tax: +b.tax.toFixed(2), fee: +b.fee.toFixed(2), earnings: +b.earnings.toFixed(2),
+        feePct: b.gross > 0 ? +((100 * b.fee) / b.gross).toFixed(1) : 0,
+      }))
+      .sort((a: any, b: any) => b.month.localeCompare(a.month));
+    const allTime = {
+      gross: +all.reduce((s, t) => s + t.gross, 0).toFixed(2),
+      tax: +all.reduce((s, t) => s + t.tax, 0).toFixed(2),
+      fee: +all.reduce((s, t) => s + t.fee, 0).toFixed(2),
+      earnings: +all.reduce((s, t) => s + t.earnings, 0).toFixed(2),
+      orders: all.length,
+    };
+
+    return json({ ok: true, periods, byMonth, allTime, currency: txns[0]?.ccy || all[0]?.ccy || 'USD', fetchedAt: new Date().toISOString(), transactions: all.length });
   } catch (e: any) {
     return json({ error: e?.message || 'Paddle query failed' }, 502);
   }
