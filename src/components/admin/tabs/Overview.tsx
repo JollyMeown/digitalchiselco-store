@@ -409,7 +409,11 @@ function SystemHealth() {
         supabase.from('abandoned_carts').select('id', { count: 'exact', head: true }).is('recovered_at', null).is('reminded_at', null),
         supabase.from('poll_status').select('ran_at, ok, note, runner').eq('key', 'cults_sales').maybeSingle(),
         supabase.from('cults_sales').select('sold_at, income, currency, product_name').order('sold_at', { ascending: false }).limit(1),
-        pageAll((a, b) => supabase.from('products').select('id, slug').eq('active', true).gt('price_usd', 0).order('id').range(a, b)),
+        // Live products AND the ones the database held back for having no file
+        // (migration 118). Without the second half a held product would vanish
+        // from this tile the moment the guard did its job, which is exactly
+        // when the owner needs to see it.
+        pageAll((a, b) => supabase.from('products').select('id, slug, title, active, held_missing_file, is_subscription, membership_plan_slug').or('active.eq.true,held_missing_file.eq.true').gt('price_usd', 0).order('id').range(a, b)),
         pageAll((a, b) => supabase.from('product_downloads').select('product_id').order('id').range(a, b)),
       ]);
       // Admin-controlled daily cap (Automations tab); falls back to 180.
@@ -417,7 +421,13 @@ function SystemHealth() {
       const dailyCap = Number(gsCap?.email_daily_cap) || 180;
       // Sellable products with NO download row = a buyer would receive nothing.
       const hasDl = new Set(dlRows.map((r: any) => r.product_id));
-      const missingFile = actProds.filter((p: any) => !hasDl.has(p.id) && !/^gift-card|membership/i.test(p.slug)).map((p: any) => p.slug);
+      // Keep the whole row, not just the slug: naming the product and being
+      // able to open it is the difference between a warning and a fix.
+      // Exempt what the download engine was never going to deliver: memberships
+      // and gift cards are fulfilled elsewhere. Same rule as the database
+      // trigger, so the tile and the guard can never disagree.
+      const exempt = (p: any) => p.is_subscription || p.membership_plan_slug || /^gift-card|membership/i.test(p.slug || '');
+      const missingFile = actProds.filter((p: any) => !hasDl.has(p.id) && !exempt(p));
       // weekly pending count
       let pending = 0, sentWk = 0;
       if (wk?.[0]) {
@@ -485,8 +495,43 @@ function SystemHealth() {
         <Tile state={orderState} icon="🧾" label="Last order" value={h.lastOrder ? `$${Number(h.lastOrder.total).toFixed(2)}` : 'none'} sub={h.lastOrder ? (lastAgeH < 1 ? 'just now' : lastAgeH < 48 ? `${Math.round(lastAgeH)}h ago` : `${Math.round(lastAgeH / 24)}d ago`) : ''} href="#orders" />
         <Tile state={cartsState} icon="🛒" label="Open carts" value={String(h.openCarts)} sub="awaiting reminder" href="#insights" />
         <Tile state={cultsState} icon="◈" label="Cults3D sale alerts" value={cultsText} sub={cultsSub} href="#cults" />
-        <Tile state={fileState} icon="📎" label="Products missing file" value={h.missingFile.length ? `${h.missingFile.length} broken` : 'all have files'} sub={h.missingFile.length ? 'buyer would get NOTHING: ' + h.missingFile.join(', ') : 'every sellable product has a download'} href="#products" />
+        <Tile state={fileState} icon="📎" label="Products missing file" value={h.missingFile.length ? `${h.missingFile.length} broken` : 'all have files'} sub={h.missingFile.length ? 'buyer would get NOTHING · listed below' : 'every sellable product has a download'} href="#products" />
       </div>
+
+      {/* Naming the broken product is the whole point of the tile. The Products
+          tab searches on title, so the title is handed over rather than the
+          slug, and the tab picks it up from sessionStorage on mount. */}
+      {h.missingFile.length > 0 && (
+        <div className="mt-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2.5">
+          <div className="text-xs font-medium text-red-900 mb-1">
+            {h.missingFile.length === 1 ? 'This product has no download file' : `${h.missingFile.length} products have no download file`}.
+            {h.missingFile.some((p: any) => p.active) ? ' A buyer would pay and receive nothing.' : ' Held off the storefront until the file arrives.'}
+          </div>
+          <ul className="space-y-1">
+            {h.missingFile.slice(0, 10).map((p: any) => (
+              <li key={p.id} className="flex items-center gap-2 flex-wrap text-[11px]">
+                <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide font-medium ${p.active ? 'bg-red-200 text-red-900' : 'bg-amber-200 text-amber-900'}`}>
+                  {p.active ? 'live' : 'held as draft'}
+                </span>
+                <button
+                  className="underline text-red-900 font-medium text-left"
+                  onClick={() => {
+                    try { sessionStorage.setItem('admin:productQuery', p.title || p.slug); } catch { /* private mode */ }
+                    window.location.hash = 'products';
+                    window.dispatchEvent(new CustomEvent('admin:product-search', { detail: p.title || p.slug }));
+                  }}
+                >{p.title || p.slug}</button>
+                <a href={`/product/${p.slug}`} target="_blank" rel="noreferrer" className="text-red-900/60 underline">view ↗</a>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[10px] text-red-900/70 mt-1.5">
+            Clicking the name opens Products with this one already searched. A product that arrives without a file is now
+            held as a draft by the database, and publishes itself the moment its download is added, so nothing sellable can
+            go live empty.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

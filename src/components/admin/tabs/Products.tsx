@@ -19,7 +19,12 @@ const slugify = (s: string) =>
 export default function Products() {
   const [rows, setRows] = useState<Row[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
-  const [q, setQ] = useState('');
+  // Overview's health tiles hand a product over by name (the search matches on
+  // title), so "1 broken" leads straight to the product instead of the list.
+  const [q, setQ] = useState(() => {
+    try { const pre = sessionStorage.getItem('admin:productQuery'); if (pre) { sessionStorage.removeItem('admin:productQuery'); return pre; } } catch {}
+    return '';
+  });
   const [catFilter, setCatFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>(() => {
     // the 🟠 moderation banner's "Review now" jumps here pre-filtered to pending
@@ -47,6 +52,12 @@ export default function Products() {
   const reqIdRef = useRef(0);
 
   useEffect(() => { loadCats(); }, []);
+  // …and when the tab is already mounted, the same hand-over arrives as an event
+  useEffect(() => {
+    const on = (e: Event) => { const t = (e as CustomEvent).detail; if (typeof t === 'string' && t) { setQ(t); setStatusFilter('all'); } };
+    window.addEventListener('admin:product-search', on);
+    return () => window.removeEventListener('admin:product-search', on);
+  }, []);
   // Debounce the search box so each keystroke doesn't spam Supabase. 220ms feels
   // instant but collapses a 6-char "bundle" type into a single round-trip.
   useEffect(() => {
