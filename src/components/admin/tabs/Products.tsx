@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnPrimary, btnDanger, inputCls, labelCls, linkColor } from '../ui';
 import ImageUpload from '../ImageUpload';
 import Lightbox from '../Lightbox';
+import LinkCompare from '../LinkCompare';
 
 type Cat = { id: string; name: string; slug: string };
 type Row = {
@@ -53,6 +54,7 @@ export default function Products() {
   const [report, setReport] = useState<any | null>(null);
   const [names, setNames] = useState<Record<string, string | null>>({});
   const [naming, setNaming] = useState(false);
+  const [compare, setCompare] = useState(false);
   // Monotonic request id — guards against an older in-flight load() overwriting
   // a newer result. Without this, typing fast in the search box could "snap
   // back" to the unfiltered 200 rows.
@@ -259,12 +261,15 @@ export default function Products() {
           )}
           <span className="text-xs text-ink-700/60 ml-auto">{visibleRows.length} of {rows.length} shown</span>
           <button className={btnGhost} disabled={checking} onClick={runDownloadCheck} title="Scans the WHOLE catalogue for products with no download file, empty links, or one file attached to several products. Run it after a BRS upload run.">{checking ? 'Checking…' : '🔎 Check download links'}</button>
+          <button className={btnGhost} onClick={() => setCompare(true)} title="Shows the products that share one file side by side, with their pictures and their Etsy listings, so the wrong one can be repointed.">🔍 Compare shared files</button>
           <button className={btnGhost} onClick={() => setImportOpen(true)} title="Bulk import products from a CSV">⇪ Import CSV</button>
           <button className={btnPrimary} onClick={() => setCreating(true)}>+ New product</button>
         </div>
       </Card>
 
       <CsvImportModal open={importOpen} onClose={() => setImportOpen(false)} onDone={() => { setImportOpen(false); load(); }} />
+
+      {compare && <LinkCompare onClose={() => { setCompare(false); load(); }} />}
 
       {report && (() => {
         const T = report.totals;
