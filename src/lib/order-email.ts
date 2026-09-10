@@ -135,30 +135,47 @@ export async function buildOrderConfirmationForOrder(
 export async function sendOrderConfirmationForOrder(
   db: SupabaseClient,
   orderId: string,
-  opts: { reason: string; force?: boolean },
+  // `to` overrides the buyer's own address. Needed when their mailbox rejects
+  // us: a hard bounce puts the address on Resend's suppression list, and every
+  // later send to it is accepted by the API and then quietly dropped, so the
+  // buyer pays and receives nothing through no fault of ours. Proven on
+  // 2026-09-08, where one order out of seventeen produced no delivery event at
+  // all because the address had bounced three weeks earlier.
+  opts: { reason: string; force?: boolean; to?: string },
 ): Promise<{ ok: boolean; sent?: boolean; error?: string; email?: string; skippedWhy?: string }> {
   const built = await buildOrderConfirmationForOrder(db, orderId);
   if (!built.ok) return { ok: false, error: built.error };
   const { order, subject, html, text } = built;
   if (order.status !== 'paid') return { ok: false, error: `order status is '${order.status}', not paid`, email: order.email };
   if (order.confirmation_sent_at && !opts.force) return { ok: true, sent: false, email: order.email, skippedWhy: 'already sent ' + order.confirmation_sent_at };
+  const target = (opts.to || '').trim() || order.email;
+  const redirected = target.toLowerCase() !== String(order.email).toLowerCase();
 
   const res = await sendEmail({
-    to: order.email,
+    to: target,
     subject,
     html,
     text,
     // Fresh key per attempt: the original webhook send used `order:<id>`, and
     // Resend's idempotency window would swallow a same-key retry as a no-op.
-    idempotencyKey: `order:${order.id}:${opts.reason}:${new Date().toISOString().slice(0, 13)}`,
+    // the alternate address gets its own key, so redirecting is never swallowed
+    // as a duplicate of the send that already failed to reach the buyer
+    idempotencyKey: `order:${order.id}:${opts.reason}:${redirected ? target : ''}:${new Date().toISOString().slice(0, 13)}`,
     tags: [{ name: 'kind', value: 'order' }],
     attachments: [{ filename: PORTAL_GUIDE_FILENAME, path: PORTAL_GUIDE_URL }],
   });
   if (res.ok && !res.skipped) {
     await db.from('orders').update({ confirmation_sent_at: new Date().toISOString() }).eq('id', order.id);
-    return { ok: true, sent: true, email: order.email };
+    // A redirected delivery is worth remembering: the next person to look at
+    // this order should see where the files actually went.
+    if (redirected) {
+      const { data: cur } = await db.from('orders').select('admin_note').eq('id', order.id).maybeSingle();
+      const note = `${new Date().toISOString().slice(0, 16).replace('T', ' ')} files re-sent to ${target} (buyer address ${order.email} not reachable)`;
+      await db.from('orders').update({ admin_note: [cur?.admin_note, note].filter(Boolean).join('\n') }).eq('id', order.id);
+    }
+    return { ok: true, sent: true, email: target };
   }
-  return { ok: false, sent: false, email: order.email, error: res.error || (res.skipped ? 'Resend not configured' : 'send failed') };
+  return { ok: false, sent: false, email: target, error: res.error || (res.skipped ? 'Resend not configured' : 'send failed') };
 }
 
 // Grace period before the sweep resends: the webhook normally delivers within

@@ -34,6 +34,9 @@ export const POST: APIRoute = async ({ request }) => {
     if (!b.ok) return json({ ok: false, error: b.error }, 502);
     return json({ ok: true, subject: b.subject, html: b.html, email: b.order.email });
   }
-  const r = await sendOrderConfirmationForOrder(supabaseAdmin(), orderId, { reason: 'admin', force: body?.force !== false });
+  // Optional alternate recipient, for a buyer whose own mailbox rejects us.
+  const alt = String(body?.to || '').trim();
+  if (alt && !/^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(alt)) return json({ error: 'That does not look like an email address.' }, 400);
+  const r = await sendOrderConfirmationForOrder(supabaseAdmin(), orderId, { reason: 'admin', force: body?.force !== false, to: alt || undefined });
   return json(r, r.ok ? 200 : 502);
 };

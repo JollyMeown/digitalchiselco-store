@@ -47,16 +47,24 @@ export default function Orders() {
     } catch (e: any) { alert(String(e?.message || e)); }
     setPreviewing(false);
   }
-  async function resendEmail(id: string) {
+  // `to` sends the same files to a different address. A buyer whose mailbox
+  // has hard-bounced once is on Resend's suppression list, so every resend to
+  // their own address is accepted and then dropped; the only way to reach them
+  // is somewhere else. The redirect is written into the order's admin note.
+  async function resendEmail(id: string, to?: string) {
     setResending(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch('/api/admin/resend-order-email', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ order_id: id, force: true }) });
+      const res = await fetch('/api/admin/resend-order-email', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ order_id: id, force: true, to: to || undefined }) });
       const j = await res.json();
       alert(j.ok && j.sent ? `Confirmation email sent to ${j.email}.` : `Send failed: ${j.error || res.status}`);
       load(true);
     } catch (e: any) { alert(String(e?.message || e)); }
     setResending(false);
+  }
+  function resendElsewhere(id: string, current: string) {
+    const to = prompt(`Send this order's files to a different address.\n\nThe buyer gave ${current}. If their mail provider rejected us, that address will keep failing silently, so enter the address they asked you to use instead.`, '');
+    if (to && to.trim()) resendEmail(id, to.trim());
   }
   async function setStatusFor(id: string, s: string) {
     await supabase.from('orders').update({ status: s }).eq('id', id);
@@ -236,6 +244,7 @@ export default function Orders() {
               ))}
               <button className={btnGhost} disabled={previewing} onClick={() => previewEmail(open.id)} title="Opens the exact rebuilt confirmation email in a new tab without sending anything">{previewing ? 'Building…' : '👁 Preview email'}</button>
               <button className={open.confirmation_sent_at ? btnGhost : btnPrimary} disabled={resending} onClick={() => resendEmail(open.id)} title="Rebuilds the order confirmation with all download links and emails it to the buyer now (bypasses the daily marketing quota)">{resending ? 'Sending…' : '📧 Resend download email'}</button>
+              <button className={btnGhost} disabled={resending} onClick={() => resendElsewhere(open.id, open.email)} title="Same files, different address. Use this when the buyer's own mailbox rejects our email, which happens silently once an address has hard-bounced.">✉️ Send to another address</button>
               <a href={`/admin/invoice/${open.id}`} target="_blank" className={btnGhost}>Invoice ↗</a>
               <div className="ml-auto flex gap-2">
                 {open.deleted_at
