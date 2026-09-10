@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, Modal, btnGhost, btnDanger, btnPrimary, inputCls } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
+import { deliveryForOrders, type Delivery } from '../../../lib/order-delivery';
 
 export default function Orders() {
   const [rows, setRows] = useState<any[]>([]);
@@ -13,6 +14,8 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<any | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [deliv, setDeliv] = useState<Map<string, Delivery>>(new Map());
+  const [linkBusy, setLinkBusy] = useState(false);
 
   useEffect(() => { load(); }, [status, dateFrom, dateTo, showDeleted]);
   useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
@@ -28,6 +31,10 @@ export default function Orders() {
     if (!showDeleted) q = q.is('deleted_at', null);
     const { data } = await q;
     setRows(data ?? []); setLoading(false);
+    // Did these buyers actually receive their files? "Sent" is not "delivered",
+    // and a suppressed address fails silently, so this is checked separately
+    // against the mail provider's own events.
+    try { setDeliv(await deliveryForOrders(supabase, (data || []).filter((o: any) => o.status === 'paid'))); } catch { /* never block the list */ }
   }
   const [resending, setResending] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -61,6 +68,24 @@ export default function Orders() {
       load(true);
     } catch (e: any) { alert(String(e?.message || e)); }
     setResending(false);
+  }
+  // A sign-in link for the buyer's own account page, signed by the server so it
+  // works on the live site. This is the answer for a customer we cannot email:
+  // the normal "request a link" flow would send the link to the address that is
+  // already failing.
+  async function accountLink(email: string) {
+    setLinkBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/account-link', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ email }) });
+      const j = await res.json();
+      if (!j.ok) alert(`Could not make the link: ${j.error || res.status}`);
+      else {
+        try { await navigator.clipboard.writeText(j.url); alert(`Account link copied. It signs ${j.email} in for ${j.expiresInDays} days.\n\n${j.url}`); }
+        catch { prompt('Copy this account link:', j.url); }
+      }
+    } catch (e: any) { alert(String(e?.message || e)); }
+    setLinkBusy(false);
   }
   function resendElsewhere(id: string, current: string) {
     const to = prompt(`Send this order's files to a different address.\n\nThe buyer gave ${current}. If their mail provider rejected us, that address will keep failing silently, so enter the address they asked you to use instead.`, '');
@@ -157,6 +182,36 @@ export default function Orders() {
         </div>
       </Card>
 
+      {/* The paid orders whose buyer never got their files. This is the thing
+          that must find the owner, rather than waiting to be found. */}
+      {(() => {
+        const bad = rows.filter((r) => deliv.get(r.id)?.warn);
+        if (!bad.length) return null;
+        return (
+          <div className="rounded-lg border-2 border-red-300 bg-red-50 px-3 py-2.5">
+            <div className="text-sm font-bold text-red-900">
+              ⚠ {bad.length === 1 ? 'One buyer has paid and may have received nothing' : `${bad.length} buyers have paid and may have received nothing`}
+            </div>
+            <ul className="mt-1 space-y-1">
+              {bad.slice(0, 8).map((r) => {
+                const d = deliv.get(r.id)!;
+                return (
+                  <li key={r.id} className="text-[11px] text-red-900 flex flex-wrap items-center gap-2">
+                    <button className="underline font-medium" onClick={() => setOpen(r)}>{r.email}</button>
+                    <span className="text-red-900/70">{new Date(r.created_at).toLocaleDateString()} · ${Number(r.total).toFixed(2)} · {d.label}</span>
+                    {d.addressBounced && <span className="px-1.5 py-0.5 rounded bg-red-200 text-[9px] uppercase tracking-wide">address has bounced before</span>}
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="text-[10px] text-red-900/70 mt-1.5">
+              Open the order, then use <b>Send to another address</b> or <b>Copy account link</b>. Resending to the same
+              address will fail the same silent way if their provider has stopped accepting our mail.
+            </p>
+          </div>
+        );
+      })()}
+
       {loading ? <div className="text-sm text-ink-700/60">Loading…</div> : filtered.length === 0 ? (
         <Card><p className="text-sm text-ink-700/60">No orders match the current filters.</p></Card>
       ) : (
@@ -170,7 +225,19 @@ export default function Orders() {
                 <tr key={r.id} className={`border-t border-black/5 hover:bg-cream/30 ${r.deleted_at ? 'opacity-50' : ''}`}>
                   <td className="p-2 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
                   <td className="p-2 font-mono text-xs">{r.id.slice(0, 8)}{r.deleted_at && <span className="ml-1 text-red-600">(hidden)</span>}</td>
-                  <td className="p-2">{r.email}</td>
+                  <td className="p-2">
+                    {r.email}
+                    {(() => {
+                      const d = deliv.get(r.id);
+                      if (!d || (!d.warn && d.state !== 'sent')) return null;
+                      return (
+                        <span
+                          className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded font-medium align-middle ${d.warn ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-amber-100 text-amber-900'}`}
+                          title={d.detail}
+                        >{d.warn ? '⚠ ' : ''}{d.label}</span>
+                      );
+                    })()}
+                  </td>
                   <td className="p-2">{(r.order_items || []).length}</td>
                   <td className="p-2"><span className={`text-xs px-2 py-0.5 rounded ${badge(r.status)}`}>{r.status}</span></td>
                   <td className="p-2 text-right">${Number(r.total).toFixed(2)}</td>
@@ -190,7 +257,21 @@ export default function Orders() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-ink-700/60 text-xs">Customer</span><div>{open.email}</div></div>
-              <div><span className="text-ink-700/60 text-xs">Download email</span><div>{open.confirmation_sent_at ? <span className="text-green-700 text-xs">✓ sent {new Date(open.confirmation_sent_at).toLocaleString()}</span> : <span className="text-red-700 text-xs font-bold">✗ NOT SENT, buyer has no links!</span>}</div></div>
+              <div>
+                <span className="text-ink-700/60 text-xs">Download email</span>
+                <div>{open.confirmation_sent_at ? <span className="text-green-700 text-xs">✓ sent {new Date(open.confirmation_sent_at).toLocaleString()}</span> : <span className="text-red-700 text-xs font-bold">✗ NOT SENT, buyer has no links!</span>}</div>
+                {/* Sent is only half the story: this line says whether it arrived. */}
+                {(() => {
+                  const d = deliv.get(open.id);
+                  if (!d) return null;
+                  return (
+                    <div className={`text-xs mt-0.5 ${d.warn ? 'text-red-700 font-bold' : d.state === 'opened' || d.state === 'delivered' ? 'text-green-700' : 'text-amber-800'}`}>
+                      {d.warn ? '⚠ ' : ''}{d.label}
+                      <span className="block text-[10px] font-normal text-ink-700/60">{d.detail}</span>
+                    </div>
+                  );
+                })()}
+              </div>
               <div><span className="text-ink-700/60 text-xs">Date</span><div>{new Date(open.created_at).toLocaleString()}</div></div>
               <div><span className="text-ink-700/60 text-xs">Provider</span><div>{open.provider || '—'} {open.provider_order_id ? `· ${open.provider_order_id}` : ''}</div></div>
               <div><span className="text-ink-700/60 text-xs">Status</span><div><span className={`text-xs px-2 py-0.5 rounded ${badge(open.status)}`}>{open.status}</span></div></div>
@@ -245,6 +326,7 @@ export default function Orders() {
               <button className={btnGhost} disabled={previewing} onClick={() => previewEmail(open.id)} title="Opens the exact rebuilt confirmation email in a new tab without sending anything">{previewing ? 'Building…' : '👁 Preview email'}</button>
               <button className={open.confirmation_sent_at ? btnGhost : btnPrimary} disabled={resending} onClick={() => resendEmail(open.id)} title="Rebuilds the order confirmation with all download links and emails it to the buyer now (bypasses the daily marketing quota)">{resending ? 'Sending…' : '📧 Resend download email'}</button>
               <button className={btnGhost} disabled={resending} onClick={() => resendElsewhere(open.id, open.email)} title="Same files, different address. Use this when the buyer's own mailbox rejects our email, which happens silently once an address has hard-bounced.">✉️ Send to another address</button>
+              <button className={btnGhost} disabled={linkBusy} onClick={() => accountLink(open.email)} title="Copies a ready-to-paste sign-in link to this buyer's account page, where every file they have ever bought can be re-downloaded. Use it when email cannot reach them at all.">{linkBusy ? 'Making link…' : '🔗 Copy account link'}</button>
               <a href={`/admin/invoice/${open.id}`} target="_blank" className={btnGhost}>Invoice ↗</a>
               <div className="ml-auto flex gap-2">
                 {open.deleted_at

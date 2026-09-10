@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card, StatBox, btnGhost, btnPrimary, inputCls } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
+import { deliveryForOrders } from '../../../lib/order-delivery';
 
 type Order = { id: string; email: string; total: number; status: string; created_at: string };
 type Item = { title: string; price_usd: number; qty: number; order_id: string };
@@ -416,6 +417,19 @@ function SystemHealth() {
         pageAll((a, b) => supabase.from('products').select('id, slug, title, active, held_missing_file, is_subscription, membership_plan_slug').or('active.eq.true,held_missing_file.eq.true').gt('price_usd', 0).order('id').range(a, b)),
         pageAll((a, b) => supabase.from('product_downloads').select('product_id').order('id').range(a, b)),
       ]);
+      // Buyers who paid and may have received nothing. Judged on the mail
+      // provider's own delivery events, because "we sent it" is not the same
+      // as "they got it": a suppressed address swallows every send silently.
+      let undelivered: any[] = [];
+      try {
+        const { data: paid } = await supabase.from('orders')
+          .select('id, email, total, currency, created_at, status, confirmation_sent_at')
+          .eq('status', 'paid').is('deleted_at', null)
+          .gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString());
+        const dmap = await deliveryForOrders(supabase, paid || []);
+        undelivered = (paid || []).filter((o: any) => dmap.get(o.id)?.warn).map((o: any) => ({ ...o, d: dmap.get(o.id) }));
+      } catch { /* the tile is diagnostic; never break the dashboard for it */ }
+
       // Admin-controlled daily cap (Automations tab); falls back to 180.
       const { data: gsCap } = await supabase.from('growth_settings').select('email_daily_cap').eq('id', 1).maybeSingle();
       const dailyCap = Number(gsCap?.email_daily_cap) || 180;
@@ -440,7 +454,7 @@ function SystemHealth() {
       const delivered = (evs30 || []).filter((e: any) => e.event === 'delivered' || e.event === 'sent').length;
       const bounced = (evs30 || []).filter((e: any) => e.event === 'bounced').length;
       const complained = (evs30 || []).filter((e: any) => e.event === 'complained').length;
-      setH({ run: runs?.[0] || null, sentToday: sentToday || 0, delivered, bounced, complained, wk: wk?.[0] || null, pending, sentWk, lastOrder: lastOrder?.[0] || null, openCarts: openCarts || 0, cultsPoll: cultsPoll || null, lastCults: lastCults?.[0] || null, missingFile, dailyCap });
+      setH({ run: runs?.[0] || null, sentToday: sentToday || 0, delivered, bounced, complained, wk: wk?.[0] || null, pending, sentWk, lastOrder: lastOrder?.[0] || null, openCarts: openCarts || 0, cultsPoll: cultsPoll || null, lastCults: lastCults?.[0] || null, missingFile, dailyCap, undelivered });
     })();
   }, []);
   if (!h) return null;
@@ -477,7 +491,9 @@ function SystemHealth() {
     </a>
   );
   const fileState = h.missingFile.length ? 'red' : 'green';
-  const all = [cronState, quotaState, bounceState, wkState, orderState, cartsState, cultsState, fileState];
+  const undel = h.undelivered || [];
+  const undelState = undel.length ? 'red' : 'green';
+  const all = [cronState, quotaState, bounceState, wkState, orderState, cartsState, cultsState, fileState, undelState];
   const worst = all.includes('red') ? 'red' : all.includes('amber') ? 'amber' : 'green';
 
   return (
@@ -487,7 +503,7 @@ function SystemHealth() {
         <span className="text-sm font-bold text-ink-900">System health</span>
         <span className="text-[11px] text-ink-700/50">{worst === 'green' ? 'all systems normal' : worst === 'amber' ? 'something needs a look' : 'ATTENTION NEEDED'} · tap a tile for detail</span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-2">
         <Tile state={cronState} icon="⏱" label="Nightly automation" value={cronText} sub={h.run?.error || (h.run ? new Date(h.run.ran_at).toLocaleString() : 'scheduler has never reported in')} href="#automations" />
         <Tile state={quotaState} icon="📧" label="Email quota today" value={`${h.sentToday} / ${DAILY_SOFT_CAP}`} sub={`${quotaPct}% of soft daily cap`} href="#automations" />
         <Tile state={bounceState} icon="📉" label="Bounce + spam (30d)" value={`${bounceRate.toFixed(1)}%`} sub={`${h.bounced} bounced · ${h.complained} complaints · ${h.delivered} delivered`} href="#automations" />
@@ -496,7 +512,30 @@ function SystemHealth() {
         <Tile state={cartsState} icon="🛒" label="Open carts" value={String(h.openCarts)} sub="awaiting reminder" href="#insights" />
         <Tile state={cultsState} icon="◈" label="Cults3D sale alerts" value={cultsText} sub={cultsSub} href="#cults" />
         <Tile state={fileState} icon="📎" label="Products missing file" value={h.missingFile.length ? `${h.missingFile.length} broken` : 'all have files'} sub={h.missingFile.length ? 'buyer would get NOTHING · listed below' : 'every sellable product has a download'} href="#products" />
+        <Tile state={undelState} icon="📮" label="Order emails not delivered" value={undel.length ? `${undel.length} buyer${undel.length === 1 ? '' : 's'}` : 'all delivered'} sub={undel.length ? 'paid but never received the files · listed below' : 'every paid order in 30 days reached its buyer'} href="#orders" />
       </div>
+
+      {/* A buyer who paid and got nothing outranks everything else on this page. */}
+      {undel.length > 0 && (
+        <div className="mt-2 rounded-lg border-2 border-red-300 bg-red-50 px-3 py-2.5">
+          <div className="text-xs font-bold text-red-900 mb-1">
+            {undel.length === 1 ? 'A buyer paid and never received their download email' : `${undel.length} buyers paid and never received their download email`}
+          </div>
+          <ul className="space-y-1">
+            {undel.slice(0, 6).map((o: any) => (
+              <li key={o.id} className="text-[11px] text-red-900 flex flex-wrap items-center gap-2">
+                <a href="#orders" className="underline font-medium">{o.email}</a>
+                <span className="text-red-900/70">{new Date(o.created_at).toLocaleDateString()} · {o.currency} {Number(o.total).toFixed(2)} · {o.d?.label}</span>
+                {o.d?.addressBounced && <span className="px-1.5 py-0.5 rounded bg-red-200 text-[9px] uppercase tracking-wide">address has bounced before</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="text-[10px] text-red-900/70 mt-1.5">
+            Open the order in Orders, then <b>Send to another address</b> or <b>Copy account link</b>. Once an address has
+            bounced, the mail provider drops every later send without telling us, so resending to the same address will not work.
+          </p>
+        </div>
+      )}
 
       {/* Naming the broken product is the whole point of the tile. The Products
           tab searches on title, so the title is handed over rather than the
