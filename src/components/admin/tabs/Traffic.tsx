@@ -300,8 +300,22 @@ function LampStudio({ days }: { days: number }) {
 // Rolling windows in hours (owner request 2026-09-05: "current hour, last 6
 // hours, last 12 hours, 1 day, 1 week"). 'today' is the calendar day; the
 // rest count back from right now using each event's timestamp.
+/** "2 h 5 m ago" for a timestamp, in words rather than a bare clock time. */
+function agoText(iso: string): string {
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h ${m % 60} min ago`;
+  const d = Math.floor(h / 24);
+  return `${d} day${d === 1 ? '' : 's'} ago`;
+}
+
 const PANEL_RANGES = [
-  { key: 'hour', label: 'This hour', hours: 1 },
+  // "This hour" read as the clock hour and caused a real scare: a sale 78
+  // minutes old showed as zero and looked lost. These windows count back from
+  // right now, so the label says so.
+  { key: 'hour', label: 'Last 60 min', hours: 1 },
   { key: '6h', label: '6 h', hours: 6 },
   { key: '12h', label: '12 h', hours: 12 },
   { key: '24h', label: '24 h', hours: 24 },
@@ -381,7 +395,12 @@ function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Re
   const prevCount = (t: string) => prevRange.filter((e) => e.type === t).length;
   const paidIn = orders.filter((o) => within(o.created_at));
   const paidPrev = orders.filter((o) => withinPrev(o.created_at));
-  const prevLabel = range === 'today' ? 'yesterday' : `previous ${rangeDef.label.replace('This ', '').toLowerCase()}`;
+  const lastOrder = orders.length
+    ? orders.reduce((a, b) => (new Date(a.created_at) > new Date(b.created_at) ? a : b))
+    : null;
+  const prevLabel = range === 'today' ? 'yesterday'
+    : range === 'hour' ? 'the 60 min before that'
+    : `previous ${rangeDef.label.replace('This ', '').toLowerCase()}`;
   const sinceTsForRange = () => startMs != null ? new Date(startMs).toISOString() : todayKey + 'T00:00:00Z';
   const metrics = [
     { icon: '🛒', label: 'Added to cart', type: 'add_to_cart' },
@@ -484,6 +503,14 @@ function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Re
           <div className="text-[11px] text-[#F5EFE3]/70">
             {paidIn.length ? `$${paidIn.reduce((a, o) => a + (Number(o.total) || 0), 0).toFixed(0)} · ` : ''}{prevLabel}: <span className="font-bold text-[#FAC775]">{paidPrev.length}</span>
           </div>
+          {/* A zero here reads as "nothing is selling" when it often means "the
+              last sale is just older than the window". Saying when the last
+              order actually arrived answers that without a hunt through Orders.
+              Learned on 2026-09-10: a membership sold 78 minutes earlier and
+              the owner thought the panel had missed it. */}
+          {paidIn.length === 0 && lastOrder && (
+            <div className="text-[11px] text-[#FAC775]/90 mt-0.5">last paid order {agoText(lastOrder.created_at)}</div>
+          )}
         </div>
       </div>
 
