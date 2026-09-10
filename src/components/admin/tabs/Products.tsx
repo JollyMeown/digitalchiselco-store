@@ -244,7 +244,7 @@ export default function Products() {
 
       {report && (() => {
         const T = report.totals;
-        const clean = !T.missing && !T.held && !T.badLink && !T.sharedLinks;
+        const clean = !T.missing && !T.held && !T.badLink && !report.shared?.length;
         const Group = ({ title, tone, items, note, render }: any) => items.length === 0 ? null : (
           <div className={`rounded-lg border px-3 py-2.5 ${tone}`}>
             <div className="text-xs font-bold mb-0.5">{title} ({items.length})</div>
@@ -305,17 +305,20 @@ export default function Products() {
                   )}
                 />
                 <Group
-                  title="One file on several products" tone="border-red-300 bg-red-50 text-red-900"
-                  note="At least one of these delivers somebody else's file, and nothing looks broken until a customer says so."
+                  title="Different designs sharing one file" tone="border-red-300 bg-red-50 text-red-900"
+                  note="These titles have little in common, so one of them is probably shipping the other's model. Open each and compare the file against the picture. Bundles and the same design listed twice are excluded, and counted below."
                   items={report.shared}
                   render={(s: any, i: number) => (
                     <li key={i} className="text-[11px]">
-                      <div className="opacity-70 break-all">{String(s.download_link).slice(0, 70)}…</div>
-                      <div className="flex flex-wrap gap-x-2">
-                        {s.products.map((p: any) => (
-                          <button key={p.id} className="underline" onClick={() => openProduct(p)}>{String(p.title).slice(0, 46)}</button>
+                      <div className="flex flex-wrap gap-x-2 items-center">
+                        {s.products.map((p: any, n: number) => (
+                          <span key={p.id} className="flex items-center gap-1">
+                            {n > 0 && <span className="opacity-50">vs</span>}
+                            <button className="underline" onClick={() => openProduct(p)}>{String(p.title).slice(0, 44)}</button>
+                          </span>
                         ))}
                       </div>
+                      <div className="opacity-60 break-all text-[10px]">{String(s.download_link).slice(0, 68)}…</div>
                     </li>
                   )}
                 />
@@ -326,6 +329,12 @@ export default function Products() {
               <div className="mt-2 text-[11px] text-ink-700/70">
                 Uploads short of a file, by BRS computer:{' '}
                 {Object.entries(report.byComputer).sort((a: any, b: any) => b[1] - a[1]).map(([c, n]: any) => `🖥 ${c}: ${n}`).join(' · ')}
+              </div>
+            )}
+            {report.sharedBenign && (report.sharedBenign.bundle || report.sharedBenign.duplicateListing) > 0 && (
+              <div className="mt-2 text-[11px] text-ink-700/70">
+                Files shared for good reason and left alone: {report.sharedBenign.bundle} inside bundles,{' '}
+                {report.sharedBenign.duplicateListing} where the same design is listed under two titles.
               </div>
             )}
             <div className="mt-1 text-[10px] text-ink-700/45">Checked {new Date(report.checkedAt).toLocaleString()}. Clicking a name searches for it in the list below.</div>

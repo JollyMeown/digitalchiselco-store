@@ -13,9 +13,16 @@
 //   1. MISSING    sellable, no download row at all. The buyer gets nothing.
 //   2. HELD       held off the storefront by the guard, waiting for its file.
 //   3. BAD LINK   a download row whose link is empty or not a real URL.
-//   4. SHARED     one link attached to several products, so at least one of
-//                 them delivers the wrong file. Worse than a dead link,
-//                 because nothing looks broken until a customer complains.
+//   4. SHARED     one link attached to several products. Worse than a dead
+//                 link when it is wrong, because nothing looks broken until a
+//                 customer complains. Two innocent explanations exist though,
+//                 so the report separates them rather than crying wolf:
+//                 a bundle legitimately carries every file it contains, and
+//                 the same design is sometimes listed twice under different
+//                 titles. What is left, two DIFFERENT designs pointing at one
+//                 file, means one of them ships the wrong model. That is
+//                 judged by how much the titles have in common, which is a
+//                 signal and not a proof, and the report says so.
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../lib/supabase';
@@ -51,7 +58,7 @@ export const GET: APIRoute = async ({ request }) => {
     const db = supabaseAdmin();
     const [products, downloads] = await Promise.all([
       fetchAll((a, b) => db.from('products')
-        .select('id, slug, title, active, price_usd, held_missing_file, is_subscription, membership_plan_slug, submitted_by, created_at')
+        .select('id, slug, title, active, price_usd, held_missing_file, is_subscription, membership_plan_slug, submitted_by, created_at, is_bundle')
         .order('created_at', { ascending: false }).range(a, b)),
       fetchAll((a, b) => db.from('product_downloads').select('id, product_id, file_name, download_link').order('id').range(a, b)),
     ]);
@@ -103,17 +110,42 @@ export const GET: APIRoute = async ({ request }) => {
       if (!arr.includes(d.product_id)) arr.push(d.product_id);
     }
     const productById = new Map((products as any[]).map((p) => [p.id, p]));
-    const shared = [...byLink.entries()]
+    // Words every listing carries say nothing about which design it is, so they
+    // are dropped before the titles are compared.
+    const NOISE = new Set(['stl', 'file', 'files', 'cnc', 'router', 'wood', 'carving', 'relief', 'bas', 'basrelief', 'wall', 'art', 'design', 'designs', 'panel', 'decor', 'model', 'aspire', 'vcarve', 'carveco', 'digital', 'download', 'for', 'and', 'with', 'the', 'a', 'of', 'to', 'gift', 'gifts', 'custom', 'pro', '3d']);
+    const words = (t: string) => new Set(String(t).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2 && !NOISE.has(w)));
+    /** Jaccard overlap of the meaningful words in two titles. */
+    function overlap(a: string, b: string): number {
+      const A = words(a), B = words(b);
+      if (!A.size || !B.size) return 0;
+      let hit = 0; for (const w of A) if (B.has(w)) hit++;
+      return hit / Math.min(A.size, B.size);
+    }
+    const sharedAll = [...byLink.entries()]
       .filter(([, ids]) => ids.length > 1)
-      .map(([url, ids]) => ({
-        download_link: url,
-        products: ids.map((id) => {
+      .map(([url, ids]) => {
+        const items = ids.map((id) => {
           const p = productById.get(id);
-          return p ? { id, slug: p.slug, title: p.title, active: p.active } : { id, slug: null, title: '(deleted product)', active: false };
-        }),
-      }))
-      .sort((a, b) => b.products.length - a.products.length)
-      .slice(0, 40);
+          return p ? { id, slug: p.slug, title: p.title, active: p.active, is_bundle: !!p.is_bundle } : { id, slug: null, title: '(deleted product)', active: false, is_bundle: false };
+        });
+        // worst pair decides: if any two titles look unrelated, the group needs a look
+        let worst = 1;
+        for (let i = 0; i < items.length; i++) {
+          for (let j = i + 1; j < items.length; j++) worst = Math.min(worst, overlap(items[i].title, items[j].title));
+        }
+        const hasBundle = items.some((p) => p.is_bundle);
+        return {
+          download_link: url, products: items, similarity: +worst.toFixed(2),
+          kind: hasBundle ? 'bundle' : worst >= 0.4 ? 'duplicate-listing' : 'mismatch',
+        };
+      });
+    // Only the mismatches are a fault. The rest is reported as a count so the
+    // owner can see the check looked at them and decided they were fine.
+    const shared = sharedAll.filter((s) => s.kind === 'mismatch').sort((a, b) => a.similarity - b.similarity).slice(0, 40);
+    const sharedBenign = {
+      bundle: sharedAll.filter((s) => s.kind === 'bundle').length,
+      duplicateListing: sharedAll.filter((s) => s.kind === 'duplicate-listing').length,
+    };
 
     // Which BRS machine uploaded the products that came up short. The upload
     // runs from several computers, so naming the source is what makes the
@@ -133,6 +165,7 @@ export const GET: APIRoute = async ({ request }) => {
         missing: missing.length, held: held.length, badLink: badLink.length,
         sharedLinks: shared.length,
       },
+      sharedBenign,
       missing, held, badLink, shared, byComputer,
     });
   } catch (e: any) {
