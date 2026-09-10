@@ -86,7 +86,13 @@ for (const g of groups) {
     if (sug) {
       console.log(`           -> ${sug.name.slice(0, 70)}`);
       console.log(`              score ${sug.score.toFixed(2)} margin ${sug.margin.toFixed(2)}${idOf(g.url) === sug.id ? '  (same file it already has, no better candidate found)' : ''}`);
-      if (idOf(g.url) !== sug.id && sug.score >= 0.35) {
+      // Two bars, not one. A good score alone is not enough: "Christ King of
+      // Kings" scored 0.46 against a Sacred Heart Cherub file simply because
+      // religious carvings share vocabulary, and the runner-up was 0.03 behind.
+      // A proposal is only worth showing when one file fits clearly BETTER than
+      // whatever came second. A blank field is honest; a confident wrong answer
+      // gets a customer the wrong model.
+      if (idOf(g.url) !== sug.id && sug.score >= 0.45 && sug.margin >= 0.10) {
         rows.push({
           product_id: p.id,
           suggested_link: `https://drive.google.com/uc?export=download&id=${sug.id}`,
