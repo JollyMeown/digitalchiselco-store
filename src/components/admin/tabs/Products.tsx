@@ -343,26 +343,53 @@ export default function Products() {
                     // shares the most words with it is the one the file belongs
                     // to; the others are shipping it by mistake.
                     const fn = names[s.download_link];
+                    // Same vocabulary filter the server uses, so the two halves
+                    // of the check cannot disagree with each other.
+                    const NOISE = new Set(['stl', 'file', 'files', 'cnc', 'router', 'wood', 'carving', 'relief', 'bas', 'wall', 'art', 'design', 'designs', 'panel', 'decor', 'model', 'aspire', 'vcarve', 'carveco', 'digital', 'download', 'for', 'and', 'with', 'the', 'gift', 'gifts', 'custom', 'pro', '3d']);
+                    const clean = (x: string) => new Set(String(x).toLowerCase().replace(/\.(stl|zip)$/i, '').replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2 && !NOISE.has(w)));
                     const score = (t: string) => {
                       if (!fn) return null;
-                      const clean = (x: string) => new Set(String(x).toLowerCase().replace(/\.(stl|zip)$/i, '').replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2));
                       const F = clean(fn), T = clean(t);
                       if (!F.size) return null;
                       let h = 0; for (const w of F) if (T.has(w)) h++;
                       return h / F.size;
                     };
                     const scored = s.products.map((p: any) => ({ p, s: score(p.title) }));
-                    const best = fn ? Math.max(...scored.map((x: any) => x.s ?? 0)) : null;
+                    const sorted = [...scored].sort((a: any, b: any) => (b.s ?? 0) - (a.s ?? 0));
+                    const best = fn ? (sorted[0]?.s ?? 0) : null;
+                    const runnerUp = sorted[1]?.s ?? 0;
+                    // A clear winner needs to beat the others, not merely score
+                    // well: two listings of one design both match the name.
+                    const decisive = fn != null && best != null && best - runnerUp >= 0.2;
                     return (
                       <li key={i} className="text-[11px] border-b border-red-200/60 pb-1 last:border-0">
-                        {fn && <div className="opacity-80 mb-0.5">📄 <b>{fn}</b></div>}
+                        {fn && (
+                          <div className="opacity-80 mb-0.5">
+                            📄 <b>{fn}</b>
+                            {!decisive && <span className="ml-1 text-[10px] opacity-70">(the name does not clearly favour either, compare by eye)</span>}
+                          </div>
+                        )}
                         <div className="flex flex-col gap-0.5">
-                          {scored.map(({ p, s: sc }: any) => (
-                            <span key={p.id} className="flex items-center gap-1.5">
-                              {fn && <span className={`text-[9px] px-1 rounded ${sc === best && (sc ?? 0) > 0.4 ? 'bg-green-200 text-green-900' : 'bg-red-200 text-red-900'}`}>{sc === best && (sc ?? 0) > 0.4 ? 'owns it' : 'wrong file'}</span>}
-                              <button className="underline text-left" onClick={() => openProduct(p)}>{String(p.title).slice(0, 52)}</button>
-                            </span>
-                          ))}
+                          {scored.map(({ p, s: sc }: any) => {
+                            const owns = decisive && sc === best;
+                            // Losing to the winner is not proof of being wrong:
+                            // when the same design is listed twice, the second
+                            // title still matches the file's name. Only a title
+                            // with almost nothing in common with the file is
+                            // called wrong.
+                            const wrong = decisive && !owns && (sc ?? 0) < 0.35;
+                            const alsoMatches = decisive && !owns && !wrong;
+                            return (
+                              <span key={p.id} className="flex items-center gap-1.5">
+                                {fn && (
+                                  <span className={`text-[9px] px-1 rounded ${owns ? 'bg-green-200 text-green-900' : wrong ? 'bg-red-200 text-red-900' : 'bg-amber-200 text-amber-900'}`}>
+                                    {owns ? 'owns it' : wrong ? 'wrong file' : alsoMatches ? 'same design, listed twice' : 'cannot tell'}
+                                  </span>
+                                )}
+                                <button className="underline text-left" onClick={() => openProduct(p)}>{String(p.title).slice(0, 52)}</button>
+                              </span>
+                            );
+                          })}
                         </div>
                         {!fn && <div className="opacity-60 break-all text-[10px]">{String(s.download_link).slice(0, 68)}…</div>}
                       </li>
