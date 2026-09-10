@@ -51,6 +51,8 @@ export default function Products() {
   // Overview tile, or waiting for a customer to write in.
   const [checking, setChecking] = useState(false);
   const [report, setReport] = useState<any | null>(null);
+  const [names, setNames] = useState<Record<string, string | null>>({});
+  const [naming, setNaming] = useState(false);
   // Monotonic request id — guards against an older in-flight load() overwriting
   // a newer result. Without this, typing fast in the search box could "snap
   // back" to the unfiltered 200 rows.
@@ -70,7 +72,29 @@ export default function Products() {
     return () => clearTimeout(t);
   }, [q, catFilter, statusFilter, bestsellerOnly, newOnly, newRange, customFrom, customTo]);
 
+  // Second stage of the download check. The file's own name is the only thing
+  // that says which of two products a shared file belongs to, so it is fetched
+  // for the flagged groups only, six at a time to stay inside the function's
+  // time limit.
+  async function resolveFileNames(links: string[]) {
+    setNaming(true);
+    const found: Record<string, string | null> = { ...names };
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      for (let i = 0; i < links.length; i += 6) {
+        const r = await fetch('/api/admin/download-filename', {
+          method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token || ''}` },
+          body: JSON.stringify({ links: links.slice(i, i + 6) }),
+        }).then((x) => x.json()).catch(() => ({ error: 'bad response' }));
+        if (r?.error) { alert(`Name lookup failed: ${r.error}`); break; }
+        for (const n of r.names || []) found[n.url] = n.filename;
+        setNames({ ...found });
+      }
+    } catch (e: any) { alert(String(e?.message || e)); }
+    setNaming(false);
+  }
   async function runDownloadCheck() {
+    setNames({});
     setChecking(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -260,7 +284,13 @@ export default function Products() {
               <span className="text-xs text-ink-700/55">
                 {T.sellable.toLocaleString()} sellable products, {T.withFile.toLocaleString()} with a file, {T.exempt} memberships and gift cards skipped
               </span>
-              <button className={btnGhost + ' ml-auto'} onClick={() => setReport(null)}>Close</button>
+              {report.shared?.length > 0 && (
+                <button className={btnGhost + ' ml-auto'} disabled={naming} onClick={() => resolveFileNames(report.shared.map((s: any) => s.download_link))}
+                  title="Asks Google Drive what each shared file is really called. The name says which product the file belongs to, and therefore which one is sending the wrong model.">
+                  {naming ? 'Reading file names…' : '🔬 Which product owns the file?'}
+                </button>
+              )}
+              <button className={btnGhost + (report.shared?.length ? '' : ' ml-auto')} onClick={() => setReport(null)}>Close</button>
               <button className={btnGhost} disabled={checking} onClick={runDownloadCheck}>{checking ? 'Checking…' : 'Run again'}</button>
             </div>
 
@@ -308,19 +338,36 @@ export default function Products() {
                   title="Different designs sharing one file" tone="border-red-300 bg-red-50 text-red-900"
                   note="These titles have little in common, so one of them is probably shipping the other's model. Open each and compare the file against the picture. Bundles and the same design listed twice are excluded, and counted below."
                   items={report.shared}
-                  render={(s: any, i: number) => (
-                    <li key={i} className="text-[11px]">
-                      <div className="flex flex-wrap gap-x-2 items-center">
-                        {s.products.map((p: any, n: number) => (
-                          <span key={p.id} className="flex items-center gap-1">
-                            {n > 0 && <span className="opacity-50">vs</span>}
-                            <button className="underline" onClick={() => openProduct(p)}>{String(p.title).slice(0, 44)}</button>
-                          </span>
-                        ))}
-                      </div>
-                      <div className="opacity-60 break-all text-[10px]">{String(s.download_link).slice(0, 68)}…</div>
-                    </li>
-                  )}
+                  render={(s: any, i: number) => {
+                    // Once the real file name is known, the product whose title
+                    // shares the most words with it is the one the file belongs
+                    // to; the others are shipping it by mistake.
+                    const fn = names[s.download_link];
+                    const score = (t: string) => {
+                      if (!fn) return null;
+                      const clean = (x: string) => new Set(String(x).toLowerCase().replace(/\.(stl|zip)$/i, '').replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2));
+                      const F = clean(fn), T = clean(t);
+                      if (!F.size) return null;
+                      let h = 0; for (const w of F) if (T.has(w)) h++;
+                      return h / F.size;
+                    };
+                    const scored = s.products.map((p: any) => ({ p, s: score(p.title) }));
+                    const best = fn ? Math.max(...scored.map((x: any) => x.s ?? 0)) : null;
+                    return (
+                      <li key={i} className="text-[11px] border-b border-red-200/60 pb-1 last:border-0">
+                        {fn && <div className="opacity-80 mb-0.5">📄 <b>{fn}</b></div>}
+                        <div className="flex flex-col gap-0.5">
+                          {scored.map(({ p, s: sc }: any) => (
+                            <span key={p.id} className="flex items-center gap-1.5">
+                              {fn && <span className={`text-[9px] px-1 rounded ${sc === best && (sc ?? 0) > 0.4 ? 'bg-green-200 text-green-900' : 'bg-red-200 text-red-900'}`}>{sc === best && (sc ?? 0) > 0.4 ? 'owns it' : 'wrong file'}</span>}
+                              <button className="underline text-left" onClick={() => openProduct(p)}>{String(p.title).slice(0, 52)}</button>
+                            </span>
+                          ))}
+                        </div>
+                        {!fn && <div className="opacity-60 break-all text-[10px]">{String(s.download_link).slice(0, 68)}…</div>}
+                      </li>
+                    );
+                  }}
                 />
               </div>
             )}
