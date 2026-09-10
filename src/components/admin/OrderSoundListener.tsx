@@ -22,9 +22,9 @@ export default function OrderSoundListener() {
   const seenAlerts = useRef<Set<number>>(new Set());
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  function pushToast(t: Omit<Toast, 'at'>) {
+  function pushToast(t: Omit<Toast, 'at'>, ttl = 15000) {
     setToasts((list) => [...list.filter((x) => x.id !== t.id), { ...t, at: Date.now() }].slice(-4));
-    setTimeout(() => setToasts((list) => list.filter((x) => x.id !== t.id)), 15000);
+    setTimeout(() => setToasts((list) => list.filter((x) => x.id !== t.id)), ttl);
   }
 
   function desktopNotify(title: string, body?: string, url?: string) {
@@ -65,6 +65,42 @@ export default function OrderSoundListener() {
     (async () => {
       const { data } = await supabase.from('owner_alerts').select('id').order('id', { ascending: false }).limit(1);
       if (!cancelled) lastAlertId.current = Number(data?.[0]?.id || 0);
+    })();
+
+    // ── what sold while this dashboard was closed ──
+    // The chime is a live event: it needs this page open and connected, so a
+    // sale at 20:41 rings nothing if the tab was shut or the machine asleep,
+    // and nothing replays it afterwards. On 2026-09-10 that left the owner
+    // believing an order had gone missing when it had been recorded instantly.
+    // So on every load, say plainly what arrived since the last visit.
+    (async () => {
+      const KEY = 'admin:lastSeenOrderAt';
+      let since: string | null = null;
+      try { since = localStorage.getItem(KEY); } catch { /* private mode */ }
+      const now = new Date().toISOString();
+      try { localStorage.setItem(KEY, now); } catch { /* ignore */ }
+      // first ever load: record the mark and stay quiet rather than announcing
+      // the whole history
+      if (!since) return;
+      const { data } = await supabase.from('orders')
+        .select('id, created_at, total, currency, email')
+        .eq('status', 'paid').is('deleted_at', null)
+        .gt('created_at', since).order('created_at', { ascending: false }).limit(20);
+      if (cancelled || !data?.length) return;
+      const newest = data[0];
+      const mins = Math.max(0, Math.round((Date.now() - new Date(newest.created_at).getTime()) / 60000));
+      const ago = mins < 60 ? `${mins} min ago` : `${Math.floor(mins / 60)} h ${mins % 60} min ago`;
+      const sum = data.reduce((s, o: any) => s + (Number(o.total) || 0), 0);
+      pushToast({
+        id: 'catchup',
+        icon: '🛎️',
+        title: data.length === 1 ? `1 sale while you were away` : `${data.length} sales while you were away`,
+        body: `${sum.toFixed(2)} ${newest.currency || 'USD'} in total · most recent ${ago} (${newest.email || ''})`,
+        url: '#orders',
+      }, 60000);   // a missed sale deserves a minute on screen, not fifteen seconds
+      // The catch-up is news, so it rings, but only once and only for money
+      // that arrived since the last visit.
+      playChime();
     })();
 
     // Realtime: website orders (existing) + owner_alerts (Cults sales etc.)
