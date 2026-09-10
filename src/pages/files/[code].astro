@@ -1,0 +1,111 @@
+---
+// One link that hands a customer every file in their bundle.
+//
+// Why this page exists: Google Drive has no folder download URL. Its own
+// "download folder" button zips server-side, which is slow and unreliable on a
+// folder this size, and it is buried in an interface the customer has to work
+// out first. On 2026-09-10 a buyer wrote in saying the files "would not
+// download", which is the predictable end of sending someone a folder link.
+//
+// Here each file is a plain button that starts its own download at once, and
+// "Download everything" simply presses them all in turn. The files stay on
+// Drive and are fetched by the customer's browser, so nothing streams through
+// our functions and a busy delivery cannot eat the site's bandwidth. That is
+// the same rule the bundle ZIP endpoint follows.
+import Shell from '../../layouts/Shell.astro';
+import { supabaseAdmin } from '../../lib/supabase';
+
+export const prerender = false;
+
+const { code } = Astro.params;
+const db = supabaseAdmin();
+const { data: delivery } = await db
+  .from('folder_deliveries')
+  .select('code, title, files, note, active, opened_count')
+  .eq('code', code).eq('active', true).maybeSingle();
+
+if (delivery) {
+  // A quiet open counter, so the owner can tell "never opened it" from "opened
+  // it and is still stuck" without having to ask the customer.
+  await db.from('folder_deliveries')
+    .update({ opened_count: (Number(delivery.opened_count) || 0) + 1, last_opened_at: new Date().toISOString() })
+    .eq('code', code);
+}
+
+const files: { id: string; name: string; size: number | null }[] = (delivery?.files as any) || [];
+const totalMb = files.reduce((s, f) => s + (f.size || 0), 0) / 1048576;
+const dl = (id: string) => `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`;
+const mb = (n: number | null) => (n ? `${(n / 1048576).toFixed(1)} MB` : '');
+---
+<Shell
+  title={`${delivery?.title || 'Your files'} · DigitalChiselCo`}
+  description="Download your purchased STL files."
+  noindex={true}
+>
+  {!delivery ? (
+    <div class="max-w-2xl mx-auto py-16 text-center">
+      <h1 class="font-serif text-3xl text-bronze-800">This download link is not active</h1>
+      <p class="mt-3 text-ink-700">It may have been replaced by a newer one. Email jolly@digitalchiselco.com and I will send you a fresh link the same day.</p>
+    </div>
+  ) : (
+    <article class="max-w-3xl mx-auto py-8">
+      <p class="text-xs tracking-widest text-bronze-600 mb-2">★ YOUR DOWNLOAD</p>
+      <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">{delivery.title}</h1>
+      <p class="mt-3 text-ink-700">
+        {files.length} files, {totalMb.toFixed(0)} MB in total. Every file is yours to keep, with commercial use included.
+      </p>
+      {delivery.note && <p class="mt-2 text-ink-700">{delivery.note}</p>}
+
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <button id="all" class="px-5 py-3 rounded-lg bg-bronze-700 text-cream font-medium hover:bg-bronze-800 transition">
+          ⬇ Download everything ({files.length} files)
+        </button>
+        <span id="status" class="text-sm text-ink-700/70"></span>
+      </div>
+      <p class="mt-2 text-xs text-ink-700/60">
+        Your browser may ask once whether to allow multiple downloads. Say yes, and the files will arrive one after another
+        into your usual downloads folder. Large files take a few minutes each, so leave this tab open until they finish.
+      </p>
+
+      <ul class="mt-6 divide-y divide-black/10 border border-black/10 rounded-lg overflow-hidden bg-white">
+        {files.map((f, i) => (
+          <li class="flex items-center gap-3 px-4 py-3">
+            <span class="text-xs text-ink-700/40 w-6">{i + 1}</span>
+            <span class="flex-1 min-w-0 text-sm text-ink-900 truncate">{f.name}</span>
+            <span class="text-xs text-ink-700/50 tabular-nums">{mb(f.size)}</span>
+            <a href={dl(f.id)} class="download-one text-sm px-3 py-1.5 rounded-md border border-bronze-600/30 text-bronze-800 hover:bg-cream transition" download>Download</a>
+          </li>
+        ))}
+      </ul>
+
+      <div class="mt-8 rounded-lg border border-black/10 bg-cream/40 p-4 text-sm text-ink-700">
+        <p class="font-medium text-ink-900">If a download stops halfway</p>
+        <p class="mt-1">
+          These are large files. Use a computer rather than a phone, keep the tab open, and download two or three at a time
+          rather than all fifteen at once on a slow connection. If a file fails, click its Download button again: it starts
+          over cleanly.
+        </p>
+        <p class="mt-2">Still stuck? Email <a class="underline" href="mailto:jolly@digitalchiselco.com">jolly@digitalchiselco.com</a> and I will get the files to you another way.</p>
+      </div>
+    </article>
+  )}
+</Shell>
+
+<script>
+  const btn = document.getElementById('all');
+  const status = document.getElementById('status');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      const links = Array.from(document.querySelectorAll('a.download-one'));
+      btn.setAttribute('disabled', 'true');
+      for (let i = 0; i < links.length; i++) {
+        if (status) status.textContent = `starting file ${i + 1} of ${links.length}…`;
+        (links[i] as HTMLElement).click();
+        // a gap between clicks: browsers drop downloads fired in one burst
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      if (status) status.textContent = 'All downloads started. They will keep going in the background.';
+      btn.removeAttribute('disabled');
+    });
+  }
+</script>
