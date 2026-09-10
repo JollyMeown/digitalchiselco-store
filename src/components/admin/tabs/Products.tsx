@@ -46,6 +46,11 @@ export default function Products() {
   const [editing, setEditing] = useState<Row | null>(null);
   const [creating, setCreating] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // On-demand catalogue scan for products a buyer could pay for and receive
+  // nothing from. Run after a BRS upload run rather than waiting a day for the
+  // Overview tile, or waiting for a customer to write in.
+  const [checking, setChecking] = useState(false);
+  const [report, setReport] = useState<any | null>(null);
   // Monotonic request id — guards against an older in-flight load() overwriting
   // a newer result. Without this, typing fast in the search box could "snap
   // back" to the unfiltered 200 rows.
@@ -65,6 +70,16 @@ export default function Products() {
     return () => clearTimeout(t);
   }, [q, catFilter, statusFilter, bestsellerOnly, newOnly, newRange, customFrom, customTo]);
 
+  async function runDownloadCheck() {
+    setChecking(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch('/api/admin/download-check', { headers: { authorization: `Bearer ${session?.access_token || ''}` } })
+        .then((x) => x.json()).catch(() => ({ error: 'bad response' }));
+      if (r?.error) alert(`Check failed: ${r.error}`); else setReport(r);
+    } catch (e: any) { alert(String(e?.message || e)); }
+    setChecking(false);
+  }
   async function loadCats() {
     const { data } = await supabase.from('categories').select('id,name,slug').order('name');
     setCats(data ?? []);
@@ -219,12 +234,104 @@ export default function Products() {
             </>
           )}
           <span className="text-xs text-ink-700/60 ml-auto">{visibleRows.length} of {rows.length} shown</span>
+          <button className={btnGhost} disabled={checking} onClick={runDownloadCheck} title="Scans the WHOLE catalogue for products with no download file, empty links, or one file attached to several products. Run it after a BRS upload run.">{checking ? 'Checking…' : '🔎 Check download links'}</button>
           <button className={btnGhost} onClick={() => setImportOpen(true)} title="Bulk import products from a CSV">⇪ Import CSV</button>
           <button className={btnPrimary} onClick={() => setCreating(true)}>+ New product</button>
         </div>
       </Card>
 
       <CsvImportModal open={importOpen} onClose={() => setImportOpen(false)} onDone={() => { setImportOpen(false); load(); }} />
+
+      {report && (() => {
+        const T = report.totals;
+        const clean = !T.missing && !T.held && !T.badLink && !T.sharedLinks;
+        const Group = ({ title, tone, items, note, render }: any) => items.length === 0 ? null : (
+          <div className={`rounded-lg border px-3 py-2.5 ${tone}`}>
+            <div className="text-xs font-bold mb-0.5">{title} ({items.length})</div>
+            {note && <div className="text-[10px] opacity-80 mb-1.5">{note}</div>}
+            <ul className="space-y-1 max-h-56 overflow-y-auto">{items.map(render)}</ul>
+          </div>
+        );
+        const openProduct = (p: any) => { setQ(p.title || p.slug); setStatusFilter('all'); setReport(null); };
+        return (
+          <Card>
+            <div className="flex items-baseline gap-2 flex-wrap mb-2">
+              <h3 className="font-medium text-ink-900 text-sm">🔎 Download check</h3>
+              <span className="text-xs text-ink-700/55">
+                {T.sellable.toLocaleString()} sellable products, {T.withFile.toLocaleString()} with a file, {T.exempt} memberships and gift cards skipped
+              </span>
+              <button className={btnGhost + ' ml-auto'} onClick={() => setReport(null)}>Close</button>
+              <button className={btnGhost} disabled={checking} onClick={runDownloadCheck}>{checking ? 'Checking…' : 'Run again'}</button>
+            </div>
+
+            {clean ? (
+              <div className="rounded-lg border border-green-300 bg-green-50 px-3 py-2.5 text-xs text-green-900">
+                <b>Every sellable product has a working download row.</b> No missing files, no empty links, and no file
+                attached to more than one product.
+              </div>
+            ) : (
+              <div className="grid gap-2 md:grid-cols-2">
+                <Group
+                  title="LIVE with no file" tone="border-red-300 bg-red-50 text-red-900"
+                  note="A buyer could pay right now and receive nothing. Add the file or deactivate the product."
+                  items={report.missing}
+                  render={(p: any) => (
+                    <li key={p.id} className="text-[11px] flex flex-wrap items-center gap-1.5">
+                      <button className="underline font-medium text-left" onClick={() => openProduct(p)}>{p.title}</button>
+                      <span className="opacity-70">${p.price_usd}{p.submitted_by ? ` · 🖥 ${p.submitted_by}` : ''}</span>
+                    </li>
+                  )}
+                />
+                <Group
+                  title="Held as drafts, waiting for a file" tone="border-amber-300 bg-amber-50 text-amber-900"
+                  note="The database refused to publish these because they arrived without a download. They publish themselves the moment BRS uploads the file."
+                  items={report.held}
+                  render={(p: any) => (
+                    <li key={p.id} className="text-[11px] flex flex-wrap items-center gap-1.5">
+                      <button className="underline font-medium text-left" onClick={() => openProduct(p)}>{p.title}</button>
+                      <span className="opacity-70">{String(p.created_at).slice(0, 10)}{p.submitted_by ? ` · 🖥 ${p.submitted_by}` : ''}</span>
+                    </li>
+                  )}
+                />
+                <Group
+                  title="Broken or empty links" tone="border-red-300 bg-red-50 text-red-900"
+                  note="A download row exists but its link is not a usable web address."
+                  items={report.badLink}
+                  render={(p: any, i: number) => (
+                    <li key={p.id + i} className="text-[11px]">
+                      <button className="underline font-medium text-left" onClick={() => openProduct(p)}>{p.title}</button>
+                      <span className="opacity-70"> · {p.download_link}</span>
+                    </li>
+                  )}
+                />
+                <Group
+                  title="One file on several products" tone="border-red-300 bg-red-50 text-red-900"
+                  note="At least one of these delivers somebody else's file, and nothing looks broken until a customer says so."
+                  items={report.shared}
+                  render={(s: any, i: number) => (
+                    <li key={i} className="text-[11px]">
+                      <div className="opacity-70 break-all">{String(s.download_link).slice(0, 70)}…</div>
+                      <div className="flex flex-wrap gap-x-2">
+                        {s.products.map((p: any) => (
+                          <button key={p.id} className="underline" onClick={() => openProduct(p)}>{String(p.title).slice(0, 46)}</button>
+                        ))}
+                      </div>
+                    </li>
+                  )}
+                />
+              </div>
+            )}
+
+            {Object.keys(report.byComputer || {}).length > 0 && (
+              <div className="mt-2 text-[11px] text-ink-700/70">
+                Uploads short of a file, by BRS computer:{' '}
+                {Object.entries(report.byComputer).sort((a: any, b: any) => b[1] - a[1]).map(([c, n]: any) => `🖥 ${c}: ${n}`).join(' · ')}
+              </div>
+            )}
+            <div className="mt-1 text-[10px] text-ink-700/45">Checked {new Date(report.checkedAt).toLocaleString()}. Clicking a name searches for it in the list below.</div>
+          </Card>
+        );
+      })()}
 
 
       {loading ? <div className="text-sm text-ink-700/60">Loading…</div> : (
