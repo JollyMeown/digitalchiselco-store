@@ -11,6 +11,15 @@
 //   node scripts/stl_specs.mjs --slug <slug>       one product
 //   node scripts/stl_specs.mjs --missing 20        the next 20 without specs
 //   node scripts/stl_specs.mjs --slug <slug> --dry report, store nothing
+//
+// ONLY the Google Drive file behind the product's own link is measured, and
+// that is deliberate. A copy of the same design sitting on a BRS machine can be
+// an earlier or later export, so measuring it would describe a file the buyer
+// never receives. A local-disk mode was written and removed on 2026-09-11 for
+// exactly that reason (owner: "only google drive with link"). It measured 306
+// designs from disk and every one of them was cleared again. Do not add it back:
+// slow and true beats fast and wrong when the number is printed on a product
+// page as fact.
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 
@@ -53,6 +62,8 @@ function measure(buf) {
     file_mb: +(buf.length / 1048576).toFixed(1),
     // a relief should sit flat on the blank: its lowest point at zero
     base_flat: Math.abs(minZ) < 0.01,
+    // provenance, so a future reader never has to wonder which file was read
+    source: 'drive',
     measured_at: new Date().toISOString(),
   };
 }
