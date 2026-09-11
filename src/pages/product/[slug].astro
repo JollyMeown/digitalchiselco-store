@@ -382,6 +382,19 @@ const breadcrumbLd = {
                 <dd class="text-ink-900 text-right">flat and sitting at zero, ready to machine</dd>
               </div>
             )}
+            {/* BRS simulates how much fine detail survives the finishing pass at
+                each panel size, so it can say the smallest size worth cutting
+                rather than leaving the buyer to guess. */}
+            {p.model_specs.recommended_size_mm && (
+              <div class="flex justify-between gap-3 px-4 py-2">
+                <dt class="text-ink-700/70">Smallest size worth carving</dt>
+                <dd class="text-ink-900 text-right">
+                  {p.model_specs.recommended_size_mm} mm
+                  {p.model_specs.detail_kept_pct ? ` · keeps ${p.model_specs.detail_kept_pct}% of the fine detail` : ''}
+                  {p.model_specs.bit_mm ? <span class="block text-xs text-ink-700/55">simulated with a {p.model_specs.bit_mm} mm ball nose</span> : null}
+                </dd>
+              </div>
+            )}
           </dl>
           <p class="px-4 py-2 text-xs text-ink-700/60 bg-cream/30 border-t border-black/10">
             Scale it to whatever panel you are cutting. Scaling all three axes together keeps the depth in proportion;
