@@ -351,6 +351,45 @@ const breadcrumbLd = {
         </ul>
       )}
 
+      {/* Measured from the file itself, not written by hand. A customer asked on
+          2026-09-11 for information about a design and there was nowhere to send
+          them: the delivery PDF is a download guide, and the page said nothing
+          about size, depth or mesh weight, which are the first three things a
+          maker needs before putting a blank on the machine. */}
+      {p.model_specs && (
+        <div class="mt-6 border border-black/10 rounded-lg overflow-hidden">
+          <div class="bg-cream/50 px-4 py-2 text-xs font-medium text-bronze-800 border-b border-black/10">📐 Design facts</div>
+          <dl class="text-sm divide-y divide-black/5">
+            <div class="flex justify-between gap-3 px-4 py-2">
+              <dt class="text-ink-700/70">Model size as supplied</dt>
+              <dd class="text-ink-900 text-right tabular-nums">{p.model_specs.width} × {p.model_specs.height} × {p.model_specs.depth} mm</dd>
+            </div>
+            <div class="flex justify-between gap-3 px-4 py-2">
+              <dt class="text-ink-700/70">Shape</dt>
+              <dd class="text-ink-900 text-right">{p.model_specs.orientation}, {p.model_specs.aspect}:1</dd>
+            </div>
+            <div class="flex justify-between gap-3 px-4 py-2">
+              <dt class="text-ink-700/70">Carve depth</dt>
+              <dd class="text-ink-900 text-right">{p.model_specs.depth_pct_of_width}% of the width</dd>
+            </div>
+            <div class="flex justify-between gap-3 px-4 py-2">
+              <dt class="text-ink-700/70">Mesh</dt>
+              <dd class="text-ink-900 text-right tabular-nums">{Number(p.model_specs.triangles).toLocaleString()} triangles · {p.model_specs.file_mb} MB</dd>
+            </div>
+            {p.model_specs.base_flat && (
+              <div class="flex justify-between gap-3 px-4 py-2">
+                <dt class="text-ink-700/70">Base</dt>
+                <dd class="text-ink-900 text-right">flat and sitting at zero, ready to machine</dd>
+              </div>
+            )}
+          </dl>
+          <p class="px-4 py-2 text-xs text-ink-700/60 bg-cream/30 border-t border-black/10">
+            Scale it to whatever panel you are cutting. Scaling all three axes together keeps the depth in proportion;
+            scale Z on its own for a shallower carve.
+          </p>
+        </div>
+      )}
+
       {reviews.length > 0 && (
         <div class="mt-6 border-t border-black/10 pt-4">
           <div class="flex items-center gap-2 mb-2">
