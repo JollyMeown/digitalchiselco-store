@@ -125,3 +125,30 @@ worth a small, capped trial once the first campaign is proving itself.
 
 These recompute on every feed fetch, so a design that starts selling promotes
 itself into the biddable group without anyone remembering to do it.
+
+## How to stop the spending
+
+The website cannot do it. Pausing a campaign needs the Google Ads API and a
+developer token that Google approves separately, so the admin panel links to the
+right screens instead of pretending to control them.
+
+**To pause, in two clicks:** [ads.google.com/aw/campaigns](https://ads.google.com/aw/campaigns),
+click the coloured status dot beside the campaign name, choose **Pause**. Green
+means running, grey means paused. It stops within minutes.
+
+Other useful screens, all under account **574-282-1599**:
+
+| What | Where |
+|---|---|
+| Pause, resume, see today's spend | https://ads.google.com/aw/campaigns |
+| Change a daily budget | https://ads.google.com/aw/campaigns/settings |
+| Billing, payment method, invoices | https://ads.google.com/aw/billing/summary |
+| What Google claims it converted | https://ads.google.com/aw/conversions |
+
+**The blunt instrument**, if something is badly wrong and you cannot get into the
+campaign screens: remove the payment method under Billing. Google stops serving
+when it cannot charge. Use it only in an emergency, since re-adding it starts a
+new billing cycle.
+
+All four links are also in Admin > Advertising, at the top of the Google
+Shopping panel, beside the numbers that would make you want them.
