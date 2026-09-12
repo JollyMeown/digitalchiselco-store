@@ -65,8 +65,62 @@ const addonRest = addon ? moreLikeThese.slice(1) : moreLikeThese;
 const paddleEnv = ((process.env.PADDLE_ENV ?? import.meta.env.PADDLE_ENV) === 'production' ? 'production' : 'sandbox');
 const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
 const addonPrice = addon ? +(Number(addon.price_usd) * (100 - addonPct) / 100).toFixed(2) : 0;
+
+// ── Conversion tracking ───────────────────────────────────────────────
+// The value reported to Google comes from OUR order row, not from anything
+// the browser was told, so a tampered or stale page cannot inflate it and a
+// refund-shaped edit is impossible. It only fires when the webhook has already
+// written the order, which is also the only moment the sale is certainly real.
+//
+// transaction_id is the deduplication key: a buyer who refreshes this page, or
+// returns to it from their email, sends the same id and Google counts it once.
+const adsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID || '';
+const adsLabel = import.meta.env.PUBLIC_GOOGLE_ADS_PURCHASE_LABEL || '';
+const conv = order ? {
+  value: Number(order.total) || 0,
+  currency: String(order.currency || 'USD'),
+  transaction_id: String(txnId),
+  items: (order.order_items || []).map((i: any) => ({
+    item_id: i.product_id || undefined,
+    item_name: String(i.title || '').slice(0, 100),
+    price: Number(i.price_usd) || 0,
+    quantity: Number(i.qty) || 1,
+  })),
+  sendTo: adsId && adsLabel ? `${adsId}/${adsLabel}` : '',
+} : null;
 ---
 <Base title="Order confirmed · DigitalChiselCo" noindex>
+  {conv && (
+    <script is:inline define:vars={{ conv }}>
+      /* Purchase, reported once. GA4 gets the ecommerce event either way, so
+         revenue shows up in Analytics even before an Ads campaign exists; the
+         Ads conversion only fires when an account and a label are configured.
+         The guard is the transaction id: a refresh or a revisit from the
+         confirmation email must not be counted as a second sale. */
+      (function () {
+        try {
+          var key = 'purchase-sent:' + conv.transaction_id;
+          if (sessionStorage.getItem(key)) return;
+          sessionStorage.setItem(key, '1');
+        } catch (e) { /* private mode: the transaction id still dedupes at Google */ }
+        if (typeof gtag !== 'function') return;
+        gtag('event', 'purchase', {
+          transaction_id: conv.transaction_id,
+          value: conv.value,
+          currency: conv.currency,
+          items: conv.items,
+        });
+        if (conv.sendTo) {
+          gtag('event', 'conversion', {
+            send_to: conv.sendTo,
+            value: conv.value,
+            currency: conv.currency,
+            transaction_id: conv.transaction_id,
+          });
+        }
+      })();
+    </script>
+  )}
   <Header />
   <main class="max-w-3xl mx-auto px-4 sm:px-6 py-12 min-h-[50vh]">
     {order ? (
