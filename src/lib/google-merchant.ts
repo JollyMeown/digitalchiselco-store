@@ -239,7 +239,8 @@ export async function fetchProductStatus(): Promise<ProductStatus> {
   if (!merchantConfigured()) throw new Error('Google Merchant service account not configured');
   const account = String(env('GOOGLE_MERCHANT_ID')).replace(/\D/g, '');
   const token = await accessToken();
-  const query = 'SELECT offer_id, title, aggregated_reporting_context_status, item_issues FROM product_view';
+  // product_view refuses any query that does not select its own id
+  const query = 'SELECT id, offer_id, title, aggregated_reporting_context_status, item_issues FROM product_view';
   const byStatus: Record<string, number> = {};
   const issueMap = new Map<string, { code: string; severity: string; description: string; count: number }>();
   const sample: ProductStatus['sample'] = [];
