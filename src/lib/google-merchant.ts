@@ -217,3 +217,69 @@ export async function syncMerchantStats(days = 30): Promise<string> {
     throw e;
   }
 }
+
+// ── Why is Google showing so few of our designs? ──────────────────────
+//
+// On 2026-09-12 the feed carried 1,692 items and only 18 of them had ever
+// earned a single impression, 615 in thirty days between them. Performance
+// reports cannot explain that, because an item that Google refuses to show
+// never appears in them at all. product_view can: it carries each item's
+// reporting status and the exact issues attached to it.
+//
+// Returns the aggregate, not the 1,692 rows: how many items Google considers
+// eligible, and the issues holding the rest back, worst first.
+export type ProductStatus = {
+  total: number;
+  byStatus: Record<string, number>;
+  issues: Array<{ code: string; severity: string; description: string; count: number }>;
+  sample: Array<{ offer_id: string; title: string | null; status: string; issues: string[] }>;
+};
+
+export async function fetchProductStatus(): Promise<ProductStatus> {
+  if (!merchantConfigured()) throw new Error('Google Merchant service account not configured');
+  const account = String(env('GOOGLE_MERCHANT_ID')).replace(/\D/g, '');
+  const token = await accessToken();
+  const query = 'SELECT offer_id, title, aggregated_reporting_context_status, item_issues FROM product_view';
+  const byStatus: Record<string, number> = {};
+  const issueMap = new Map<string, { code: string; severity: string; description: string; count: number }>();
+  const sample: ProductStatus['sample'] = [];
+  let total = 0;
+  let pageToken: string | undefined;
+  do {
+    const res = await fetch(`https://merchantapi.googleapis.com/reports/v1/accounts/${account}/reports:search`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ query, pageSize: 1000, ...(pageToken ? { pageToken } : {}) }),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`product status: ${res.status} ${text.slice(0, 300)}`);
+    const j = JSON.parse(text || '{}');
+    for (const row of j.results || []) {
+      const p = row.productView || row;
+      total++;
+      const status = String(p.aggregatedReportingContextStatus || p.aggregated_reporting_context_status || 'UNKNOWN');
+      byStatus[status] = (byStatus[status] || 0) + 1;
+      const names: string[] = [];
+      for (const it of p.itemIssues || p.item_issues || []) {
+        const type = it.type || {};
+        const code = String(type.code || 'unknown');
+        const sev = String(it.severity?.aggregatedSeverity || it.severity?.aggregated_severity || 'UNKNOWN');
+        const desc = String(type.canonicalAttribute || it.description || code);
+        const key = `${code}|${sev}`;
+        const cur = issueMap.get(key) || { code, severity: sev, description: desc, count: 0 };
+        cur.count++;
+        issueMap.set(key, cur);
+        names.push(code);
+      }
+      if (sample.length < 10 && status !== 'ELIGIBLE') {
+        sample.push({ offer_id: String(p.offerId || p.offer_id || ''), title: p.title ?? null, status, issues: names });
+      }
+    }
+    pageToken = j.nextPageToken;
+  } while (pageToken);
+  return {
+    total, byStatus,
+    issues: [...issueMap.values()].sort((a, b) => b.count - a.count).slice(0, 20),
+    sample,
+  };
+}
