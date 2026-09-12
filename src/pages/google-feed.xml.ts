@@ -98,12 +98,46 @@ export async function GET() {
     for (const r of exp || []) squareIds.add(String((r as any).product_id));
   } catch (e) { console.error('[google-feed] experiment lookup failed:', (e as any)?.message); }
 
+
+// ── Custom labels: the campaign's steering wheel ──────────────────────
+//
+// Google Shopping has no keywords. The only way to say "spend on this design
+// and not that one" is a custom label, so these carry the facts a bid should
+// depend on.
+//
+// The decisive one is label 2. A click has to be paid for out of one sale's
+// margin, and at the site's measured 1.72% conversion and Paddle's ~7.8% cut,
+// a $6.39 design can only afford 10 cents a click while Shopping clicks in this
+// niche cost 20 to 60. Advertising the cheap two thirds of the catalogue is a
+// loss by arithmetic, not by opinion. Only designs that can pay $0.25 a click
+// AND have already proven they sell are marked biddable.
+const CONVERSION = 0.0172;   // site visitors who buy, measured 2026-09-12
+const NET_OF_FEES = 0.922;   // what is left after Paddle
+const breakevenCpc = (price: number) => price * NET_OF_FEES * CONVERSION;
+
+function labels(p: { price_usd: number | null; etsy_sales_365: number | null; is_bundle: boolean | null }) {
+  const price = Number(p.price_usd) || 0;
+  const sales = Number(p.etsy_sales_365) || 0;
+  const cpc = breakevenCpc(price);
+  // how well it sells: 138 products carry 54% of a year's sales
+  const tier = sales >= 10 ? 'A_best' : sales >= 3 ? 'B_proven' : sales >= 1 ? 'C_slow' : 'D_unsold';
+  const band = price >= 30 ? 'price_30_plus' : price >= 16 ? 'price_16_29' : price >= 12 ? 'price_12_15' : price >= 8 ? 'price_8_11' : 'price_under_8';
+  // biddable = can afford a real click and has demand behind it
+  const biddable = cpc >= 0.25 && sales >= 3 ? 'bid_yes' : cpc >= 0.25 ? 'bid_test' : 'bid_no';
+  return {
+    tier, band, biddable,
+    kind: p.is_bundle ? 'bundle' : 'single',
+    // the ceiling, rounded down to the cent, so a max CPC can be set per group
+    maxCpc: `max_cpc_${cpc.toFixed(2)}`,
+  };
+}
+
   const items: string[] = [];
   try {
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase
         .from('products')
-        .select('id, title, slug, price_usd, image_url, gallery, mockup_url, mockup_status, mockup_b_url, mockup_b_status, seo_description, description, product_categories(categories(name))')
+        .select('id, title, slug, price_usd, image_url, gallery, mockup_url, mockup_status, mockup_b_url, mockup_b_status, seo_description, description, is_bundle, etsy_sales_365, product_categories(categories(name))')
         .eq('active', true)
         // Google's weapons policy will never approve our rifle/scope hunting
         // scenes, so sending them only accrues violations. Excluded here only;
@@ -116,6 +150,7 @@ export async function GET() {
       const batch = data || [];
       for (const p of batch as any[]) {
         const title = shoppingTitle(String(p.title || ''));
+        const L = labels(p);
         const desc = stripEmoji((p.seo_description || (p.description || '').slice(0, 4800) || FALLBACK(title))).slice(0, 5000);
         const { price, original, percent } = pricing(p.price_usd, discount);
         const cats = (p.product_categories || []).map((pc: any) => pc.categories?.name).filter(Boolean).join(' > ');
@@ -148,6 +183,11 @@ export async function GET() {
           `<g:identifier_exists>no</g:identifier_exists>` +
           `<g:product_type>${xml(cats || 'Bas-Relief STL Files')}</g:product_type>` +
           `<g:google_product_category>${xml(GPC)}</g:google_product_category>` +
+          `<g:custom_label_0>${xml(L.tier)}</g:custom_label_0>` +
+          `<g:custom_label_1>${xml(L.band)}</g:custom_label_1>` +
+          `<g:custom_label_2>${xml(L.biddable)}</g:custom_label_2>` +
+          `<g:custom_label_3>${xml(L.kind)}</g:custom_label_3>` +
+          `<g:custom_label_4>${xml(L.maxCpc)}</g:custom_label_4>` +
           `</item>`,
         );
       }
