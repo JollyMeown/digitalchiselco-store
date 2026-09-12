@@ -74,8 +74,8 @@ const addonPrice = addon ? +(Number(addon.price_usd) * (100 - addonPct) / 100).t
 //
 // transaction_id is the deduplication key: a buyer who refreshes this page, or
 // returns to it from their email, sends the same id and Google counts it once.
-const adsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID || '';
-const adsLabel = import.meta.env.PUBLIC_GOOGLE_ADS_PURCHASE_LABEL || '';
+const adsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID || 'AW-18375026540';
+const adsLabel = import.meta.env.PUBLIC_GOOGLE_ADS_PURCHASE_LABEL || 'KH1jCNXh9vQcEOzO8rlE';
 const conv = order ? {
   value: Number(order.total) || 0,
   currency: String(order.currency || 'USD'),

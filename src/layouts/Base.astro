@@ -20,9 +20,11 @@ const site = import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com';
 // GA4 — defaults to the project's measurement ID. Override per-environment via
 // the Netlify env var PUBLIC_GA_MEASUREMENT_ID (e.g. a staging stream).
 const gaId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || 'G-MB5KF3D03Y';
-// Google Ads conversion account, e.g. AW-123456789. Absent until a campaign
-// exists, and absent is safe: no Ads config, no conversion event, no change.
-const adsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID || '';
+// Google Ads conversion account (574-282-1599). Public identifier, not a
+// secret: it appears in the page source of every site that advertises. Kept
+// here rather than in an env var for the same reason the GA id above is, so a
+// deploy from a fresh checkout measures correctly without extra setup.
+const adsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID || 'AW-18375026540';
 // Pinterest Tag (conversion tracking for the approved merchant catalog +
 // shopping campaigns). Dormant until PUBLIC_PINTEREST_TAG_ID is set in
 // Netlify: get the id from Pinterest Ads -> Conversions -> Tag manager.
