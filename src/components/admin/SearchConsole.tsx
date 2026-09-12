@@ -6,6 +6,7 @@
 // earn clicks, and for each blog post the searches that bring people to it.
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { pageAll } from './pageAll';
 import { Card } from './ui';
 
 type Day = { day: string; clicks: number; impressions: number; ctr: number; position: number };
@@ -175,7 +176,7 @@ export default function SearchConsole() {
     const [{ data: d }, { data: gs }, { data: pd }, { data: qd }, { data: pqd }] = await Promise.all([
       supabase.from('gsc_daily').select('*').gte('day', since).order('day'),
       supabase.from('growth_settings').select('gsc_sync_at, gsc_sync_error').eq('id', 1).maybeSingle(),
-      supabase.from('gsc_page_daily').select('page, clicks, impressions, position').gte('day', since).limit(20000),
+      pageAll((a, b) => supabase.from('gsc_page_daily').select('page, clicks, impressions, position').gte('day', since).range(a, b)).then((data) => ({ data })),
       supabase.from('gsc_query_daily').select('query, clicks, impressions, position').gte('day', since).limit(20000),
       supabase.from('gsc_page_query').select('page, query, clicks, impressions, position').order('clicks', { ascending: false }).limit(5000),
     ]);

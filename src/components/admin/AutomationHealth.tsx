@@ -5,6 +5,7 @@
 // admin's own inbox so the content can be checked in one sitting.
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { pageAll } from './pageAll';
 import { Card, btnPrimary, btnGhost } from './ui';
 import { useLiveRefresh } from './useLiveRefresh';
 
@@ -56,7 +57,8 @@ export default function AutomationHealth() {
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
     const [{ data: runs }, { data: log }, { data: gs }] = await Promise.all([
       supabase.from('cron_runs').select('ran_at, ok, error, summary').order('ran_at', { ascending: false }).limit(1),
-      supabase.from('email_send_log').select('kind, sent_at').eq('status', 'sent').order('sent_at', { ascending: false }).limit(5000),
+      // 7,812 rows and growing: paged, or "last sent" per kind goes stale
+      pageAll((a, b) => supabase.from('email_send_log').select('kind, sent_at').eq('status', 'sent').order('sent_at', { ascending: false }).range(a, b)).then((data) => ({ data })),
       supabase.from('growth_settings').select('*').eq('id', 1).maybeSingle(),
     ]);
     setRun(runs?.[0] || null);

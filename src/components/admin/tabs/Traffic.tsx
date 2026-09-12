@@ -101,8 +101,23 @@ export default function Traffic() {
     // the other cards keep seeing only the global range (filtered below).
     const evDays = Math.max(days, 30);
     const evSince = new Date(Date.now() - evDays * 86400000).toISOString().slice(0, 10);
-    const [{ data: evsAll }, { count: paid }, { data: oi }] = await Promise.all([
-      supabase.from('site_events').select('day, type, product_id, q, n, visitor_hash, ts').gte('day', evSince).order('ts', { ascending: false }).limit(20000),
+    // PostgREST caps a single response at 1000 rows no matter what limit is
+    // asked for, so `.limit(20000)` quietly returned the newest 1000 events and
+    // every window longer than a day or two undercounted. The visits query
+    // above already pages for this reason; events must too.
+    const evPages = async () => {
+      const out: any[] = [];
+      for (let from = 0; from < 60000; from += 1000) {
+        const { data } = await supabase.from('site_events')
+          .select('day, type, product_id, q, n, visitor_hash, ts')
+          .gte('day', evSince).order('ts', { ascending: false }).range(from, from + 999);
+        out.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      return out;
+    };
+    const [evsAll, { count: paid }, { data: oi }] = await Promise.all([
+      evPages(),
       supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'paid').gte('created_at', sinceTs),
       supabase.from('order_items').select('product_id, orders!inner(status, created_at)').eq('orders.status', 'paid').gte('orders.created_at', sinceTs).limit(5000),
     ]);

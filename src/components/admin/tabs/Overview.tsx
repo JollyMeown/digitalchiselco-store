@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { pageAll } from '../pageAll';
 import { Card, StatBox, btnGhost, btnPrimary, inputCls } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
 import { deliveryForOrders } from '../../../lib/order-delivery';
@@ -404,7 +405,9 @@ function SystemHealth() {
       const [{ data: runs }, { count: sentToday }, { data: evs30 }, { data: wk }, { data: lastOrder }, { count: openCarts }, { data: cultsPoll }, { data: lastCults }, actProds, dlRows] = await Promise.all([
         supabase.from('cron_runs').select('ran_at, ok, finished_at, error').order('ran_at', { ascending: false }).limit(1),
         supabase.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', today + 'T00:00:00Z'),
-        supabase.from('email_events').select('event').gte('created_at', d30).in('event', ['sent', 'delivered', 'bounced', 'complained']).limit(20000),
+        // 21,176 rows live in email_events; a flat limit reads 1000 of them
+        // and the bounce rate below would be computed from a sliver.
+        pageAll((a, b) => supabase.from('email_events').select('event').gte('created_at', d30).in('event', ['sent', 'delivered', 'bounced', 'complained']).range(a, b)).then((data) => ({ data })),
         supabase.from('weekly_digest_log').select('week_key, queued_count, drain_note').order('week_key', { ascending: false }).limit(1),
         supabase.from('orders').select('created_at, total, currency').eq('status', 'paid').order('created_at', { ascending: false }).limit(1),
         supabase.from('abandoned_carts').select('id', { count: 'exact', head: true }).is('recovered_at', null).is('reminded_at', null),

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { pageAll } from '../pageAll';
 import { Card, Modal, btnPrimary, btnGhost, btnDanger, inputCls } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
 
@@ -414,7 +415,8 @@ function RecruitSender() {
   const [busy, setBusy] = useState('');
   const [results, setResults] = useState<any[] | null>(null);
 
-  useEffect(() => { supabase.from('subscribers').select('email').limit(5000).then(({ data }) => setSubs(data || [])); }, []);
+  // 2,334 subscribers: a flat limit would leave two thirds unsearchable
+  useEffect(() => { pageAll((a, b) => supabase.from('subscribers').select('email').range(a, b)).then((rows) => setSubs(rows)); }, []);
   const suggestions = input.trim().length >= 2 ? subs.filter((s) => s.email.toLowerCase().includes(input.toLowerCase()) && !recipients.includes(s.email.toLowerCase())).slice(0, 6) : [];
   const addEmails = (list: string[]) => setRecipients((r) => [...new Set([...r, ...list.map((e) => e.toLowerCase().trim()).filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))])]);
 
