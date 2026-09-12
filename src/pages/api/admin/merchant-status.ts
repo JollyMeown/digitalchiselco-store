@@ -28,8 +28,14 @@ export const GET: APIRoute = async ({ request }) => {
   if (!(await isCallerAdmin(request))) return json({ error: 'Admin authentication required.' }, 401);
   const { merchantConfigured, fetchProductStatus } = await import('../../../lib/google-merchant');
   if (!merchantConfigured()) return json({ error: 'Google Merchant is not connected on this deployment.' }, 503);
+  // Which account is this deployment actually reading? Neither value is a
+  // secret: the merchant id is the number printed in Merchant Center's own
+  // header, and the service account address is what has to be granted access
+  // there. Having them on screen saves guessing when linking Google Ads.
+  const account = String(process.env.GOOGLE_MERCHANT_ID || import.meta.env.GOOGLE_MERCHANT_ID || '').replace(/\D/g, '');
+  const serviceAccount = String(process.env.GOOGLE_SA_EMAIL || import.meta.env.GOOGLE_SA_EMAIL || '');
   try {
-    return json({ ok: true, ...(await fetchProductStatus()), fetchedAt: new Date().toISOString() });
+    return json({ ok: true, account, serviceAccount, ...(await fetchProductStatus()), fetchedAt: new Date().toISOString() });
   } catch (e: any) {
     return json({ error: String(e?.message || e).slice(0, 500) }, 502);
   }
