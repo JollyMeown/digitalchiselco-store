@@ -68,6 +68,17 @@ export default function GoogleAdsPanel() {
         <button className={btnGhost + ' ml-auto'} onClick={load}>Refresh</button>
       </div>
 
+      {/* The website cannot pause a campaign: that needs the Google Ads API and a
+          developer token Google approves separately. So the next best thing is
+          to put the right screen one click away, because the moment you want to
+          stop spending is not the moment to go hunting through menus. */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        <a href="https://ads.google.com/aw/campaigns" target="_blank" rel="noreferrer" className={btnGhost}>⏸ Pause or resume campaigns ↗</a>
+        <a href="https://ads.google.com/aw/campaigns/settings" target="_blank" rel="noreferrer" className={btnGhost}>💰 Budgets ↗</a>
+        <a href="https://ads.google.com/aw/billing/summary" target="_blank" rel="noreferrer" className={btnGhost}>🧾 Billing ↗</a>
+        <span className="text-[11px] text-ink-700/50 self-center">account 574-282-1599 · to pause: click the status dot beside a campaign, choose Pause</span>
+      </div>
+
       <div className={`rounded-lg border px-3 py-2 text-xs mb-3 ${verdictTone[d.verdict]}`}>
         <b>{verdictText[d.verdict]}</b>{' '}
         The test passes at <b>{d.thresholds.targetSales30d} sales</b> in 30 days. So far: <b>{m.sales}</b>.
