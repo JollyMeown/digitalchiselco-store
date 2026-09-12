@@ -330,6 +330,12 @@ export const POST: APIRoute = async ({ request }) => {
           gift: giftData || null,
           fx: chargeCcy !== 'USD' ? { currency: chargeCcy, rate: fxRate, usd_subtotal: usdSubtotal } : null,
           expected_total_usd: usdSubtotal,
+          // The ad click that brought this buyer, travelling the same trusted
+          // path as the cart itself. Read here rather than from Paddle's
+          // custom_data, which the browser can forge, so the attribution on the
+          // order is as trustworthy as the order.
+          gclid: /^[A-Za-z0-9_.-]{10,200}$/.test(String(body.gclid || '')) ? String(body.gclid) : null,
+          ad_click_source: ['gclid', 'gbraid', 'wbraid'].includes(String(body.ad_click_source)) ? String(body.ad_click_source) : null,
         });
       } catch (e) { console.error('[checkout-init] pending_checkouts insert failed (webhook will use safe fallback):', e); }
     }

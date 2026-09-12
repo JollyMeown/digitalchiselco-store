@@ -7,6 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { Card, btnPrimary, btnGhost, inputCls } from '../ui';
 import { useLiveRefresh } from '../useLiveRefresh';
 import Chart3D from '../Chart3D';
+import GoogleAdsPanel from '../GoogleAdsPanel';
 
 const usd = (n: number | null | undefined) => (n == null ? '—' : '$' + (Math.round(Number(n) * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: Math.abs(Number(n)) < 100 ? 2 : 0 }));
 
@@ -74,6 +75,10 @@ export default function AdStrategy() {
         your own history, names the listings taking exposure without selling, and shows when orders really arrive.
         Etsy publishes no per-listing ad spend, so listing waste is measured by views without sales and labelled as such.
       </div>
+
+      {/* Google Shopping sits above the Etsy plan because it is the newer,
+          unproven channel and the one that needs watching daily. */}
+      <GoogleAdsPanel />
 
       {/* THE STANDING PLAN */}
       <Card>

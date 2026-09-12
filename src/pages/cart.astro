@@ -657,6 +657,15 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
             coupon_code: promo?.code || null, customizations: customizationsPayload,
             currency: (window.dccChosenCcy ? window.dccChosenCcy() : 'USD'),
             gift,
+            // the ad click that brought them, if there was one and it is still
+            // inside Google's own 90-day claim window
+            ...(function () {
+              try {
+                var g = JSON.parse(localStorage.getItem('dcc_gclid') || 'null');
+                if (g && g.id && Date.now() - Number(g.at || 0) < 90 * 86400000) return { gclid: g.id, ad_click_source: g.src || 'gclid' };
+              } catch (_) {}
+              return {};
+            })(),
           }),
         });
         const data = await res.json();

@@ -48,6 +48,26 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Funnel events (t != 'pv') land in site_events instead of site_visits.
     const type = String(body.t || 'pv');
+
+    // A paid ad click. Recorded once per click id, so the dashboard can compare
+    // what Google charged for with what actually arrived, and so a later sale
+    // can be traced back to the click that paid for it.
+    if (type === 'ad_click') {
+      const gclid = String(body.gclid || '').slice(0, 200);
+      if (!/^[A-Za-z0-9_.-]{10,200}$/.test(gclid)) return new Response(null, { status: 204 });
+      const src = ['gclid', 'gbraid', 'wbraid'].includes(String(body.gsrc)) ? String(body.gsrc) : 'gclid';
+      const day0 = new Date().toISOString().slice(0, 10);
+      const secret0 = process.env.ACCOUNT_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'trk';
+      const vh = crypto.createHash('sha256').update(`${ip}|${ua}|${day0}|${secret0}`).digest('hex').slice(0, 32);
+      try {
+        await supabaseAdmin().from('ad_clicks').upsert(
+          { gclid, source: src, path, visitor_hash: vh, day: day0, country: countryOf(request) },
+          { onConflict: 'gclid' },
+        );
+      } catch { /* a duplicate click id is the normal case on a refresh */ }
+      return new Response(null, { status: 204 });
+    }
+
     if (type !== 'pv') {
       if (!['view_product', 'add_to_cart', 'buy_now', 'wishlist_add', 'wishlist_remove', 'checkout_start', 'lamp_try'].includes(type)) return new Response(null, { status: 204 });
       const day0 = new Date().toISOString().slice(0, 10);

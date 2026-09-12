@@ -119,6 +119,18 @@ const faviconType = settings.favicon_image_url
         var tz = '';
         try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_) {}
         trk({ p: location.pathname, r: document.referrer || '', c: camp, tz: tz });
+        // Google ad click. Kept for 90 days, which matches the longest window
+        // Google can claim a conversion in, so a sale can always be traced back
+        // to the click that paid for it. gbraid/wbraid are the iOS variants.
+        try {
+          var q2 = new URLSearchParams(location.search);
+          var gid = q2.get('gclid') || q2.get('gbraid') || q2.get('wbraid') || '';
+          var gsrc = q2.get('gclid') ? 'gclid' : q2.get('gbraid') ? 'gbraid' : q2.get('wbraid') ? 'wbraid' : '';
+          if (gid) {
+            localStorage.setItem('dcc_gclid', JSON.stringify({ id: gid, src: gsrc, at: Date.now() }));
+            trk({ p: location.pathname, t: 'ad_click', gclid: gid, gsrc: gsrc });
+          }
+        } catch (_) {}
         // Capture a referral code from a shared ?ref= link → auto-applies in cart.
         try {
           var rp = new URLSearchParams(location.search).get('ref');

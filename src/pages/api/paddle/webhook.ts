@@ -284,6 +284,11 @@ async function handleTransactionCompleted(db: any, txn: any) {
         provider_order_id: txn.id,
         paddle_transaction_id: txn.id,
         paddle_customer_id: txn.customer_id || null,
+        // Which ad click paid for this sale, carried from the checkout snapshot
+        // rather than from anything the browser sent to Paddle. This is what
+        // lets the shop's own books check Google's conversion claims.
+        gclid: snap?.gclid || null,
+        ad_click_source: snap?.ad_click_source || null,
       })
       .select('id')
       .single();
