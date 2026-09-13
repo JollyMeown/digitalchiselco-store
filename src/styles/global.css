@@ -17,3 +17,37 @@
   border-color: #15803d !important;
   color: #ffffff !important;
 }
+
+/* A scrollbar you can actually see and grab.
+   Windows and macOS both hide the scrollbar until you start scrolling, which
+   is fine for a whole page (you know the page scrolls) but wrong for a panel
+   inside a page: with nothing showing, the panel looks like it simply ends.
+   This keeps the track permanently visible in the bronze of the site, so the
+   panel announces that there is more below and gives you a bar to drag. */
+.dcc-scroll {
+  scrollbar-width: thin;           /* Firefox */
+  scrollbar-color: rgba(133, 79, 11, 0.45) rgba(133, 79, 11, 0.08);
+  overscroll-behavior: contain;    /* hitting the bottom must not scroll the page behind it */
+}
+.dcc-scroll::-webkit-scrollbar { width: 12px; }
+.dcc-scroll::-webkit-scrollbar-track {
+  background: rgba(133, 79, 11, 0.08);
+  border-radius: 6px;
+}
+.dcc-scroll::-webkit-scrollbar-thumb {
+  background: rgba(133, 79, 11, 0.45);
+  border: 3px solid transparent;   /* inset the thumb inside the track */
+  background-clip: padding-box;
+  border-radius: 6px;
+  min-height: 40px;                /* stays grabbable in a very long list */
+}
+.dcc-scroll::-webkit-scrollbar-thumb:hover { background: rgba(133, 79, 11, 0.75); background-clip: padding-box; }
+/* On a desktop the panels are height-capped and always scroll, so reserve the
+   track permanently: a bar that appears and disappears makes the grid twitch
+   sideways as you scroll. On a phone the panels flow with the page, so leave
+   it to `auto` and show the bar only when there is something to scroll. */
+@media (min-width: 768px) {
+  /* class doubled deliberately: this has to outrank Tailwind's own
+     md:overflow-y-auto utility, which is the same specificity */
+  .dcc-scroll.dcc-scroll { overflow-y: scroll; }
+}
