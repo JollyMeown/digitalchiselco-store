@@ -360,6 +360,18 @@ const breadcrumbLd = {
         <div class="mt-6 border border-black/10 rounded-lg overflow-hidden">
           <div class="bg-cream/50 px-4 py-2 text-xs font-medium text-bronze-800 border-b border-black/10">📐 Design facts</div>
           <dl class="text-sm divide-y divide-black/5">
+            {/* First row, because it is the question that actually arrives:
+                "does it come with multiple format options (like OBJ or DXF) or
+                just STL? And what's the poly count?" (2026-08-31). Answering it
+                on the page is cheaper than answering it one buyer at a time,
+                and every buyer who does not write in just leaves instead. */}
+            <div class="flex justify-between gap-3 px-4 py-2">
+              <dt class="text-ink-700/70">File format</dt>
+              <dd class="text-ink-900 text-right">
+                STL only
+                <span class="block text-xs text-ink-700/55">decimated high-quality mesh, binary STL</span>
+              </dd>
+            </div>
             <div class="flex justify-between gap-3 px-4 py-2">
               <dt class="text-ink-700/70">Model size as supplied</dt>
               <dd class="text-ink-900 text-right tabular-nums">{p.model_specs.width} × {p.model_specs.height} × {p.model_specs.depth} mm</dd>
@@ -397,6 +409,8 @@ const breadcrumbLd = {
             )}
           </dl>
           <p class="px-4 py-2 text-xs text-ink-700/60 bg-cream/30 border-t border-black/10">
+            Opens directly in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360, and on any CNC router, 3D printer or laser
+            that reads STL. No OBJ or DXF: a DXF holds flat 2D outlines and cannot carry a three-dimensional relief at all.
             Scale it to whatever panel you are cutting. Scaling all three axes together keeps the depth in proportion;
             scale Z on its own for a shallower carve.
           </p>
