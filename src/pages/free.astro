@@ -25,6 +25,22 @@ import CutLocalStrip from '../components/CutLocalStrip.astro';
         <li>✅ No spam — unsubscribe anytime</li>
       </ul>
 
+      {/* The commonest email the shop receives is "I cannot find the original
+          e-mail with the download link, please send again." Answering it used
+          to be a manual job; now the person who lost it can help themselves. */}
+      <div class="mt-6 pt-5 border-t border-bronze-600/15 text-left">
+        <p class="text-sm text-ink-700/70">
+          Already signed up and lost the email?
+          <button id="resend-open" type="button" class="text-bronze-700 underline">Get your download link again</button>.
+        </p>
+        <form id="resend" class="hidden mt-3 flex flex-col sm:flex-row gap-2">
+          <input id="remail" type="email" required placeholder="The email you signed up with"
+                 class="flex-1 border border-black/15 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-bronze-600" />
+          <button class="bg-bronze-600 text-cream px-5 py-2.5 rounded-lg text-sm hover:bg-bronze-700 transition">Send my link</button>
+        </form>
+        <p id="rmsg" class="mt-2 text-sm text-ink-700/70"></p>
+      </div>
+
       <div class="text-left"><CutLocalStrip /></div>
     </section>
   </main>
@@ -51,6 +67,32 @@ import CutLocalStrip from '../components/CutLocalStrip.astro';
       } catch {
         msg.className = 'mt-4 text-sm text-red-600';
         msg.textContent = 'Network error. Please try again.';
+      }
+    });
+
+    // "send it again" for people who already subscribed
+    const rform = document.getElementById('resend');
+    const rmsg = document.getElementById('rmsg');
+    document.getElementById('resend-open').addEventListener('click', () => {
+      rform.classList.remove('hidden');
+      document.getElementById('remail').focus();
+    });
+    rform.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      rmsg.className = 'mt-2 text-sm text-bronze-700';
+      rmsg.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/free-resend', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email: document.getElementById('remail').value.trim() }),
+        });
+        const data = await res.json();
+        rmsg.className = 'mt-2 text-sm ' + (res.ok ? 'text-green-700' : 'text-red-600');
+        rmsg.textContent = data.message || data.error || 'Something went wrong.';
+        if (res.ok) rform.reset();
+      } catch {
+        rmsg.className = 'mt-2 text-sm text-red-600';
+        rmsg.textContent = 'Network error. Please try again.';
       }
     });
   </script>

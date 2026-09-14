@@ -1,0 +1,86 @@
+---
+// The permanent home of the 5 free STL files.
+//
+// The pack used to be delivered exactly once, by a MailerLite automation email.
+// Lose that email and there was nowhere to go: the link did not exist anywhere
+// on the site, so every "I cannot find the original e-mail with the download
+// link, please send again" had to be answered by hand. This page is the answer,
+// and /api/free-resend mails a link to it on demand.
+//
+// Gated by the same HMAC token as the opt-in confirmation, so the pack stays a
+// reason to subscribe rather than a public URL.
+import Base from '../../layouts/Base.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { supabaseAdmin } from '../../lib/supabase';
+import { verifySubscribeToken } from '../../lib/subscribe-token';
+
+export const prerender = false;
+
+const verified = verifySubscribeToken(Astro.url.searchParams.get('token'));
+let packUrl = '';
+if (verified) {
+  const db = supabaseAdmin();
+  const { data } = await db.from('growth_settings').select('free_pack_url').eq('id', 1).maybeSingle();
+  packUrl = data?.free_pack_url || '';
+  // Reaching this page is proof of a working address, so a subscriber who
+  // never clicked the original confirmation is confirmed here rather than
+  // being sent back to the start.
+  await db.from('subscribers').update({ confirmed_at: new Date().toISOString() })
+    .eq('email', verified.email).is('confirmed_at', null);
+}
+---
+<Base title="Your free STL pack · DigitalChiselCo" noindex>
+  <Header />
+  <main class="max-w-2xl mx-auto px-4 sm:px-6 py-16 min-h-[60vh]">
+    {verified && packUrl ? (
+      <section class="text-center">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-700 text-3xl mb-5">📦</div>
+        <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">Your 5 free STL files</h1>
+        <p class="mt-3 text-ink-700">Ready for CNC routers, 3D printers and laser engravers.</p>
+        <a href={packUrl} target="_blank" rel="noopener"
+           class="inline-block mt-6 bg-bronze-600 text-cream font-bold px-7 py-3 rounded-lg hover:bg-bronze-700 transition">
+          Open my free files ↗
+        </a>
+        <p class="mt-6 text-sm text-ink-700/60 max-w-md mx-auto">
+          <b>Bookmark this page.</b> The link works whenever you need it, so you never have to hunt for the email again.
+        </p>
+        <p class="mt-8 text-sm text-ink-700/70">
+          Want more? <a href="/catalog" class="text-bronze-700 underline">Browse the full catalogue</a>
+          or <a href="/membership" class="text-bronze-700 underline">join the membership</a> for 8 new designs a month.
+        </p>
+      </section>
+    ) : (
+      <section class="text-center">
+        <h1 class="font-serif text-3xl text-bronze-800">This link has expired</h1>
+        <p class="mt-4 text-ink-700 max-w-md mx-auto">Links last 14 days. Pop your email in below and we will send a fresh one straight away.</p>
+        <form id="again" class="mt-6 flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
+          <input id="em" type="email" required placeholder="you@example.com"
+                 class="flex-1 border border-black/15 rounded-lg px-4 py-3 focus:outline-none focus:border-bronze-600" />
+          <button class="bg-bronze-600 text-cream font-bold px-6 py-3 rounded-lg hover:bg-bronze-700 transition">Send my link</button>
+        </form>
+        <p id="msg" class="mt-4 text-sm text-ink-700/70"></p>
+      </section>
+    )}
+  </main>
+  <Footer />
+  <script is:inline>
+    (function () {
+      var f = document.getElementById('again');
+      if (!f) return;
+      f.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var msg = document.getElementById('msg');
+        msg.textContent = 'Sending…';
+        try {
+          var r = await fetch('/api/free-resend', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email: document.getElementById('em').value }),
+          });
+          var j = await r.json();
+          msg.textContent = j.message || j.error || 'Something went wrong.';
+        } catch (err) { msg.textContent = 'Network error — please try again.'; }
+      });
+    })();
+  </script>
+</Base>

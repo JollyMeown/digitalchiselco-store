@@ -542,3 +542,41 @@ Total paid: $${d.totalPaid.toFixed(2)} ${d.currency}
 
   return { subject, html, text };
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// "Please send the download link again."
+// The free pack used to arrive once, from a MailerLite automation, and if that
+// email was lost there was nothing the site could do. This is what
+// /api/free-resend sends: a link back to /free/files, which keeps working.
+// ──────────────────────────────────────────────────────────────────────
+export function freePackLink(d: { name?: string | null; filesUrl: string; packUrl?: string }): { subject: string; html: string; text: string } {
+  const subject = 'Your 5 free STL files';
+  const greeting = d.name ? `Hi ${esc(d.name)},` : 'Hi there,';
+
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f7f4ee;font-family:Helvetica,Arial,sans-serif;color:${BRAND_INK};">
+  <div style="max-width:560px;margin:0 auto;padding:24px;background:#fff;border:1px solid #eee;border-radius:10px;">
+    <p style="font-size:16px;margin:0 0 14px;">${greeting}</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">Here are your 5 free bas-relief STL files, ready for CNC routers, 3D printers and laser engravers.</p>
+    <p style="margin:0 0 22px;">
+      <a href="${esc(d.filesUrl)}" style="display:inline-block;background:${BRAND_BRONZE};color:${BRAND_CREAM};text-decoration:none;font-weight:bold;padding:13px 26px;border-radius:8px;">Open my free files</a>
+    </p>
+    <p style="font-size:14px;line-height:1.6;margin:0 0 18px;color:#5b4a3c;"><b>Bookmark that page.</b> It stays available, so you will not have to go looking for this email again.</p>
+    <p style="font-size:13px;line-height:1.6;margin:0;color:#7a6a5c;">If the button does not work, paste this into your browser:<br><span style="word-break:break-all;">${esc(d.filesUrl)}</span></p>
+    <p style="font-size:13px;line-height:1.6;margin:22px 0 0;color:#7a6a5c;">Happy carving,<br>Jolly · ${BRAND_NAME}</p>
+  </div>
+</body></html>`;
+
+  const text = `${d.name ? `Hi ${d.name},` : 'Hi there,'}
+
+Here are your 5 free bas-relief STL files, ready for CNC routers, 3D printers and laser engravers.
+
+${d.filesUrl}
+
+Bookmark that page. It stays available, so you will not have to go looking for this email again.
+
+Happy carving,
+Jolly · ${BRAND_NAME}`;
+
+  return { subject, html, text };
+}

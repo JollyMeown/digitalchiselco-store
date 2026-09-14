@@ -15,6 +15,11 @@ const verified = verifySubscribeToken(token);
 
 let outcome: Outcome = 'invalid';
 let displayEmail = '';
+// The pack link, shown on this page rather than trusted to arrive by email.
+// The MailerLite welcome still goes out, but it is no longer the only copy:
+// people lose it, and every lost copy used to come back to the owner by hand.
+let filesUrl = '';
+if (verified) filesUrl = `/free/files?token=${encodeURIComponent(token || '')}`;
 
 if (verified) {
   displayEmail = verified.email;
@@ -68,10 +73,13 @@ if (verified) {
         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-700 text-3xl mb-5">✓</div>
         <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">You're confirmed!</h1>
         <p class="mt-4 text-ink-700 leading-relaxed max-w-xl mx-auto">
-          <strong>{displayEmail}</strong> is in. Now <strong>check your email Inbox — and your Junk / Spam / Promotions folder</strong> for the free digital files link, which usually arrives within a minute or two.
+          <strong>{displayEmail}</strong> is in. Your files are ready right now:
         </p>
-        <p class="mt-3 text-sm text-ink-700/70 max-w-xl mx-auto">
-          Sender: <strong>DigitalChiselCo</strong> · Subject: <em>"Your 5 free STL files are here"</em>
+        <a href={filesUrl} class="inline-block mt-6 bg-bronze-600 text-cream font-bold px-7 py-3 rounded-lg hover:bg-bronze-700 transition">
+          Open my 5 free files →
+        </a>
+        <p class="mt-4 text-sm text-ink-700/70 max-w-xl mx-auto">
+          <b>Bookmark that page</b> so you always have them. A copy is on its way to your inbox too (check Junk / Spam / Promotions if it does not appear within a minute or two).
         </p>
         <div class="mt-8 flex justify-center gap-3 flex-wrap">
           <a href="/catalog" class="bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Browse the full catalog</a>
@@ -85,10 +93,14 @@ if (verified) {
         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-cream text-bronze-700 text-3xl mb-5">★</div>
         <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">You're already confirmed.</h1>
         <p class="mt-4 text-ink-700 leading-relaxed max-w-xl mx-auto">
-          We've got <strong>{displayEmail}</strong> on the list already. Check your inbox (or spam folder) for the original welcome email with your STL files. If you can't find it, email <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a> and we'll resend.
+          We've got <strong>{displayEmail}</strong> on the list already. No need to hunt for the old email, here are your files:
         </p>
+        <a href={filesUrl} class="inline-block mt-6 bg-bronze-600 text-cream font-bold px-7 py-3 rounded-lg hover:bg-bronze-700 transition">
+          Open my 5 free files →
+        </a>
+        <p class="mt-4 text-sm text-ink-700/70">Bookmark that page and it will be there whenever you need it.</p>
         <div class="mt-8">
-          <a href="/catalog" class="bg-bronze-600 text-cream px-6 py-3 rounded-md text-sm hover:bg-bronze-700 transition">Browse the catalog</a>
+          <a href="/catalog" class="border border-bronze-600 text-bronze-700 px-6 py-3 rounded-md text-sm hover:bg-bronze-600/10 transition">Browse the catalog</a>
         </div>
       </section>
     )}
