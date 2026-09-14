@@ -17,23 +17,42 @@ import { verifySubscribeToken } from '../../lib/subscribe-token';
 
 export const prerender = false;
 
-const verified = verifySubscribeToken(Astro.url.searchParams.get('token'));
+// Two ways in. `k` is the stored random key, which is now what emails carry.
+// `token` is the old HMAC link, still honoured so that links already sitting in
+// people's inboxes keep working; it is not used for anything new, because in
+// production the same deployment signed a token and then refused it.
+const key = Astro.url.searchParams.get('k');
+const legacy = verifySubscribeToken(Astro.url.searchParams.get('token'));
+const db = supabaseAdmin();
+
+let email = '';
+if (key) {
+  const { data } = await db.from('subscribers').select('email').eq('free_pack_token', key).maybeSingle();
+  email = data?.email || '';
+} else if (legacy) {
+  email = legacy.email;
+}
+
 let packUrl = '';
-if (verified) {
-  const db = supabaseAdmin();
+if (email) {
   const { data } = await db.from('growth_settings').select('free_pack_url').eq('id', 1).maybeSingle();
   packUrl = data?.free_pack_url || '';
   // Reaching this page is proof of a working address, so a subscriber who
   // never clicked the original confirmation is confirmed here rather than
   // being sent back to the start.
   await db.from('subscribers').update({ confirmed_at: new Date().toISOString() })
-    .eq('email', verified.email).is('confirmed_at', null);
+    .eq('email', email).is('confirmed_at', null);
 }
+
+// Which check failed, in the markup. When this page misbehaved there was no way
+// to tell a bad link from a missing pack URL from the outside, and that cost
+// far more time than the fix did.
+const state = !key && !legacy ? 'no-link' : !email ? 'bad-link' : !packUrl ? 'no-pack' : 'ok';
 ---
 <Base title="Your free STL pack · DigitalChiselCo" noindex>
   <Header />
-  <main class="max-w-2xl mx-auto px-4 sm:px-6 py-16 min-h-[60vh]">
-    {verified && packUrl ? (
+  <main class="max-w-2xl mx-auto px-4 sm:px-6 py-16 min-h-[60vh]" data-state={state}>
+    {state === 'ok' ? (
       <section class="text-center">
         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-700 text-3xl mb-5">📦</div>
         <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">Your 5 free STL files</h1>
@@ -52,8 +71,14 @@ if (verified) {
       </section>
     ) : (
       <section class="text-center">
-        <h1 class="font-serif text-3xl text-bronze-800">This link has expired</h1>
-        <p class="mt-4 text-ink-700 max-w-md mx-auto">Links last 14 days. Pop your email in below and we will send a fresh one straight away.</p>
+        <h1 class="font-serif text-3xl text-bronze-800">
+          {state === 'no-pack' ? 'The pack is not ready' : 'We could not open that link'}
+        </h1>
+        <p class="mt-4 text-ink-700 max-w-md mx-auto">
+          {state === 'no-pack'
+            ? 'Your link is fine, but the pack is not set up on our side yet. Email jolly@digitalchiselco.com and we will sort it out straight away.'
+            : 'Pop your email in below and we will send a fresh one. It arrives in under a minute.'}
+        </p>
         <form id="again" class="mt-6 flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
           <input id="em" type="email" required placeholder="you@example.com"
                  class="flex-1 border border-black/15 rounded-lg px-4 py-3 focus:outline-none focus:border-bronze-600" />

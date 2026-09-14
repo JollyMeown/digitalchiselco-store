@@ -418,4 +418,14 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error(redact((e && e.stack) || e)); process.exit(1); });
+// A thrown value that is not an Error has no .stack, and String() turns it into
+// the useless "[object Object]" — which is exactly what three crashed runs left
+// in cults3d-local.log, with no way to tell what had gone wrong. Serialise
+// anything that is not already text.
+const describe = (e) => {
+  if (e && e.stack) return e.stack;
+  if (e instanceof Error) return `${e.name}: ${e.message}`;
+  if (typeof e === 'object' && e !== null) { try { return JSON.stringify(e, Object.getOwnPropertyNames(e)); } catch { return Object.prototype.toString.call(e); } }
+  return e;
+};
+main().catch((e) => { console.error(redact(describe(e))); process.exit(1); });

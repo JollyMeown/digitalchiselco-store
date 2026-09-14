@@ -18,8 +18,10 @@ let displayEmail = '';
 // The pack link, shown on this page rather than trusted to arrive by email.
 // The MailerLite welcome still goes out, but it is no longer the only copy:
 // people lose it, and every lost copy used to come back to the owner by hand.
+// A stored key, not the signed token: in production the signed link was minted
+// and then rejected by the same deployment, so it is no longer trusted to be
+// the way anyone reaches their files.
 let filesUrl = '';
-if (verified) filesUrl = `/free/files?token=${encodeURIComponent(token || '')}`;
 
 if (verified) {
   displayEmail = verified.email;
@@ -37,6 +39,18 @@ if (verified) {
 
     let name: string | null = existing?.name || null;
     let alreadyConfirmed = !!existing?.confirmed_at;
+
+    // Mint (once) the key that opens /free/files, so the button below works
+    // without depending on an env-var secret.
+    {
+      const { data: row } = await db.from('subscribers').select('free_pack_token').eq('email', verified.email).maybeSingle();
+      let k = row?.free_pack_token;
+      if (!k) {
+        k = (await import('node:crypto')).randomBytes(24).toString('base64url');
+        await db.from('subscribers').update({ free_pack_token: k }).eq('email', verified.email);
+      }
+      filesUrl = `/free/files?k=${encodeURIComponent(k)}`;
+    }
 
     if (!alreadyConfirmed) {
       const nowIso = new Date().toISOString();

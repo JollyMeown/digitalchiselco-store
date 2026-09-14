@@ -10,7 +10,7 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { send as sendEmail } from '../../lib/resend';
-import { signSubscribeToken } from '../../lib/subscribe-token';
+import { randomBytes } from 'node:crypto';
 import { freePackLink } from '../../lib/email-templates';
 import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
 
@@ -31,10 +31,19 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     const db = supabaseAdmin();
-    const { data: sub } = await db.from('subscribers').select('email, name').eq('email', email).maybeSingle();
+    const { data: sub } = await db.from('subscribers').select('email, name, free_pack_token').eq('email', email).maybeSingle();
     if (sub) {
       const { data: gs } = await db.from('growth_settings').select('free_pack_url').eq('id', 1).maybeSingle();
-      const url = `${SITE}/free/files?token=${encodeURIComponent(signSubscribeToken(email))}`;
+      // A stored random token, not an HMAC over an env secret. The signed
+      // version failed in production: the same deployment signed a link and
+      // then refused it, because the two functions resolved the secret
+      // differently. The database cannot disagree with itself.
+      let tok = sub.free_pack_token;
+      if (!tok) {
+        tok = randomBytes(24).toString('base64url');
+        await db.from('subscribers').update({ free_pack_token: tok }).eq('email', email);
+      }
+      const url = `${SITE}/free/files?k=${encodeURIComponent(tok)}`;
       const { subject, html, text } = freePackLink({ name: sub.name, filesUrl: url, packUrl: gs?.free_pack_url || '' });
       await sendEmail({
         to: email, subject, html, text,
