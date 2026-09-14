@@ -171,12 +171,18 @@ const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
       <fieldset class="space-y-4">
         <legend class="font-serif text-xl text-bronze-800 mb-1">Show your work</legend>
         <div>
-          <span class="lbl">Photos of pieces you’ve made * <span class="text-ink-700/40">(3–8 images, JPG/PNG/WebP, your own work)</span></span>
+          <span class="lbl">Photos of pieces you’ve made * <span class="text-ink-700/40">(3–8 images, straight from your phone is fine)</span></span>
           <div id="gallery" class="flex flex-wrap gap-3 mt-1"></div>
+          <!-- accept="image/*" on purpose. Naming jpeg/png/webp made iOS hand
+               over the original HEIC file, which the server then refused, and
+               two real applications arrived with no photos at all because of
+               it. Everything is converted to JPEG in the browser below, so any
+               format the phone can open is now fine here. -->
           <label class="inline-flex items-center gap-2 mt-2 cursor-pointer text-sm text-bronze-700 border border-bronze-600/40 rounded-lg px-3 py-2 hover:bg-cream">
-            <input type="file" id="photos" accept="image/jpeg,image/png,image/webp" multiple class="hidden" /> ＋ Add photos
+            <input type="file" id="photos" accept="image/*" multiple class="hidden" /> ＋ Add photos
           </label>
           <p id="upnote" class="text-xs text-ink-700/50 mt-1"></p>
+          <div id="upfail" class="hidden mt-2 text-xs rounded-lg border border-red-300 bg-red-50 text-red-800 px-3 py-2"></div>
         </div>
         <div class="grid sm:grid-cols-3 gap-4">
           <label class="block"><span class="lbl">Etsy shop</span><input name="etsy_url" class="fld" placeholder="etsy.com/shop/…" /></label>
@@ -248,19 +254,58 @@ const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
       var intl=document.getElementById('intl'), inw=document.getElementById('intl-notes-wrap');
       intl.addEventListener('change',function(){ inw.classList.toggle('hidden', !intl.checked); });
       // photo uploads
-      var urls=[], gal=document.getElementById('gallery'), note=document.getElementById('upnote');
+      var urls=[], failed=[], gal=document.getElementById('gallery'), note=document.getElementById('upnote'), fail=document.getElementById('upfail');
+
+      // Shrink and re-encode every picked file to JPEG before it is uploaded.
+      // Two real applications (2026-09-06) arrived with zero photos because a
+      // phone handed over HEIC, which the server rejects, and because modern
+      // phone photos run well past the 6 MB cap. Both die here instead: the
+      // browser decodes whatever the phone gave it (Safari reads HEIC) and
+      // hands on a modest JPEG. If a browser cannot decode the format, the
+      // original is sent and the server's message explains what to do.
+      async function toJpeg(file){
+        if(!/^image\//.test(file.type||'')) return file;
+        var MAX=1600;
+        try{
+          var bmp = window.createImageBitmap ? await createImageBitmap(file) : await new Promise(function(res,rej){
+            var im=new Image(), u=URL.createObjectURL(file);
+            im.onload=function(){ URL.revokeObjectURL(u); res(im); }; im.onerror=function(){ URL.revokeObjectURL(u); rej(new Error('decode')); }; im.src=u;
+          });
+          var w=bmp.width, h=bmp.height;
+          if(!w||!h) throw new Error('empty');
+          var s=Math.min(1, MAX/Math.max(w,h));
+          var c=document.createElement('canvas'); c.width=Math.round(w*s); c.height=Math.round(h*s);
+          c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+          var blob=await new Promise(function(res){ c.toBlob(res,'image/jpeg',0.85); });
+          if(bmp.close) bmp.close();
+          if(!blob) throw new Error('encode');
+          return new File([blob], (file.name||'photo').replace(/\.[^.]+$/,'')+'.jpg', { type:'image/jpeg' });
+        }catch(err){ return file; }          // let the server answer for it
+      }
+
+      function showFails(){
+        if(!failed.length){ fail.classList.add('hidden'); return; }
+        fail.classList.remove('hidden');
+        fail.innerHTML='<b>'+failed.length+' photo'+(failed.length>1?'s':'')+' did not upload.</b><br>'
+          + failed.map(function(x){ return '• '+x.name+' — '+x.why; }).join('<br>');
+      }
+
       document.getElementById('photos').addEventListener('change', async function(e){
         var files=[].slice.call(e.target.files||[]);
+        failed=[]; showFails();
         for(var i=0;i<files.length;i++){
           if(urls.length>=8){ note.textContent='Max 8 photos.'; break; }
-          var f=files[i]; note.textContent='Uploading '+f.name+'…';
-          var fd=new FormData(); fd.append('file',f); fd.append('t', window.__UPT||'');
+          var f=files[i]; note.textContent='Uploading '+f.name+' ('+(i+1)+' of '+files.length+')…';
+          var send=await toJpeg(f);
+          var fd=new FormData(); fd.append('file',send); fd.append('t', window.__UPT||'');
           try{
             var r=await fetch('/api/maker-upload',{method:'POST',body:fd}); var j=await r.json();
-            if(j.url){ urls.push(j.url); addThumb(j.url); note.textContent=urls.length+' photo'+(urls.length>1?'s':'')+' added'; }
-            else note.textContent=j.error||'Upload failed';
-          }catch(err){ note.textContent='Upload failed — try again'; }
+            if(j.url){ urls.push(j.url); addThumb(j.url); }
+            else failed.push({name:f.name, why:j.error||('Upload failed ('+r.status+')')});
+          }catch(err){ failed.push({name:f.name, why:'Network error'}); }
         }
+        note.textContent=urls.length+' photo'+(urls.length===1?'':'s')+' added';
+        showFails();
         e.target.value='';
       });
       function addThumb(url){
@@ -280,6 +325,18 @@ const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
         ['deliver_domestic_ship','deliver_intl','agreed_owns_machines','agreed_fees','agreed_terms'].forEach(function(k){ body[k]=!!form.querySelector('[name="'+k+'"]').checked; });
         Object.keys(chosen).forEach(function(k){ body[k]=chosen[k]; });
         body.portfolio_urls=urls;
+        // The photos are marked required, but nothing used to enforce it: if
+        // every upload failed the form still submitted and still showed the
+        // success screen, so the maker left believing the photos were sent.
+        // That is exactly how two applications arrived empty.
+        if(!urls.length){
+          err.textContent = failed.length
+            ? 'Your '+failed.length+' photo'+(failed.length>1?'s':'')+' did not upload, so the application has no work to show. Please see the message above and try adding them again.'
+            : 'Please add at least one photo of your work before submitting.';
+          err.classList.remove('hidden');
+          document.getElementById('photos').scrollIntoView({behavior:'smooth', block:'center'});
+          return;
+        }
         var btn=document.getElementById('submit'); btn.disabled=true; btn.textContent='Submitting…';
         try{
           var r=await fetch('/api/maker-apply',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});

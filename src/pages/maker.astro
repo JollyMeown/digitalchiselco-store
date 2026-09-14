@@ -50,7 +50,7 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
         <p class="text-xs text-ink-700/50 mt-6">Not a maker yet? <a href="/become-a-maker" class="text-bronze-600 underline">Apply to join →</a></p>
       </div>
     ) : (
-      <div id="app" data-token={token}>
+      <div id="app" data-token={token} data-portfolio={JSON.stringify(maker.portfolio_urls || [])}>
         <div class="flex items-center justify-between gap-3 pt-4 mb-5">
           <div>
             <p class="text-xs tracking-[0.2em] uppercase text-bronze-600">Cut Local · Maker</p>
@@ -61,6 +61,24 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
             <div class="text-ink-700/70">{maker.rating_count > 0 ? <span><span class="text-bronze-600">{stars(maker.rating_avg)}</span> {Number(maker.rating_avg).toFixed(1)} ({maker.rating_count})</span> : <span class="text-ink-700/45 text-xs">no reviews yet</span>}</div>
           </div>
         </div>
+
+        {/* PORTFOLIO — the photos buyers see on the public profile.
+            Added 2026-09-14: there was no way to change these after applying,
+            so a maker whose application photos failed to upload had an empty
+            profile and no recourse. */}
+        <section class="mb-8 border border-black/10 rounded-xl p-4 bg-white">
+          <div class="flex items-baseline justify-between gap-3 flex-wrap">
+            <h2 class="font-serif text-xl text-bronze-800">Your work photos</h2>
+            <a href={`/m/${maker.id}`} target="_blank" class="text-xs text-bronze-700 underline">see your public profile ↗</a>
+          </div>
+          <p class="text-xs text-ink-700/60 mt-0.5">These are what buyers see when they pick a maker. Up to 12. Photos straight from your phone are fine.</p>
+          <div id="pf-gallery" class="flex flex-wrap gap-3 mt-3"></div>
+          <label class="inline-flex items-center gap-2 mt-3 cursor-pointer text-sm text-bronze-700 border border-bronze-600/40 rounded-lg px-3 py-2 hover:bg-cream">
+            <input type="file" id="pf-input" accept="image/*" multiple class="hidden" /> ＋ Add photos
+          </label>
+          <p id="pf-note" class="text-xs text-ink-700/50 mt-1"></p>
+          <div id="pf-fail" class="hidden mt-2 text-xs rounded-lg border border-red-300 bg-red-50 text-red-800 px-3 py-2"></div>
+        </section>
 
         {/* ACTIVE JOBS */}
         {activeJobs.length > 0 && (
@@ -211,6 +229,83 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
       var app=document.getElementById('app'); if(!app) return;
       var token=app.dataset.token;
       var api=function(op,extra){ return fetch('/api/mp/action',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({op:op,token:token},extra))}).then(function(r){return r.json();}); };
+
+      // ---- portfolio photos ----------------------------------------------
+      // Same browser-side conversion as the application form: the phone's own
+      // format (HEIC on an iPhone) is decoded and re-sent as a modest JPEG, so
+      // the upload cannot fail for a reason the maker cannot see or fix.
+      (function(){
+        var input=document.getElementById('pf-input'), gal=document.getElementById('pf-gallery');
+        var note=document.getElementById('pf-note'), fail=document.getElementById('pf-fail');
+        if(!input) return;
+        var photos=[]; try{ photos=JSON.parse(app.dataset.portfolio||'[]'); }catch(e){ photos=[]; }
+
+        async function toJpeg(file){
+          if(!/^image\//.test(file.type||'')) return file;
+          try{
+            var bmp = window.createImageBitmap ? await createImageBitmap(file) : await new Promise(function(res,rej){
+              var im=new Image(), u=URL.createObjectURL(file);
+              im.onload=function(){ URL.revokeObjectURL(u); res(im); }; im.onerror=function(){ URL.revokeObjectURL(u); rej(new Error('decode')); }; im.src=u;
+            });
+            var s=Math.min(1, 1600/Math.max(bmp.width,bmp.height));
+            var c=document.createElement('canvas'); c.width=Math.round(bmp.width*s); c.height=Math.round(bmp.height*s);
+            c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+            var blob=await new Promise(function(res){ c.toBlob(res,'image/jpeg',0.85); });
+            if(bmp.close) bmp.close();
+            if(!blob) throw new Error('encode');
+            return new File([blob],(file.name||'photo').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'});
+          }catch(e){ return file; }
+        }
+
+        function draw(){
+          gal.innerHTML='';
+          photos.forEach(function(u){
+            var w=document.createElement('div'); w.style.position='relative';
+            var img=document.createElement('img'); img.src=u; img.loading='lazy';
+            img.className='w-24 h-24 rounded-lg object-cover border border-black/10';
+            var rm=document.createElement('button'); rm.type='button'; rm.textContent='×';
+            rm.title='Remove this photo';
+            rm.className='absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border border-black/15 text-ink-800 leading-none';
+            rm.onclick=async function(){
+              if(!confirm('Remove this photo from your public profile?')) return;
+              var j=await post({action:'remove',url:u});
+              if(j.ok){ photos=j.portfolio_urls; draw(); note.textContent='Removed.'; }
+              else note.textContent=j.error||'Could not remove it.';
+            };
+            w.appendChild(img); w.appendChild(rm); gal.appendChild(w);
+          });
+          note.textContent=photos.length+' photo'+(photos.length===1?'':'s')+' on your profile'+(photos.length?'':' — buyers see no work yet');
+        }
+        function post(body){
+          return fetch('/api/mp/portfolio',{method:'POST',headers:{'content-type':'application/json'},
+            body:JSON.stringify(Object.assign({t:token},body))}).then(function(r){return r.json();});
+        }
+
+        input.addEventListener('change', async function(e){
+          var files=[].slice.call(e.target.files||[]), bad=[], added=[];
+          fail.classList.add('hidden');
+          for(var i=0;i<files.length;i++){
+            if(photos.length+added.length>=12){ bad.push({name:files[i].name, why:'you already have 12 photos'}); continue; }
+            note.textContent='Uploading '+files[i].name+' ('+(i+1)+' of '+files.length+')…';
+            var fd=new FormData(); fd.append('file', await toJpeg(files[i])); fd.append('t', token);
+            try{
+              var r=await fetch('/api/maker-upload',{method:'POST',body:fd}); var j=await r.json();
+              if(j.url) added.push(j.url); else bad.push({name:files[i].name, why:j.error||('failed ('+r.status+')')});
+            }catch(err){ bad.push({name:files[i].name, why:'network error'}); }
+          }
+          if(added.length){
+            var s=await post({action:'add',urls:added});
+            if(s.ok) photos=s.portfolio_urls; else bad.push({name:added.length+' photo(s)', why:s.error||'could not be saved'});
+          }
+          draw();
+          if(bad.length){
+            fail.classList.remove('hidden');
+            fail.innerHTML='<b>'+bad.length+' photo'+(bad.length>1?'s':'')+' did not upload.</b><br>'+bad.map(function(x){return '• '+x.name+' — '+x.why;}).join('<br>');
+          }
+          e.target.value='';
+        });
+        draw();
+      })();
 
       // submit quotes
       document.querySelectorAll('.quoteform').forEach(function(f){
