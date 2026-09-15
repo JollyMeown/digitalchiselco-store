@@ -270,7 +270,16 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
                  city and machines, click to open their profile. Loaded only
                  when scrolled into view so the homepage stays fast. -->
             <div class="hidden lg:block relative self-center lg:-mr-6">
-              <MakerMap client:visible compact />
+              {/* client:only, not client:visible. With client:visible Astro still
+                  renders the component on the server, and this one draws every
+                  country border on Earth as SVG paths: 248 KB of the homepage's
+                  627 KB of HTML was this map, below the fold, on every visit
+                  (2026-09-15 audit). The map is decoration; it draws itself in
+                  the browser when scrolled to, and the box keeps its height so
+                  nothing jumps. */}
+              <div style="min-height:300px">
+                <MakerMap client:only="react" compact />
+              </div>
               <div class="mt-2 text-center text-[11px] text-cream/45">
                 {makerCount > 0
                   ? <span>Hover any glowing dot to see that workshop</span>
