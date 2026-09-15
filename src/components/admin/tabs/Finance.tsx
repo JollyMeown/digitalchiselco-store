@@ -423,6 +423,19 @@ export default function Finance() {
         <button className="underline text-bronze-700" onClick={() => load()}>reload</button>
       </div>
 
+      {/* A wrong number with confidence is worse than no number. From March to
+          September 2026 the Etsy refresh was timing out and the tab showed Etsy at
+          a $5,772 loss for six months, because fees and ad spend were written while
+          revenue silently came back as zero. The refresh now marks a channel that
+          failed; this is where that mark becomes visible. */}
+      {Object.entries(ch).filter(([, v]: any) => v && v.ok === false).map(([name, v]: any) => (
+        <div key={name} className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+          <b>{CHANNELS[name]?.label || name} numbers are stale.</b> The last refresh could not reach {CHANNELS[name]?.label || name}
+          {v.error ? <> (<span className="font-mono text-xs">{String(v.error).slice(0, 120)}</span>)</> : null}, so the figures below are from{' '}
+          {v.last_good_sync ? new Date(v.last_good_sync).toLocaleString() : 'an earlier sync'} and the totals on this page exclude anything since.
+          Usual cause on this PC: the VPN blocks openapi.etsy.com. Turn it off and run <code className="bg-white px-1 rounded">node scripts/finance_refresh.mjs</code>.
+        </div>
+      ))}
       {noData && (
         <Card><p className="text-sm text-ink-700/70">No finance data cached yet. Run the local refresh: <code className="bg-cream px-1 rounded">node scripts/finance_refresh.mjs</code> (needs the Etsy OAuth token on that machine, like the Cults3D engine). Then hit <b>reload</b>.</p></Card>
       )}

@@ -69,14 +69,37 @@ const status = { channels: {}, generated_note: 'Etsy revenue = receipt grandtota
   console.log(`website: ${count} paid orders`);
 }
 
+// A channel either refreshes completely or not at all.
+//
+// From March to September 2026 this script wrote Etsy fees and ad spend while
+// the receipts call was timing out (the PC's VPN cannot reach openapi.etsy.com),
+// so the dashboard showed Etsy at a loss of $5,772 for six months. The fix is
+// not to hide the failure but to refuse to publish half a picture: a channel
+// whose fetch failed keeps its previous rows and is marked stale, and the
+// Finance tab says so in red instead of showing a confident wrong number.
+const channelOk = { website: true, etsy: true, cults: true };
+const channelError = {};
+const failChannel = (ch, why) => { channelOk[ch] = false; channelError[ch] = String(why).slice(0, 160); };
+
+// Etsy calls retried: a dropped connection is common from this machine and is
+// not a reason to declare the shop broke.
+async function etsyRetry(path) {
+  let last;
+  for (let i = 1; i <= 3; i++) {
+    try { return await etsy(path, { oauth: true }); }
+    catch (e) { last = e; if (i < 3) await new Promise((r) => setTimeout(r, i * 3000)); }
+  }
+  throw last;
+}
+
 // ── 2) ETSY — receipts (revenue) + ledger (ad spend / fees / payouts / balance) ──
 {
   // revenue from receipts
   let rev = 0, receipts = 0;
   for (let offset = 0; offset < 20000; offset += 100) {
     let page;
-    try { page = await etsy(`/shops/${SHOP}/receipts?limit=100&offset=${offset}`, { oauth: true }); }
-    catch (e) { console.log('etsy receipts stop:', e.message.slice(0, 80)); break; }
+    try { page = await etsyRetry(`/shops/${SHOP}/receipts?limit=100&offset=${offset}`); }
+    catch (e) { console.log('etsy receipts FAILED:', e.message.slice(0, 80)); failChannel('etsy', 'receipts: ' + e.message); break; }
     const rows = page.results || [];
     if (!rows.length) break;
     let oldestInPage = Infinity;
@@ -102,8 +125,8 @@ const status = { channels: {}, generated_note: 'Etsy revenue = receipt grandtota
     const start = Math.max(cutSec, end - 2678000);
     for (let offset = 0; offset < 100000; offset += 100) {
       let page;
-      try { page = await etsy(`/shops/${SHOP}/payment-account/ledger-entries?min_created=${start}&max_created=${end}&limit=100&offset=${offset}`, { oauth: true }); }
-      catch (e) { console.log('etsy ledger stop:', e.message.slice(0, 80)); break; }
+      try { page = await etsyRetry(`/shops/${SHOP}/payment-account/ledger-entries?min_created=${start}&max_created=${end}&limit=100&offset=${offset}`); }
+      catch (e) { console.log('etsy ledger FAILED:', e.message.slice(0, 80)); failChannel('etsy', 'ledger: ' + e.message); break; }
       const rows = page.results || [];
       if (!rows.length) break;
       for (const e of rows) {
@@ -132,7 +155,7 @@ const status = { channels: {}, generated_note: 'Etsy revenue = receipt grandtota
 }
 
 // ── 3) CULTS3D — sales (EUR → USD) ───────────────────────────────────
-if (CULTS_USER && CULTS_KEY) {
+if (CULTS_USER && CULTS_KEY) try {
   const auth = 'Basic ' + Buffer.from(`${CULTS_USER}:${CULTS_KEY}`).toString('base64');
   const gql = async (q) => (await fetch('https://cults3d.com/graphql', { method: 'POST', headers: { 'content-type': 'application/json', authorization: auth }, body: JSON.stringify({ query: q }) })).json();
   const sales = [];
@@ -154,13 +177,36 @@ if (CULTS_USER && CULTS_KEY) {
   const nextEst = pending > 0 ? new Date(Date.UTC(nowD.getUTCFullYear(), nowD.getUTCMonth() + (nowD.getUTCDate() >= 15 ? 1 : 0), 15)).toISOString().slice(0, 10) : null;
   status.channels.cults = { currency: 'EUR', eur_usd: EUR_USD, revenue_365d: round2(rev), pending: round2(pending), available: round2(available), next_payout_est: nextEst, payout_url: 'https://cults3d.com/en/sales' };
   console.log(`cults: ${sales.length} sales, €${round2(rev)} in window, pending €${round2(pending)}, available €${round2(available)}`);
+} catch (e) {
+  console.log('cults FAILED:', String(e?.message || e).slice(0, 80));
+  failChannel('cults', e?.message || e);
 } else {
   console.log('cults: skipped (no CULTS3D creds)');
 }
 
 // ── write finance_daily (replace the window) + finance_status ────────
-const rows = [...daily.entries()].map(([k, v]) => { const [day, channel] = k.split('|'); return { day, channel, revenue_usd: round2(v.revenue_usd), ad_spend_usd: round2(v.ad_spend_usd), fees_usd: round2(v.fees_usd), revenue_native: round2(v.revenue_native), currency: v.currency }; });
-await db.from('finance_daily').delete().gte('day', cutoff.toISOString().slice(0, 10));
-for (let i = 0; i < rows.length; i += 500) { const { error } = await db.from('finance_daily').upsert(rows.slice(i, i + 500), { onConflict: 'day,channel' }); if (error) throw error; }
-await db.from('finance_status').update({ data: status, synced_at: new Date().toISOString() }).eq('id', 1);
-console.log(`\n✓ wrote ${rows.length} finance_daily rows + status. Channels: ${Object.keys(status.channels).join(', ')}`);
+// Only channels that refreshed completely are rewritten. A failed channel keeps
+// whatever rows it had, and its status carries the error and the moment of the
+// last good sync, so the tab can show "stale since" instead of a wrong total.
+const okChannels = Object.keys(channelOk).filter((c) => channelOk[c]);
+const rows = [...daily.entries()]
+  .map(([k, v]) => { const [day, channel] = k.split('|'); return { day, channel, revenue_usd: round2(v.revenue_usd), ad_spend_usd: round2(v.ad_spend_usd), fees_usd: round2(v.fees_usd), revenue_native: round2(v.revenue_native), currency: v.currency }; })
+  .filter((r) => channelOk[r.channel]);
+if (okChannels.length) {
+  await db.from('finance_daily').delete().gte('day', cutoff.toISOString().slice(0, 10)).in('channel', okChannels);
+  for (let i = 0; i < rows.length; i += 500) { const { error } = await db.from('finance_daily').upsert(rows.slice(i, i + 500), { onConflict: 'day,channel' }); if (error) throw error; }
+}
+const { data: prevStatus } = await db.from('finance_status').select('data, synced_at').eq('id', 1).maybeSingle();
+const prev = prevStatus?.data?.channels || {};
+const nowIso = new Date().toISOString();
+for (const c of Object.keys(channelOk)) {
+  if (channelOk[c]) {
+    status.channels[c] = { ...(status.channels[c] || {}), ok: true, error: null, last_good_sync: nowIso };
+  } else {
+    // keep the last good numbers, mark them stale, say why
+    status.channels[c] = { ...(prev[c] || {}), ok: false, error: channelError[c], last_good_sync: prev[c]?.last_good_sync || null };
+  }
+}
+await db.from('finance_status').update({ data: status, synced_at: nowIso }).eq('id', 1);
+console.log(`\n✓ wrote ${rows.length} finance_daily rows for [${okChannels.join(', ')}]${okChannels.length < 3 ? ' — FAILED: ' + Object.keys(channelOk).filter((c) => !channelOk[c]).map((c) => c + ' (' + channelError[c] + ')').join('; ') : ''}`);
+if (okChannels.length < Object.keys(channelOk).length) process.exitCode = 2;
