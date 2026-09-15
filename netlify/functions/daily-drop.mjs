@@ -51,10 +51,11 @@ export default async () => {
     : null;
 
   const { due, why } = await dueNow(db);
-  if (!due) return new Response('not the scheduled hour (' + why + ')', { status: 200 });
 
   // Same-day guard: if the owner moves the hour later in the day, do not run a
   // second time. A successful run inside the last 20 h means today is covered.
+  // The same lookup also drives the CATCH-UP below.
+  let covered = false;
   if (db) {
     try {
       const { data: recent } = await db.from('cron_runs').select('ran_at, summary')
@@ -67,9 +68,25 @@ export default async () => {
       // nothing ran again for 20 h. If the last run was degraded, run again.
       const growth = recent?.[0]?.summary?.growth || {};
       const starved = Object.values(growth).filter((v) => typeof v === 'string' && /time budget/i.test(v)).length;
-      if (recent?.length && starved <= 3) return new Response('already ran in the last 20h', { status: 200 });
-      if (recent?.length) console.warn(`[daily-drop] last run was degraded (${starved} steps starved) — running again`);
+      covered = !!(recent?.length && starved <= 3);
+      if (recent?.length && !covered) console.warn(`[daily-drop] last run was degraded (${starved} steps starved) — running again`);
     } catch { /* if the check fails, prefer running over skipping */ }
+  }
+  if (covered) return new Response('already ran in the last 20h', { status: 200 });
+
+  // CATCH-UP: the scheduled hour is a single tick. If that one tick is lost
+  // (a deploy building at that minute, a cold-start timeout, a platform blip)
+  // nothing ran for the whole day and nobody noticed until the next evening.
+  // Seen on 2026-09-15: deploys at 17:02 and 17:06 UTC, no heartbeat all day.
+  // So a LATER tick on the same day runs the automation too, as long as the
+  // last good run is more than 20 h old. Before the scheduled hour we still
+  // wait, so the owner's chosen time stays the normal time.
+  if (!due) {
+    const m = /^(\d+):00 in (.+), scheduled (\d+):00$/.exec(why);
+    const late = m && Number(m[1]) > Number(m[3]);
+    if (!late) return new Response('not the scheduled hour (' + why + ')', { status: 200 });
+    console.warn('[daily-drop] CATCH-UP: scheduled tick was missed today (' + why + ') and no run in 20h — running now');
+    await notify('🟡 <b>Nightly run is late</b>\nThe scheduled tick was missed today (' + why + '). Running it now on the next hourly tick.');
   }
   console.log('[daily-drop] firing —', why);
 
