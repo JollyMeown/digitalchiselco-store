@@ -4,9 +4,10 @@ export type ProductCard = {
   id: string; title: string; slug: string; price_usd: number;
   image_url: string | null; is_bundle: boolean; link_status: string;
   rating_avg?: number | null; rating_count?: number | null;
+  customer_photo_url?: string | null;   // a real buyer's carve, from an approved photo review
 };
 
-const CARD = 'id,title,slug,price_usd,image_url,is_bundle,link_status,rating_avg,rating_count';
+const CARD = 'id,title,slug,price_usd,image_url,is_bundle,link_status,rating_avg,rating_count,customer_photo_url';
 
 export type SiteSettings = {
   donation_total: number; rating: number; reviews_count: number;
@@ -142,11 +143,25 @@ export async function titleVocabulary(): Promise<Map<string, number>> {
   return map;
 }
 
-export async function getRelatedProducts(excludeId: string, limit = 5) {
+// "Related" used to be five random products with no relation at all. Now it
+// is the same collection's best sellers, which is the second sale a buyer of
+// this design is most likely to make; falls back to shop-wide best sellers.
+export async function getRelatedProducts(excludeId: string, limit = 5, categoryId?: string | null) {
   try {
+    if (categoryId) {
+      const { data, error } = await supabase
+        .from('products').select(`${CARD}, product_categories!inner(category_id)`)
+        .eq('active', true).neq('id', excludeId).eq('product_categories.category_id', categoryId)
+        .not('image_url', 'is', null)
+        .order('etsy_sales_365', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      if (data && data.length >= Math.min(3, limit)) return data as ProductCard[];
+    }
     const { data, error } = await supabase
       .from('products').select(CARD).eq('active', true).neq('id', excludeId)
-      .not('image_url', 'is', null).limit(limit);
+      .not('image_url', 'is', null)
+      .order('etsy_sales_365', { ascending: false, nullsFirst: false }).limit(limit);
     if (error) throw error;
     return (data ?? []) as ProductCard[];
   } catch (e) { console.error('getRelatedProducts failed:', e); return []; }
@@ -184,25 +199,33 @@ export async function getCategoryBySlug(slug: string) {
 // Alphabetical was the ONLY order the catalog had, so a bundle uploaded this
 // morning landed on page 15 behind everything that happened to start with an
 // earlier letter, and nobody, owner included, could find it (2026-09-15).
-export type CatalogSort = 'title' | 'newest';
-export async function getProducts(page = 1, perPage = 48, sort: CatalogSort = 'title') {
+// 'best' (the default everywhere since 2026-09-15) puts the designs that
+// actually sell first, from the Etsy sales data; unsold designs follow newest
+// first, so a fresh upload is never buried behind a dead one.
+export type CatalogSort = 'best' | 'title' | 'newest';
+export const sortOf = (v: string | null | undefined): CatalogSort => (v === 'newest' || v === 'title' ? v : 'best');
+function applySort<T extends { order: (...a: any[]) => T }>(q: T, sort: CatalogSort): T {
+  if (sort === 'newest') return q.order('created_at', { ascending: false }).order('title');
+  if (sort === 'title') return q.order('title');
+  return q.order('etsy_sales_365', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false });
+}
+export async function getProducts(page = 1, perPage = 48, sort: CatalogSort = 'best') {
   const from = (page - 1) * perPage;
   try {
-    let q = supabase.from('products').select(CARD, { count: 'exact' }).eq('active', true);
-    q = sort === 'newest' ? q.order('created_at', { ascending: false }).order('title') : q.order('title');
+    const q = applySort(supabase.from('products').select(CARD, { count: 'exact' }).eq('active', true) as any, sort);
     const { data, count, error } = await q.range(from, from + perPage - 1);
     if (error) throw error;
     return { products: (data ?? []) as ProductCard[], total: count ?? 0, page, perPage };
   } catch (e) { console.error('getProducts failed:', e); return { products: [], total: 0, page, perPage }; }
 }
 
-export async function getProductsByCategory(categoryId: string, page = 1, perPage = 48) {
+export async function getProductsByCategory(categoryId: string, page = 1, perPage = 48, sort: CatalogSort = 'best') {
   const from = (page - 1) * perPage;
   try {
-    const { data, count, error } = await supabase
+    const q = applySort(supabase
       .from('products').select(`${CARD}, product_categories!inner(category_id)`, { count: 'exact' })
-      .eq('active', true).eq('product_categories.category_id', categoryId)
-      .order('title').range(from, from + perPage - 1);
+      .eq('active', true).eq('product_categories.category_id', categoryId) as any, sort);
+    const { data, count, error } = await q.range(from, from + perPage - 1);
     if (error) throw error;
     return { products: (data ?? []) as ProductCard[], total: count ?? 0, page, perPage };
   } catch (e) { console.error('getProductsByCategory failed:', e); return { products: [], total: 0, page, perPage }; }
@@ -230,25 +253,30 @@ export async function getProductById(id: string) {
 
 // Given a set of product IDs the user currently has in cart, return products
 // from the same categories (excluding those already in the cart).
+// Best sellers come from the sales data, not from a hand-set flag. The flag
+// was sorted A to Z, so "Best Sellers" showed whatever the admin had ticked,
+// alphabetically, while the 20-a-year designs sat unflagged (owner,
+// 2026-09-15: "we have Etsy data, I want the best sellers always at top").
+// The flag still counts as a tie-break, so a hand pick can nudge, not override.
 export async function getBestSellers(limit = 8): Promise<ProductCard[]> {
   try {
     const { data, error } = await supabase
-      .from('products').select(CARD).eq('active', true).eq('is_bestseller', true)
-      .not('image_url', 'is', null).order('title').limit(limit);
+      .from('products').select(CARD).eq('active', true)
+      .not('image_url', 'is', null).eq('is_bundle', false)
+      .order('etsy_sales_365', { ascending: false, nullsFirst: false })
+      .order('is_bestseller', { ascending: false })
+      .order('rating_count', { ascending: false, nullsFirst: false })
+      .limit(limit);
     if (error) throw error;
     return (data ?? []) as ProductCard[];
   } catch (e) { console.error('getBestSellers failed:', e); return []; }
 }
 
+// "Just added" means exactly that: the newest live designs, always. The
+// admin's is_latest_pick flag used to win and was sorted by title, so a
+// design uploaded this morning never appeared there (owner, 2026-09-15).
 export async function getLatestProducts(limit = 8): Promise<ProductCard[]> {
   try {
-    // Prefer admin-picked rows. If none are flagged, fall back to actual
-    // newest-by-created_at so the section never goes empty.
-    const { data: picked, error: pErr } = await supabase
-      .from('products').select(CARD).eq('active', true).eq('is_latest_pick', true)
-      .not('image_url', 'is', null).order('title').limit(limit);
-    if (pErr) throw pErr;
-    if (picked && picked.length > 0) return picked as ProductCard[];
     const { data, error } = await supabase
       .from('products').select(CARD).eq('active', true)
       .not('image_url', 'is', null).order('created_at', { ascending: false }).limit(limit);

@@ -3,8 +3,9 @@ import Shell from '../../layouts/Shell.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import Pick5Strip from '../../components/Pick5Strip.astro';
-import { getCategoryBySlug, getProductsByCategory, getSettings } from '../../lib/queries';
+import { getCategoryBySlug, getProductsByCategory, getSettings, sortOf } from '../../lib/queries';
 import { jsonLd } from '../../lib/jsonld';
+import { img } from '../../lib/img';
 import xss from 'xss';
 
 const { slug } = Astro.params;
@@ -12,7 +13,8 @@ const category = await getCategoryBySlug(slug!);
 if (!category) return Astro.rewrite('/404');
 
 const page = Math.max(1, Number(Astro.url.searchParams.get('page') || '1'));
-const { products, total, perPage } = await getProductsByCategory(category.id, page);
+const sort = sortOf(Astro.url.searchParams.get('sort'));
+const { products, total, perPage } = await getProductsByCategory(category.id, page, 48, sort);
 const pages = Math.ceil(total / perPage);
 const isPremium = category.slug === 'premium-bundle-offer';
 const settings = await getSettings();
@@ -59,7 +61,8 @@ const faqLd = faq.length ? {
   {category.image_url && !isPremium ? (
     <>
       <div class="mb-5 overflow-hidden rounded-lg">
-        <img src={category.image_url} alt={`${baseName} relief carvings, a selection of designs from this collection`} class="w-full h-auto block" loading="eager" />
+        <img src={img(category.image_url, { w: 1400, q: 80 })} srcset={[700, 1000, 1400].map((w) => `${img(category.image_url, { w, q: 80 })} ${w}w`).join(', ')} sizes="(min-width: 1280px) 1232px, 100vw"
+             alt={`${baseName} relief carvings, a selection of designs from this collection`} class="w-full h-auto block" loading="eager" fetchpriority="high" width="1672" height="941" />
       </div>
       <h1 class="font-serif text-2xl sm:text-3xl text-bronze-800 leading-tight">{baseName} relief STL files</h1>
       <p class="text-ink-700/70 text-sm mt-1 mb-4">{total.toLocaleString()} designs · instant download · commercial licence included</p>
@@ -97,6 +100,16 @@ const faqLd = faq.length ? {
     <div class="mt-2 h-2 rounded-full bg-white/70 overflow-hidden"><div id="coll-fill" class="h-full bg-bronze-600 transition-all" style="width:0%"></div></div>
   </div>
 
+  <div class="flex items-center justify-end mb-3">
+    <div class="inline-flex rounded-lg border border-black/10 overflow-hidden text-sm" role="group" aria-label="Sort">
+      {([['best', 'Best sellers'], ['newest', 'Newest'], ['title', 'A to Z']] as const).map(([k, label], i) => (
+        <a href={k === 'best' ? `/collections/${category.slug}` : `/collections/${category.slug}?sort=${k}`}
+           class={`px-3 py-1.5 ${i ? 'border-l border-black/10 ' : ''}${sort === k ? 'bg-bronze-600 text-cream' : 'text-ink-700 hover:bg-cream'}`}
+           aria-current={sort === k ? 'true' : undefined}>{label}</a>
+      ))}
+    </div>
+  </div>
+
   <Pick5Strip where="collection" />
 
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -104,9 +117,9 @@ const faqLd = faq.length ? {
   </div>
   {pages > 1 && (
     <nav class="flex justify-center gap-2 mt-10 text-sm" aria-label="Pages">
-      {page > 1 && <a href={`/collections/${slug}?page=${page - 1}`} class="px-3 py-1.5 border border-black/10 rounded">← Prev</a>}
+      {page > 1 && <a href={`/collections/${slug}?${sort !== 'best' ? `sort=${sort}&` : ''}page=${page - 1}`} class="px-3 py-1.5 border border-black/10 rounded">← Prev</a>}
       <span class="px-3 py-1.5">Page {page} of {pages}</span>
-      {page < pages && <a href={`/collections/${slug}?page=${page + 1}`} class="px-3 py-1.5 border border-black/10 rounded">Next →</a>}
+      {page < pages && <a href={`/collections/${slug}?${sort !== 'best' ? `sort=${sort}&` : ''}page=${page + 1}`} class="px-3 py-1.5 border border-black/10 rounded">Next →</a>}
     </nav>
   )}
 

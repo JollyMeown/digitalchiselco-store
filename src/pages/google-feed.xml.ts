@@ -164,7 +164,15 @@ function labels(p: { price_usd: number | null; etsy_sales_365: number | null; is
           p.mockup_status === 'approved' ? p.mockup_url : null,
           p.mockup_b_status === 'approved' ? p.mockup_b_url : null,
         ].filter(Boolean) as string[];
-        const extraImgs = [...lifestyle, ...gallery.slice(1)]
+        // Bundles: the hero is a collage with baked-in price text, which Google's
+        // image policy refuses, so the 15 highest-value items in the catalogue
+        // were the ones Shopping would not show. The first gallery image after
+        // the hero is one clean design from the bundle; it goes in as the main
+        // image and the collage rides along as an additional one.
+        const bundleMain = p.is_bundle && gallery.length > 1 ? gallery[1] : null;
+        const mainImage = squareIds.has(String(p.id)) ? `${SITE}/sq/${p.slug}.jpg` : img(bundleMain || p.image_url, { w: 1200, q: 85 });
+        const extraImgs = [...lifestyle, ...(bundleMain ? [p.image_url, ...gallery.slice(2)] : gallery.slice(1))]
+          .filter(Boolean)
           .slice(0, 10)
           .map((g) => `<g:additional_image_link>${xml(img(g, { w: 1200, q: 85 }))}</g:additional_image_link>`).join('');
         items.push(
@@ -173,7 +181,7 @@ function labels(p: { price_usd: number | null; etsy_sales_365: number | null; is
           `<title>${xml(title)}</title>` +
           `<description>${xml(desc)}</description>` +
           `<link>${xml(`${SITE}/product/${p.slug}?utm_source=google&utm_medium=shopping`)}</link>` +
-          `<g:image_link>${xml(squareIds.has(String(p.id)) ? `${SITE}/sq/${p.slug}.jpg` : img(p.image_url, { w: 1200, q: 85 }))}</g:image_link>` +
+          `<g:image_link>${xml(mainImage)}</g:image_link>` +
           extraImgs +
           `<g:availability>in_stock</g:availability>` +
           `<g:price>${original.toFixed(2)} USD</g:price>` +

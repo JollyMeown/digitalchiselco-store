@@ -109,6 +109,13 @@ try {
   </div>
   <div id="dcc-cart-items" class="flex-1 overflow-y-auto p-3"></div>
   <div class="border-t border-black/10 p-4">
+    <!-- Pick-5 nudge: shown by the cart script when two or more single designs
+         are in the cart, because five for $25 is usually the better deal for
+         that buyer and a higher order for the shop. Hidden until it is true. -->
+    <a id="dcc-cart-pick5" href="/bundle-builder?src=cart" hidden
+       class="mb-3 flex items-center justify-between gap-2 rounded-lg border border-[#FAC775] bg-[#FAEEDA] px-3 py-2 text-xs text-bronze-800 hover:shadow-sm transition">
+      <span>Buying a few? <b>Pick any 5 for $25</b> instead</span><span aria-hidden="true">→</span>
+    </a>
     <div class="flex justify-between text-sm mb-3"><span>Subtotal</span><span id="dcc-cart-subtotal" class="font-medium text-ink-800">$0.00</span></div>
     <a href="/cart" class="dcc-cart-go block text-center bg-bronze-600 text-cream py-2.5 rounded-md hover:bg-bronze-700 transition">View cart &amp; checkout</a>
   </div>
@@ -201,6 +208,10 @@ try {
       + '<a href="/product/' + esc(p.slug) + '" class="flex-1 min-w-0"><div class="text-sm text-ink-800 line-clamp-2">' + esc(p.title) + '</div><div class="text-xs text-bronze-600">$' + (Number(p.price) || 0).toFixed(2) + '</div></a>'
       + '<button class="mini-cart-remove text-ink-700/40 hover:text-red-500 text-xl leading-none" data-id="' + esc(p.id) + '" aria-label="Remove">&times;</button></div>'; }).join('');
     if (sub) { sub.textContent = '$' + total.toFixed(2); if (window.dccConvertCcy) window.dccConvertCcy(); }
+    // Two or more single designs adding up past the bundle price: the buyer
+    // is better off with Pick-5, and the shop with a bigger order. Only then.
+    const nudge = document.getElementById('dcc-cart-pick5');
+    if (nudge) nudge.hidden = !(items.length >= 2 && total > 25 && !items.some((p) => /bundle|mega pack/i.test(p.title || '')));
   }
   function openCart() { renderMiniCart(); cartDrawer?.classList.remove('translate-x-full'); cartOverlay?.classList.remove('hidden'); document.documentElement.style.overflow = 'hidden'; }
   function closeCart() { cartDrawer?.classList.add('translate-x-full'); cartOverlay?.classList.add('hidden'); document.documentElement.style.overflow = ''; }

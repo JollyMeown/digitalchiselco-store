@@ -49,7 +49,7 @@ try {
     .limit(1).maybeSingle();
   film = (f as any) || null;
 } catch { /* the page works without it */ }
-const related = await getRelatedProducts(p.id, 5);
+const related = await getRelatedProducts(p.id, 5, cat?.id || null);   // same collection, best sellers first
 const soldCount = await getSoldCount(p.id);
 // Real numbers from Etsy for the same design: how many times it sold this
 // year, how many people favourited it, and what it costs there. All three are

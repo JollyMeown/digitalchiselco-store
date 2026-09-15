@@ -370,23 +370,31 @@ export function articleEmail(d: { email: string; post: ArticlePost }): Out {
 }
 
 // ── Abandoned cart (one reminder, ~20h later) ────────────────────────
-export function cartReminderEmail(d: { email: string; items: { title: string; price: number; image_url?: string | null; slug?: string | null }[]; subtotal: number }): Out {
+export function cartReminderEmail(d: { email: string; items: { title: string; price: number; image_url?: string | null; slug?: string | null; etsy_price?: number | null }[]; subtotal: number }): Out {
   const subject = 'Your cart is saved — your designs are waiting';
+  // The reason a hesitant buyer was missing: the same file costs more on
+  // Etsy, and nobody had told them. Real listing price, shown per item only
+  // when it is genuinely higher.
+  let etsyTotal = 0, siteTotal = 0;
   const rows = d.items.slice(0, 6).map((i) => {
     const t = esc(i.title.split('|')[0].trim().slice(0, 60));
     const link = i.slug ? `${SITE}/product/${esc(i.slug)}` : `${SITE}/cart`;
     const thumb = i.image_url
       ? `<a href="${link}"><img src="${esc(i.image_url)}" width="54" height="54" style="width:54px;height:54px;border-radius:6px;object-fit:cover;display:block;border:1px solid #E5DDD0;" alt=""></a>`
       : '';
+    const cheaper = i.etsy_price && i.etsy_price > Number(i.price) + 0.5;
+    if (cheaper) { etsyTotal += Number(i.etsy_price); siteTotal += Number(i.price); }
     return `<tr>
       <td style="padding:8px 10px 8px 0;width:54px;vertical-align:middle;">${thumb}</td>
-      <td style="padding:8px 8px 8px 0;font-size:14px;color:${INK};vertical-align:middle;"><a href="${link}" style="color:${INK};text-decoration:none;">${t}</a></td>
+      <td style="padding:8px 8px 8px 0;font-size:14px;color:${INK};vertical-align:middle;"><a href="${link}" style="color:${INK};text-decoration:none;">${t}</a>${cheaper ? `<div style="font-size:12px;color:#777;">$${Number(i.etsy_price).toFixed(2)} on Etsy</div>` : ''}</td>
       <td style="padding:8px 0;font-size:14px;color:#777;text-align:right;vertical-align:middle;white-space:nowrap;">$${Number(i.price).toFixed(2)}</td>
     </tr>`;
   }).join('');
+  const saved = etsyTotal - siteTotal;
   const body = `
     <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">You left ${d.items.length === 1 ? 'a design' : d.items.length + ' designs'} in your cart — no rush, it's saved on your device. Here's what's waiting:</p>
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:12px;border-top:1px solid #E5DDD0;">${rows}</table>
+    ${saved >= 1 ? `<p style="margin:10px 0 0;font-size:13px;color:${BRONZE_DARK};">The same ${d.items.length === 1 ? 'file costs' : 'files cost'} $${saved.toFixed(2)} more on Etsy. Same download, same commercial licence.</p>` : ''}
     ${d.items.length >= 2 ? `<p style="margin:10px 0 0;font-size:13px;color:${BRONZE_DARK};">💡 2+ designs = 10% off automatically (code SET10 in the cart).</p>` : ''}
     ${btn(SITE + '/cart', 'Finish checkout')}
     <p style="margin:12px 0 0;font-size:12px;color:#999;">Files are delivered instantly by email after payment.</p>`;
@@ -654,16 +662,21 @@ export function productPicksEmail(d: { email: string; products: MiniProduct[]; n
 }
 
 // ── Wishlist reminder (they hearted it, never bought it) ──────────────
-export function wishlistReminderEmail(d: { email: string; products: MiniProduct[] }): Out {
+export function wishlistReminderEmail(d: { email: string; products: (MiniProduct & { etsy_price?: number | null })[] }): Out {
   const subject = d.products.length === 1
     ? `Still thinking about ${String(d.products[0].title || '').split('|')[0].trim().slice(0, 40)}?`
     : 'The designs on your wishlist are still waiting 🪵';
   const rows: string[] = [];
   for (let i = 0; i < Math.min(3, d.products.length); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  // A saved design is a design they already want; the missing piece is a
+  // reason to buy it here. The real Etsy price is that reason, when it is
+  // genuinely higher.
+  const saved = d.products.reduce((s, p) => s + (p.etsy_price && p.etsy_price > Number(p.price_usd || 0) + 0.5 ? p.etsy_price - Number(p.price_usd || 0) : 0), 0);
   const body = `
     <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Hi fellow maker,</p>
     <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">A little while ago you saved ${d.products.length === 1 ? 'this design' : 'these designs'} to your wishlist. ${d.products.length === 1 ? 'It is' : 'They are'} still here, instant download, ready to carve whenever you are:</p>
     ${rows.join('')}
+    ${saved >= 1 ? `<p style="font-size:13px;line-height:1.6;color:${BRONZE_DARK};margin:12px 0 0;">The same ${d.products.length === 1 ? 'file costs' : 'files cost'} $${saved.toFixed(2)} more on Etsy. Same download, same commercial licence.</p>` : ''}
     ${btn(SITE + '/favorites', 'Open my wishlist')}
     <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">Tip: two or more designs unlock a bulk discount in the cart.</p>`;
   const text = `Still on your wishlist:\n` +

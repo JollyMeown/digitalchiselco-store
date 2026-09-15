@@ -3,16 +3,17 @@ import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import ProductCard from '../components/ProductCard.astro';
 import Pick5Strip from '../components/Pick5Strip.astro';
-import { getProducts, getSettings } from '../lib/queries';
+import { getProducts, getSettings, sortOf } from '../lib/queries';
 
 const page = Math.max(1, Number(Astro.url.searchParams.get('page') || '1'));
-const sort = Astro.url.searchParams.get('sort') === 'newest' ? 'newest' : 'title';
+const sort = sortOf(Astro.url.searchParams.get('sort'));   // best sellers first unless asked otherwise
 const { products, total, perPage } = await getProducts(page, 48, sort);
 const settings = await getSettings();
 const pages = Math.ceil(total / perPage);
 const around = Array.from({ length: pages }, (_, i) => i + 1)
   .filter((p) => p === 1 || p === pages || Math.abs(p - page) <= 2);
-const qs = (p: number) => `/catalog?${sort === 'newest' ? 'sort=newest&' : ''}page=${p}`;
+const qs = (p: number) => `/catalog?${sort !== 'best' ? `sort=${sort}&` : ''}page=${p}`;
+const SORTS = [['best', 'Best sellers'], ['newest', 'Newest'], ['title', 'A to Z']] as const;
 ---
 <Shell title="Catalog — All STL Files | DigitalChiselCo" scrollPastBanner={true}>
   <Breadcrumbs crumbs={[{ label: 'Catalog' }]} />
@@ -22,8 +23,11 @@ const qs = (p: number) => `/catalog?${sort === 'newest' ? 'sort=newest&' : ''}pa
     <!-- Newest-first exists because alphabetical was the only order, which
          buried every new upload wherever its first letter fell. -->
     <div class="inline-flex rounded-lg border border-black/10 overflow-hidden text-sm" role="group" aria-label="Sort">
-      <a href="/catalog" class={`px-3 py-1.5 ${sort === 'title' ? 'bg-bronze-600 text-cream' : 'text-ink-700 hover:bg-cream'}`} aria-current={sort === 'title' ? 'true' : undefined}>A to Z</a>
-      <a href="/catalog?sort=newest" class={`px-3 py-1.5 border-l border-black/10 ${sort === 'newest' ? 'bg-bronze-600 text-cream' : 'text-ink-700 hover:bg-cream'}`} aria-current={sort === 'newest' ? 'true' : undefined}>Newest</a>
+      {SORTS.map(([k, label], i) => (
+        <a href={k === 'best' ? '/catalog' : `/catalog?sort=${k}`}
+           class={`px-3 py-1.5 ${i ? 'border-l border-black/10 ' : ''}${sort === k ? 'bg-bronze-600 text-cream' : 'text-ink-700 hover:bg-cream'}`}
+           aria-current={sort === k ? 'true' : undefined}>{label}</a>
+      ))}
     </div>
   </div>
 

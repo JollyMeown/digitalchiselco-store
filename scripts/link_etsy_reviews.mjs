@@ -6,9 +6,14 @@
 //   node scripts/link_etsy_reviews.mjs --apply    # write
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
-import { etsy } from './etsy_client.mjs';
+import { etsy, getAccessToken } from './etsy_client.mjs';
 
 const APPLY = process.argv.includes('--apply');
+// The reviews endpoint refuses offsets past 100 for anonymous calls, and the
+// client only sends the OAuth token once it has been loaded. Without this line
+// the importer silently stopped at 100 of 726 reviews, which is why only 145
+// were ever attached to products (found 2026-09-15).
+if (!(await getAccessToken())) { console.error('no Etsy token on this machine'); process.exit(1); }
 const SHOP_NAME = process.env.ETSY_SHOP_NAME || 'DigitalChiselCo';
 const db = createClient(process.env.PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
@@ -28,31 +33,48 @@ for (let from = 0; ; from += 1000) {
 }
 console.log(`products with an Etsy listing id: ${byListing.size}`);
 
-// existing linked reviews (avoid re-inserting)
-const { data: existing } = await db.from('reviews').select('etsy_review_id').like('etsy_review_id', 'etsy:txn:%').limit(20000);
+// existing linked reviews (avoid re-inserting). Two keys: the transaction id
+// when the endpoint gives one, and a content key (product + date + text),
+// because the per-listing endpoint does not always carry the transaction id
+// the shop-wide one did, and the 145 reviews imported earlier must not come
+// back a second time under a different key.
+const { data: existing } = await db.from('reviews').select('etsy_review_id, product_id, text, rating, etsy_created_at').eq('source', 'etsy').limit(20000);
 const have = new Set((existing || []).map((r) => r.etsy_review_id));
+const contentKey = (pid, ts, text, rating) => `${pid}|${ts ? String(ts).slice(0, 10) : ''}|${String(text || '').trim().slice(0, 80).toLowerCase()}|${rating}`;
+const haveContent = new Set((existing || []).map((r) => contentKey(r.product_id, r.etsy_created_at, r.text, r.rating)));
 
-// paginate all shop reviews
+// Per LISTING, not per shop. The shop-wide reviews endpoint is public and
+// ignores the OAuth token, so Etsy applies its anonymous cap and refuses any
+// offset past 100: the importer stopped at 100 of 726 reviews every time it
+// ran, and only 145 ever reached products. A listing rarely has more than 100
+// reviews, so walking the listings that have sold sidesteps the cap entirely.
 let fetched = 0, mapped = 0, noListing = 0, noText = 0, dup = 0;
 const toInsert = [];
-for (let offset = 0; ; offset += 100) {
+const { data: sold } = await db.from('products').select('etsy_listing_id').eq('active', true).gt('etsy_sales_365', 0).not('etsy_listing_id', 'is', null).limit(5000);
+const listingIds = [...new Set((sold || []).map((p) => String(p.etsy_listing_id)))];
+console.log(`walking ${listingIds.length} listings that have sold`);
+let n = 0;
+for (const lid of listingIds) {
   let page;
-  try { page = await etsy(`/shops/${shop.shop_id}/reviews?limit=100&offset=${offset}`, { oauth: true }); }
-  catch (e) { console.error('reviews fetch stopped:', e.message.slice(0, 120)); break; }
-  const rows = page.results || [];
-  if (!rows.length) break;
+  try { page = await etsy(`/listings/${lid}/reviews?limit=100`, { oauth: true }); }
+  catch (e) { if (!/404/.test(e.message)) console.error(`listing ${lid}:`, e.message.slice(0, 80)); continue; }
+  finally { await new Promise((res) => setTimeout(res, 120)); if (++n % 100 === 0) console.log(`  ${n}/${listingIds.length} listings, ${toInsert.length} new so far`); }
+  const rows = page?.results || [];
   for (const r of rows) {
     fetched++;
     const text = String(r.review || '').trim();
-    const listing = r.listing_id != null ? String(r.listing_id) : '';
+    const listing = r.listing_id != null ? String(r.listing_id) : lid;
     const pid = byListing.get(listing);
     if (!pid) { noListing++; continue; }
-    if (text.length < 3) { noText++; continue; }
-    const key = `etsy:txn:${r.transaction_id || (listing + ':' + (r.create_timestamp || r.created_timestamp || Math.random()))}`;
-    if (have.has(key)) { dup++; continue; }
-    have.add(key);
-    mapped++;
+    // a star-only review is still a real rating; it is shown as stars with no
+    // quote rather than thrown away
+    if (text.length < 3 && !(Number(r.rating) >= 1)) { noText++; continue; }
     const ts = Number(r.create_timestamp || r.created_timestamp || 0);
+    const key = `etsy:txn:${r.transaction_id || (listing + ':' + (ts || Math.random()))}`;
+    const ck = contentKey(pid, ts ? new Date(ts * 1000).toISOString() : '', text, Math.max(1, Math.min(5, Number(r.rating) || 5)));
+    if (have.has(key) || haveContent.has(ck)) { dup++; continue; }
+    have.add(key); haveContent.add(ck);
+    mapped++;
     toInsert.push({
       product_id: pid,
       name: 'Verified buyer',
@@ -63,7 +85,6 @@ for (let offset = 0; ; offset += 100) {
       ...(ts ? { etsy_created_at: new Date(ts * 1000).toISOString() } : {}),
     });
   }
-  if (rows.length < 100) break;
 }
 
 console.log(`\nfetched ${fetched} Etsy reviews · linkable ${mapped} · skipped: ${noListing} no-product, ${noText} no-text, ${dup} already-linked`);

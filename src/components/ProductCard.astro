@@ -24,6 +24,16 @@ const srcset = [400, 600, 800].map((w) => `${img(product.image_url, { w, square:
     ) : (
       <div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">{title}</div>
     )}
+    {/* A real buyer's carving, from an approved photo review, fades in on
+        hover over the render. A real carve on a real wall outsells a render,
+        and this is what the 150-point photo reward exists to collect. */}
+    {product.customer_photo_url && (
+      <>
+        <img src={img(product.customer_photo_url, { w: 400, square: true, q: 78 })} alt={`${title}, carved by a customer`} loading="lazy" decoding="async" width="400" height="400"
+             class="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <span class="absolute bottom-2 left-2 text-[10px] font-medium bg-white/90 text-bronze-800 rounded px-1.5 py-0.5 shadow-sm">📷 carved by a customer</span>
+      </>
+    )}
     {product.is_bundle && (
       <span class="absolute top-2 left-2 inline-flex items-center gap-1 bg-[#FAC775] text-bronze-900 text-[10px] font-medium tracking-wider uppercase px-2 py-0.5 rounded shadow-sm">
         <span aria-hidden="true">🔥</span> Bundle

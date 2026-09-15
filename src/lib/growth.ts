@@ -657,12 +657,20 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         // Enrich with product thumbnails + slugs so the email shows pictures
         // (the cart snapshot only stores id/title/price).
         const ids = rawItems.map((i) => i.id).filter((id): id is string => !!id && /^[0-9a-f-]{36}$/i.test(id));
-        const imgBy: Record<string, { image_url: string | null; slug: string }> = {};
+        const imgBy: Record<string, { image_url: string | null; slug: string; etsy_price: number | null }> = {};
         if (ids.length) {
-          const { data: prods } = await db.from('products').select('id, image_url, slug').in('id', ids);
-          for (const p of prods || []) imgBy[p.id] = { image_url: p.image_url, slug: p.slug };
+          const { data: prods } = await db.from('products').select('id, image_url, slug, etsy_listing_id').in('id', ids);
+          // the same file's real Etsy price, so the reminder can say what the
+          // buyer saves here instead of only asking them to come back
+          const lids = (prods || []).map((p: any) => p.etsy_listing_id).filter(Boolean);
+          const priceBy: Record<string, number> = {};
+          if (lids.length) {
+            const { data: st } = await db.from('etsy_listing_stats').select('listing_id, price_usd').in('listing_id', lids);
+            for (const r of st || []) if (r.price_usd != null) priceBy[String(r.listing_id)] = Number(r.price_usd);
+          }
+          for (const p of (prods || []) as any[]) imgBy[p.id] = { image_url: p.image_url, slug: p.slug, etsy_price: p.etsy_listing_id ? priceBy[String(p.etsy_listing_id)] ?? null : null };
         }
-        const items = rawItems.map((i) => ({ title: i.title, price: i.price, image_url: (i.id && imgBy[i.id]?.image_url) || null, slug: (i.id && imgBy[i.id]?.slug) || null }));
+        const items = rawItems.map((i) => ({ title: i.title, price: i.price, image_url: (i.id && imgBy[i.id]?.image_url) || null, slug: (i.id && imgBy[i.id]?.slug) || null, etsy_price: (i.id && imgBy[i.id]?.etsy_price) || null }));
         const { subject, html, text } = withOvr('cart', cartReminderEmail({ email: c.email, items, subtotal: Number(c.subtotal) || 0 }), c.email);
         const res = await sendEmail({ to: c.email, subject, html, text, idempotencyKey: `cartrem:${c.id}`, tags: [{ name: 'kind', value: 'cart' }] });
         if (res.ok) { await db.from('abandoned_carts').update({ reminded_at: new Date().toISOString() }).eq('id', c.id); s.sent++; }
@@ -1203,11 +1211,19 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         pids = pids.filter((id) => !own.has(id));
         if (!pids.length) continue;
         const { data: prods } = await db.from('products')
-          .select('id, title, slug, image_url, price_usd')
+          .select('id, title, slug, image_url, price_usd, etsy_listing_id')
           .in('id', pids).eq('active', true).not('image_url', 'is', null).limit(3);
         if (!prods?.length) continue;
+        // the same file's real Etsy price, so the email can name the saving
+        const wl = (prods as any[]).map((p) => p.etsy_listing_id).filter(Boolean);
+        const wp: Record<string, number> = {};
+        if (wl.length) {
+          const { data: st } = await db.from('etsy_listing_stats').select('listing_id, price_usd').in('listing_id', wl);
+          for (const r of st || []) if (r.price_usd != null) wp[String(r.listing_id)] = Number(r.price_usd);
+        }
+        const enriched = (prods as any[]).map((p) => ({ ...p, etsy_price: p.etsy_listing_id ? wp[String(p.etsy_listing_id)] ?? null : null }));
         const { subject, html, text } = withOvr('wishlistReminder',
-          wishlistReminderEmail({ email: em, products: prods as MiniProduct[] }), em);
+          wishlistReminderEmail({ email: em, products: enriched as any }), em);
         const res = await sendEmail({ to: em, subject, html, text, idempotencyKey: hashKey(`wishrem:${em}`, prods.map((p: any) => p.id)), tags: [{ name: 'kind', value: 'wishlistReminder' }] });
         if (res.ok) {
           s.sent++; sends++;

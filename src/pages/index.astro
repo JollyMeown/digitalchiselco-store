@@ -14,7 +14,8 @@ import Marquee from '../components/Marquee.astro';
 import {
   getCategories, getProducts, getSettings,
   getBestSellers, getLatestProducts, getReviews, getFaqs, getMembershipPlans,
-  getPremiumBundles, MARQUEE_DEFAULTS,
+  getPremiumBundles, MARQUEE_DEFAULTS, getCategoryBySlug, getProductsByCategory,
+  type ProductCard as ProductCardT,
 } from '../lib/queries';
 import { fillPlanTokens, planFeatureLines } from '../lib/membership-facts';
 import { jsonLd } from '../lib/jsonld';
@@ -51,6 +52,23 @@ const [bestsellers, latest, reviews, faqs, plans, { products }, premiumBundles] 
 
 // fallback bestsellers if admin hasn't flagged any yet — use first 8 with images
 const showBest = bestsellers.length > 0 ? bestsellers : products.filter((p) => p.image_url).slice(0, 8);
+
+// Seasonal row (Admin > Settings: seasonal_slug / seasonal_label / seasonal_until).
+// Halloween is six weeks out and the collection exists; a dated row above Best
+// Sellers sells it while it matters, then Christmas takes the slot. Empty slug
+// or a past date and nothing renders.
+let seasonal: { name: string; slug: string; label: string; products: ProductCardT[] } | null = null;
+try {
+  const sSlug = String((s as any).seasonal_slug || '').trim();
+  const sUntil = String((s as any).seasonal_until || '');
+  if (sSlug && (!sUntil || sUntil >= new Date().toISOString().slice(0, 10))) {
+    const cat = await getCategoryBySlug(sSlug);
+    if (cat) {
+      const { products: sp } = await getProductsByCategory(cat.id, 1, 8, 'best');
+      if (sp.length >= 4) seasonal = { name: cat.name, slug: cat.slug, label: String((s as any).seasonal_label || ''), products: sp };
+    }
+  }
+} catch {}
 const featuredPlan = plans.find((p) => p.highlight) || plans[0];
 
 // Per-section homepage motion config (admin → Settings → Homepage motion),
@@ -145,6 +163,24 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
            and a half phone screens, before seeing a single design to buy. Best
            sellers now open the page, then what is new, then bundles and the
            collections, and Cut Local sits below the shop it serves. -->
+      {seasonal && (
+        <section class="relative">
+          <div class="absolute inset-0 -mx-4 sm:-mx-6 rounded-2xl bg-gradient-to-br from-[#2b1d12] via-[#3a2716] to-[#5E380A] -z-10" aria-hidden="true"></div>
+          <div class="py-6">
+            <div class="flex justify-between items-end flex-wrap gap-2 mb-4 px-1">
+              <div class="min-w-0">
+                <div class="text-[11px] tracking-[0.18em] uppercase text-[#FAC775] font-medium">🎃 In season</div>
+                <h2 class="font-serif text-xl sm:text-2xl md:text-3xl text-cream mt-0.5">{seasonal.name}</h2>
+                {seasonal.label && <p class="text-sm text-cream/80 mt-0.5">{seasonal.label}</p>}
+              </div>
+              <a href={`/collections/${seasonal.slug}`} class="text-sm text-[#FAC775] hover:underline whitespace-nowrap">See the whole collection →</a>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {seasonal.products.slice(0, 8).map((p, i) => <ProductCard product={p} discount={s.discount_percent} eager={i < 4} />)}
+            </div>
+          </div>
+        </section>
+      )}
       <!-- Best Sellers (admin-selected) — animated marquee -->
       {showBest.length > 0 && (
         <section>
