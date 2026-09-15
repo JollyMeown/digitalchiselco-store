@@ -24,6 +24,13 @@ export function img(url: string | null | undefined, opts: { w?: number; q?: numb
   } else {
     if (opts.w) params.push(`width=${opts.w}`);
     if (opts.h) params.push(`height=${opts.h}`);
+    // Supabase's default is resize=cover, and with only a width given it keeps
+    // the ORIGINAL height as the box: a 1672x941 collection banner asked for
+    // width=600 came back 600x941, the middle third of the picture, and the
+    // homepage tiles showed a dog's face instead of "Funny Animal Series"
+    // (owner, 2026-09-15). contain keeps the proportions whenever the caller
+    // has not asked for a specific box.
+    if (opts.w && !opts.h) params.push('resize=contain');
   }
   if (opts.q) params.push(`quality=${opts.q}`);
   return params.length ? `${transformed}?${params.join('&')}` : transformed;
