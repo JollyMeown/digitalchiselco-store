@@ -971,6 +971,7 @@ export function makerRecruitEmail(opts: { email: string; applyUrl?: string; wave
 </div>
 <p style="margin:22px 0;"><a href="${url}" style="background:#854F0B;color:#fff;text-decoration:none;padding:13px 24px;border-radius:8px;font-weight:bold;">Apply to become a Maker →</a></p>
 <p>It takes about 5 minutes. We review every maker by hand, so you'll be part of a trusted, quality network from day one.</p>
+<p style="font-size:13px;color:#7a6a5c;">What happens next: we look at your application within two days. When it is approved you get an email with your own maker dashboard link, where you edit your listing, add photos of finished projects, and quote on jobs. Nothing appears publicly until then.</p>
 <p style="font-size:14px;">Want the full detail first? Every question makers ask is answered here: <a href="${FAQ_URL}" style="color:#854F0B;">${FAQ_URL.replace('https://', '')}</a></p>
 <p>Happy making,<br/>Jolly · DigitalChiselCo</p></div>`;
   const text = `${v.subject}. Cut Local is our maker network at DigitalChiselCo. Get paid work near you: buyers request a piece, you quote on your terms, they pay you directly, and we take just a ${RECRUIT_FEE_PCT}% success fee on completed jobs. What it costs: joining is free with no monthly fee; sending a quote costs one credit (${RECRUIT_PACK_LINE}) and your first ${RECRUIT_FOUNDING_CREDITS} quotes are free; on a $300 job our fee is $9. Full answers: ${FAQ_URL}. Apply (about 5 minutes): ${url}  — Jolly, DigitalChiselCo`;

@@ -173,12 +173,22 @@ export async function getLiveSeasonalCollection() {
     return data?.[0] || null;
   } catch { return null; }
 }
-export async function getSeasonalProducts(col: { keywords?: unknown; title?: string }, limit = 60): Promise<ProductCard[]> {
+export async function getSeasonalProducts(col: { keywords?: unknown; title?: string; include_ids?: unknown; exclude_ids?: unknown }, limit = 60): Promise<ProductCard[]> {
   try {
     const { supabaseAdmin } = await import('./supabase');
     const db = supabaseAdmin();
     const words = seasonSubjectWords(col.keywords);
-    if (!words.length) return [];
+    // Hand-curation over the keyword matches: include_ids are always in and
+    // come first, exclude_ids never appear however well a keyword matches.
+    const includeIds = (Array.isArray(col.include_ids) ? col.include_ids : []).map(String);
+    const excludeIds = new Set((Array.isArray(col.exclude_ids) ? col.exclude_ids : []).map(String));
+    let pinned: any[] = [];
+    if (includeIds.length) {
+      const { data } = await db.from('products').select(CARD + ',etsy_sales_365,created_at').in('id', includeIds).eq('active', true);
+      const order = new Map(includeIds.map((id, i) => [id, i]));
+      pinned = (data || []).sort((a: any, b: any) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    }
+    if (!words.length) return pinned.filter((p) => !excludeIds.has(p.id)).slice(0, limit) as ProductCard[];
     const safe = (w: string) => w.replace(/[,()*%]/g, '');
     // 1) titles carrying a subject word. (Tags are jsonb, and a substring
     //    match on a jsonb array is not expressible in a PostgREST or=; titles
@@ -197,10 +207,10 @@ export async function getSeasonalProducts(col: { keywords?: unknown; title?: str
         .order('etsy_sales_365', { ascending: false, nullsFirst: false }).limit(limit);
       byCat = data || [];
     }
-    const seen = new Set<string>(); const merged: any[] = [];
-    for (const p of [...(byWord || []), ...byCat]) { if (!seen.has(p.id)) { seen.add(p.id); merged.push(p); } }
+    const seen = new Set<string>(pinned.map((p) => p.id)); const merged: any[] = [];
+    for (const p of [...(byWord || []), ...byCat]) { if (!seen.has(p.id) && !excludeIds.has(p.id)) { seen.add(p.id); merged.push(p); } }
     merged.sort((a, b) => (Number(b.etsy_sales_365) || 0) - (Number(a.etsy_sales_365) || 0) || String(b.created_at).localeCompare(String(a.created_at)));
-    return merged.slice(0, limit) as ProductCard[];
+    return [...pinned.filter((p) => !excludeIds.has(p.id)), ...merged].slice(0, limit) as ProductCard[];
   } catch (e) { console.error('getSeasonalProducts failed:', e); return []; }
 }
 

@@ -62,13 +62,62 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
           </div>
         </div>
 
+        {/* YOUR LISTING — added 2026-09-15 after a maker asked "where do I go to
+            review my name on the Maker listing and to edit my profile?" There
+            was nowhere: the application wrote the row once. Every field below
+            is what buyers see on /makers and /m/<id>. */}
+        <details class="mb-8 border border-black/10 rounded-xl bg-white" id="listing-box">
+          <summary class="cursor-pointer select-none px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <span class="font-serif text-xl text-bronze-800">Your listing</span>
+            <span class="text-xs text-ink-700/60">how buyers see you · click to edit · <a href={`/m/${maker.id}`} target="_blank" class="text-bronze-700 underline" onclick="event.stopPropagation()">view public profile ↗</a></span>
+          </summary>
+          <form id="listing-form" class="px-4 pb-4 grid sm:grid-cols-2 gap-3 text-sm">
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Workshop name (shown on the listing)</span>
+              <input name="maker_name" value={maker.maker_name || ''} required class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Your name</span>
+              <input name="contact_name" value={maker.contact_name || ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" /></label>
+            <label class="block sm:col-span-2"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">About your workshop (buyers read this before they ask for a quote)</span>
+              <textarea name="bio" rows="3" class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2">{maker.bio || ''}</textarea></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">City</span>
+              <input name="city" value={maker.city || ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">State / region</span>
+              <input name="region" value={maker.region || ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Country</span>
+              <input name="country" value={maker.country || ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Machines (comma separated: CNC router, laser, 3D printer)</span>
+              <input name="machine_types" value={(maker.machine_types || []).join(', ')} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Machine models</span>
+              <input name="machine_models" value={maker.machine_models || ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" placeholder="Shapeoko 5 Pro, xTool P2" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Materials (comma separated)</span>
+              <input name="materials" value={(maker.materials || []).join(', ')} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" placeholder="walnut, maple, cherry, acrylic" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Largest piece you can make</span>
+              <input name="max_size" value={maker.max_size || ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" placeholder="600 x 900 mm" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Typical lead time (days)</span>
+              <input name="min_lead_days" type="number" min="0" max="90" value={maker.min_lead_days ?? ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Website</span>
+              <input name="website_url" value={maker.website_url || ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Instagram</span>
+              <input name="instagram_url" value={maker.instagram_url || ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" placeholder="@yourshop" /></label>
+            <label class="block"><span class="text-[11px] uppercase tracking-wide text-ink-700/50">Etsy shop</span>
+              <input name="etsy_url" value={maker.etsy_url || ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" /></label>
+            <div class="flex flex-wrap gap-4 sm:col-span-2 text-sm">
+              <label class="inline-flex items-center gap-2"><input type="checkbox" name="deliver_domestic_ship" checked={!!maker.deliver_domestic_ship} /> I ship within my country</label>
+              <label class="inline-flex items-center gap-2"><input type="checkbox" name="deliver_intl" checked={!!maker.deliver_intl} /> I ship internationally</label>
+            </div>
+            <div class="sm:col-span-2 flex items-center gap-3">
+              <button class="bg-bronze-600 text-cream font-bold px-5 py-2.5 rounded-lg hover:bg-bronze-700 transition">Save listing</button>
+              <span id="listing-msg" class="text-xs text-ink-700/60"></span>
+            </div>
+          </form>
+        </details>
+
         {/* PORTFOLIO — the photos buyers see on the public profile.
             Added 2026-09-14: there was no way to change these after applying,
             so a maker whose application photos failed to upload had an empty
             profile and no recourse. */}
         <section class="mb-8 border border-black/10 rounded-xl p-4 bg-white">
           <div class="flex items-baseline justify-between gap-3 flex-wrap">
-            <h2 class="font-serif text-xl text-bronze-800">Your work photos</h2>
+            <h2 class="font-serif text-xl text-bronze-800">Your finished projects</h2>
             <a href={`/m/${maker.id}`} target="_blank" class="text-xs text-bronze-700 underline">see your public profile ↗</a>
           </div>
           <p class="text-xs text-ink-700/60 mt-0.5">These are what buyers see when they pick a maker. Up to 12. Photos straight from your phone are fine.</p>
@@ -229,6 +278,25 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
       var app=document.getElementById('app'); if(!app) return;
       var token=app.dataset.token;
       var api=function(op,extra){ return fetch('/api/mp/action',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({op:op,token:token},extra))}).then(function(r){return r.json();}); };
+
+      // ---- your listing ---------------------------------------------------
+      (function(){
+        var lf=document.getElementById('listing-form'), lm=document.getElementById('listing-msg');
+        if(!lf) return;
+        lf.addEventListener('submit', async function(e){
+          e.preventDefault(); lm.textContent='Saving…';
+          var fd=new FormData(lf), body={t:token};
+          fd.forEach(function(v,k){ body[k]=v; });
+          body.deliver_domestic_ship=lf.querySelector('[name=deliver_domestic_ship]').checked;
+          body.deliver_intl=lf.querySelector('[name=deliver_intl]').checked;
+          try{
+            var r=await fetch('/api/mp/profile',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+            var j=await r.json();
+            lm.textContent=j.ok?'✓ Saved. Buyers see the new details straight away.':(j.error||'Could not save.');
+            if(j.ok){ var h=document.querySelector('h1'); if(h) h.textContent=body.maker_name; }
+          }catch(err){ lm.textContent='Network error, please try again.'; }
+        });
+      })();
 
       // ---- portfolio photos ----------------------------------------------
       // Same browser-side conversion as the application form: the phone's own
