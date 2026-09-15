@@ -174,14 +174,25 @@ const bodyParts = safeBody.includes(CALC_MARK) ? safeBody.split(CALC_MARK, 2) : 
     .post-body table { font-size: .92rem; width: 100%; border-collapse: separate; border-spacing: 0; margin: 1.4rem 0 1.8rem;
       border: 1px solid rgba(133, 79, 11, .28); border-radius: .6rem; overflow: hidden; line-height: 1.4;
       box-shadow: 0 2px 10px rgba(65, 36, 2, .06); }
-    @media (max-width: 640px) { .post-body table { display: block; overflow-x: auto; white-space: nowrap; } }
+    /* Cells wrap. The old rule kept every non-first column on one line so
+       price columns lined up, but a prose table (troubleshooting: what you
+       see / why / fix) then grew to several screens wide and ran off the
+       page on every device (owner, 2026-09-16). Numbers stay tabular and
+       short, so letting them wrap costs nothing. On a phone the table keeps
+       a readable minimum column width and scrolls sideways in its own box. */
+    @media (max-width: 640px) {
+      .post-body table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .post-body th, .post-body td { min-width: 9rem; }
+      .post-body td:first-child, .post-body th:first-child { min-width: 7rem; }
+    }
     .post-body thead th { background: #633806; color: #FAEEDA; font-weight: 600; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase;
       padding: .7rem .8rem; text-align: left; border-bottom: 2px solid #412402; }
     .post-body tbody td { padding: .6rem .8rem; border-bottom: 1px solid rgba(133, 79, 11, .15); vertical-align: top; color: #2A1A0E; }
     .post-body tbody tr:nth-child(even) td { background: #FBF5EA; }
     .post-body tbody tr:last-child td { border-bottom: 0; }
     .post-body tbody tr:hover td { background: #F6E9D2; }
-    .post-body td:not(:first-child), .post-body th:not(:first-child) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .post-body td:not(:first-child), .post-body th:not(:first-child) { font-variant-numeric: tabular-nums; }
+    .post-body td:first-child { font-weight: 600; }
     .post-body td:last-child strong { color: #633806; font-size: 1.02em; }
   </style>
 

@@ -92,9 +92,12 @@ const post = {
   } : {}),
 };
 
-const existing = await fetch(`${URL_BASE}/rest/v1/posts?select=id&slug=eq.${SLUG}`, { headers: H }).then((r) => r.json());
+const existing = await fetch(`${URL_BASE}/rest/v1/posts?select=id,status&slug=eq.${SLUG}`, { headers: H }).then((r) => r.json());
 let r;
 if (Array.isArray(existing) && existing.length) {
+  // A draft that goes live now gets today as its publish date, not the day
+  // the draft was first saved for review.
+  if (existing[0].status !== 'published' && post.status === 'published') post.published_at = new Date().toISOString();
   r = await fetch(`${URL_BASE}/rest/v1/posts?id=eq.${existing[0].id}`, { method: 'PATCH', headers: H, body: JSON.stringify(post) });
   console.log(r.ok ? 'updated' : `update failed ${r.status}: ${(await r.text()).slice(0, 200)}`);
 } else {

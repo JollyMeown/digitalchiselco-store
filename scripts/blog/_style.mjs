@@ -57,6 +57,9 @@ export const FRAMING =
   + 'Respect the product\'s own orientation and true real-world size (a wall panel is roughly 25-45 cm, '
   + 'a serving tray 30-40 cm across). No people\'s faces.\n';
 
-/** Assemble a frame prompt. `scene` is the only part that changes per frame. */
-export const framePrompt = (scene, { hands = false, bench = true } = {}) =>
-  `${FIDELITY}${FINISH}\n${scene}\n\n${SHOT}${NO_BRAND}${FRAMING}${bench ? BENCH : ''}${hands ? HANDS : ''}`;
+/** Assemble a frame prompt. `scene` is the only part that changes per frame.
+ *  `finish: false` drops the house-finish paragraph (and the generator drops
+ *  the swatch): the scene then owns the finish in words. Used for raw-wood
+ *  stages and for the colouring guide, whose whole subject is colour. */
+export const framePrompt = (scene, { hands = false, bench = true, finish = true } = {}) =>
+  `${FIDELITY}${finish ? FINISH : 'FINISH: exactly as the scene below describes it, nothing else.\n'}\n${scene}\n\n${SHOT}${NO_BRAND}${FRAMING}${bench ? BENCH : ''}${hands ? HANDS : ''}`;

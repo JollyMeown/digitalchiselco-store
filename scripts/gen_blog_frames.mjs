@@ -37,10 +37,12 @@ const H = { apikey: SERVICE, authorization: `Bearer ${SERVICE}` };
 
 const brs = JSON.parse(fs.readFileSync(BRS_CFG, 'utf8').replace(/^\uFEFF/, ''));
 const GKEY = brs.gemini_api_key;
-const GMODEL = brs.gemini_image_model || 'gemini-3-pro-image';
 if (!GKEY) { console.error('no gemini_api_key in the BRS config'); process.exit(1); }
 
 const args = process.argv.slice(2);
+// --model overrides the BRS default (which BRS keeps on the fast model for
+// product mockups); article photography wants the pro image model.
+const GMODEL = (() => { const i = args.indexOf('--model'); return i >= 0 && args[i + 1] ? args[i + 1] : (brs.gemini_image_model || 'gemini-3-pro-image'); })();
 const SLUG = args.find((a) => !a.startsWith('--'));
 if (!SLUG) { console.error('usage: gen_blog_frames.mjs <slug> [--preview] [--only a,b] [--force] [--upload-existing]'); process.exit(1); }
 const flag = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 ? (args[i + 1] ?? true) : d; };
@@ -57,6 +59,13 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 const heroCache = new Map();
 async function heroFor(slug) {
   if (heroCache.has(slug)) return heroCache.get(slug);
+  // An explicit URL is used as-is: a series that needs the RAW render for
+  // the early stages and the finished photo for the late ones names each.
+  if (/^https?:\/\//.test(slug)) {
+    const buf = Buffer.from(await (await fetch(slug)).arrayBuffer());
+    heroCache.set(slug, buf);
+    return buf;
+  }
   // Prefix match, best seller first: frames.json may carry a slug that was
   // copied from a truncated listing, and an exact match would silently fail.
   const r = await fetch(`${URL_BASE}/rest/v1/products?select=image_url,title,slug&active=eq.true&slug=like.${encodeURIComponent(slug + '*')}&order=etsy_sales_365.desc&limit=1`, { headers: H }).then((x) => x.json());
@@ -130,20 +139,27 @@ let ok = 0, failed = 0;
 for (const f of queue) {
   const local = path.join(OUT_DIR, `${f.key}.jpg`);
   if (!FORCE && fs.existsSync(local)) { console.log(`. ${f.key} … cached`); continue; }
+  // Diagrams and charts are drawn locally by a script next to the article;
+  // the frame exists so upload/manifest/alt text treat them like the rest.
+  if (/^(DRAWN|COMPOSED)\b/.test(f.scene || '')) { console.log(`. ${f.key} … drawn locally, skipped`); continue; }
   process.stdout.write(`. ${f.key} … `);
   try {
     const refs = [];
     for (const s of [f.ref, ...(f.extraRefs || [])].filter(Boolean)) refs.push(await heroFor(s));
-    refs.push(styleRef);                                  // style reference always LAST
+    const useSwatch = f.finish !== false;
+    if (useSwatch) refs.push(styleRef);                   // style reference always LAST
     const n = refs.length;
-    const which = `ATTACHED IMAGES: image 1${n > 2 ? ` to ${n - 1}` : ''} = the real product(s), THE SUBJECT of the photograph. `
-      + `Image ${n} = a material swatch of wood and finish only; it is NOT an object and must not appear as one.\n`;
+    const products = useSwatch ? n - 1 : n;
+    const which = products
+      ? `ATTACHED IMAGES: image 1${products > 1 ? ` to ${products}` : ''} = the real product(s), THE SUBJECT of the photograph. `
+        + (useSwatch ? `Image ${n} = a material swatch of wood and finish only; it is NOT an object and must not appear as one.\n` : '\n')
+      : '';
     const scene = which + f.scene.replace(/image 2/g, `image ${n}`);
     // No product attached: drop the compositing preamble entirely, or the model
     // invents a carved panel to satisfy "image 1 shows a carved product".
-    const prompt = refs.length
-      ? framePrompt(scene, { hands: !!f.hands, bench: f.bench !== false, finish: f.finish !== false })
-      : `${f.scene}
+    const prompt = products
+      ? framePrompt(scene, { hands: !!f.hands, bench: f.bench !== false, finish: useSwatch })
+      : `${scene}
 
 ${SHOT}${NO_BRAND}${f.bench !== false ? BENCH : ''}${f.hands ? HANDS : ''}`;
     const raw = await gemini(prompt, refs, f.aspect);

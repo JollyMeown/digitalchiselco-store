@@ -93,6 +93,11 @@ const PINS = {
     title: 'VCarve vs Aspire vs Carveco vs Fusion 360 for Relief Carving (2026)',
     desc: 'Which CAM software to buy for carving 3D relief STL files: VCarve Pro against Aspire head to head, Carveco Maker, Fusion 360, Easel Pro and Carbide Create, with 2026 prices, STL import, toolpaths, bed limits and a plain recommendation. Free guide from DigitalChiselCo. #vcarve #aspire #carveco #fusion360 #cncsoftware #cncrouter',
   },
+  'how-to-color-a-cnc-relief-carving': {
+    hook: 'Tinted washes that keep the wood grain',
+    title: 'How to Color a CNC Relief Carving So It Still Looks Like Wood',
+    desc: 'The tinted-wash method for painting a CNC relief carving without hiding the wood: seal first, thin artists\' acrylics to a wash, color the subject, shade the shadows, keep the ground bare, glaze the recesses and finish matte. Ten color recipes, brands, and a troubleshooting table. Free guide from DigitalChiselCo. #woodcarving #cncrouter #reliefcarving #paintedwood #woodfinishing #cncprojects',
+  },
   'how-to-scale-stl-files-for-cnc-routers': {
     hook: 'Resize without ruining the detail',
     title: 'How to Scale STL Files for CNC Routers Without Losing Detail',

@@ -80,6 +80,10 @@ const SCENES = {
     scene: 'THE FILE AND THE RESULT. The finished panel from image 1, in the house finish, stands on the maple bench. Beside it a plain closed laptop, its lid shut so there is no screen visible at all, two router cutters standing in a small wooden block, a coiled black USB cable and a mug of coffee. Warm workshop light. No screens, no logos, no writing anywhere.',
     hands: false, bench: true,
   },
+  // The colouring guide keeps its own frames (build_frames.mjs beside it):
+  // every scene there is finish:false and shares one LOOK paragraph, so its
+  // email frame is written there, not here. Listed so nobody adds one twice.
+  'how-to-color-a-cnc-relief-carving': null,
   'how-to-scale-stl-files-for-cnc-routers': {
     alt: 'The same relief design carved at three sizes, small, medium and large, nested on the bench',
     scene: 'ONE FILE, THREE SIZES. Three carvings of the design from image 1, all in the house finish, arranged in a row on the maple bench: a small one about 10 cm, a medium one about 20 cm, a large one about 40 cm. The detail on all three is equally crisp; only the size changes. A steel rule lies along the front edge of the bench. Soft even daylight, shot from slightly above.',
@@ -89,6 +93,7 @@ const SCENES = {
 
 let n = 0;
 for (const [slug, s] of Object.entries(SCENES)) {
+  if (!s) { console.log('own frames, skipped:', slug); continue; }
   const dir = path.join(HERE, slug);
   const fp = path.join(dir, 'frames.json');
   if (!fs.existsSync(fp)) { console.log('no frames.json for', slug); continue; }
