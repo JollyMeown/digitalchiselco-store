@@ -143,6 +143,67 @@ export async function titleVocabulary(): Promise<Map<string, number>> {
   return map;
 }
 
+// ── Seasonal collections (Admin > Seasonal) ──────────────────────────
+// The landing page used to require each keyword PHRASE to appear verbatim
+// inside a product title, and only looked at the first 12 keywords. The
+// Halloween collection's keywords are search phrases ("3D Halloween STL",
+// "Halloween wall art STL"); no title contains one of those as a single string,
+// so the page matched nothing (owner, 2026-09-15). Matching now works the way
+// a person would read those keywords: each phrase is broken into its subject
+// words (generic carving words dropped), a product matches when its title or
+// tags carry any subject word, and products filed in a category whose name
+// shares a subject word are included too. Best sellers first.
+const SEASON_STOP = new Set(['stl','cnc','3d','relief','reliefs','file','files','router','carving','carvings','wood','wooden','woodworking','printing','print','wall','art','decor','decoration','decorations','design','designs','model','models','digital','download','for','the','and','of','a','sign','signs','plaque','panel','gift','gifts','laser','bas']);
+export function seasonSubjectWords(keywords: unknown): string[] {
+  const out = new Set<string>();
+  for (const k of (Array.isArray(keywords) ? keywords : [])) {
+    for (const w of String(k).toLowerCase().split(/[^a-z0-9]+/)) {
+      if (w.length >= 3 && !SEASON_STOP.has(w)) out.add(w);
+    }
+  }
+  return [...out].slice(0, 40);
+}
+export async function getLiveSeasonalCollection() {
+  try {
+    const { supabaseAdmin } = await import('./supabase');
+    const now = new Date().toISOString();
+    const { data } = await supabaseAdmin().from('seasonal_collections').select('*').eq('active', true)
+      .or(`starts_at.is.null,starts_at.lte.${now}`).or(`ends_at.is.null,ends_at.gte.${now}`)
+      .order('ends_at', { ascending: true, nullsFirst: false }).limit(1);
+    return data?.[0] || null;
+  } catch { return null; }
+}
+export async function getSeasonalProducts(col: { keywords?: unknown; title?: string }, limit = 60): Promise<ProductCard[]> {
+  try {
+    const { supabaseAdmin } = await import('./supabase');
+    const db = supabaseAdmin();
+    const words = seasonSubjectWords(col.keywords);
+    if (!words.length) return [];
+    const safe = (w: string) => w.replace(/[,()*%]/g, '');
+    // 1) titles carrying a subject word. (Tags are jsonb, and a substring
+    //    match on a jsonb array is not expressible in a PostgREST or=; titles
+    //    plus the category union below cover the set comfortably.)
+    const orExpr = words.map((w) => `title.ilike.*${safe(w)}*`).join(',');
+    const { data: byWord } = await db.from('products').select(CARD + ',etsy_sales_365,created_at')
+      .eq('active', true).not('image_url', 'is', null).or(orExpr)
+      .order('etsy_sales_365', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(limit);
+    // 2) whole categories whose name shares a subject word (the curated set)
+    const { data: cats } = await db.from('categories').select('id, name');
+    const catIds = (cats || []).filter((c: any) => words.some((w) => String(c.name).toLowerCase().includes(w))).map((c: any) => c.id);
+    let byCat: any[] = [];
+    if (catIds.length) {
+      const { data } = await db.from('products').select(`${CARD},etsy_sales_365,created_at, product_categories!inner(category_id)`)
+        .eq('active', true).not('image_url', 'is', null).in('product_categories.category_id', catIds)
+        .order('etsy_sales_365', { ascending: false, nullsFirst: false }).limit(limit);
+      byCat = data || [];
+    }
+    const seen = new Set<string>(); const merged: any[] = [];
+    for (const p of [...(byWord || []), ...byCat]) { if (!seen.has(p.id)) { seen.add(p.id); merged.push(p); } }
+    merged.sort((a, b) => (Number(b.etsy_sales_365) || 0) - (Number(a.etsy_sales_365) || 0) || String(b.created_at).localeCompare(String(a.created_at)));
+    return merged.slice(0, limit) as ProductCard[];
+  } catch (e) { console.error('getSeasonalProducts failed:', e); return []; }
+}
+
 // "Related" used to be five random products with no relation at all. Now it
 // is the same collection's best sellers, which is the second sale a buyer of
 // this design is most likely to make; falls back to shop-wide best sellers.

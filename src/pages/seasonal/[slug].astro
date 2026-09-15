@@ -8,6 +8,7 @@ import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import { getSettings } from '../../lib/queries';
 import { supabaseAdmin } from '../../lib/supabase';
+import { getSeasonalProducts } from '../../lib/queries';
 
 const { slug } = Astro.params;
 const db = supabaseAdmin();
@@ -19,16 +20,10 @@ const inWindow = col && (!col.starts_at || col.starts_at <= nowIso) && (!col.end
 if (!col || !inWindow) return Astro.rewrite('/404');
 
 const settings = await getSettings();
-const keywords: string[] = Array.isArray(col.keywords) ? col.keywords.filter(Boolean) : [];
-let products: any[] = [];
-if (keywords.length) {
-  const orExpr = keywords.slice(0, 12).map((k) => `title.ilike.*${String(k).replace(/[,()*]/g, '')}*`).join(',');
-  const { data } = await db.from('products')
-    .select('id, title, slug, price_usd, image_url, is_bundle, link_status')
-    .eq('active', true).not('image_url', 'is', null).or(orExpr)
-    .order('created_at', { ascending: false }).limit(60);
-  products = data || [];
-}
+// Subject-word matching across titles, tags and matching categories, best
+// sellers first (see getSeasonalProducts for why the old title-phrase match
+// found nothing for Halloween).
+const products = await getSeasonalProducts(col, 60);
 const meta = (col.subtitle || `Seasonal bas-relief STL designs: ${col.title}.`).slice(0, 155);
 ---
 <Shell title={`${col.title} | DigitalChiselCo`} description={meta} scrollPastBanner={true}>

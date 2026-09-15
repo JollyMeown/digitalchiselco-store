@@ -15,6 +15,7 @@ import {
   getCategories, getProducts, getSettings,
   getBestSellers, getLatestProducts, getReviews, getFaqs, getMembershipPlans,
   getPremiumBundles, MARQUEE_DEFAULTS, getCategoryBySlug, getProductsByCategory,
+  getLiveSeasonalCollection, getSeasonalProducts,
   type ProductCard as ProductCardT,
 } from '../lib/queries';
 import { fillPlanTokens, planFeatureLines } from '../lib/membership-facts';
@@ -57,15 +58,26 @@ const showBest = bestsellers.length > 0 ? bestsellers : products.filter((p) => p
 // Halloween is six weeks out and the collection exists; a dated row above Best
 // Sellers sells it while it matters, then Christmas takes the slot. Empty slug
 // or a past date and nothing renders.
-let seasonal: { name: string; slug: string; label: string; products: ProductCardT[] } | null = null;
+let seasonal: { name: string; href: string; label: string; products: ProductCardT[] } | null = null;
 try {
-  const sSlug = String((s as any).seasonal_slug || '').trim();
-  const sUntil = String((s as any).seasonal_until || '');
-  if (sSlug && (!sUntil || sUntil >= new Date().toISOString().slice(0, 10))) {
-    const cat = await getCategoryBySlug(sSlug);
-    if (cat) {
-      const { products: sp } = await getProductsByCategory(cat.id, 1, 8, 'best');
-      if (sp.length >= 4) seasonal = { name: cat.name, slug: cat.slug, label: String((s as any).seasonal_label || ''), products: sp };
+  // Admin > Seasonal is the one control: the live seasonal collection (the one
+  // ending soonest) fills this row and the row links to its landing page. The
+  // site_settings slug is only a fallback for when no seasonal collection is
+  // live, so the row can still point at a plain category.
+  const live = await getLiveSeasonalCollection();
+  if (live) {
+    const sp = await getSeasonalProducts(live, 8);
+    if (sp.length >= 4) seasonal = { name: String(live.title), href: `/seasonal/${live.slug}`, label: String(live.subtitle || (s as any).seasonal_label || ''), products: sp };
+  }
+  if (!seasonal) {
+    const sSlug = String((s as any).seasonal_slug || '').trim();
+    const sUntil = String((s as any).seasonal_until || '');
+    if (sSlug && (!sUntil || sUntil >= new Date().toISOString().slice(0, 10))) {
+      const cat = await getCategoryBySlug(sSlug);
+      if (cat) {
+        const { products: sp } = await getProductsByCategory(cat.id, 1, 8, 'best');
+        if (sp.length >= 4) seasonal = { name: cat.name, href: `/collections/${cat.slug}`, label: String((s as any).seasonal_label || ''), products: sp };
+      }
     }
   }
 } catch {}
@@ -173,7 +185,7 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
                 <h2 class="font-serif text-xl sm:text-2xl md:text-3xl text-cream mt-0.5">{seasonal.name}</h2>
                 {seasonal.label && <p class="text-sm text-cream/80 mt-0.5">{seasonal.label}</p>}
               </div>
-              <a href={`/collections/${seasonal.slug}`} class="text-sm text-[#FAC775] hover:underline whitespace-nowrap">See the whole collection →</a>
+              <a href={seasonal.href} class="text-sm text-[#FAC775] hover:underline whitespace-nowrap">See the whole collection →</a>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {seasonal.products.slice(0, 8).map((p, i) => <ProductCard product={p} discount={s.discount_percent} eager={i < 4} />)}
