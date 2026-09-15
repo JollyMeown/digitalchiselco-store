@@ -171,6 +171,30 @@ export default function Products() {
     setRows((r) => r.map((x) => (x.id === id ? { ...x, active: true, pending_review: false } as any : x)));
   }
 
+  // Bulk approval (owner, 2026-09-15: "there should be Approve all or Approve
+  // selected"). 284 uploads landed in the queue at once when the BRS review
+  // gate was switched on; one click per item was never going to work. Selection
+  // is per visible row; "Approve all shown" takes whatever the current filters
+  // show, so a search or a category narrows what gets published.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  async function approveMany(ids: string[]) {
+    if (!ids.length) return;
+    if (!confirm(`Publish ${ids.length} item${ids.length === 1 ? '' : 's'} live on the storefront?`)) return;
+    setBulkBusy(true);
+    let done = 0, failed = 0;
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const { error } = await supabase.from('products').update({ pending_review: false, active: true }).in('id', chunk);
+      if (error) failed += chunk.length; else done += chunk.length;
+    }
+    setRows((r) => r.map((x) => (ids.includes(x.id) ? { ...x, active: true, pending_review: false } as any : x)));
+    setSelected(new Set());
+    setBulkBusy(false);
+    if (failed) alert(`Approved ${done}, ${failed} failed.`);
+  }
+
   // Inline flag toggles for the Best seller / Latest pick homepage rows.
   // Optimistic: flip local state immediately, revert if the write fails.
   async function toggleFlag(id: string, field: 'is_bestseller' | 'is_latest_pick', value: boolean) {
@@ -258,6 +282,17 @@ export default function Products() {
                 </>
               )}
             </>
+          )}
+          {visibleRows.some((r) => (r as any).pending_review) && (
+            <span className="inline-flex items-center gap-1.5 ml-2">
+              <button className={btnGhost} disabled={bulkBusy} onClick={() => setSelected(new Set(visibleRows.filter((r) => (r as any).pending_review).map((r) => r.id)))} title="Tick every pending item currently shown">☑ Select all pending</button>
+              <button className="text-xs rounded bg-green-600 text-white px-3 py-1.5 hover:bg-green-700 disabled:opacity-40" disabled={bulkBusy || selected.size === 0} onClick={() => approveMany([...selected])}>
+                ✅ Approve selected{selected.size ? ` (${selected.size})` : ''}
+              </button>
+              <button className="text-xs rounded border border-green-600 text-green-700 px-3 py-1.5 hover:bg-green-50 disabled:opacity-40" disabled={bulkBusy} onClick={() => approveMany(visibleRows.filter((r) => (r as any).pending_review).map((r) => r.id))} title="Publishes every pending item the current filters show">
+                {bulkBusy ? 'Approving…' : `Approve all shown (${visibleRows.filter((r) => (r as any).pending_review).length})`}
+              </button>
+            </span>
           )}
           <span className="text-xs text-ink-700/60 ml-auto">{visibleRows.length} of {rows.length} shown</span>
           <button className={btnGhost} disabled={checking} onClick={runDownloadCheck} title="Scans the WHOLE catalogue for products with no download file, empty links, or one file attached to several products. Run it after a BRS upload run.">{checking ? 'Checking…' : '🔎 Check download links'}</button>
@@ -427,6 +462,13 @@ export default function Products() {
           <table className="w-full text-sm">
             <thead className="text-xs text-ink-700/60 text-left bg-cream/40">
               <tr>
+                <th className="p-2 w-8">
+                  {visibleRows.some((r) => (r as any).pending_review) && (
+                    <input type="checkbox" aria-label="Select all pending items shown"
+                      checked={selected.size > 0 && visibleRows.filter((r) => (r as any).pending_review).every((r) => selected.has(r.id))}
+                      onChange={(e) => setSelected(e.target.checked ? new Set(visibleRows.filter((r) => (r as any).pending_review).map((r) => r.id)) : new Set())} />
+                  )}
+                </th>
                 <th className="p-2 w-10"></th><th className="p-2 w-14"></th><th className="p-2">Title</th>
                 <th className="p-2">Categories</th><th className="p-2 w-20">Price</th>
                 <th className="p-2 w-16 text-center" title="Shows in the homepage Best Sellers row">★ Best</th>
@@ -436,7 +478,12 @@ export default function Products() {
             </thead>
             <tbody>
               {visibleRows.map((r) => (
-                <tr key={r.id} className="border-t border-black/5 hover:bg-cream/30">
+                <tr key={r.id} className={`border-t border-black/5 hover:bg-cream/30 ${selected.has(r.id) ? 'bg-green-50/60' : ''}`}>
+                  <td className="p-2">
+                    {(r as any).pending_review && (
+                      <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSel(r.id)} aria-label={`Select ${r.title.slice(0, 40)}`} />
+                    )}
+                  </td>
                   <td className="p-2"><span className={`inline-block w-2.5 h-2.5 rounded-full ${linkColor[r.link_status] || 'bg-gray-400'}`} /></td>
                   <td className="p-2">{r.image_url ? <img src={r.image_url} className="w-10 h-10 object-cover rounded" /> : <div className="w-10 h-10 bg-cream rounded" />}</td>
                   <td className="p-2">
