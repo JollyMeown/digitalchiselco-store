@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
-import MakerMap from '../components/MakerMap.tsx';
+import MakerMapLazy from '../components/MakerMapLazy.tsx';
 import Footer from '../components/Footer.astro';
 import RecentlyViewed from '../components/RecentlyViewed.astro';
 import SawdustCinema from '../components/SawdustCinema.astro';
@@ -325,9 +325,9 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
                   (2026-09-15 audit). The map is decoration; it draws itself in
                   the browser when scrolled to, and the box keeps its height so
                   nothing jumps. */}
-              <div style="min-height:300px">
-                <MakerMap client:only="react" compact />
-              </div>
+              {/* client:visible on a wrapper that dynamically imports the map:
+                  nothing map-related is fetched until the panel is scrolled to. */}
+              <MakerMapLazy client:visible compact />
               <div class="mt-2 text-center text-[11px] text-cream/45">
                 {makerCount > 0
                   ? <span>Hover any glowing dot to see that workshop</span>
