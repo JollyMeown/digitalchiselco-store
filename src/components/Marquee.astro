@@ -2,6 +2,16 @@
 // CSS marquee — content scrolls left→right or right→left infinitely,
 // pauses on hover. Use a single child <div> with display flex/gap and put N items in it;
 // this component duplicates the children once to make the loop seamless.
+//
+// Cost control (2026-09-15 audit: the homepage spent most of its main-thread
+// time in Rendering / Style & Layout, and the marquees were why):
+//   - the animation runs only while the marquee is on screen; an
+//     IntersectionObserver pauses it otherwise, so six marquees on one page do
+//     not all animate at once for a visitor reading the top of the page
+//   - on phones there is no animation and no duplicate copy: the row becomes
+//     a native swipe-scroll, which halves the DOM and costs nothing per frame
+//   - the fade at the edges is two gradient overlays, not mask-image; a mask
+//     over a moving layer forces a repaint of the whole strip every frame
 interface Props { duration?: number; direction?: 'left' | 'right'; pauseOnHover?: boolean; gapClass?: string; }
 const { duration = 40, direction = 'left', pauseOnHover = true, gapClass = 'gap-4' } = Astro.props;
 ---
@@ -10,21 +20,51 @@ const { duration = 40, direction = 'left', pauseOnHover = true, gapClass = 'gap-
     <div class={`dcc-marquee-group flex ${gapClass} flex-shrink-0`}>
       <slot />
     </div>
-    <div class={`dcc-marquee-group flex ${gapClass} flex-shrink-0`} aria-hidden="true">
+    <div class={`dcc-marquee-group dcc-marquee-dup flex ${gapClass} flex-shrink-0`} aria-hidden="true">
       <slot />
     </div>
   </div>
+  <div class="dcc-marquee-fade dcc-marquee-fade-l" aria-hidden="true"></div>
+  <div class="dcc-marquee-fade dcc-marquee-fade-r" aria-hidden="true"></div>
 </div>
 <style is:global>
-  .dcc-marquee { overflow: hidden; position: relative; mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent); }
-  .dcc-marquee-track { display: flex; width: max-content; animation: dcc-scroll var(--dcc-duration) linear infinite; animation-direction: var(--dcc-direction); }
-  .dcc-marquee-pausable:hover .dcc-marquee-track { animation-play-state: paused; }
+  .dcc-marquee { overflow: hidden; position: relative; }
+  .dcc-marquee-track { display: flex; width: max-content; animation: dcc-scroll var(--dcc-duration) linear infinite; animation-direction: var(--dcc-direction); will-change: transform; }
+  .dcc-marquee-pausable:hover .dcc-marquee-track,
+  .dcc-marquee.is-off .dcc-marquee-track { animation-play-state: paused; }
+  .dcc-marquee-fade { position: absolute; top: 0; bottom: 0; width: 6%; pointer-events: none; }
+  .dcc-marquee-fade-l { left: 0; background: linear-gradient(to right, #fff, rgba(255,255,255,0)); }
+  .dcc-marquee-fade-r { right: 0; background: linear-gradient(to left, #fff, rgba(255,255,255,0)); }
   @keyframes dcc-scroll {
     from { transform: translateX(0); }
     to   { transform: translateX(-50%); }
   }
+  /* phones: swipe, do not animate, and do not render the loop copy at all */
+  @media (max-width: 767px) {
+    .dcc-marquee { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .dcc-marquee::-webkit-scrollbar { display: none; }
+    .dcc-marquee-track { animation: none; will-change: auto; }
+    .dcc-marquee-dup { display: none; }
+    .dcc-marquee-fade { display: none; }
+  }
   @media (prefers-reduced-motion: reduce) {
     .dcc-marquee-track { animation: none; }
-    .dcc-marquee { mask-image: none; }
+    .dcc-marquee-dup { display: none; }
+    .dcc-marquee-fade { display: none; }
+    .dcc-marquee { overflow-x: auto; }
   }
 </style>
+<script is:inline>
+  // Pause every marquee that is not on screen. One observer for the page.
+  (function () {
+    if (window.__dccMarqueeIO) return;
+    if (!('IntersectionObserver' in window)) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { e.target.classList.toggle('is-off', !e.isIntersecting); });
+    }, { rootMargin: '100px 0px' });
+    window.__dccMarqueeIO = io;
+    var watch = function () { document.querySelectorAll('.dcc-marquee:not([data-io])').forEach(function (m) { m.setAttribute('data-io', '1'); io.observe(m); }); };
+    watch();
+    document.addEventListener('astro:page-load', watch);
+  })();
+</script>
