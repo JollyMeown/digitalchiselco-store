@@ -1,15 +1,25 @@
 ---
 import type { ProductCard } from '../lib/queries';
 import { pricing, money, DEFAULT_DISCOUNT } from '../lib/pricing';
-interface Props { product: ProductCard; discount?: number; }
-const { product, discount = DEFAULT_DISCOUNT } = Astro.props;
+import { img } from '../lib/img';
+interface Props { product: ProductCard; discount?: number; eager?: boolean; }
+const { product, discount = DEFAULT_DISCOUNT, eager = false } = Astro.props;
 const { price, original, percent } = pricing(product.price_usd, discount);
 const title = product.title.split('|')[0].trim();
+// Right-sized card images. The catalog was serving the raw upload into a
+// 400px tile: two 3 MB PNGs on one page, 12.7 MB in total, Lighthouse 66.
+// The product page and the feeds already went through img(); the card, which
+// every grid on the site uses, did not. Square crop so the tile is always the
+// subject, three widths so a phone never downloads the desktop variant.
+const src = img(product.image_url, { w: 400, square: true, q: 78 });
+const srcset = [400, 600, 800].map((w) => `${img(product.image_url, { w, square: true, q: 78 })} ${w}w`).join(', ');
 ---
 <div class="group border border-black/10 rounded-md overflow-hidden hover:shadow-md transition flex flex-col bg-white">
   <a href={`/product/${product.slug}`} class="relative block aspect-square bg-cream overflow-hidden">
     {product.image_url ? (
-      <img src={product.image_url} alt={`${title} bas-relief STL design`} loading="lazy" width="400" height="400"
+      <img src={src} srcset={srcset} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+           alt={`${title} bas-relief STL design`} loading={eager ? 'eager' : 'lazy'} fetchpriority={eager ? 'high' : undefined}
+           decoding="async" width="400" height="400"
            class="w-full h-full object-cover group-hover:scale-[1.03] transition" />
     ) : (
       <div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">{title}</div>

@@ -8,6 +8,7 @@ import { supabaseAdmin } from '../../../lib/supabase';
 import { rateLimit, clientIp, tooMany } from '../../../lib/rate-limit';
 import { send as sendEmail } from '../../../lib/resend';
 import { telegramOwner } from '../../../lib/notify';
+import { shrinkImage } from '../../../lib/shrink';
 import { customRequestReceivedEmail } from '../../../lib/marketing-emails';
 
 export const prerender = false;
@@ -37,10 +38,14 @@ export const POST: APIRoute = async ({ request }) => {
     if (photo.startsWith('data:')) {
       const m = photo.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
       if (!m) return json({ error: 'Please upload a JPG, PNG or WebP picture.' }, 400);
-      const buf = Buffer.from(m[2], 'base64');
-      if (buf.length > 8 * 1024 * 1024) return json({ error: 'The picture is over 8MB, please send a smaller one.' }, 400);
-      const path = `custom-requests/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${EXT[m[1]] || 'jpg'}`;
-      const up = await db.storage.from('site-media').upload(path, buf, { contentType: m[1], upsert: false });
+      const raw = Buffer.from(m[2], 'base64');
+      if (raw.length > 12 * 1024 * 1024) return json({ error: 'The picture is over 12MB, please send a smaller one.' }, 400);
+      // This photo is the SOURCE a relief is modelled from, so it keeps far
+      // more resolution than a display image (3000 px, not 1600) while still
+      // shedding the bytes a phone adds for nothing.
+      const { buf, contentType, ext } = await shrinkImage(raw, { max: 3000, quality: 90 });
+      const path = `custom-requests/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext === 'bin' ? (EXT[m[1]] || 'jpg') : ext}`;
+      const up = await db.storage.from('site-media').upload(path, buf, { contentType: contentType === 'application/octet-stream' ? m[1] : contentType, upsert: false });
       if (up.error) return json({ error: 'The picture could not be stored, please try again.' }, 500);
       photo_url = db.storage.from('site-media').getPublicUrl(path).data.publicUrl;
     } else return json({ error: 'Please add a picture, it is what we model from.' }, 400);

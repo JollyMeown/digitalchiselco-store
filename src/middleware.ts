@@ -77,12 +77,30 @@ async function legacyRedirect(pathname: string): Promise<string | null> {
   return null;
 }
 
+// ── Edge caching for the storefront ───────────────────────────────────
+// Every storefront page was served `Cache-Control: no-cache`, so each visitor
+// waited for the SSR function to query Supabase: measured TTFB 3.8 s on the
+// homepage, 1.6 s on the catalog. These pages read no cookie and render the
+// same for everyone (cart, wishlist and "recently viewed" are client-side),
+// so Netlify's CDN can hold them. Five minutes fresh, then served stale while a
+// single background fetch renews it, so a price or catalogue change lands
+// within minutes and no visitor ever waits on the origin. The browser itself
+// is still told not to cache, so a back-button never shows a stale price.
+const CACHEABLE = /^\/(?:$|catalog\/?$|collections(?:\/[^/]+)?\/?$|product\/[^/]+\/?$|blog(?:\/[^/]+)?\/?$|designs(?:\/[^/]+)?\/?$|free\/?$|membership\/?$|faq\/?$|our-story\/?$|gift-cards\/?$)/;
+const NEVER_CACHE = /^\/(?:admin|api|account|checkout|maker|requests|cart|search|free\/(?:confirm|files))/;
+
 export const onRequest = defineMiddleware(async (context, next) => {
   if (csrfBlocked(context.request, context.url.pathname)) {
     return new Response('Cross-site POST form submissions are forbidden', { status: 403 });
   }
   if (context.request.method === 'GET') {
     const path = context.url.pathname;
+    // One URL per page. /catalog/ and /catalog both answered 200 with a
+    // self-referencing canonical, so Google indexed two copies of every
+    // listing page. The slash form now 301s to the bare one.
+    if (path.length > 1 && path.endsWith('/') && !path.startsWith('/api/')) {
+      return context.redirect(path.slice(0, -1) + context.url.search, 301);
+    }
     // cheap pre-filter so the async helper only runs on legacy-looking paths
     if (/\.html$/.test(path) || path.startsWith('/category/') || /^\/product\/\d{5,}-/.test(path)) {
       const to = await legacyRedirect(path);
@@ -90,6 +108,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
   }
   const response = await next();
+  try {
+    const path = context.url.pathname;
+    if (context.request.method === 'GET' && response.status === 200 && CACHEABLE.test(path) && !NEVER_CACHE.test(path)
+        && !context.request.headers.get('cookie')?.includes('sb-')) {
+      response.headers.set('Netlify-CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=86400, durable');
+      response.headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+      response.headers.set('Cache-Tag', path.startsWith('/product/') ? 'product,storefront' : 'storefront');
+    }
+  } catch { /* never let a caching header break a page */ }
   try {
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
       // a page may pre-set a STRICTER Referrer-Policy (token-in-URL pages use

@@ -6,6 +6,7 @@ import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
 import { verifyUploadToken, verifyMakerToken } from '../../lib/marketplace-token';
+import { shrinkImage } from '../../lib/shrink';
 
 export const prerender = false;
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json' } });
@@ -41,10 +42,15 @@ export const POST: APIRoute = async ({ request }) => {
   if (file.size > MAX_MB * 1024 * 1024) return json({ error: `Image is ${(file.size / 1048576).toFixed(1)} MB, over the ${MAX_MB} MB limit. Please use a smaller one.` }, 400);
 
   const rand = Math.random().toString(36).slice(2, 12);
-  const objectPath = `applications/${new Date().toISOString().slice(0, 10)}/${rand}.${ext}`;
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  // The form already shrinks in the browser; this is the server's own copy of
+  // the same rule, so a script or an old browser cannot put a 12 MB original
+  // on a public profile page.
+  const shr = await shrinkImage(Buffer.from(await file.arrayBuffer()), { max: 1600, quality: 85 });
+  const finalExt = shr.ext === 'bin' ? ext : shr.ext;
+  const finalType = shr.contentType === 'application/octet-stream' ? file.type : shr.contentType;
+  const objectPath = `applications/${new Date().toISOString().slice(0, 10)}/${rand}.${finalExt}`;
   const db = supabaseAdmin();
-  const { error } = await db.storage.from('maker-portfolio').upload(objectPath, bytes, { contentType: file.type, upsert: false });
+  const { error } = await db.storage.from('maker-portfolio').upload(objectPath, shr.buf, { contentType: finalType, upsert: false });
   if (error) { console.error('[maker-upload]', error.message); return json({ error: 'Upload failed. Please try again.' }, 500); }
 
   return json({ ok: true, url: `${SUPABASE_URL}/storage/v1/object/public/maker-portfolio/${objectPath}` });

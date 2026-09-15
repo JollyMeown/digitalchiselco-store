@@ -5,6 +5,7 @@ import type { APIRoute } from 'astro';
 import crypto from 'node:crypto';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { rateLimit, clientIp, tooMany } from '../../../lib/rate-limit';
+import { shrinkImage } from '../../../lib/shrink';
 
 export const prerender = false;
 const json = (data: unknown, status = 200) =>
@@ -28,10 +29,13 @@ export const POST: APIRoute = async ({ request }) => {
     if (photo.startsWith('data:')) {
       const m = photo.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
       if (!m) return json({ error: 'Unsupported image format.' }, 400);
-      const buf = Buffer.from(m[2], 'base64');
+      const raw = Buffer.from(m[2], 'base64');
+      // display image: 1600 px is plenty, and a phone photo arrives at 4000 px / 6 MB
+      const shr = await shrinkImage(raw, { max: 1600, quality: 85 });
+      const buf = shr.buf;
       if (buf.length > 5 * 1024 * 1024) return json({ error: 'Image is over 5MB.' }, 400);
-      const path = `design-requests/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${EXT[m[1]] || 'jpg'}`;
-      const up = await db.storage.from('site-media').upload(path, buf, { contentType: m[1], upsert: false });
+      const path = `design-requests/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${shr.ext === 'bin' ? (EXT[m[1]] || 'jpg') : shr.ext}`;
+      const up = await db.storage.from('site-media').upload(path, buf, { contentType: shr.contentType === 'application/octet-stream' ? m[1] : shr.contentType, upsert: false });
       if (!up.error) image_url = db.storage.from('site-media').getPublicUrl(path).data.publicUrl;
     }
 

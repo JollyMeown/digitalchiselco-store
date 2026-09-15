@@ -180,12 +180,17 @@ export async function getCategoryBySlug(slug: string) {
   } catch (e) { console.error('getCategoryBySlug failed:', e); return null; }
 }
 
-export async function getProducts(page = 1, perPage = 48) {
+// `sort`: 'newest' puts the latest upload first; the default stays A to Z.
+// Alphabetical was the ONLY order the catalog had, so a bundle uploaded this
+// morning landed on page 15 behind everything that happened to start with an
+// earlier letter, and nobody, owner included, could find it (2026-09-15).
+export type CatalogSort = 'title' | 'newest';
+export async function getProducts(page = 1, perPage = 48, sort: CatalogSort = 'title') {
   const from = (page - 1) * perPage;
   try {
-    const { data, count, error } = await supabase
-      .from('products').select(CARD, { count: 'exact' })
-      .eq('active', true).order('title').range(from, from + perPage - 1);
+    let q = supabase.from('products').select(CARD, { count: 'exact' }).eq('active', true);
+    q = sort === 'newest' ? q.order('created_at', { ascending: false }).order('title') : q.order('title');
+    const { data, count, error } = await q.range(from, from + perPage - 1);
     if (error) throw error;
     return { products: (data ?? []) as ProductCard[], total: count ?? 0, page, perPage };
   } catch (e) { console.error('getProducts failed:', e); return { products: [], total: 0, page, perPage }; }

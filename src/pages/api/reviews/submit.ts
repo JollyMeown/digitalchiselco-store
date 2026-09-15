@@ -6,6 +6,7 @@ import type { APIRoute } from 'astro';
 import crypto from 'node:crypto';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { rateLimit, clientIp, tooMany } from '../../../lib/rate-limit';
+import { shrinkImage } from '../../../lib/shrink';
 
 export const prerender = false;
 
@@ -44,11 +45,14 @@ export const POST: APIRoute = async ({ request }) => {
     if (photo.startsWith('data:')) {
       const m = photo.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
       if (!m) return json({ error: 'Unsupported image format.' }, 400);
-      const buf = Buffer.from(m[2], 'base64');
+      const raw = Buffer.from(m[2], 'base64');
+      // display image: 1600 px is plenty, and a phone photo arrives at 4000 px / 6 MB
+      const shr = await shrinkImage(raw, { max: 1600, quality: 85 });
+      const buf = shr.buf;
       if (buf.length > 5 * 1024 * 1024) return json({ error: 'Photo is over 5MB.' }, 400);
-      const ext = EXT[m[1]] || 'jpg';
+      const ext = shr.ext === 'bin' ? (EXT[m[1]] || 'jpg') : shr.ext;
       const path = `reviews/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
-      const up = await db.storage.from('site-media').upload(path, buf, { contentType: m[1], upsert: false });
+      const up = await db.storage.from('site-media').upload(path, buf, { contentType: shr.contentType === 'application/octet-stream' ? m[1] : shr.contentType, upsert: false });
       if (up.error) { console.error('review photo upload failed:', up.error.message); }
       else photo_url = db.storage.from('site-media').getPublicUrl(path).data.publicUrl;
     }

@@ -1,7 +1,16 @@
 ---
 import { getSettings } from '../lib/queries';
+import { img } from '../lib/img';
 const s = await getSettings();
 if (!s.banner_image_url) return null;
+// Only the homepage gets the headline and buttons: on a product page the
+// banner is a masthead, and a second H1 there would compete with the design's
+// own title.
+const home = Astro.url.pathname === '/';
+// The banner is the largest thing painted on the homepage (Lighthouse: LCP
+// element, 222 KB as uploaded). Served right-sized for the viewport instead.
+const bannerSrc = img(s.banner_image_url, { w: 1400, q: 80 });
+const bannerSet = [640, 1000, 1400, 1700].map((w) => `${img(s.banner_image_url, { w, q: 80 })} ${w}w`).join(', ');
 // Cut Local exists only when the marketplace is live, so the maker shortcut
 // under the banner appears with it.
 let live = false;
@@ -13,18 +22,41 @@ try {
 ---
 <div id="site-banner" class="bg-cream/40 border-b border-black/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 md:py-5">
-    <a href="/" class="block rounded-lg overflow-hidden">
-      <picture>
-        <img
-          src={s.banner_image_url}
-          alt="DigitalChiselCo — From Vision to Timeless Craft"
-          loading="eager"
-          fetchpriority="high"
-          width="1700"
-          height="720"
-          class="w-full h-auto block"
-        />
-      </picture>
+    {home && (
+      <!-- The one sentence the page was missing. Until 2026-09-15 the homepage
+           had no H1 and nothing above the fold said what is sold or what to do:
+           a visitor saw statistics, a logo banner and a FAQ button. This is the
+           promise and the two doors, before the picture. -->
+      <div class="text-center max-w-3xl mx-auto mb-4 md:mb-5">
+        <h1 class="font-serif text-[26px] sm:text-4xl md:text-[44px] leading-[1.1] text-bronze-800 tracking-tight" style="text-wrap:balance">
+          Bas-relief STL files that carve beautifully, first time
+        </h1>
+        <p class="mt-2.5 text-[15px] sm:text-base text-ink-700/80 leading-relaxed" style="text-wrap:balance">
+          {Number(s.products_count).toLocaleString()}+ designs for CNC routers, laser engravers and 3D printers. Instant download, commercial use included.
+        </p>
+        <div class="mt-4 flex flex-wrap justify-center gap-2.5">
+          <a href="/catalog" class="inline-flex items-center gap-2 bg-bronze-600 text-cream font-bold text-[15px] px-6 py-3 rounded-lg hover:bg-bronze-700 shadow-sm transition">
+            Shop best sellers <span aria-hidden="true">→</span>
+          </a>
+          <a href="/free" class="inline-flex items-center gap-2 border border-bronze-600/50 text-bronze-800 font-medium text-[15px] px-6 py-3 rounded-lg hover:bg-white transition">
+            Try 5 files free
+          </a>
+        </div>
+      </div>
+    )}
+    <a href={home ? '/catalog' : '/'} class="block rounded-lg overflow-hidden">
+      <img
+        src={bannerSrc}
+        srcset={bannerSet}
+        sizes="(min-width: 1280px) 1232px, 100vw"
+        alt="DigitalChiselCo bas-relief carving: from 3D design to STL to the finished carved panel"
+        loading="eager"
+        fetchpriority="high"
+        decoding="async"
+        width="1700"
+        height="720"
+        class="w-full h-auto block"
+      />
     </a>
     <!-- Help shortcuts: the FAQ is the first thing a hesitant buyer looks for,
          so it sits under the banner on every page rather than in the footer. -->
