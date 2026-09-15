@@ -51,6 +51,21 @@ try {
 } catch { /* the page works without it */ }
 const related = await getRelatedProducts(p.id, 5);
 const soldCount = await getSoldCount(p.id);
+// Real numbers from Etsy for the same design: how many times it sold this
+// year, how many people favourited it, and what it costs there. All three are
+// facts a buyer can check, which is why they persuade where "bestseller"
+// badges do not. The site price is lower than Etsy's and never said so until
+// a buyer found out by asking (2026-09-14).
+let etsyStats: { favorers: number; price_usd: number | null } | null = null;
+if (p.etsy_listing_id) {
+  try {
+    const { supabaseAdmin } = await import('../../lib/supabase');
+    const { data } = await supabaseAdmin().from('etsy_listing_stats').select('favorers, price_usd').eq('listing_id', p.etsy_listing_id).maybeSingle();
+    if (data) etsyStats = { favorers: Number(data.favorers) || 0, price_usd: data.price_usd != null ? Number(data.price_usd) : null };
+  } catch { /* the page must never depend on this */ }
+}
+const soldYear = Number(p.etsy_sales_365) || 0;
+const etsyCheaperBy = etsyStats?.price_usd && etsyStats.price_usd > price + 0.5 ? etsyStats.price_usd : null;
 
 // Social proof: two CURATED reviews (generic=true — English, 5★, never naming a
 // specific design so they read true under any product), rotated per product via
@@ -248,6 +263,17 @@ const breadcrumbLd = {
         <span class="text-ink-700/40 line-through">{money(original)}</span>
         <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">{percent}% off</span>
       </div>
+      {/* Three checkable facts in one line. A buyer cannot verify a badge; they
+          can verify a price on Etsy and a sales count on the listing. */}
+      {(etsyCheaperBy || soldYear >= 3 || (etsyStats?.favorers || 0) >= 10) && (
+        <p class="mt-2 text-[13px] text-ink-700/80 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {etsyCheaperBy && (
+            <span><span class="font-medium text-green-800">{money(price)} here</span>, {money(etsyCheaperBy)} for the same file on Etsy</span>
+          )}
+          {soldYear >= 3 && <span>· <strong>{soldYear.toLocaleString()}</strong> sold this year</span>}
+          {(etsyStats?.favorers || 0) >= 10 && <span>· <strong>{etsyStats!.favorers.toLocaleString()}</strong> people favourited it</span>}
+        </p>
+      )}
 
       {sale && (
         <div class="mt-3 flex items-center gap-2.5 bg-[#5E380A] text-[#F5EFE3] rounded-md px-3 py-2.5 text-sm">
@@ -408,6 +434,28 @@ const breadcrumbLd = {
               </div>
             )}
           </dl>
+          {/* "Which bits, how deep, what size?" is the question every first-time
+              buyer sends (John, 2026-09-14). Everything here is arithmetic on the
+              measured file, so it is never a guess: stock thickness is the model
+              depth plus a 5 mm base; a 400 mm hobby machine gets a fit hint when
+              the model is wider than that. The three bits are the ones every
+              relief needs; a tapered detail bit is named because a straight
+              1/16 inch flexes on a light machine and snaps. */}
+          {p.model_specs.width > 0 && (
+            <div class="px-4 py-3 border-t border-black/10 text-xs text-ink-800 space-y-1.5">
+              <div class="text-[11px] uppercase tracking-wide text-bronze-800 font-medium">Cutting it</div>
+              <div>
+                <b>Stock:</b> at the supplied size you need about {Math.ceil((Number(p.model_specs.depth) + 5) / 5) * 5} mm ({(Math.ceil((Number(p.model_specs.depth) + 5) / 5) * 5 / 25.4).toFixed(1)}") thick material for the full depth plus a base.
+                {Number(p.model_specs.depth) > 25 ? ' For thinner stock, scale Z on its own to 18 to 22 mm: bas-relief reads beautifully compressed.' : ''}
+              </div>
+              {Number(p.model_specs.width) > 400 && (
+                <div><b>Small machine?</b> On a 400 x 400 mm bed scale it to about 380 mm wide ({Math.round(380 / Number(p.model_specs.aspect || 1))} mm tall) and set the depth separately.</div>
+              )}
+              <div><b>Bits:</b> 1/8" (3.175 mm) flat end mill to rough at 1 to 1.5 mm a pass · 1/8" ball nose to finish at 8 to 10% stepover · 1/16" <em>tapered</em> ball nose for the finest areas only.</div>
+              <div><b>Wood:</b> basswood, poplar, cherry or hard maple hold this detail. Avoid red oak and ash: open grain tears out exactly where the fine work lives.</div>
+              <div class="text-ink-700/60">Expect the finishing pass to take hours at this detail level; that is normal. Cut a 200 mm test in scrap first if it is your first relief.</div>
+            </div>
+          )}
           <p class="px-4 py-2 text-xs text-ink-700/60 bg-cream/30 border-t border-black/10">
             Opens directly in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360, and on any CNC router, 3D printer or laser
             that reads STL. No OBJ or DXF: a DXF holds flat 2D outlines and cannot carry a three-dimensional relief at all.
@@ -483,7 +531,7 @@ const breadcrumbLd = {
     )}
 
     <details class="bg-cream/40 border border-bronze-600/20 rounded-lg p-4">
-      <summary class="cursor-pointer text-sm font-medium text-bronze-800 select-none">✍️ Write a review / share your carve photo</summary>
+      <summary class="cursor-pointer text-sm font-medium text-bronze-800 select-none">✍️ Write a review / share your carve photo <span class="ml-1 text-xs font-normal text-green-800 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">earn 100 points, 150 with a photo</span></summary>
       <form id="review-form" class="mt-4 space-y-3">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label class="block"><span class="text-xs text-ink-700/70 block mb-1">Your name</span>

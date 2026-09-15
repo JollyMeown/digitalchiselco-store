@@ -20,7 +20,9 @@ const isCatalog = path === '/catalog';
 ---
 <aside class="hidden lg:block w-[220px] flex-shrink-0">
   <div class="sticky top-[88px]">
-    <h2 class="text-xs font-medium text-ink-800 mb-3 uppercase tracking-wide">Categories</h2>
+    {/* a <p>, not an <h2>: this rail sits before the page content in the DOM,
+        so as a heading it outranked the real first section on every page */}
+    <p class="text-xs font-medium text-ink-800 mb-3 uppercase tracking-wide" id="side-cats-label">Categories</p>
     <nav class="text-sm space-y-0.5">
       <a href="/catalog"
         class={`flex items-center justify-between gap-2 py-1.5 px-2 rounded ${isCatalog ? 'bg-cream text-bronze-700 font-medium' : 'text-bronze-700 font-medium hover:bg-cream'}`}>

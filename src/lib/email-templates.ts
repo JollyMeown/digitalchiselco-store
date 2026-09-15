@@ -549,15 +549,22 @@ Total paid: $${d.totalPaid.toFixed(2)} ${d.currency}
 // email was lost there was nothing the site could do. This is what
 // /api/free-resend sends: a link back to /free/files, which keeps working.
 // ──────────────────────────────────────────────────────────────────────
-export function freePackLink(d: { name?: string | null; filesUrl: string; packUrl?: string }): { subject: string; html: string; text: string } {
-  const subject = 'Your 5 free STL files';
+export function freePackLink(d: { name?: string | null; filesUrl: string; packUrl?: string; missed?: boolean }): { subject: string; html: string; text: string } {
+  // `missed` is for the people who asked for the pack and never got it because
+  // they never clicked the confirmation link, so the automation that ships the
+  // files never fired. They are owed an apology; everyone else is not, and
+  // telling 95 people their files failed when they did not would be a lie.
+  const subject = d.missed ? 'Your 5 free STL files (sorry for the wait)' : 'Your 5 free STL files';
   const greeting = d.name ? `Hi ${esc(d.name)},` : 'Hi there,';
+  const lead = d.missed
+    ? 'You asked for our free STL pack and it never reached you. That was our fault, not yours: the files only went out after a confirmation click, and if that step did not happen the pack simply never sent. We have fixed that. Here they are.'
+    : 'Here are your 5 free bas-relief STL files, ready for CNC routers, 3D printers and laser engravers.';
 
   const html = `<!doctype html>
 <html><body style="margin:0;padding:0;background:#f7f4ee;font-family:Helvetica,Arial,sans-serif;color:${BRAND_INK};">
   <div style="max-width:560px;margin:0 auto;padding:24px;background:#fff;border:1px solid #eee;border-radius:10px;">
     <p style="font-size:16px;margin:0 0 14px;">${greeting}</p>
-    <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">Here are your 5 free bas-relief STL files, ready for CNC routers, 3D printers and laser engravers.</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">${esc(lead)}</p>
     <p style="margin:0 0 22px;">
       <a href="${esc(d.filesUrl)}" style="display:inline-block;background:${BRAND_BRONZE};color:${BRAND_CREAM};text-decoration:none;font-weight:bold;padding:13px 26px;border-radius:8px;">Open my free files</a>
     </p>
@@ -569,7 +576,7 @@ export function freePackLink(d: { name?: string | null; filesUrl: string; packUr
 
   const text = `${d.name ? `Hi ${d.name},` : 'Hi there,'}
 
-Here are your 5 free bas-relief STL files, ready for CNC routers, 3D printers and laser engravers.
+${lead}
 
 ${d.filesUrl}
 

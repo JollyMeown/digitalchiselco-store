@@ -35,14 +35,30 @@ try {
           {Number(s.products_count).toLocaleString()}+ designs for CNC routers, laser engravers and 3D printers. Instant download, commercial use included.
         </p>
         <div class="mt-4 flex flex-wrap justify-center gap-2.5">
-          <a href="/catalog" class="inline-flex items-center gap-2 bg-bronze-600 text-cream font-bold text-[15px] px-6 py-3 rounded-lg hover:bg-bronze-700 shadow-sm transition">
+          <a href="/catalog" data-hero="hero_shop" class="inline-flex items-center gap-2 bg-bronze-600 text-cream font-bold text-[15px] px-6 py-3 rounded-lg hover:bg-bronze-700 shadow-sm transition">
             Shop best sellers <span aria-hidden="true">→</span>
           </a>
-          <a href="/free" class="inline-flex items-center gap-2 border border-bronze-600/50 text-bronze-800 font-medium text-[15px] px-6 py-3 rounded-lg hover:bg-white transition">
+          <a href="/free" data-hero="hero_free" class="inline-flex items-center gap-2 border border-bronze-600/50 text-bronze-800 font-medium text-[15px] px-6 py-3 rounded-lg hover:bg-white transition">
             Try 5 files free
           </a>
         </div>
       </div>
+    )}
+    {home && (
+      <script is:inline>
+        // Which door do visitors take? Counted in site_events so the admin
+        // Traffic tab can compare the two promises instead of guessing.
+        (function () {
+          document.querySelectorAll('[data-hero]').forEach(function (a) {
+            a.addEventListener('click', function () {
+              try {
+                var d = JSON.stringify({ t: a.getAttribute('data-hero'), p: location.pathname });
+                if (navigator.sendBeacon) navigator.sendBeacon('/api/track', new Blob([d], { type: 'application/json' }));
+              } catch (_) {}
+            });
+          });
+        })();
+      </script>
     )}
     <a href={home ? '/catalog' : '/'} class="block rounded-lg overflow-hidden">
       <img

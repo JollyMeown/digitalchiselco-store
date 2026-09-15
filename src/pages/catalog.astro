@@ -2,6 +2,7 @@
 import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import ProductCard from '../components/ProductCard.astro';
+import Pick5Strip from '../components/Pick5Strip.astro';
 import { getProducts, getSettings } from '../lib/queries';
 
 const page = Math.max(1, Number(Astro.url.searchParams.get('page') || '1'));
@@ -25,6 +26,8 @@ const qs = (p: number) => `/catalog?${sort === 'newest' ? 'sort=newest&' : ''}pa
       <a href="/catalog?sort=newest" class={`px-3 py-1.5 border-l border-black/10 ${sort === 'newest' ? 'bg-bronze-600 text-cream' : 'text-ink-700 hover:bg-cream'}`} aria-current={sort === 'newest' ? 'true' : undefined}>Newest</a>
     </div>
   </div>
+
+  <Pick5Strip where="catalog" />
 
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
     {products.map((p, i) => <ProductCard product={p} discount={settings.discount_percent} eager={i < 4} />)}

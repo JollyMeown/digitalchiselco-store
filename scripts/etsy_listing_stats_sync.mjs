@@ -31,6 +31,9 @@ for (;;) {
       title: String(l.title || '').slice(0, 300),
       views: Number(l.views) || 0,
       favorers: Number(l.num_favorers) || 0,
+      // the listing's real Etsy price, so the product page can say honestly
+      // what the same file costs there (the site is cheaper and never said so)
+      price_usd: l.price && l.price.amount ? Math.round((Number(l.price.amount) / Number(l.price.divisor || 100)) * 100) / 100 : null,
       // Always send both, never undefined: PostgREST unions the keys across a
       // batch and writes NULL wherever a row omits one, so a mixed batch of
       // stale and fresh rows used to fail the not-null constraint outright.

@@ -400,9 +400,10 @@ export function reviewRequestEmail(d: { email: string; name?: string | null; ite
   const body = `
     <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">${d.name ? `Hi ${esc(d.name)},` : 'Hi,'}</p>
     <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#555;">It's been about a week since you picked up <strong>${esc(first)}</strong> — did it make it onto the machine yet?</p>
-    <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#555;"><strong>Reply with a photo of your carve</strong> and we may feature it on our "Carved by you" wall (with credit). Rough first attempts welcome — makers love seeing real results.</p>
-    ${btn(SITE + '/account', 'Re-download your files')}`;
-  return { subject, html: shell(subject, 'Show us your carve 🪵', body, d.email), text: `How did ${first} carve? Reply with a photo! Files: ${SITE}/account\nUnsubscribe: ${unsubUrl(d.email)}` };
+    <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#555;"><strong>Leave a short review on the design's page</strong> and we add <strong>100 points</strong> to your account the moment it is approved, <strong>150 with a photo</strong>. Points come off your next order. Rough first attempts welcome: makers love seeing real results, and we may feature yours on the "Carved by you" wall, with credit.</p>
+    <p style="margin:10px 0 0;font-size:13px;line-height:1.6;color:#777;">Open the design from your account, scroll to Reviews, and write two lines. That is all it takes.</p>
+    ${btn(SITE + '/account?review=1', 'Review it and earn points')}`;
+  return { subject, html: shell(subject, 'Show us your carve 🪵', body, d.email), text: `How did ${first} carve? Leave a review on the design's page and earn 100 points (150 with a photo) once approved. Your designs: ${SITE}/account\nUnsubscribe: ${unsubUrl(d.email)}` };
 }
 
 export function newArrivalsEmail(d: { email: string; name?: string | null; products: MiniProduct[] }): Out {

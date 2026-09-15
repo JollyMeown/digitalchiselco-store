@@ -1,0 +1,30 @@
+---
+// The Pick-5 bundle is the shop's best average-order lever (8% of the
+// catalogue makes 54% of sales, and bundles carry the highest order value),
+// and until 2026-09-15 it lived only as a nav link. This puts it where the
+// browsing actually happens: above every catalogue and collection grid.
+// One line, one button, tracked so we can see whether it earns its place.
+import { BUNDLE5_MIN as BUNDLE_PRICE } from '../lib/bundle5';
+interface Props { where?: string }
+const { where = 'catalog' } = Astro.props;
+---
+<a href={`/bundle-builder?src=pick5-${where}`} data-pick5-strip
+   class="group flex items-center justify-between gap-3 rounded-xl border border-[#FAC775] bg-gradient-to-r from-[#FAEEDA] to-[#FAC775]/40 px-4 py-3 mb-6 hover:shadow-md transition">
+  <div class="min-w-0">
+    <div class="font-serif text-base sm:text-lg text-bronze-800 leading-tight">Pick any 5 designs for ${BUNDLE_PRICE}</div>
+    <div class="text-xs text-ink-700/70 mt-0.5">Mix any five files from the whole catalogue. Bundle price locks in at checkout, instant download.</div>
+  </div>
+  <span class="shrink-0 inline-flex items-center gap-1.5 bg-bronze-600 text-cream text-sm font-bold px-4 py-2 rounded-lg group-hover:bg-bronze-700 transition">Build mine <span aria-hidden="true">→</span></span>
+</a>
+<script is:inline>
+  (function () {
+    var a = document.querySelector('[data-pick5-strip]');
+    if (!a) return;
+    a.addEventListener('click', function () {
+      try {
+        var d = JSON.stringify({ t: 'pick5_strip', p: location.pathname });
+        if (navigator.sendBeacon) navigator.sendBeacon('/api/track', new Blob([d], { type: 'application/json' }));
+      } catch (_) {}
+    });
+  })();
+</script>

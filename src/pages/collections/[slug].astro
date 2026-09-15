@@ -2,6 +2,7 @@
 import Shell from '../../layouts/Shell.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
+import Pick5Strip from '../../components/Pick5Strip.astro';
 import { getCategoryBySlug, getProductsByCategory, getSettings } from '../../lib/queries';
 import { jsonLd } from '../../lib/jsonld';
 import xss from 'xss';
@@ -96,8 +97,10 @@ const faqLd = faq.length ? {
     <div class="mt-2 h-2 rounded-full bg-white/70 overflow-hidden"><div id="coll-fill" class="h-full bg-bronze-600 transition-all" style="width:0%"></div></div>
   </div>
 
+  <Pick5Strip where="collection" />
+
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-    {products.map((p) => <ProductCard product={p} discount={settings.discount_percent} />)}
+    {products.map((p, i) => <ProductCard product={p} discount={settings.discount_percent} eager={i < 4} />)}
   </div>
   {pages > 1 && (
     <nav class="flex justify-center gap-2 mt-10 text-sm" aria-label="Pages">

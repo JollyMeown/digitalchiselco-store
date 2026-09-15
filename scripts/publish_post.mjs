@@ -73,7 +73,10 @@ const post = {
   title: meta.title,
   excerpt: meta.excerpt,
   body,
-  cover_image_url: img[meta.cover] || null,
+  // cover may name a generated frame ("hero") or a featured product
+  // ("pick:fox"), so an article can ship on real product art without waiting
+  // for, or paying for, generated frames.
+  cover_image_url: (String(meta.cover || '').startsWith('pick:') ? pick(meta.cover.slice(5), 'MOCK') : img[meta.cover]) || null,
   author: 'Jolly',
   status: args.includes('--draft') ? 'draft' : 'published',
   seo_title: meta.seo_title,
