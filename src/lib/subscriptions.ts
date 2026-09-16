@@ -36,6 +36,14 @@ const KIND = [{ name: 'kind', value: 'membership' }];
 // The only address allowed to receive a test pack (month 2090 or later).
 const TEST_INBOX = 'jolly@digitalchiselco.com';
 
+// The emailed starter month (see migration 132). It is a real one-month term,
+// so the upgrade path and its credit work exactly as for any plan, but the
+// pack it delivers is a FIXED bundle rather than that calendar month's member
+// pack. The sentinel month sorts far away from every real month, so nothing
+// that lists packs by date can collide with it.
+export const STARTER_PLAN_SLUG = 'starter-month';
+export const STARTER_PACK_MONTH = '0001-01';
+
 type DB = ReturnType<typeof supabaseAdmin>;
 
 // ── date helpers ('YYYY-MM-DD' / 'YYYY-MM' strings, UTC-safe) ─────────
@@ -318,7 +326,12 @@ export async function processSubscription(db: DB, s: any, ctx: Ctx): Promise<voi
     for (let guard = 0; guard < 24 && dropsSent < s.total_drops; guard++) {
       const dueDate = addMonths(s.start_date, dropsSent);
       if (dueDate > today && !isTestTerm) break;
-      const ym = toYM(dueDate);
+      // The starter month ships its OWN fixed bundle, never a member month.
+      // Owner rule 2026-09-16: "this September pack is also used by paid
+      // members, so do not send to paid members" - so the emailed starter
+      // offer must not hand out the pack that members paid for. Its single
+      // drop reads the sentinel row instead, which is built once and reused.
+      const ym = s.plan_slug === STARTER_PLAN_SLUG ? STARTER_PACK_MONTH : toYM(dueDate);
       if (ym >= '2090' && !isTestTerm) break;        // test months never reach real members
       const pack = await getPack(db, ym);
       if (!hasFiles(pack)) {

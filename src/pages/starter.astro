@@ -11,6 +11,7 @@
 import Shell from '../layouts/Shell.astro';
 import { supabaseAdmin } from '../lib/supabase';
 import { planFacts } from '../lib/membership-facts';
+import { STARTER_PACK_MONTH } from '../lib/subscriptions';
 
 let plan: any = null;
 let upgrade: any = null;
@@ -24,10 +25,10 @@ try {
   const { data: up } = await db.from('membership_plans')
     .select('slug,name,months,files_per_month,price_usd').eq('slug', '3-month').maybeSingle();
   upgrade = up;
-  // Show this month's real pack cover and designs, so the offer is concrete.
-  const month = new Date().toISOString().slice(0, 7);
+  // The starter bundle is its OWN fixed row, never a member month: the packs
+  // members pay for stay theirs (owner rule, 2026-09-16).
   const { data: mf } = await db.from('monthly_files')
-    .select('month,title,cover_image_url,items').eq('month', month).maybeSingle();
+    .select('month,title,cover_image_url,items').eq('month', STARTER_PACK_MONTH).maybeSingle();
   pack = mf;
 } catch { /* the page still renders without the pack */ }
 
@@ -47,21 +48,20 @@ const saving = plan.original_price_usd ? Math.round((1 - plan.price_usd / plan.o
       One month of the membership, for ${plan.price_usd.toFixed(2)}
     </h1>
     <p class="mt-4 text-lg text-ink-700 leading-relaxed">
-      This is the same pack every paying member receives this month:
-      <strong>{plan.files_per_month} brand-new bas-relief STL designs</strong>, sent the moment you join.
-      {saving && <span> That is about <strong>{saving}% off</strong> what the same designs cost one at a time.</span>}
+      <strong>{plan.files_per_month} hand-picked bas-relief STL designs</strong>, sent the moment you join.
+      {saving && <span> Bought one at a time these come to about ${plan.original_price_usd}, so this is roughly <strong>{saving}% off</strong>.</span>}
     </p>
 
     {pack?.cover_image_url && (
       <figure class="mt-7">
-        <img src={pack.cover_image_url} alt={`This month's pack: ${pack.title || ''}`} loading="eager" width="1200" height="800" class="w-full rounded-xl shadow-md" />
-        <figcaption class="text-sm text-ink-600 mt-2 text-center">This month's pack, exactly as members receive it.</figcaption>
+        <img src={pack.cover_image_url} alt="The starter bundle" loading="eager" width="1200" height="800" class="w-full rounded-xl shadow-md" />
+        <figcaption class="text-sm text-ink-600 mt-2 text-center">The six designs in the starter bundle.</figcaption>
       </figure>
     )}
 
     {items.length > 0 && (
       <div class="mt-6">
-        <h2 class="font-serif text-xl mb-3">What is inside this month</h2>
+        <h2 class="font-serif text-xl mb-3">What is inside</h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           {items.map((it: any) => (
             <div class="border border-black/10 rounded-lg overflow-hidden bg-white">

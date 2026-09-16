@@ -677,62 +677,105 @@ export function starterMonthEmail(d: {
   reason: 'free-pack' | 'buyer' | 'browser';
   spent?: number;               // lifetime spend, for the 'buyer' opening
   designs?: number;             // how many singles they bought
-  price: number;                // starter-month price, from the plan row
-  files: number;                // designs in the pack
-  packTitle?: string | null;
+  price: number;                // starter price, from the plan row
+  files: number;                // designs in the starter bundle
+  retail?: number | null;       // what those designs cost one at a time
   packCover?: string | null;
   packItems?: MiniProduct[];
   upgradePrice?: number | null; // the 3-month price, for the ladder line
   upgradeFiles?: number | null;
+  // Measured from the catalogue, never typed by hand: how much cheaper the
+  // same designs are here than on Etsy.
+  etsyCheaperCount?: number | null;
+  etsyCheaperPct?: number | null;
+  etsyAvgSaving?: number | null;
 }): Out {
   const e = d.email;
   const first = (d.name || '').trim().split(/\s+/)[0];
   const hi = first ? `${esc(first)}, ` : '';
   const per = (d.price / Math.max(1, d.files)).toFixed(2);
+  const avgSingle = d.retail ? d.retail / Math.max(1, d.files) : 6.5;
 
-  // One opening line per segment. Each states a fact we hold about them.
+  // One opening line per segment, each stating a fact we actually hold.
   const opener = d.reason === 'buyer'
-    ? `${hi}you have picked up ${d.designs || 'a few'} design${(d.designs || 2) === 1 ? '' : 's'} from us${d.spent ? ` for $${d.spent.toFixed(2)}` : ''}. Here is a cheaper way to carry on.`
+    ? `${hi}you have bought ${d.designs || 'a few'} design${(d.designs || 2) === 1 ? '' : 's'} from us${d.spent ? `, $${d.spent.toFixed(2)} so far` : ''}. Thank you. This is the cheapest way I can offer to carry on.`
     : d.reason === 'free-pack'
-      ? `${hi}you took the five free files a while back. This is what the next eight look like.`
-      : `${hi}here is the shortest way to see whether a membership suits the way you carve.`;
+      ? `${hi}you took the five free files from us a while back. Here is what the next six look like, and why they cost less than a cup of coffee each.`
+      : `${hi}here is the shortest way to find out whether a membership suits the way you carve.`;
 
   const subject = d.reason === 'buyer'
-    ? `${d.files} new designs for $${d.price.toFixed(2)} (less than one single)`
-    : `Your next ${d.files} designs, for $${d.price.toFixed(2)}`;
+    ? `${d.files} designs for $${d.price.toFixed(2)}, about the price of one`
+    : `${d.files} bas-relief designs for $${d.price.toFixed(2)}`;
+
+  // The Etsy line. It is the strongest thing we can say and it is checkable,
+  // so it gets its own panel rather than a bullet.
+  const etsyPanel = (d.etsyCheaperPct && d.etsyAvgSaving)
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:18px 0 0;">
+         <tr><td style="background:${CREAM};border-left:3px solid ${BRONZE};border-radius:6px;padding:14px 16px;">
+           <div style="font-size:13px;letter-spacing:1px;text-transform:uppercase;color:${BRONZE};margin-bottom:6px;">Worth knowing</div>
+           <div style="font-size:15px;line-height:1.6;color:#555;">
+             Every design we sell on Etsy is also here, and
+             <strong>${d.etsyCheaperCount ? `${d.etsyCheaperCount} of them` : 'almost all of them'} cost less on our own site</strong>
+             &mdash; on average <strong>$${d.etsyAvgSaving.toFixed(2)} less</strong>, about ${Math.round(d.etsyCheaperPct)}% off the Etsy price.
+             Etsy takes a quarter of every sale; buying direct is simply cheaper for you, and it is the same file either way.
+           </div>
+         </td></tr>
+       </table>`
+    : '';
 
   const body = `
     <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#555;">${opener}</p>
-    <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#555;">
-      For <strong>$${d.price.toFixed(2)}</strong> you get <strong>${d.files} brand-new bas-relief STL designs</strong> straight away.
-      Not a sample set: it is the exact pack every paying member receives this month${d.packTitle ? `, ${esc(d.packTitle)}` : ''}.
-      That works out at about <strong>$${per} a design</strong>, where singles are around $6.
+
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#555;">
+      <strong>${d.files} hand-picked bas-relief STL designs for $${d.price.toFixed(2)}.</strong>
+      That is about <strong>$${per} a design</strong>, where singles run around $${avgSingle.toFixed(2)}.
+      ${d.retail ? `Bought one at a time this bundle comes to roughly $${d.retail.toFixed(2)}.` : ''}
     </p>
-    ${d.packCover ? `<p style="margin:16px 0 0;"><img src="${esc(d.packCover)}" width="544" style="width:100%;border-radius:10px;display:block;" alt="This month's pack"></p>` : ''}
+
+    ${d.packCover ? `<p style="margin:16px 0 0;"><img src="${esc(d.packCover)}" width="544" style="width:100%;border-radius:10px;display:block;" alt="The starter bundle"></p>` : ''}
     ${d.packItems && d.packItems.length ? productGrid(d.packItems.slice(0, 3)) : ''}
-    <ul style="margin:14px 0 0;padding-left:18px;font-size:14px;color:#555;line-height:1.7;">
+
+    ${etsyPanel}
+
+    <p style="margin:18px 0 0;font-size:15px;line-height:1.6;color:#555;">
+      These are not leftovers or a sample set. It is a bundle put together for people
+      carving their first few projects with us: a spread of subjects, every file
+      watertight, CNC tested and ready to cut.
+    </p>
+
+    <ul style="margin:12px 0 0;padding-left:18px;font-size:14px;color:#555;line-height:1.7;">
       <li>Commercial use included, so you can sell what you carve</li>
-      <li>Nothing renews automatically and there is nothing to cancel</li>
+      <li>One payment. Nothing renews, and there is nothing to cancel</li>
       <li>The files stay yours for good</li>
-      ${d.upgradePrice ? `<li>Want more? Upgrade any time and we credit what you paid here</li>` : ''}
+      ${d.upgradePrice ? `<li>If you want more later, upgrade any time and we credit this $${d.price.toFixed(2)} against it</li>` : ''}
     </ul>
-    ${btn(SITE + '/starter', `Send me this month's ${d.files} designs`)}
-    <p style="margin:14px 0 0;font-size:13px;color:#8a7a68;line-height:1.6;">
-      This link is for you rather than the public pricing page${d.upgradePrice && d.upgradeFiles ? `, where the smallest plan is $${d.upgradePrice.toFixed(2)} for ${d.upgradeFiles} designs` : ''}.
-    </p>`;
+
+    ${btn(SITE + '/starter', `Send me the ${d.files} designs`)}
+
+    ${d.upgradePrice && d.upgradeFiles ? `<p style="margin:14px 0 0;font-size:13px;color:#8a7a68;line-height:1.6;">
+      Carving most weekends? The ${d.upgradeFiles}-design membership is $${d.upgradePrice.toFixed(2)},
+      which works out cheaper per design. Start here and move up whenever you like.
+    </p>` : ''}
+
+    <p style="margin:16px 0 0;font-size:14px;line-height:1.6;color:#555;">Jolly, DigitalChiselCo</p>`;
 
   const text = [
     opener.replace(/<[^>]+>/g, ''),
     '',
-    `${d.files} brand-new bas-relief STL designs for $${d.price.toFixed(2)} (about $${per} each).`,
-    'The same pack every paying member gets this month. Commercial use included. Nothing renews.',
+    `${d.files} hand-picked bas-relief STL designs for $${d.price.toFixed(2)} (about $${per} each, singles run around $${avgSingle.toFixed(2)}).`,
+    d.etsyCheaperPct && d.etsyAvgSaving
+      ? `Worth knowing: the same designs cost about $${d.etsyAvgSaving.toFixed(2)} less here than on Etsy, roughly ${Math.round(d.etsyCheaperPct)}% off, because Etsy takes a quarter of every sale.`
+      : '',
+    'Commercial use included. One payment, nothing renews, the files stay yours.',
+    d.upgradePrice ? `Upgrade any time and we credit the $${d.price.toFixed(2)}.` : '',
     '',
     `Get it: ${SITE}/starter`,
     '',
+    'Jolly, DigitalChiselCo',
     `Unsubscribe: ${unsubUrl(e)}`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
-  return { subject, html: shell(subject, `One month, ${d.files} designs, $${d.price.toFixed(2)}`, body, e), text };
+  return { subject, html: shell(subject, `${d.files} designs for $${d.price.toFixed(2)}`, body, e), text };
 }
 
 // ── Wishlist reminder (they hearted it, never bought it) ──────────────
