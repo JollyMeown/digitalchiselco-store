@@ -10,13 +10,62 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { inputCls, btnPrimary } from '../ui';
+import { shrink } from '../ImageUpload';
+
+const MAX_SAMPLES = 8;
+
+/** Sample pictures for a reply: resized in the browser first, then stored. */
+function SamplePicker({ reqId, urls, onChange }: { reqId: string; urls: string[]; onChange: (u: string[]) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  async function add(files: FileList | null) {
+    if (!files?.length) return;
+    setBusy(true); setErr('');
+    const next = [...urls];
+    try {
+      for (const picked of Array.from(files).slice(0, MAX_SAMPLES - next.length)) {
+        const f = await shrink(picked);
+        const ext = (f.name.split('.').pop() || 'jpg').toLowerCase();
+        const path = `custom-replies/${reqId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error } = await supabase.storage.from('site-media').upload(path, f, { upsert: false, contentType: f.type });
+        if (error) throw error;
+        next.push(supabase.storage.from('site-media').getPublicUrl(path).data.publicUrl);
+        onChange([...next]);
+      }
+    } catch (e: any) { setErr(e.message || 'Upload failed'); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className={`text-xs px-3 py-1.5 rounded-md border border-bronze-600 text-bronze-700 cursor-pointer hover:bg-cream ${busy || urls.length >= MAX_SAMPLES ? 'opacity-50 pointer-events-none' : ''}`}>
+          {busy ? 'Uploading…' : '🖼 Add sample pictures'}
+          <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
+        </label>
+        <span className="text-[11px] text-ink-700/60">up to {MAX_SAMPLES}, shown in the email under your message</span>
+        {err && <span className="text-xs text-red-700">{err}</span>}
+      </div>
+      {urls.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {urls.map((u) => (
+            <div key={u} className="relative">
+              <img src={u} alt="" className="w-20 h-20 object-cover rounded-md border border-black/10" />
+              <button onClick={() => onChange(urls.filter((x) => x !== u))} title="Remove"
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white border border-black/20 text-xs leading-none">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Req = {
   id: string; name: string | null; email: string; photo_url: string | null;
   description: string | null; size_note: string | null; material: string | null;
   deadline: string | null; status: string; quote_usd: number | null;
   admin_notes: string | null; created_at: string; updated_at: string | null;
-  replied_at?: string | null; reply_body?: string | null; reply_count?: number | null;
+  replied_at?: string | null; reply_body?: string | null; reply_count?: number | null; reply_images?: string[] | null;
 };
 
 /** A starting point for the reply, in the owner's voice. */
@@ -132,6 +181,7 @@ export default function CustomRequests() {
 
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [sending, setSending] = useState<string | null>(null);
+  const [samples, setSamples] = useState<Record<string, string[]>>({});
   const replyText = (r: Req) => replies[r.id] ?? (looksLikeLetter(f(r, 'admin_notes')) ? f(r, 'admin_notes') : starterReply(r, f(r, 'quote_usd')));
 
   async function sendReply(r: Req) {
@@ -139,11 +189,12 @@ export default function CustomRequests() {
     if (/_{3,}/.test(text)) { setMsg('Fill in the blanks (___) in the reply before sending.'); return; }
     if (!window.confirm(`Send this reply to ${r.email}?`)) return;
     setSending(r.id); setMsg('Sending…');
-    const res = await call({ action: 'request_reply', id: r.id, message: text, quote_usd: f(r, 'quote_usd') });
+    const res = await call({ action: 'request_reply', id: r.id, message: text, quote_usd: f(r, 'quote_usd'), images: samples[r.id] || [] });
     setSending(null);
     if (res?.ok) {
       setMsg(res.message || 'Sent.');
       setReplies((d) => { const n = { ...d }; delete n[r.id]; return n; });
+      setSamples((d) => { const n = { ...d }; delete n[r.id]; return n; });
       load();
     } else setMsg(`Not sent: ${res?.error || 'unknown error'}`);
   }
@@ -243,6 +294,8 @@ export default function CustomRequests() {
                     <textarea rows={9} value={replyText(r)}
                       onChange={(e) => setReplies((d) => ({ ...d, [r.id]: e.target.value }))}
                       className={inputCls + ' font-normal'} />
+                    <SamplePicker reqId={r.id} urls={samples[r.id] || []}
+                      onChange={(u) => setSamples((d) => ({ ...d, [r.id]: u }))} />
                     <div className="flex flex-wrap items-center gap-2">
                       <button onClick={() => sendReply(r)} disabled={sending === r.id}
                         className={btnPrimary + (sending === r.id ? ' opacity-50' : '')}>
@@ -259,6 +312,11 @@ export default function CustomRequests() {
                       <details className="text-xs">
                         <summary className="cursor-pointer text-ink-700/70">Last reply sent</summary>
                         <pre className="whitespace-pre-wrap font-sans text-ink-800 mt-1">{r.reply_body}</pre>
+                        {(r.reply_images || []).length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {(r.reply_images || []).map((u) => <img key={u} src={u} alt="" className="w-16 h-16 object-cover rounded border border-black/10" />)}
+                          </div>
+                        )}
                       </details>
                     )}
                   </div>

@@ -125,19 +125,26 @@ export const POST: APIRoute = async ({ request }) => {
       if (!req) return json({ error: 'request not found' }, 404);
       const quote = b.quote_usd === '' || b.quote_usd === null || b.quote_usd === undefined ? (req.quote_usd ?? null) : Number(b.quote_usd);
       const ref = 'CD-' + String(req.id).slice(0, 8).toUpperCase();
-      const mail = customQuoteReplyEmail({ email: req.email, ref, message, photoUrl: req.photo_url, quoteUsd: quote });
+      // Sample pictures: only files the admin uploaded into our own storage
+      // for this request, never an arbitrary URL placed into a customer email.
+      const base = `${process.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/site-media/custom-replies/${req.id}/`;
+      const images = (Array.isArray(b.images) ? b.images : [])
+        .map((u: unknown) => String(u || ''))
+        .filter((u: string) => u.startsWith(base) && !u.includes('..'))
+        .slice(0, 8);
+      const mail = customQuoteReplyEmail({ email: req.email, ref, message, photoUrl: req.photo_url, quoteUsd: quote, images });
       const res = await sendEmail({
         to: req.email, subject: mail.subject, html: mail.html, text: mail.text,
         // transactional: a direct answer to someone who asked
         tags: [{ name: 'kind', value: 'custom-request' }],
-        idempotencyKey: `custom-reply:${req.id}:${createHash('sha256').update(message).digest('hex').slice(0, 16)}`,
+        idempotencyKey: `custom-reply:${req.id}:${createHash('sha256').update(message + '|' + images.join('|')).digest('hex').slice(0, 16)}`,
       });
       if (!res.ok) return json({ error: res.error || 'send failed' }, 502);
       const now = new Date().toISOString();
       await db.from('custom_design_requests').update({
         status: req.status === 'new' ? 'quoted' : req.status,
         quote_usd: quote,
-        replied_at: now, reply_body: message, reply_count: Number(req.reply_count || 0) + 1,
+        replied_at: now, reply_body: message, reply_images: images, reply_count: Number(req.reply_count || 0) + 1,
         updated_at: now,
       }).eq('id', id);
       return json({ ok: true, message: `Sent to ${req.email}.` });

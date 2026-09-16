@@ -606,14 +606,29 @@ export function customRequestReceivedEmail(d: { email: string; name?: string | n
 export function customQuoteReplyEmail(d: {
   email: string; ref: string; message: string;
   photoUrl?: string | null; quoteUsd?: number | null;
+  images?: string[];            // sample pictures the owner attached
 }): Out {
   const subject = `Your custom relief quote (${d.ref})`;
+  const pics = (d.images || []).slice(0, 8);
+  // Two across, in rows: reads well at 544px and on a phone.
+  const rows: string[] = [];
+  for (let i = 0; i < pics.length; i += 2) {
+    rows.push(`<tr>${pics.slice(i, i + 2).map((u) => `
+      <td width="50%" style="padding:5px;vertical-align:top;">
+        <a href="${esc(u)}"><img src="${esc(u)}" alt="sample" width="262" style="width:100%;max-width:262px;border-radius:8px;border:1px solid #E5DDD0;display:block;"></a>
+      </td>`).join('')}${pics.slice(i, i + 2).length < 2 ? '<td width="50%"></td>' : ''}</tr>`);
+  }
+  const gallery = pics.length
+    ? `<div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${BRONZE};font-weight:700;margin:6px 0 4px;">Samples</div>
+       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 14px;">${rows.join('')}</table>`
+    : '';
   const paras = d.message.replace(/\r\n/g, '\n').trim().split(/\n{2,}/).map((p) =>
     `<p style="font-size:15px;line-height:1.65;margin:0 0 14px;color:${INK};">${
       esc(p).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}</p>`).join('');
   const body = `
     ${d.photoUrl ? `<p style="text-align:center;margin:0 0 16px;"><img src="${esc(d.photoUrl)}" alt="your picture" width="220" style="max-width:220px;width:100%;border-radius:10px;border:1px solid #E5DDD0;"></p>` : ''}
     ${paras}
+    ${gallery}
     ${d.quoteUsd ? `<div style="background:${CREAM};border-radius:8px;padding:12px 14px;margin:6px 0 0;font-size:14px;color:${INK};">Quoted price: <b>$${Number(d.quoteUsd).toFixed(2)}</b> &middot; nothing is charged until you say yes</div>` : ''}
     <p style="font-size:13px;color:#8a7a68;margin:16px 0 0;">Reference ${esc(d.ref)}. Just reply to this email to answer.</p>`;
   const text = `${d.message.replace(/\*\*(.+?)\*\*/g, '$1').trim()}\n\n${d.quoteUsd ? `Quoted price: $${Number(d.quoteUsd).toFixed(2)} (nothing is charged until you say yes)\n\n` : ''}Reference ${d.ref}. Just reply to this email to answer.`;

@@ -18,7 +18,7 @@ const BUCKET = 'site-media';
 // and photos become JPEG. A small PNG is kept as PNG so a logo keeps its
 // transparency; a large one is a photo wearing the wrong extension.
 const MAX = 2000;
-async function shrink(f: File): Promise<File> {
+export async function shrink(f: File): Promise<File> {
   if (!/^image\//.test(f.type) || f.type === 'image/svg+xml' || f.type === 'image/gif') return f;
   const keepPng = f.type === 'image/png' && f.size <= 400 * 1024;
   try {
