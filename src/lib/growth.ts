@@ -6,7 +6,7 @@
 //   3. Post-purchase followups (review +7d, new arrivals +30d, loyalty on 3rd order)
 // Every send is idempotent (Resend idempotency keys + ledger tables).
 
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { fetchAll } from './fetch-all';
 import { supabaseAdmin } from './supabase';
 import { send as sendEmail, sendBatch, isQuotaExhausted, marketingBudgetRemaining } from './resend';
@@ -14,7 +14,7 @@ import {
   articleEmail, dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
   weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, customDesignPitchEmail, applyOverride, TEMPLATE_HEADINGS,
   winbackEmail, priceDropEmail, referralNudgeEmail, refundWinbackEmail,
-  wishlistReminderEmail, ownerWeeklyReport, filmEmail,
+  wishlistReminderEmail, ownerWeeklyReport, filmEmail, etsyBuyerFreePackEmail,
   type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
 import { isoWeekKey } from './weekly-digest';
@@ -52,7 +52,7 @@ const outOfTime = () => Date.now() - RUN_STARTED_AT.t > timeBudgetMs();
 // daily quota is exhausted they are skipped with a visible 'deferred' marker —
 // no doomed API calls, no wasted seconds, and tomorrow they run first thing.
 // (Non-email steps like fx / bundle-of-week / send-time learning still run.)
-const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'customPitch', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits', 'makerRecruitDrip', 'makerRecruitDripExtra', 'makerFeeSettlement']);
+const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'etsyFreePack','customPitch', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits', 'makerRecruitDrip', 'makerRecruitDripExtra', 'makerFeeSettlement']);
 async function step(stats: Record<string, any>, key: string, fn: () => Promise<void>) {
   if (outOfTime()) { stats[key] = 'skipped: time budget (runs next time)'; return; }
   if (EMAIL_STEPS.has(key) && isQuotaExhausted()) { stats[key] = 'deferred: Resend daily quota reached (runs tomorrow)'; return; }
@@ -272,6 +272,79 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       }
     }
     stats.etsyWelcome = s;
+  });
+
+  // ── Etsy buyers get the free pack (owner: "200 a day daily") ──────────
+  // 2,054 imported Etsy buyers and 5 website sales among them. Selling to
+  // them cold converts at 0.30%; the free pack converts at 13.2%, so this
+  // hands over the pack and explains the price gap honestly. 200 a night so
+  // the sending domain warms up instead of taking 2,000 cold sends at once.
+  // It runs itself dry: once everyone has had it, the step does nothing.
+  // Same logic as scripts/etsy_buyer_freepack.mjs, which sent the first 200.
+  await step(stats, 'etsyFreePack', async () => {
+    if (g.etsy_freepack_enabled === false) { stats.etsyFreePack = 'off'; return; }
+    const PER_RUN = Math.max(0, Number(g.etsy_freepack_per_run ?? 200));
+    const KIND = 'etsy-freepack';
+    const s: any = { candidates: 0, sent: 0, failed: 0 };
+    const { data: gs2 } = await db.from('growth_settings').select('free_pack_url').eq('id', 1).maybeSingle();
+    if (!gs2?.free_pack_url) { stats.etsyFreePack = 'skipped: no free_pack_url'; return; }
+
+    const people = await fetchAll((a, b) => db.from('subscribers')
+      .select('email, name, free_pack_token').like('source', 'etsy%')
+      .not('confirmed_at', 'is', null).is('unsubscribed_at', null).is('suppressed_at', null).range(a, b));
+    const sentRows = await fetchAll((a, b) => db.from('email_send_log')
+      .select('recipient').eq('kind', KIND).eq('status', 'sent').range(a, b));
+    const done = new Set(sentRows.map((r: any) => String(r.recipient).toLowerCase()));
+    const TEST = /fake|mailinator|@example\.|@test\.|\.invalid|localhost|^claude-|^deploycheck@/i;
+    const pendingAll = (people as any[]).filter((p) => {
+      const e = String(p.email || '').toLowerCase().trim();
+      return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && !TEST.test(e) && !done.has(e);
+    });
+    s.candidates = pendingAll.length;
+    if (!pendingAll.length) { s.note = 'everyone has had it'; stats.etsyFreePack = s; return; }
+    const pending = pendingAll.slice(0, PER_RUN);
+    if (pendingAll.length > pending.length) s.note = `${pendingAll.length - pending.length} left for the next nights (${PER_RUN}/night)`;
+
+    // The price gap, measured tonight.
+    const prods = await fetchAll((a, b) => db.from('products')
+      .select('price_usd, etsy_listing_id').eq('active', true).not('etsy_listing_id', 'is', null).range(a, b));
+    const stats2 = await fetchAll((a, b) => db.from('etsy_listing_stats').select('listing_id, price_usd').range(a, b));
+    const ep: Record<string, number> = {};
+    for (const x of stats2 as any[]) ep[String(x.listing_id)] = Number(x.price_usd);
+    const cheaper = (prods as any[]).map((p) => ({ w: Number(p.price_usd), e: ep[String(p.etsy_listing_id)] }))
+      .filter((x) => x.w > 0 && x.e > 0 && x.w < x.e);
+    const gap = cheaper.length ? {
+      count: cheaper.length,
+      pct: cheaper.reduce((a, b) => a + (1 - b.w / b.e), 0) / cheaper.length * 100,
+      avg: cheaper.reduce((a, b) => a + (b.e - b.w), 0) / cheaper.length,
+    } : null;
+    const { data: picksRaw } = await db.from('products').select('title, slug, price_usd, image_url')
+      .eq('active', true).not('slug', 'like', 'gift-card-%').not('image_url', 'is', null)
+      .order('created_at', { ascending: false }).limit(3);
+    const picks = (picksRaw || []) as MiniProduct[];
+
+    for (const p of pending) {
+      try {
+        let key = p.free_pack_token as string | null;
+        if (!key) {
+          key = randomBytes(24).toString('base64url');
+          const { error } = await db.from('subscribers').update({ free_pack_token: key }).eq('email', p.email);
+          if (error) throw new Error(`key: ${error.message}`);
+        }
+        const m = etsyBuyerFreePackEmail({
+          email: p.email, name: p.name, filesUrl: `${SITE}/free/files?k=${encodeURIComponent(key)}`,
+          cheaperCount: gap?.count ?? null, cheaperPct: gap?.pct ?? null, avgSaving: gap?.avg ?? null, picks,
+        });
+        const r = await sendEmail({
+          to: p.email, subject: m.subject, html: m.html, text: m.text,
+          idempotencyKey: `etsy-freepack:${String(p.email).toLowerCase()}`,
+          tags: [{ name: 'kind', value: KIND }],
+        });
+        if ((r as any)?.quota) { s.note = 'stopped: daily email quota reached, continues tomorrow'; break; }
+        if (r.ok) s.sent++; else s.failed++;
+      } catch (e) { s.failed++; console.error('[etsyFreePack]', p.email, e); }
+    }
+    stats.etsyFreePack = s;
   });
 
 
