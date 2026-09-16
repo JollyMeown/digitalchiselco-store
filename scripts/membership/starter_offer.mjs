@@ -38,6 +38,7 @@ const TEST = args.includes('--test') ? args[args.indexOf('--test') + 1] : null;
 const GROUP = (args[args.indexOf('--group') + 1] || 'both').toLowerCase();
 const LIMIT = Number(args[args.indexOf('--limit') + 1]) || 0;
 
+const KIND = 'membership-offer';
 const lc = (s) => String(s || '').trim().toLowerCase();
 const isJunk = (e) => /^claude-|^deploycheck@|@example\.(invalid|com|test)$/i.test(e);
 
@@ -102,7 +103,7 @@ for (const it of items) {
 // Already offered? The ledger is the record, so a second run can never
 // double-send, whatever flags it is given.
 const already = new Set(
-  (await all('email_send_log', 'recipient,kind,status', (q) => q.eq('kind', 'membership-offer').eq('status', 'sent')))
+  (await all('email_send_log', 'recipient,kind,status', (q) => q.eq('kind', KIND).eq('status', 'sent')))
     .map((r) => lc(r.recipient)),
 );
 
@@ -166,7 +167,7 @@ const build = (p) => {
 if (TEST) {
   const sample = { email: TEST, name: null, source: 'free-pack' };
   const m = build(sample);
-  const r = await sendEmail({ to: TEST, subject: m.subject, html: m.html, text: m.text, kind: 'membership-offer' });
+  const r = await sendEmail({ to: TEST, subject: m.subject, html: m.html, text: m.text, tags: [{ name: 'kind', value: KIND }] });
   console.log('\ntest sent:', TEST, JSON.stringify(r).slice(0, 120));
   process.exit(0);
 }
@@ -176,7 +177,15 @@ let sent = 0, failed = 0;
 for (const p of todo) {
   const m = build(p);
   try {
-    const r = await sendEmail({ to: p.email, subject: m.subject, html: m.html, text: m.text, kind: 'membership-offer' });
+    const r = await sendEmail({
+      to: p.email, subject: m.subject, html: m.html, text: m.text,
+      idempotencyKey: `starter-offer:${lc(p.email)}`,
+      // `kind` is NOT a top-level send option: it lives in tags, and passing it
+      // at the top level is silently ignored. Wave 1 went out that way, which
+      // logged 20 rows with a null kind (so the dedupe below could not see
+      // them) and dropped the List-Unsubscribe header. Do not "simplify" this.
+      tags: [{ name: 'kind', value: KIND }],
+    });
     if (r?.quota) { console.log('stopping: daily email quota reached'); break; }
     sent++;
   } catch (e) { failed++; console.error('  failed', p.email, String(e.message).slice(0, 80)); }
