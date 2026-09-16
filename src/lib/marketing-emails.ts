@@ -661,6 +661,80 @@ export function productPicksEmail(d: { email: string; products: MiniProduct[]; n
   return { subject, html: shell(subject, 'Picked just for you 🪵', body, d.email), text };
 }
 
+// ── Starter-month offer (the emailed-only way into the membership) ────
+//
+// The jump from single files to a $24.99 three-month term is the step most
+// people do not take. This offer replaces that step with one month at $4.99,
+// and it is never shown on /membership (the plan row is gated by
+// available_from), so it cannot cannibalise the longer plans: only the people
+// we email can buy it.
+//
+// `reason` shapes the opening line, because the same offer lands differently
+// depending on what the person has already done. Everything else is identical.
+export function starterMonthEmail(d: {
+  email: string;
+  name?: string | null;
+  reason: 'free-pack' | 'buyer' | 'browser';
+  spent?: number;               // lifetime spend, for the 'buyer' opening
+  designs?: number;             // how many singles they bought
+  price: number;                // starter-month price, from the plan row
+  files: number;                // designs in the pack
+  packTitle?: string | null;
+  packCover?: string | null;
+  packItems?: MiniProduct[];
+  upgradePrice?: number | null; // the 3-month price, for the ladder line
+  upgradeFiles?: number | null;
+}): Out {
+  const e = d.email;
+  const first = (d.name || '').trim().split(/\s+/)[0];
+  const hi = first ? `${esc(first)}, ` : '';
+  const per = (d.price / Math.max(1, d.files)).toFixed(2);
+
+  // One opening line per segment. Each states a fact we hold about them.
+  const opener = d.reason === 'buyer'
+    ? `${hi}you have picked up ${d.designs || 'a few'} design${(d.designs || 2) === 1 ? '' : 's'} from us${d.spent ? ` for $${d.spent.toFixed(2)}` : ''}. Here is a cheaper way to carry on.`
+    : d.reason === 'free-pack'
+      ? `${hi}you took the five free files a while back. This is what the next eight look like.`
+      : `${hi}here is the shortest way to see whether a membership suits the way you carve.`;
+
+  const subject = d.reason === 'buyer'
+    ? `${d.files} new designs for $${d.price.toFixed(2)} (less than one single)`
+    : `Your next ${d.files} designs, for $${d.price.toFixed(2)}`;
+
+  const body = `
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#555;">${opener}</p>
+    <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#555;">
+      For <strong>$${d.price.toFixed(2)}</strong> you get <strong>${d.files} brand-new bas-relief STL designs</strong> straight away.
+      Not a sample set: it is the exact pack every paying member receives this month${d.packTitle ? `, ${esc(d.packTitle)}` : ''}.
+      That works out at about <strong>$${per} a design</strong>, where singles are around $6.
+    </p>
+    ${d.packCover ? `<p style="margin:16px 0 0;"><img src="${esc(d.packCover)}" width="544" style="width:100%;border-radius:10px;display:block;" alt="This month's pack"></p>` : ''}
+    ${d.packItems && d.packItems.length ? productGrid(d.packItems.slice(0, 3)) : ''}
+    <ul style="margin:14px 0 0;padding-left:18px;font-size:14px;color:#555;line-height:1.7;">
+      <li>Commercial use included, so you can sell what you carve</li>
+      <li>Nothing renews automatically and there is nothing to cancel</li>
+      <li>The files stay yours for good</li>
+      ${d.upgradePrice ? `<li>Want more? Upgrade any time and we credit what you paid here</li>` : ''}
+    </ul>
+    ${btn(SITE + '/starter', `Send me this month's ${d.files} designs`)}
+    <p style="margin:14px 0 0;font-size:13px;color:#8a7a68;line-height:1.6;">
+      This link is for you rather than the public pricing page${d.upgradePrice && d.upgradeFiles ? `, where the smallest plan is $${d.upgradePrice.toFixed(2)} for ${d.upgradeFiles} designs` : ''}.
+    </p>`;
+
+  const text = [
+    opener.replace(/<[^>]+>/g, ''),
+    '',
+    `${d.files} brand-new bas-relief STL designs for $${d.price.toFixed(2)} (about $${per} each).`,
+    'The same pack every paying member gets this month. Commercial use included. Nothing renews.',
+    '',
+    `Get it: ${SITE}/starter`,
+    '',
+    `Unsubscribe: ${unsubUrl(e)}`,
+  ].join('\n');
+
+  return { subject, html: shell(subject, `One month, ${d.files} designs, $${d.price.toFixed(2)}`, body, e), text };
+}
+
 // ── Wishlist reminder (they hearted it, never bought it) ──────────────
 export function wishlistReminderEmail(d: { email: string; products: (MiniProduct & { etsy_price?: number | null })[] }): Out {
   const subject = d.products.length === 1

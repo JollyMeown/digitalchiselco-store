@@ -1,0 +1,120 @@
+---
+// The emailed starter-month offer.
+//
+// This page exists so the starter month can be bought WITHOUT ever appearing
+// on /membership. The plan row carries available_from = 2099-01-01, so the
+// public picker filters it out (getMembershipPlans), while this page asks for
+// it by slug. Anyone who lands here from the email gets one click to the cart.
+//
+// It is deliberately a single offer with a single button: the whole point of
+// the starter month is to remove the choice that stops people at $24.99.
+import Shell from '../layouts/Shell.astro';
+import { supabaseAdmin } from '../lib/supabase';
+import { planFacts } from '../lib/membership-facts';
+
+let plan: any = null;
+let upgrade: any = null;
+let pack: any = null;
+try {
+  const db = supabaseAdmin();
+  const { data } = await db.from('membership_plans')
+    .select('slug,name,months,files_per_month,price_usd,original_price_usd,features')
+    .eq('slug', 'starter-month').maybeSingle();
+  plan = data;
+  const { data: up } = await db.from('membership_plans')
+    .select('slug,name,months,files_per_month,price_usd').eq('slug', '3-month').maybeSingle();
+  upgrade = up;
+  // Show this month's real pack cover and designs, so the offer is concrete.
+  const month = new Date().toISOString().slice(0, 7);
+  const { data: mf } = await db.from('monthly_files')
+    .select('month,title,cover_image_url,items').eq('month', month).maybeSingle();
+  pack = mf;
+} catch { /* the page still renders without the pack */ }
+
+if (!plan) return Astro.redirect('/membership', 302);
+const F = planFacts(plan);
+const items: any[] = Array.isArray(pack?.items) ? pack.items.slice(0, 8) : [];
+const saving = plan.original_price_usd ? Math.round((1 - plan.price_usd / plan.original_price_usd) * 100) : null;
+---
+<Shell
+  title="Starter Month · 8 Bas-Relief STL Designs for $4.99"
+  description="Try the DigitalChiselCo membership for one month: 8 fresh bas-relief STL designs delivered straight away, commercial use included, no auto-renewal."
+  noindex={true}
+>
+  <section class="max-w-3xl mx-auto">
+    <p class="text-xs tracking-widest text-bronze-600 mb-3">★ INVITATION ONLY</p>
+    <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">
+      One month of the membership, for ${plan.price_usd.toFixed(2)}
+    </h1>
+    <p class="mt-4 text-lg text-ink-700 leading-relaxed">
+      This is the same pack every paying member receives this month:
+      <strong>{plan.files_per_month} brand-new bas-relief STL designs</strong>, sent the moment you join.
+      {saving && <span> That is about <strong>{saving}% off</strong> what the same designs cost one at a time.</span>}
+    </p>
+
+    {pack?.cover_image_url && (
+      <figure class="mt-7">
+        <img src={pack.cover_image_url} alt={`This month's pack: ${pack.title || ''}`} loading="eager" width="1200" height="800" class="w-full rounded-xl shadow-md" />
+        <figcaption class="text-sm text-ink-600 mt-2 text-center">This month's pack, exactly as members receive it.</figcaption>
+      </figure>
+    )}
+
+    {items.length > 0 && (
+      <div class="mt-6">
+        <h2 class="font-serif text-xl mb-3">What is inside this month</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {items.map((it: any) => (
+            <div class="border border-black/10 rounded-lg overflow-hidden bg-white">
+              {it.image_url && <img src={it.image_url} alt={it.title} loading="lazy" width="300" height="300" class="w-full aspect-square object-cover" />}
+              <div class="p-2 text-xs leading-snug">{String(it.title || '').split('|')[0].trim()}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    <ul class="mt-7 space-y-2 text-ink-700">
+      {(plan.features || []).map((f: string) => (
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span><span>{f}</span></li>
+      ))}
+    </ul>
+
+    <div class="mt-8 rounded-xl border-2 border-bronze-600 bg-cream/40 p-6 text-center">
+      <div class="text-3xl font-serif text-bronze-800">${plan.price_usd.toFixed(2)}</div>
+      <div class="text-sm text-ink-600 mt-1">one payment · {plan.files_per_month} designs · nothing renews automatically</div>
+      <button id="starter-buy" class="mt-4 inline-block bg-bronze-700 text-cream font-bold px-8 py-3 rounded-lg hover:bg-bronze-800 transition">
+        Send me this month's pack
+      </button>
+      <p id="starter-msg" class="mt-3 text-sm text-ink-600"></p>
+    </div>
+
+    {upgrade && (
+      <p class="mt-6 text-sm text-ink-600 leading-relaxed">
+        Carving more than one project a month? The {upgrade.name} is
+        <strong> ${Number(upgrade.price_usd).toFixed(2)}</strong> for {upgrade.months * (upgrade.files_per_month || 8)} designs.
+        Start here and upgrade whenever you like: we credit what you have already paid.
+        <a href="/membership" class="text-bronze-700 underline ml-1">See the longer plans</a>
+      </p>
+    )}
+  </section>
+
+  <script is:inline define:vars={{ slug: plan.slug, name: plan.name, price: plan.price_usd }}>
+    document.getElementById('starter-buy')?.addEventListener('click', () => {
+      const msg = document.getElementById('starter-msg');
+      try {
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        const id = 'membership:' + slug;
+        if (!cart.find((x) => x.id === id)) {
+          cart.push({ id, slug: 'membership', title: name, price: price, img: '' });
+          localStorage.setItem('cart', JSON.stringify(cart));
+          if (window.dccAction) window.dccAction('add_to_cart');
+        }
+        window.dispatchEvent(new Event('cart-changed'));
+        if (msg) msg.textContent = 'Added. Taking you to checkout…';
+        setTimeout(() => { window.location.href = '/cart'; }, 500);
+      } catch (e) {
+        if (msg) msg.textContent = 'Something went wrong. Please reload and try again.';
+      }
+    });
+  </script>
+</Shell>
