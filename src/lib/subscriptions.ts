@@ -62,7 +62,14 @@ export function addDays(ymdStr: string, n: number): string {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-export function ymLabel(ym: string): string { const [y, m] = ym.split('-').map(Number); return `${MONTHS[m - 1]} ${y}`; }
+// The starter bundle lives under a sentinel month, which as a date reads
+// "January 1". It is not a month, so it says its own name everywhere a month
+// label is shown: email subjects, the pack email, the portal and owner alerts.
+export function ymLabel(ym: string): string {
+  if (ym === STARTER_PACK_MONTH) return 'Starter Bundle';
+  const [y, m] = ym.split('-').map(Number);
+  return `${MONTHS[m - 1]} ${y}`;
+}
 export function ymdLabel(ymdStr: string): string { const [y, m, d] = ymdStr.split('-').map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; }
 export function daysUntil(from: string, to: string): number {
   const [fy, fm, fd] = from.split('-').map(Number);

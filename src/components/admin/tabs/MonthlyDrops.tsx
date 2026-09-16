@@ -18,7 +18,13 @@ type Log = { subscription_id: string; email_type: string; drop_month: string; st
 type Dl = { subscription_id: string; month: string };
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const label = (m: string) => { const [y, mo] = m.split('-').map(Number); return `${MONTHS[mo - 1]} ${y}`; };
+// '0001-01' is the starter bundle's sentinel, not a date: it would read
+// "January 1" in the pack list.
+const label = (m: string) => {
+  if (m === '0001-01') return 'Starter Bundle';
+  const [y, mo] = m.split('-').map(Number);
+  return `${MONTHS[mo - 1]} ${y}`;
+};
 const addYM = (ym: string, n: number) => { const [y, m] = ym.split('-').map(Number); return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7); };
 const termMonths = (s: Sub) => Array.from({ length: s.total_drops }, (_, k) => addYM(s.start_date.slice(0, 7), k));
 
