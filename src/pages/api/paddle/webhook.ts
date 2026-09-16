@@ -16,7 +16,7 @@ import { supabaseAdmin } from '../../../lib/supabase';
 import { verifyWebhookSignature, paddleApi } from '../../../lib/paddle';
 import { send as sendEmail } from '../../../lib/resend';
 import { orderConfirmation, membershipPurchaseNotification } from '../../../lib/email-templates';
-import { createSubscriptionForPurchase } from '../../../lib/subscriptions';
+import { createSubscriptionForPurchase, packLink, toYM, STARTER_PLAN_SLUG, STARTER_PACK_MONTH } from '../../../lib/subscriptions';
 import { giftCardEmail, paymentRecoveryEmail } from '../../../lib/marketing-emails';
 import { telegramOwner } from '../../../lib/notify';
 
@@ -843,6 +843,26 @@ async function handleTransactionCompleted(db: any, txn: any) {
         }
       }
 
+      // A membership line has no product_downloads row, so without this it fell
+      // through to "Download link will be emailed within a few minutes", which
+      // is a poor thing to read straight after paying. The term was created
+      // earlier in this same webhook, so its pack link exists now: put a real
+      // download button on the line instead (owner, 2026-09-16).
+      const membershipLinks: Record<string, { name?: string; url: string }[]> = {};
+      if (purchasedMemberships.length && email) {
+        try {
+          const { data: terms } = await db.from('member_subscriptions')
+            .select('id, plan_slug, start_date, total_drops').eq('order_id', order.id);
+          for (const t of terms || []) {
+            const ym = t.plan_slug === STARTER_PLAN_SLUG ? STARTER_PACK_MONTH : toYM(t.start_date);
+            const { data: pk } = await db.from('monthly_files').select('standard_drive_link').eq('month', ym).maybeSingle();
+            if (pk?.standard_drive_link) {
+              membershipLinks[t.plan_slug] = [{ name: 'your designs', url: packLink(t.id, ym, 'standard', 'email') }];
+            }
+          }
+        } catch (e) { console.error('[order email] membership download link lookup failed:', e); }
+      }
+
       const emailItems = (orderItems || []).map((it: any) => {
         const fields = (it.order_item_customizations || []).flatMap((c: any) => Array.isArray(c.fields) ? c.fields : []);
         // A line is "customized" if either it has captured field values OR the
@@ -855,7 +875,12 @@ async function handleTransactionCompleted(db: any, txn: any) {
           price_usd: Number(it.price_usd) || 0,
           // Skip download links entirely for customized lines — the file
           // doesn't exist yet; the customer gets it once the artisan delivers.
-          download_links: isCustomized ? undefined : (it.product_id ? downloadsByProduct[it.product_id] : undefined),
+          download_links: isCustomized
+            ? undefined
+            : (it.product_id
+              ? downloadsByProduct[it.product_id]
+              : membershipLinks[purchasedMemberships.find((mp: any) => mp.name === it.title)?.slug || '']
+                ?? (purchasedMemberships.length === 1 ? membershipLinks[purchasedMemberships[0].slug] : undefined)),
           image_url: (it.products as any)?.image_url || null,
       is_customized: isCustomized,
           customization_fields: fields,
