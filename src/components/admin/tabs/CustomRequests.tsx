@@ -16,7 +16,23 @@ type Req = {
   description: string | null; size_note: string | null; material: string | null;
   deadline: string | null; status: string; quote_usd: number | null;
   admin_notes: string | null; created_at: string; updated_at: string | null;
+  replied_at?: string | null; reply_body?: string | null; reply_count?: number | null;
 };
+
+/** A starting point for the reply, in the owner's voice. */
+function starterReply(r: Req, quote: number | null): string {
+  const first = (r.name || '').trim().split(/\s+/)[0] || 'there';
+  return [
+    `Hi ${first},`,
+    'Thank you for the request and the reference picture.',
+    `I can make this for you${r.size_note ? ` at ${r.size_note}` : ''}.`,
+    `The price would be $${quote ? quote.toFixed(2) : '___'}, with the finished STL delivered within ___ days of your approval.`,
+    'Let me know if that works for you and I will get started.',
+    'Jolly, DigitalChiselCo',
+  ].join('\n\n');
+}
+/** The owner sometimes drafts the letter in the notes box; offer it as the reply. */
+const looksLikeLetter = (s: string | null | undefined) => !!s && /^\s*(hi|hello|dear)\b/i.test(s);
 
 const PROMISE_HOURS = 24;
 const STATUSES = ['new', 'quoted', 'paid', 'in_progress', 'delivered', 'declined'] as const;
@@ -114,11 +130,23 @@ export default function CustomRequests() {
     if (res?.ok) { setDraft((d) => { const n = { ...d }; delete n[r.id]; return n; }); load(); }
   }
 
-  const mailto = (r: Req) => {
-    const first = (r.name || '').trim().split(/\s+/)[0] || 'there';
-    const subject = `Your custom relief: ${String(r.description || 'design').slice(0, 40)}`;
-    return `mailto:${encodeURIComponent(r.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`Hi ${first},\n\nThank you for the request.\n\n`)}`;
-  };
+  const [replies, setReplies] = useState<Record<string, string>>({});
+  const [sending, setSending] = useState<string | null>(null);
+  const replyText = (r: Req) => replies[r.id] ?? (looksLikeLetter(f(r, 'admin_notes')) ? f(r, 'admin_notes') : starterReply(r, f(r, 'quote_usd')));
+
+  async function sendReply(r: Req) {
+    const text = replyText(r).trim();
+    if (/_{3,}/.test(text)) { setMsg('Fill in the blanks (___) in the reply before sending.'); return; }
+    if (!window.confirm(`Send this reply to ${r.email}?`)) return;
+    setSending(r.id); setMsg('Sending…');
+    const res = await call({ action: 'request_reply', id: r.id, message: text, quote_usd: f(r, 'quote_usd') });
+    setSending(null);
+    if (res?.ok) {
+      setMsg(res.message || 'Sent.');
+      setReplies((d) => { const n = { ...d }; delete n[r.id]; return n; });
+      load();
+    } else setMsg(`Not sent: ${res?.error || 'unknown error'}`);
+  }
 
   return (
     <div className="space-y-5">
@@ -198,11 +226,44 @@ export default function CustomRequests() {
                         onChange={(e) => setF(r.id, 'quote_usd', e.target.value === '' ? null : Number(e.target.value))}
                         placeholder="e.g. 60" className={inputCls + ' mt-1 max-w-[110px]'} />
                     </label>
-                    <a href={mailto(r)} className="text-xs px-3 py-2 rounded-md border border-bronze-600 text-bronze-700 hover:bg-cream">✉ Reply by email</a>
                     <button onClick={() => save(r)} disabled={!dirty}
                       className={btnPrimary + (dirty ? '' : ' opacity-40 cursor-not-allowed')}>Save</button>
                   </div>
-                  <label className="text-xs block">Private notes
+
+                  <div className="rounded-lg border border-bronze-600/40 bg-cream/30 p-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-semibold text-bronze-800">✉ Reply to {r.name || 'the customer'}</span>
+                      <span className="text-[11px] text-ink-700/60">sent from the site to {r.email}, their replies come back to your inbox</span>
+                      {r.replied_at && (
+                        <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-800">
+                          Reply sent {ago(r.replied_at)}{(r.reply_count || 0) > 1 ? ` · ${r.reply_count} replies` : ''}
+                        </span>
+                      )}
+                    </div>
+                    <textarea rows={9} value={replyText(r)}
+                      onChange={(e) => setReplies((d) => ({ ...d, [r.id]: e.target.value }))}
+                      className={inputCls + ' font-normal'} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button onClick={() => sendReply(r)} disabled={sending === r.id}
+                        className={btnPrimary + (sending === r.id ? ' opacity-50' : '')}>
+                        {sending === r.id ? 'Sending…' : 'Send reply'}
+                      </button>
+                      <button onClick={() => setReplies((d) => ({ ...d, [r.id]: starterReply(r, f(r, 'quote_usd')) }))}
+                        className="text-xs underline text-ink-700/70">Start from the template</button>
+                      {/_{3,}/.test(replyText(r)) && (
+                        <span className="text-xs text-red-700">Fill in the ___ blanks before sending.</span>
+                      )}
+                      <span className="text-[11px] text-ink-700/50 ml-auto">Blank lines make paragraphs. **word** makes it bold. The quote above is added as a line.</span>
+                    </div>
+                    {r.reply_body && (
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-ink-700/70">Last reply sent</summary>
+                        <pre className="whitespace-pre-wrap font-sans text-ink-800 mt-1">{r.reply_body}</pre>
+                      </details>
+                    )}
+                  </div>
+
+                  <label className="text-xs block">Private notes (only you see these)
                     <textarea rows={2} value={f(r, 'admin_notes') || ''} onChange={(e) => setF(r.id, 'admin_notes', e.target.value)}
                       placeholder="What you quoted, what they asked, anything to remember" className={inputCls + ' mt-1'} />
                   </label>
