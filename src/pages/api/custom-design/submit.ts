@@ -58,7 +58,14 @@ export const POST: APIRoute = async ({ request }) => {
 
     // requester confirmation (transactional)
     const conf = customRequestReceivedEmail({ email, name, photoUrl: photo_url, description, ref });
-    await sendEmail({ to: email, subject: conf.subject, html: conf.html, text: conf.text, tags: [{ name: 'kind', value: 'custom-request' }] }).catch(() => null);
+    const sentConf = await sendEmail({ to: email, subject: conf.subject, html: conf.html, text: conf.text, tags: [{ name: 'kind', value: 'custom-request' }] }).catch(() => null);
+
+    // the conversation record starts here: what they asked, and what we said
+    await db.from('custom_request_messages').insert([
+      { request_id: row.id, direction: 'in', kind: 'request', body: description, images: photo_url ? [photo_url] : [], created_by: email },
+      { request_id: row.id, direction: 'out', kind: 'confirmation', subject: conf.subject, provider_id: (sentConf as any)?.id || null,
+        body: 'Automatic confirmation: your request has arrived, a firm quote and delivery date within 24 hours, nothing charged until you approve.', created_by: 'automatic' },
+    ]).then(() => null, () => null);
 
     // owner: alert row (admin bell), Telegram, and an email with the picture
     const summary = `${name || email} · ${description.slice(0, 90)}${size_note ? ' · ' + size_note : ''}${material ? ' · ' + material : ''}`;

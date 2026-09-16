@@ -182,7 +182,13 @@ export default function CustomRequests() {
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [sending, setSending] = useState<string | null>(null);
   const [samples, setSamples] = useState<Record<string, string[]>>({});
-  const replyText = (r: Req) => replies[r.id] ?? (looksLikeLetter(f(r, 'admin_notes')) ? f(r, 'admin_notes') : starterReply(r, f(r, 'quote_usd')));
+  const [threadVer, setThreadVer] = useState<Record<string, number>>({});
+  const bumpThread = (id: string) => setThreadVer((v) => ({ ...v, [id]: (v[id] || 0) + 1 }));
+  // First reply: start from the owner's drafted letter or the template. After
+  // that the box starts EMPTY, so a sent message never reappears looking unsent.
+  const replyText = (r: Req) => replies[r.id]
+    ?? ((r.reply_count || 0) > 0 ? ''
+      : looksLikeLetter(f(r, 'admin_notes')) ? f(r, 'admin_notes') : starterReply(r, f(r, 'quote_usd')));
 
   async function sendReply(r: Req) {
     const text = replyText(r).trim();
@@ -195,6 +201,7 @@ export default function CustomRequests() {
       setMsg(res.message || 'Sent.');
       setReplies((d) => { const n = { ...d }; delete n[r.id]; return n; });
       setSamples((d) => { const n = { ...d }; delete n[r.id]; return n; });
+      bumpThread(r.id);
       load();
     } else setMsg(`Not sent: ${res?.error || 'unknown error'}`);
   }
@@ -254,7 +261,7 @@ export default function CustomRequests() {
                   </div>
 
                   <div>
-                    <div className="font-medium text-ink-900">{r.name || '(no name)'}</div>
+                    <div className="font-medium text-ink-800">{r.name || '(no name)'}</div>
                     <a href={`mailto:${r.email}`} className="text-sm text-bronze-700 underline break-all">{r.email}</a>
                   </div>
 
@@ -281,9 +288,12 @@ export default function CustomRequests() {
                       className={btnPrimary + (dirty ? '' : ' opacity-40 cursor-not-allowed')}>Save</button>
                   </div>
 
+                  <Conversation reqId={r.id} name={r.name} call={call} version={threadVer[r.id] || 0}
+                    onChanged={() => bumpThread(r.id)} />
+
                   <div className="rounded-lg border border-bronze-600/40 bg-cream/30 p-3 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-semibold text-bronze-800">✉ Reply to {r.name || 'the customer'}</span>
+                      <span className="text-xs font-semibold text-bronze-800">✉ {(r.reply_count || 0) > 0 ? 'Write another reply' : `Reply to ${r.name || 'the customer'}`}</span>
                       <span className="text-[11px] text-ink-700/60">sent from the site to {r.email}, their replies come back to your inbox</span>
                       {r.replied_at && (
                         <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-800">
@@ -293,6 +303,7 @@ export default function CustomRequests() {
                     </div>
                     <textarea rows={9} value={replyText(r)}
                       onChange={(e) => setReplies((d) => ({ ...d, [r.id]: e.target.value }))}
+                      placeholder="Write your next message. It will be added to the conversation above once sent."
                       className={inputCls + ' font-normal'} />
                     <SamplePicker reqId={r.id} urls={samples[r.id] || []}
                       onChange={(u) => setSamples((d) => ({ ...d, [r.id]: u }))} />
@@ -308,17 +319,6 @@ export default function CustomRequests() {
                       )}
                       <span className="text-[11px] text-ink-700/50 ml-auto">Blank lines make paragraphs. **word** makes it bold. The quote above is added as a line.</span>
                     </div>
-                    {r.reply_body && (
-                      <details className="text-xs">
-                        <summary className="cursor-pointer text-ink-700/70">Last reply sent</summary>
-                        <pre className="whitespace-pre-wrap font-sans text-ink-800 mt-1">{r.reply_body}</pre>
-                        {(r.reply_images || []).length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {(r.reply_images || []).map((u) => <img key={u} src={u} alt="" className="w-16 h-16 object-cover rounded border border-black/10" />)}
-                          </div>
-                        )}
-                      </details>
-                    )}
                   </div>
 
                   <label className="text-xs block">Private notes (only you see these)
@@ -335,10 +335,104 @@ export default function CustomRequests() {
   );
 }
 
+type Msg = {
+  id: string; direction: 'in' | 'out'; kind: string; body: string | null; images: string[] | null;
+  quote_usd: number | null; subject: string | null; created_at: string; events: string[];
+};
+const KIND_LABEL: Record<string, string> = {
+  request: 'Their request', confirmation: 'Automatic confirmation', reply: 'Your reply',
+  customer_reply: 'Their reply', note: 'Note',
+};
+
+/** The whole correspondence for one request, oldest first. */
+function Conversation({ reqId, name, call, version, onChanged }: {
+  reqId: string; name: string | null; call: (p: any) => Promise<any>; version: number; onChanged: () => void;
+}) {
+  const [msgs, setMsgs] = useState<Msg[] | null>(null);
+  const [open, setOpen] = useState(true);
+  const [pasting, setPasting] = useState(false);
+  const [pasted, setPasted] = useState('');
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    let alive = true;
+    call({ action: 'request_thread', id: reqId }).then((r) => { if (alive && r?.ok) setMsgs(r.messages || []); });
+    return () => { alive = false; };
+  }, [reqId, version]);
+
+  async function addTheirs() {
+    const r = await call({ action: 'request_log_in', id: reqId, body: pasted });
+    if (r?.ok) { setPasted(''); setPasting(false); setNote(''); onChanged(); } else setNote(r?.error || 'Could not add it.');
+  }
+  const status = (ev: string[]) => ev.includes('clicked') ? { t: 'clicked', c: 'bg-green-100 text-green-800' }
+    : ev.includes('opened') ? { t: 'opened', c: 'bg-green-100 text-green-800' }
+    : ev.includes('bounced') ? { t: 'bounced', c: 'bg-red-100 text-red-800' }
+    : ev.includes('delivered') ? { t: 'delivered', c: 'bg-blue-50 text-blue-800' }
+    : ev.length ? { t: ev[ev.length - 1], c: 'bg-gray-100 text-gray-700' } : null;
+
+  return (
+    <div className="rounded-lg border border-black/10 bg-white">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 px-3 py-2 text-left">
+        <span className="text-xs font-semibold text-ink-800">💬 Conversation</span>
+        <span className="text-[11px] text-ink-700/60">{msgs ? `${msgs.length} message${msgs.length === 1 ? '' : 's'}` : 'loading…'}</span>
+        <span className="ml-auto text-xs text-ink-700/50">{open ? 'hide' : 'show'}</span>
+      </button>
+      {open && msgs && (
+        <div className="px-3 pb-3 space-y-2 border-t border-black/5 pt-3">
+          {msgs.length === 0 && <p className="text-xs text-ink-700/50">Nothing recorded yet.</p>}
+          {msgs.map((m) => {
+            const mine = m.direction === 'out';
+            const st = mine ? status(m.events || []) : null;
+            return (
+              <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[88%] rounded-lg px-3 py-2 text-sm ${mine ? (m.kind === 'confirmation' ? 'bg-gray-50 border border-gray-200' : 'bg-[#F6ECDD] border border-bronze-600/30') : 'bg-cream border border-amber-200'}`}>
+                  <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                    <span className="text-[10px] uppercase tracking-wide font-semibold text-ink-700/70">
+                      {m.kind === 'request' || m.kind === 'customer_reply' ? `${name || 'Customer'}: ` : ''}{KIND_LABEL[m.kind] || m.kind}
+                    </span>
+                    <span className="text-[10px] text-ink-700/50">{new Date(m.created_at).toLocaleString()}</span>
+                    {m.quote_usd != null && <span className="text-[10px] px-1.5 rounded bg-amber-100 text-amber-900">quoted ${Number(m.quote_usd).toFixed(2)}</span>}
+                    {st && <span className={`text-[10px] px-1.5 rounded ${st.c}`}>{st.t}</span>}
+                  </div>
+                  {m.body && <div className="whitespace-pre-wrap text-ink-800">{m.body}</div>}
+                  {(m.images || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {(m.images || []).map((u) => (
+                        <a key={u} href={u} target="_blank" rel="noreferrer">
+                          <img src={u} alt="" className="w-16 h-16 object-cover rounded border border-black/10" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {!pasting ? (
+            <button onClick={() => setPasting(true)} className="text-xs underline text-ink-700/70">
+              + Add {name ? `${name}'s` : 'their'} reply from your inbox
+            </button>
+          ) : (
+            <div className="space-y-1.5">
+              <textarea rows={4} value={pasted} onChange={(e) => setPasted(e.target.value)}
+                placeholder="Paste what they wrote back. It is only recorded here, nothing is sent."
+                className={inputCls} />
+              <div className="flex items-center gap-2">
+                <button onClick={addTheirs} className={btnPrimary}>Add to conversation</button>
+                <button onClick={() => { setPasting(false); setPasted(''); }} className="text-xs underline text-ink-700/60">Cancel</button>
+                {note && <span className="text-xs text-red-700">{note}</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Tile({ n, label, tone }: { n: number | string; label: string; tone: 'amber' | 'red' | 'plain' }) {
   const cls = tone === 'red' ? 'bg-red-600 text-white border-red-700'
     : tone === 'amber' ? 'bg-amber-50 text-amber-900 border-amber-300'
-    : 'bg-white text-ink-900 border-black/10';
+    : 'bg-white text-ink-800 border-black/10';
   return (
     <div className={`rounded-xl border p-4 ${cls}`}>
       <div className="text-2xl font-semibold tabular-nums">{n}</div>

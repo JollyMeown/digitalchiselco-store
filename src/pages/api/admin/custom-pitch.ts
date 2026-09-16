@@ -110,6 +110,33 @@ export const POST: APIRoute = async ({ request }) => {
       if (error) return json({ error: error.message }, 500);
       return json({ ok: true, message: 'Saved.' });
     }
+    if (action === 'request_thread') {
+      // Every message for one request, oldest first, with how each email fared.
+      const id = String(b.id || '');
+      if (!id) return json({ error: 'id required' }, 400);
+      const { data: msgs } = await db.from('custom_request_messages').select('*').eq('request_id', id).order('created_at');
+      const ids = (msgs || []).map((m: any) => m.provider_id).filter(Boolean);
+      const events: Record<string, string[]> = {};
+      if (ids.length) {
+        const { data: ev } = await db.from('email_events').select('provider_id, event').in('provider_id', ids);
+        for (const e of ev || []) (events[(e as any).provider_id] ||= []).push((e as any).event);
+      }
+      return json({ ok: true, messages: (msgs || []).map((m: any) => ({ ...m, events: [...new Set(events[m.provider_id] || [])] })) });
+    }
+    if (action === 'request_log_in') {
+      // Customer replies land in the owner's inbox, not the site. Paste one in
+      // here and it joins the record in the right place.
+      const id = String(b.id || '');
+      const body = String(b.body || '').trim().slice(0, 8000);
+      if (!id || body.length < 2) return json({ error: 'Paste the customer\'s message first.' }, 400);
+      const at = b.at ? new Date(String(b.at)) : new Date();
+      const { error } = await db.from('custom_request_messages').insert({
+        request_id: id, direction: 'in', kind: 'customer_reply', body,
+        created_at: isNaN(at.getTime()) ? new Date().toISOString() : at.toISOString(), created_by: 'pasted by ' + (who.email || 'owner'),
+      });
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true, message: 'Added to the conversation.' });
+    }
     if (action === 'request_reply') {
       // Send the owner's reply to the customer, from the site, in the same
       // style as the confirmation they already received.
@@ -141,6 +168,10 @@ export const POST: APIRoute = async ({ request }) => {
       });
       if (!res.ok) return json({ error: res.error || 'send failed' }, 502);
       const now = new Date().toISOString();
+      await db.from('custom_request_messages').insert({
+        request_id: req.id, direction: 'out', kind: 'reply', subject: mail.subject, body: message,
+        images, quote_usd: quote, provider_id: (res as any).id || null, created_at: now, created_by: who.email || 'owner',
+      });
       await db.from('custom_design_requests').update({
         status: req.status === 'new' ? 'quoted' : req.status,
         quote_usd: quote,
