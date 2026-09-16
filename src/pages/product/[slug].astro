@@ -111,6 +111,27 @@ try {
   productReviews = (pr || []) as any;
 } catch { /* optional */ }
 const prAvg = productReviews.length ? (productReviews.reduce((s, r) => s + Number(r.rating || 5), 0) / productReviews.length) : 0;
+
+// ── The one review worth showing beside the price ──────────────────────
+// 660 of our reviews carry real text but they sit below the fold, where the
+// people deciding whether to buy never reach them. This lifts the single best
+// sentence up next to the button. "Best" is a 5-star review long enough to say
+// something and short enough to read, preferring ones that name what buyers
+// actually worry about: detail, quality, whether it cuts cleanly.
+const SAYS_SOMETHING = /detail|quality|clean|sharp|crisp|carve|cut|print|easy|perfect|beautiful|worth|recommend|fast|exactly/i;
+const pullQuote = (() => {
+  const good = productReviews
+    .filter((r) => Number(r.rating || 5) >= 5)
+    .map((r) => ({ ...r, t: String(r.text || '').replace(/\s+/g, ' ').trim() }))
+    .filter((r) => r.t.length >= 35 && r.t.length <= 200)
+    // ASCII-ish only: a German or French quote reads as a mistake to most visitors
+    .filter((r) => !/[À-ɏЀ-ӿ]/.test(r.t));
+  if (!good.length) return null;
+  good.sort((a, b) => (SAYS_SOMETHING.test(b.t) ? 1 : 0) - (SAYS_SOMETHING.test(a.t) ? 1 : 0)
+    || (b.photo_url ? 1 : 0) - (a.photo_url ? 1 : 0)
+    || b.t.length - a.t.length);
+  return good[0];
+})();
 // "Verified Buyer" is the imported-name placeholder — don't print it twice.
 const reviewerLabel = (name: string) =>
   /^\s*verified\s*buyer\s*$/i.test(name || '') ? 'Verified buyer' : `${name}, verified buyer`;
@@ -273,6 +294,21 @@ const breadcrumbLd = {
           {soldYear >= 3 && <span>· <strong>{soldYear.toLocaleString()}</strong> sold this year</span>}
           {(etsyStats?.favorers || 0) >= 10 && <span>· <strong>{etsyStats!.favorers.toLocaleString()}</strong> people favourited it</span>}
         </p>
+      )}
+
+      {pullQuote && (
+        <figure class="mt-3 border-l-[3px] border-bronze-600 bg-cream/50 rounded-r-md pl-3 pr-3 py-2.5">
+          <blockquote class="text-sm text-ink-800 leading-snug">
+            <span class="text-bronze-600" aria-hidden="true">&ldquo;</span>{pullQuote.t}<span class="text-bronze-600" aria-hidden="true">&rdquo;</span>
+          </blockquote>
+          <figcaption class="mt-1 text-xs text-ink-700/70 flex items-center gap-1.5">
+            <span class="text-bronze-600" aria-hidden="true">★★★★★</span>
+            <span>{reviewerLabel(pullQuote.name)}</span>
+            {productReviews.length > 1 && (
+              <a href="#reviews" class="ml-auto underline hover:text-bronze-700">all {productReviews.length} reviews</a>
+            )}
+          </figcaption>
+        </figure>
       )}
 
       {sale && (
