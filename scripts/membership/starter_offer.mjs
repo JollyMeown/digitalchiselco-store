@@ -99,6 +99,13 @@ for (const it of items) {
   spend[e].designs += (it.qty || 1);
 }
 
+// Already offered? The ledger is the record, so a second run can never
+// double-send, whatever flags it is given.
+const already = new Set(
+  (await all('email_send_log', 'recipient,kind,status', (q) => q.eq('kind', 'membership-offer').eq('status', 'sent')))
+    .map((r) => lc(r.recipient)),
+);
+
 const people = await all('subscribers', 'email,name,source,confirmed_at,unsubscribed_at,suppressed_at');
 const eligible = people.filter((p) => {
   const e = lc(p.email);
@@ -107,6 +114,7 @@ const eligible = people.filter((p) => {
   if (!p.confirmed_at) return false;
   if (everMember.has(e)) return false;                 // rule 1 and 2
   if (/^etsy/i.test(p.source || '')) return false;     // rule 4
+  if (already.has(e)) return false;                    // offered once already
   return true;
 });
 
