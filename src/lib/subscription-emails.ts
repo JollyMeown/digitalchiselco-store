@@ -65,9 +65,12 @@ function shell(opts: { subject: string; heading: string; subheading?: string; bo
 const btn = (href: string, label: string, primary = true) =>
   `<a href="${esc(href)}" style="display:inline-block;margin:6px 6px 0;background:${primary ? BRONZE_DARK : '#ffffff'};color:${primary ? CREAM : BRONZE_DARK};border:1px solid ${BRONZE_DARK};text-decoration:none;padding:13px 24px;border-radius:8px;font-size:15px;font-weight:600;">${label}</a>`;
 
-function packButtons(standardLink?: string | null, bonusLink?: string | null): string {
+// The starter bundle is not a month, so "this month's pack" is wrong on it.
+// The label follows whatever the pack is actually called.
+function packButtons(standardLink?: string | null, bonusLink?: string | null, monthLabel?: string | null): string {
   const parts: string[] = [];
-  if (standardLink) parts.push(btn(standardLink, '&#11015; Download this month\'s pack', true));
+  const what = monthLabel === 'Starter Bundle' ? 'your Starter Bundle' : 'this month\'s pack';
+  if (standardLink) parts.push(btn(standardLink, `&#11015; Download ${what}`, true));
   if (bonusLink) parts.push(btn(bonusLink, '&#11088; Bonus files (Premium)', false));
   return parts.length ? `<p style="text-align:center;margin:18px 0 4px;">${parts.join('')}</p>` : '';
 }
@@ -165,7 +168,7 @@ export function firstPackEmail(d: DropEmailData): { subject: string; html: strin
     ${cover(d)}
     ${d.packTitle ? `<p style="margin:14px 0 0;font-size:16px;color:${INK};font-family:Georgia,serif;"><strong>${esc(d.packTitle)}</strong></p>` : ''}
     ${d.previewNote ? `<p style="margin:6px 0 0;font-size:14px;color:#666;line-height:1.6;">${esc(d.previewNote)}</p>` : ''}
-    ${hasFiles ? packButtons(d.standardLink) : pending}
+    ${hasFiles ? packButtons(d.standardLink, null, d.monthLabel) : pending}
     ${itemGrid(d.items)}
     ${hasFiles ? bonusSection(d) : ''}
     ${termLine(d)}
@@ -186,7 +189,7 @@ export function monthlyDropEmail(d: DropEmailData): { subject: string; html: str
     ${cover(d)}
     ${d.packTitle ? `<p style="margin:14px 0 0;font-size:16px;color:${INK};font-family:Georgia,serif;"><strong>${esc(d.packTitle)}</strong></p>` : ''}
     ${d.previewNote ? `<p style="margin:6px 0 0;font-size:14px;color:#666;line-height:1.6;">${esc(d.previewNote)}</p>` : ''}
-    ${(d.standardLink || d.bonusLink) ? packButtons(d.standardLink) : pending}
+    ${(d.standardLink || d.bonusLink) ? packButtons(d.standardLink, null, d.monthLabel) : pending}
     ${itemGrid(d.items)}
     ${(d.standardLink || d.bonusLink) ? bonusSection(d) : ''}
     ${termLine(d)}
