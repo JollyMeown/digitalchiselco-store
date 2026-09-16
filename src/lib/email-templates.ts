@@ -505,10 +505,10 @@ export function membershipPurchaseNotification(d: MembershipPurchaseData): { sub
   <div style="max-width:560px;margin:0 auto;padding:24px;background:#fff;border:1px solid #eee;border-radius:10px;">
     <div style="background:${BRAND_BRONZE};color:${BRAND_CREAM};padding:14px 18px;border-radius:6px;margin-bottom:18px;">
       <strong style="font-size:16px;">New membership purchase</strong><br>
-      <span style="font-size:13px;opacity:.85;">Time to send the first pack.</span>
+      <span style="font-size:13px;opacity:.85;">Nothing to do: the first pack has been sent automatically.</span>
     </div>
 
-    <p style="margin:0 0 14px;font-size:15px;">A customer just paid for a membership. Their details are below — kick off the manual fulfilment when you have a moment.</p>
+    <p style="margin:0 0 14px;font-size:15px;">A customer just paid for a membership. Their term was created and this month's pack emailed the moment the payment landed. Admin &gt; Subscriptions shows when it was delivered, opened and downloaded.</p>
 
     <table style="width:100%;border-collapse:collapse;margin:0 0 18px;font-size:14px;">
       <tr><td style="padding:6px 8px;width:120px;color:#666;">Name</td><td style="padding:6px 8px;"><strong>${esc(d.customerName || '(not provided)')}</strong></td></tr>
@@ -527,6 +527,7 @@ export function membershipPurchaseNotification(d: MembershipPurchaseData): { sub
 </body></html>`;
 
   const text = `New membership purchase
+Nothing to do: the term was created and the first pack was sent automatically.
 
 Name : ${d.customerName || '(not provided)'}
 Email: ${d.customerEmail}
