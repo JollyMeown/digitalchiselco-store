@@ -38,14 +38,14 @@ const items: any[] = Array.isArray(pack?.items) ? pack.items.slice(0, 8) : [];
 const saving = plan.original_price_usd ? Math.round((1 - plan.price_usd / plan.original_price_usd) * 100) : null;
 ---
 <Shell
-  title="Starter Month · 8 Bas-Relief STL Designs for $4.99"
-  description="Try the DigitalChiselCo membership for one month: 8 fresh bas-relief STL designs delivered straight away, commercial use included, no auto-renewal."
+  title={`Starter Bundle · ${plan.files_per_month} Bas-Relief STL Designs for $${plan.price_usd.toFixed(2)}`}
+  description={`${plan.files_per_month} hand-picked bas-relief STL designs for $${plan.price_usd.toFixed(2)}, delivered straight away. Commercial use included, one payment, nothing renews.`}
   noindex={true}
 >
   <section class="max-w-3xl mx-auto">
     <p class="text-xs tracking-widest text-bronze-600 mb-3">★ INVITATION ONLY</p>
     <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">
-      One month of the membership, for ${plan.price_usd.toFixed(2)}
+      {plan.files_per_month} designs, one payment, ${plan.price_usd.toFixed(2)}
     </h1>
     <p class="mt-4 text-lg text-ink-700 leading-relaxed">
       <strong>{plan.files_per_month} hand-picked bas-relief STL designs</strong>, sent the moment you join.
