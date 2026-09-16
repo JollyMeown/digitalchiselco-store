@@ -62,7 +62,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     // owner: alert row (admin bell), Telegram, and an email with the picture
     const summary = `${name || email} · ${description.slice(0, 90)}${size_note ? ' · ' + size_note : ''}${material ? ' · ' + material : ''}`;
-    await db.from('owner_alerts').insert({ kind: 'custom_request', title: `Custom design request ${ref}`, body: summary, url: '#automations', meta: { id: row.id, email, photo_url } }).then(() => null, () => null);
+    await db.from('owner_alerts').insert({ kind: 'custom_request', title: `Custom design request ${ref}`, body: summary, url: '#customrequests', meta: { id: row.id, email, photo_url } }).then(() => null, () => null);
     await telegramOwner(`🖼 <b>Custom design request</b> ${ref}\n${esc(name || '')} &lt;${esc(email)}&gt;\n${esc(description.slice(0, 300))}\n${size_note ? 'Size: ' + esc(size_note) + '\n' : ''}${material ? 'Material: ' + esc(material) + '\n' : ''}${deadline ? 'Deadline: ' + esc(deadline) + '\n' : ''}Picture: ${photo_url}`).catch(() => null);
     await sendEmail({
       to: OWNER_INBOX, subject: `Custom design request ${ref} from ${name || email}`,

@@ -28,6 +28,7 @@ import Shorts from './tabs/Shorts';
 import PdfMaker from './tabs/PdfMaker';
 import Seasonal from './tabs/Seasonal';
 import DesignBoard from './tabs/DesignBoard';
+import CustomRequests from './tabs/CustomRequests';
 import OrderSoundListener from './OrderSoundListener';
 import { inputCls, btnPrimary } from './ui';
 
@@ -48,6 +49,7 @@ const TABS: Tab[] = [
   { key: 'categories',  label: 'Categories',   icon: '☷', Component: Categories },
   { key: 'categorymgr', label: 'Category Manager', icon: '🗂', Component: CategoryManager },
   { key: 'orders',      label: 'Orders',       icon: '⊞', Component: Orders },
+  { key: 'customrequests', label: 'Custom Requests', icon: '🖼', Component: CustomRequests },
   { key: 'cults',       label: 'Cults3D Sales', icon: '◈', Component: Cults },
   { key: 'shorts',      label: 'YouTube Shorts', icon: '▶', Component: Shorts },
   { key: 'discounts',   label: 'Discounts',    icon: '%', Component: Discounts },
@@ -193,11 +195,51 @@ export default function AdminApp() {
             <h1 className="font-serif text-2xl text-ink-800">{TABS.find((t) => t.key === tab)?.label}</h1>
             <a href="/" className="text-sm text-bronze-600 hover:underline">View storefront ↗</a>
           </div>
+          <CustomRequestBanner goRequests={() => setTab('customrequests')} />
           <PendingModerationBanner goProducts={() => { try { sessionStorage.setItem('products_filter', 'pending'); } catch {} setTab('products'); }} />
           <Active />
         </div>
       </main>
       <OrderSoundListener />
+    </div>
+  );
+}
+
+// A customer waiting on a quote is the most time-sensitive thing in the admin:
+// /custom-design promises a price within 24 hours. Shown on every page while
+// any request is unanswered, red once the oldest one is past that promise.
+// Owner, 2026-09-16: "as this is hidden it should be somewhere I can see".
+function CustomRequestBanner({ goRequests }: { goRequests: () => void }) {
+  const [rows, setRows] = useState<{ created_at: string; name: string | null }[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const { data } = await supabase.from('custom_design_requests')
+          .select('created_at, name').eq('status', 'new').order('created_at', { ascending: true }).limit(50);
+        if (alive) setRows((data as any) || []);
+      } catch {}
+    };
+    load();
+    const t = setInterval(load, 60000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  if (!rows.length) return null;
+  const hoursOld = (Date.now() - new Date(rows[0].created_at).getTime()) / 3600e3;
+  const left = 24 - hoursOld;
+  const overdue = left <= 0;
+  const when = overdue
+    ? `the oldest is ${Math.round(-left)} h past the 24-hour reply promise`
+    : `the oldest has ${left < 1 ? `${Math.round(left * 60)} min` : `${Math.round(left)} h`} left on the 24-hour reply promise`;
+  return (
+    <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-sm shadow-sm ${overdue ? 'border-red-500 bg-red-50 text-red-900' : 'border-amber-400 bg-amber-50 text-amber-900'}`}>
+      <span className="text-lg">🖼</span>
+      <span className="flex-1 min-w-[220px]">
+        <b>{rows.length} custom design request{rows.length === 1 ? '' : 's'}</b> waiting for a quote{rows[0].name ? ` (oldest from ${rows[0].name})` : ''}: {when}.
+      </span>
+      <button onClick={goRequests} className={`rounded px-3 py-1.5 text-xs font-medium text-white ${overdue ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'}`}>
+        Answer now →
+      </button>
     </div>
   );
 }
