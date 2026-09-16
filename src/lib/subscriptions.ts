@@ -572,14 +572,18 @@ export async function resolvePackClick(q: { s: string; m: string; k: string; v: 
     const url = kind === 'bonus' ? pack?.bonus_drive_link : pack?.standard_drive_link;
     return url ? { url } : { error: 'this pack has no files yet', status: 404 };
   }
-  const { data: s } = await db.from('member_subscriptions').select('id, email, tier, status, start_date, total_drops').eq('id', q.s).maybeSingle();
+  const { data: s } = await db.from('member_subscriptions').select('id, email, tier, status, start_date, total_drops, plan_slug').eq('id', q.s).maybeSingle();
   if (!s) return { error: 'membership not found', status: 404 };
   const pack = await getMemberPack(db, s.id, q.m);
   const url = kind === 'bonus' ? (s.tier === 'premium' ? pack?.bonus_drive_link : null) : pack?.standard_drive_link;
   if (!url) return { error: 'this pack is not available yet', status: 404 };
   // packs stay downloadable after expiry (files never expire), but only the
-  // months of the term itself
-  const months = Array.from({ length: s.total_drops }, (_, k) => toYM(addMonths(s.start_date, k)));
+  // months of the term itself. A starter term owns exactly one "month", the
+  // sentinel its bundle lives under: deriving months from start_date would
+  // say 2026-09 and refuse the buyer their own download.
+  const months = s.plan_slug === STARTER_PLAN_SLUG
+    ? [STARTER_PACK_MONTH]
+    : Array.from({ length: s.total_drops }, (_, k) => toYM(addMonths(s.start_date, k)));
   if (!months.includes(q.m)) return { error: 'that month is not part of this membership', status: 403 };
   const now = new Date().toISOString();
   await db.from('pack_downloads').insert({ subscription_id: s.id, email: s.email, month: q.m, kind, via: q.v === 'portal' ? 'portal' : 'email', user_agent: (q.ua || '').slice(0, 200) });

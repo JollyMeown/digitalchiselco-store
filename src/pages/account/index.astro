@@ -4,6 +4,7 @@ import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { verifyAccountToken } from '../../lib/account-token';
+import { STARTER_PLAN_SLUG, STARTER_PACK_MONTH } from '../../lib/subscriptions';
 
 export const prerender = false;
 
@@ -151,7 +152,10 @@ if (session?.email) {
     memberBlocks = subs.map((s: any) => {
       const list: EntitledPack[] = [];
       for (let k = 1; k <= s.total_drops; k++) {
-        const ym = addMonthsYM(s.start_date, k - 1);
+        // A starter term's single pack lives under the sentinel month, not the
+        // calendar month it was bought in, so the portal must ask for that one
+        // or it shows an empty September and a dead download button.
+        const ym = s.plan_slug === STARTER_PLAN_SLUG ? STARTER_PACK_MONTH : addMonthsYM(s.start_date, k - 1);
         const sentRow = (sent || []).find((l: any) => l.subscription_id === s.id && String(l.drop_month).split('#')[0] === ym);
         // the pack this member actually received (snapshot on the first pack
         // email or import record) wins over a later regeneration of the month
@@ -160,7 +164,10 @@ if (session?.email) {
         // the owner's 2099 test term (BRS pack builder proof) is always unlocked
         const testTerm = session.email === 'jolly@digitalchiselco.com' && String(s.start_date) >= '2090';
         list.push({
-          monthYM: ym, monthLabel: ymLabel(ym), accessible: ym <= currentYM || testTerm, dropNumber: k,
+          // "January 1" is what ymLabel makes of the sentinel, so the starter
+          // names itself instead.
+          monthYM: ym, monthLabel: ym === STARTER_PACK_MONTH ? 'Starter Bundle' : ymLabel(ym),
+          accessible: ym <= currentYM || testTerm, dropNumber: k,
           title: pack?.title || null, note: pack?.preview_note || null, cover: pack?.cover_image_url || null,
           items: Array.isArray(pack?.items) ? pack.items.slice(0, 8) : [],
           bonusItems: s.tier === 'premium' && Array.isArray(pack?.bonus_items) ? pack.bonus_items.slice(0, 4) : [],
