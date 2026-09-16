@@ -536,8 +536,12 @@ export async function resendPack(subscriptionId: string, ym: string, opts: { req
   const { data: s } = await db.from('member_subscriptions').select('*').eq('id', subscriptionId).maybeSingle();
   if (!s) return { ok: false, error: 'membership not found' };
   if (opts.requireEmail && String(s.email).toLowerCase() !== opts.requireEmail.toLowerCase()) return { ok: false, error: 'not your membership' };
-  // the month must be one of this term's months and already unlocked
-  const idx = Array.from({ length: s.total_drops }, (_, k) => toYM(addMonths(s.start_date, k))).indexOf(ym);
+  // the month must be one of this term's months and already unlocked. A
+  // starter term owns only the sentinel its bundle lives under, so deriving
+  // months from start_date would refuse the buyer their own pack.
+  const idx = s.plan_slug === STARTER_PLAN_SLUG
+    ? (ym === STARTER_PACK_MONTH ? 0 : -1)
+    : Array.from({ length: s.total_drops }, (_, k) => toYM(addMonths(s.start_date, k))).indexOf(ym);
   if (idx < 0) return { ok: false, error: 'that month is not part of this membership' };
   const testTerm = String(s.email).toLowerCase() === TEST_INBOX && String(s.start_date) >= '2090';
   if (ym >= '2090' && !testTerm) return { ok: false, error: 'test months are only sent to the shop inbox' };
