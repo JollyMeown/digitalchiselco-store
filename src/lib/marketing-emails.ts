@@ -661,6 +661,88 @@ export function productPicksEmail(d: { email: string; products: MiniProduct[]; n
   return { subject, html: shell(subject, 'Picked just for you 🪵', body, d.email), text };
 }
 
+// ── Etsy buyers: the price gap, with the free pack as the reason to look ──
+//
+// 2,054 people have bought from us on Etsy and are on the list, yet only 5
+// have ever bought on the site. Emailing them offers has not worked: cold
+// imports convert at 0.30%, while people who took the free pack convert at
+// 13.2%. So this does not sell anything. It gives them the five free files,
+// and uses the one fact they can check to explain why the site is worth a
+// look: the same designs cost less here, because Etsy takes a quarter.
+export function etsyBuyerFreePackEmail(d: {
+  email: string;
+  name?: string | null;
+  filesUrl: string;              // their permanent /free/files?k= link
+  boughtTitle?: string | null;   // a design they actually bought, if known
+  cheaperCount?: number | null;
+  cheaperPct?: number | null;
+  avgSaving?: number | null;
+  picks?: MiniProduct[];
+}): Out {
+  const e = d.email;
+  const first = (d.name || '').trim().split(/\s+/)[0];
+  const hi = first ? `${esc(first)}, ` : '';
+  const subject = d.avgSaving
+    ? `Your 5 free STL files (and why our prices differ from Etsy)`
+    : 'Your 5 free STL files, as a thank you';
+
+  const body = `
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#555;">
+      ${hi}you bought ${d.boughtTitle ? `<strong>${esc(String(d.boughtTitle).split('|')[0].trim().slice(0, 60))}</strong>` : 'one of our designs'} from us on Etsy. Thank you, genuinely.
+      Here are <strong>five more, free</strong>, as a thank you. No catch and nothing to enter.
+    </p>
+
+    ${btn(d.filesUrl, 'Get the 5 free files')}
+
+    ${(d.cheaperPct && d.avgSaving) ? `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:20px 0 0;">
+      <tr><td style="background:${CREAM};border-left:3px solid ${BRONZE};border-radius:6px;padding:14px 16px;">
+        <div style="font-size:13px;letter-spacing:1px;text-transform:uppercase;color:${BRONZE};margin-bottom:6px;">While you are here</div>
+        <div style="font-size:15px;line-height:1.6;color:#555;">
+          Every design on our Etsy shop is on our own site too, and
+          <strong>${d.cheaperCount ? `${d.cheaperCount} of them` : 'almost all of them'} cost less here</strong>
+          &mdash; on average <strong>$${d.avgSaving.toFixed(2)} less</strong>, about ${Math.round(d.cheaperPct)}% off.
+          It is the same file. Etsy takes roughly a quarter of every sale, and buying direct simply skips that.
+        </div>
+      </td></tr>
+    </table>` : ''}
+
+    <p style="margin:18px 0 0;font-size:15px;line-height:1.6;color:#555;">
+      The other thing you get by buying direct: everything lands in your own account here.
+      Sign in and every file you have bought is sitting there with a download button beside it,
+      for as long as you want it. No hunting back through order history to find a file you paid for.
+    </p>
+
+    ${d.picks && d.picks.length ? `<div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${BRONZE};font-weight:700;margin:20px 0 6px;">New since you last carved</div>${productGrid(d.picks.slice(0, 3))}` : ''}
+
+    ${btn(SITE + '/catalog', 'Browse the full catalogue')}
+
+    <p style="margin:16px 0 0;font-size:14px;line-height:1.6;color:#555;">
+      And if you ever lose a file you bought from us, on Etsy or here, just reply to this email and I will send it again.
+    </p>
+    <p style="margin:12px 0 0;font-size:14px;line-height:1.6;color:#555;">Jolly, DigitalChiselCo</p>`;
+
+  const text = [
+    `${first ? first + ', y' : 'Y'}ou bought one of our designs on Etsy. Thank you. Here are five more, free:`,
+    d.filesUrl,
+    '',
+    (d.cheaperPct && d.avgSaving)
+      ? `While you are here: every design on our Etsy shop is on our own site too, and ${d.cheaperCount || 'almost all'} of them cost less here, on average $${d.avgSaving.toFixed(2)} less, about ${Math.round(d.cheaperPct)}% off. Same file. Etsy takes about a quarter of every sale and buying direct skips that.`
+      : '',
+    '',
+    'Everything you buy here also lands in your own account, with a download button beside it, for as long as you want it.',
+    '',
+    `Browse: ${SITE}/catalog`,
+    '',
+    'Lost a file you bought from us anywhere? Reply and I will send it again.',
+    '',
+    'Jolly, DigitalChiselCo',
+    `Unsubscribe: ${unsubUrl(e)}`,
+  ].filter(Boolean).join('\n');
+
+  return { subject, html: shell(subject, 'Five files on us', body, e), text };
+}
+
 // ── Starter-month offer (the emailed-only way into the membership) ────
 //
 // The jump from single files to a $24.99 three-month term is the step most
