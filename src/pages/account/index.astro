@@ -63,6 +63,10 @@ type OrderItem = {
   downloads?: DownloadRow[];
   image_url?: string | null;
   is_customized?: boolean;
+  // Membership lines carry no product: they are filled from the pack instead.
+  is_membership?: boolean;
+  pack_link?: string | null;
+  pack_files?: number;
   customization_fields?: CustomizationField[];
   order_item_customizations?: { fields: CustomizationField[] }[];
   products?: { image_url: string | null; slug: string | null; is_customizable: boolean } | null;
@@ -102,6 +106,11 @@ if (session?.email) {
       const fields = (it.order_item_customizations || []).flatMap((c) => Array.isArray(c.fields) ? c.fields : []);
       it.customization_fields = fields;
       it.is_customized = fields.length > 0 || !!it.products?.is_customizable;
+      // A membership line has no product behind it, so it fell through to a
+      // "no image" box and, below, to "Download link will be emailed". Both
+      // are wrong: the pack is already delivered and sits in the packs section
+      // above. Borrow the pack's own cover and say so.
+      it.is_membership = !it.product_id && /membership|starter bundle/i.test(String(it.title || ''));
       it.image_url = it.products?.image_url || null;
       // Customized lines never show static download links — the file is built post-purchase.
       // Refunded/non-paid orders keep their history but lose the download buttons
@@ -126,7 +135,7 @@ function addMonthsYM(startYMD: string, n: number): string {
 function ymLabel(ym: string): string { const [y, m] = ym.split('-').map(Number); return `${_MONTHS[m - 1]} ${y}`; }
 
 type EntitledPack = { monthYM: string; monthLabel: string; accessible: boolean; dropNumber: number; title: string | null; note: string | null; cover: string | null; items: { title: string; image_url?: string | null; slug?: string | null }[]; bonusItems: { title: string; image_url?: string | null; slug?: string | null }[]; standard: string | null; bonus: string | null; sentAt: string | null; downloaded: number };
-type MemberBlock = { id: string; planName: string; status: string; dropsSent: number; totalDrops: number; tier: string; startLabel: string; endLabel: string; daysLeft: number; renewed: boolean; packs: EntitledPack[] };
+type MemberBlock = { id: string; orderId: string | null; planName: string; status: string; dropsSent: number; totalDrops: number; tier: string; startLabel: string; endLabel: string; daysLeft: number; renewed: boolean; packs: EntitledPack[] };
 let memberBlocks: MemberBlock[] = [];
 
 if (session?.email) {
@@ -134,7 +143,7 @@ if (session?.email) {
   const { packLink, ymdLabel: ymdL, daysUntil, todayYMD } = await import('../../lib/subscriptions');
   const { data: subs } = await db
     .from('member_subscriptions')
-    .select('id, plan_slug, months, tier, status, start_date, end_date, total_drops, drops_sent, renewed_to')
+    .select('id, order_id, plan_slug, months, tier, status, start_date, end_date, total_drops, drops_sent, renewed_to')
     .eq('email', session.email)
     .order('start_date', { ascending: false });
   if (subs && subs.length) {
@@ -178,12 +187,33 @@ if (session?.email) {
         });
       }
       return {
-        id: s.id, planName: planName(s.plan_slug), status: s.status, dropsSent: s.drops_sent, totalDrops: s.total_drops, tier: s.tier,
+        id: s.id, orderId: s.order_id, planName: planName(s.plan_slug), status: s.status, dropsSent: s.drops_sent, totalDrops: s.total_drops, tier: s.tier,
         startLabel: ymdL(s.start_date), endLabel: ymdL(s.end_date), daysLeft: daysUntil(today, s.end_date), renewed: !!s.renewed_to, packs: list,
       };
     });
   }
 }
+
+// A membership line in the order list has no product and no file of its own:
+// what it bought is the pack, which is delivered as one branded PDF. Give the
+// line the pack's cover and its real download button, instead of a grey "no
+// image" box and a promise that a link is coming (owner, 2026-09-16).
+for (const o of orders) {
+  for (const it of (o.order_items || []) as any[]) {
+    if (!it.is_membership) continue;
+    const block = memberBlocks.find((b: any) => b.orderId === o.id);
+    const pack = block?.packs?.find((p: any) => p.accessible && p.standard) || block?.packs?.[0];
+    if (!pack) continue;
+    it.image_url = it.image_url || pack.cover || null;
+    it.pack_link = pack.standard || null;
+    it.pack_files = Array.isArray(pack.items) ? pack.items.length : 0;
+  }
+}
+// "0 files available" while the buyer has just downloaded six reads as a bug.
+// Count what a membership actually entitles them to alongside single files.
+totalFiles += memberBlocks.reduce((n: number, b: any) =>
+  n + (b.packs || []).filter((p: any) => p.accessible && p.standard)
+    .reduce((m: number, p: any) => m + (Array.isArray(p.items) ? p.items.length : 0), 0), 0);
 
 // ── Referral program: a stable REF-XXXX share code per customer ───────
 // The code IS a real 15% coupon (so it flows through the normal cart discount
@@ -559,6 +589,13 @@ if (session?.email) {
                                       ⬇ Download{it.downloads!.length > 1 ? ` file ${i + 1}` : ''}{d.file_name && it.downloads!.length === 1 ? ` · ${d.file_name}` : ''}
                                     </a>
                                   ))}
+                                </div>
+                              ) : it.pack_link ? (
+                                <div class="flex flex-wrap gap-2 items-center">
+                                  <a href={it.pack_link} class="inline-flex items-center gap-1 bg-bronze-700 text-cream text-xs font-medium px-3 py-1.5 rounded-md hover:bg-bronze-800 transition">
+                                    ⬇ Download the pack{it.pack_files ? ` · ${it.pack_files} designs` : ''}
+                                  </a>
+                                  <span class="text-xs text-ink-700/60">one PDF with every design link inside</span>
                                 </div>
                               ) : (
                                 <div class="text-xs text-ink-700/60 italic">
