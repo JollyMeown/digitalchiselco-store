@@ -737,6 +737,19 @@ export function starterMonthEmail(d: {
 
     ${etsyPanel}
 
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:16px 0 0;">
+      <tr><td style="background:${CREAM};border-left:3px solid ${BRONZE};border-radius:6px;padding:14px 16px;">
+        <div style="font-size:13px;letter-spacing:1px;text-transform:uppercase;color:${BRONZE};margin-bottom:6px;">You never lose a file</div>
+        <div style="font-size:15px;line-height:1.6;color:#555;">
+          Everything you buy here lands in your own account on the site.
+          Sign in and every design you have ever bought is sitting there with a
+          download button next to it, for as long as you want it.
+          No hunting through old emails, no expiring links, no asking anyone to
+          send it again. Lose your laptop tomorrow and the files are still there.
+        </div>
+      </td></tr>
+    </table>
+
     <p style="margin:18px 0 0;font-size:15px;line-height:1.6;color:#555;">
       These are not leftovers or a sample set. It is a bundle put together for people
       carving their first few projects with us: a spread of subjects, every file
@@ -746,7 +759,7 @@ export function starterMonthEmail(d: {
     <ul style="margin:12px 0 0;padding-left:18px;font-size:14px;color:#555;line-height:1.7;">
       <li>Commercial use included, so you can sell what you carve</li>
       <li>One payment. Nothing renews, and there is nothing to cancel</li>
-      <li>The files stay yours for good</li>
+      <li>Kept in your account for good, and re-downloadable any time</li>
       ${d.upgradePrice ? `<li>If you want more later, upgrade any time and we credit this $${d.price.toFixed(2)} against it</li>` : ''}
     </ul>
 
@@ -766,6 +779,7 @@ export function starterMonthEmail(d: {
     d.etsyCheaperPct && d.etsyAvgSaving
       ? `Worth knowing: the same designs cost about $${d.etsyAvgSaving.toFixed(2)} less here than on Etsy, roughly ${Math.round(d.etsyCheaperPct)}% off, because Etsy takes a quarter of every sale.`
       : '',
+    'And everything you buy here lives in your own account on the site: every design you have ever bought, with a download button beside it, for as long as you want it. No hunting through old emails and no expiring links.',
     'Commercial use included. One payment, nothing renews, the files stay yours.',
     d.upgradePrice ? `Upgrade any time and we credit the $${d.price.toFixed(2)}.` : '',
     '',
