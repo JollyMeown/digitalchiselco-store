@@ -5,6 +5,7 @@ import LiveVisitorMap from '../LiveVisitorMap';
 import ChannelStats from '../ChannelStats';
 import MerchantStats from '../MerchantStats';
 import SearchConsole from '../SearchConsole';
+import SavedCarts from '../SavedCarts';
 
 type Visit = { day: string; path: string; referrer_host: string | null; device: string | null; country: string | null; visitor_hash: string | null; campaign?: string | null };
 
@@ -197,6 +198,7 @@ export default function Traffic() {
           </div>
 
           <ShopperActions events={eventsExt} names={prodNames} paid={paidCount} days={days} />
+          <SavedCarts />
 
           <LampStudio days={days} />
 

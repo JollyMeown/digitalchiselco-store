@@ -559,6 +559,8 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
                   });
                 }
               } catch (_) {}
+              // tell the saved-cart record this cart was BOUGHT, before it empties
+              try { if (window.dccCartSnapshot) { localStorage.setItem('cart', '[]'); window.dccCartSnapshot({ converted: true, txn: txnId || '' }); } } catch (_) {}
               localStorage.setItem('cart', '[]');
               window.dispatchEvent(new Event('cart-changed'));
               window.location.href = '/checkout/success' + (txnId ? '?txn=' + encodeURIComponent(txnId) : '');

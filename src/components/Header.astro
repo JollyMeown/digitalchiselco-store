@@ -152,6 +152,44 @@ try {
   // of the week, favorites "add all", membership) record the SAME event.
   window.dccAction = dccAction;
 
+  // ── Saved-cart snapshot (admin sees what a returning shopper has saved) ──
+  // A random anonymous id per browser; no personal data unless the shopper
+  // typed an email on this site. Sent when the cart changes, and once per page
+  // view while the cart holds something (that is what marks a return visit).
+  function dccBid() {
+    try {
+      let b = localStorage.getItem('dcc_bid');
+      if (!b || !/^[a-z0-9]{16,40}$/.test(b)) {
+        const r = new Uint8Array(12); crypto.getRandomValues(r);
+        b = Array.from(r, (x) => x.toString(16).padStart(2, '0')).join('');
+        localStorage.setItem('dcc_bid', b);
+      }
+      return b;
+    } catch { return ''; }
+  }
+  function dccCartSnapshot(extra) {
+    try {
+      const c = JSON.parse(localStorage.getItem('cart') || '[]');
+      const ids = c.map((x) => String(x.id));
+      const sig = ids.slice().sort().join(',');
+      const last = localStorage.getItem('dcc_cart_sig');
+      const view = !!(extra && extra.view);
+      // nothing to say: an empty cart that was already empty, or an unchanged cart outside a page view
+      if (!extra && sig === last) return;
+      if (view && !ids.length) return;
+      if (!ids.length && last === null) return;
+      localStorage.setItem('dcc_cart_sig', sig);
+      const bid = dccBid(); if (!bid) return;
+      const em = localStorage.getItem('buyer_email') || localStorage.getItem('dcc_email') || '';
+      navigator.sendBeacon('/api/cart-snapshot', new Blob([JSON.stringify(Object.assign({
+        bid, ids, p: location.pathname, em: em || undefined,
+      }, extra || {}))], { type: 'application/json' }));
+    } catch {}
+  }
+  window.dccCartSnapshot = dccCartSnapshot;
+  window.addEventListener('cart-changed', () => dccCartSnapshot());
+  if (!location.pathname.startsWith('/admin')) setTimeout(() => dccCartSnapshot({ view: true }), 1500);
+
   // ── Wishlist / Favorites (localStorage, no login required) ─────────
   const WISH_KEY = 'dcc_wishlist';
   function wishList() { try { return JSON.parse(localStorage.getItem(WISH_KEY) || '[]'); } catch { return []; } }

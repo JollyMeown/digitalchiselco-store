@@ -46,6 +46,13 @@ export const POST: APIRoute = async ({ request }) => {
     const device = deviceOf(ua);
     if (device === 'bot') return new Response(null, { status: 204 });
 
+    // Never record dev-server traffic (page views AND events, 2026-09-17:
+    // local tests of the cart were landing in the live Shopper actions): `npm run dev` writes to the SAME
+    // production database, which put 233 phantom "localhost" visits into the
+    // 30-day analytics and skewed every channel percentage.
+    const originHost = (() => { try { return new URL(request.headers.get('origin') || request.headers.get('referer') || '').hostname; } catch { return ''; } })();
+    if (/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(originHost)) return new Response(null, { status: 204 });
+
     // Funnel events (t != 'pv') land in site_events instead of site_visits.
     const type = String(body.t || 'pv');
 
@@ -99,11 +106,6 @@ export const POST: APIRoute = async ({ request }) => {
       }
     } catch { /* ignore bad referrer */ }
 
-    // Never record dev-server traffic: `npm run dev` writes to the SAME
-    // production database, which put 233 phantom "localhost" visits into the
-    // 30-day analytics and skewed every channel percentage.
-    const originHost = (() => { try { return new URL(request.headers.get('origin') || request.headers.get('referer') || '').hostname; } catch { return ''; } })();
-    if (/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(originHost)) return new Response(null, { status: 204 });
 
     const day = new Date().toISOString().slice(0, 10);
     const secret = process.env.ACCOUNT_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'trk';
