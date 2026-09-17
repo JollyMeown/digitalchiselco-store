@@ -739,9 +739,12 @@ async function handleTransactionCompleted(db: any, txn: any) {
   if (purchasedMemberships.length && email && email !== 'unknown@digitalchiselco.com') {
     for (const mp of purchasedMemberships) {
       try {
+        // A gifted membership belongs to the RECIPIENT (it used to be
+        // created for the buyer). Their name is not known, only the giver's.
         const r = await createSubscriptionForPurchase({
-          email,
-          customerName: earlyOpsCustomerName,
+          email: gift ? deliveryEmail : email,
+          customerName: gift ? null : earlyOpsCustomerName,
+          gift: gift ? { from: gift.fromName, note: gift.note, buyerEmail: email } : null,
           plan: { slug: mp.slug, name: mp.name, months: mp.months, files_per_month: mp.files_per_month, price_usd: mp.price_usd },
           orderId: order.id,
           paddleTransactionId: `${txn.id}:${mp.slug}`,

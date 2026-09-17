@@ -753,6 +753,14 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       document.getElementById('gift-fields')?.classList.toggle('hidden', !e.target.checked);
       if (e.target.checked) setTimeout(() => document.getElementById('gift-to')?.focus(), 50);
     });
+    // Came from "Give it as a gift" on the membership page: open the gift fields.
+    try {
+      if (localStorage.getItem('dcc_gift_intent') === '1') {
+        localStorage.removeItem('dcc_gift_intent');
+        const gc = document.getElementById('gift-check');
+        if (gc && !gc.checked) { gc.checked = true; gc.dispatchEvent(new Event('change')); }
+      }
+    } catch (_) {}
 
     // Back to cart from the inline checkout. FIRST click offers to email the
     // cart (we know exactly this is where sales die — the funnel's

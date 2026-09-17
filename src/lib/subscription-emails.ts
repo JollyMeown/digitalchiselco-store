@@ -150,7 +150,20 @@ export type DropEmailData = {
   logoUrl?: string | null;
   resend?: boolean;
   makerInvite?: boolean;   // append the Cut Local block (marketplace live)       // "here it is again"
+  isGift?: boolean;        // the term was bought for them by someone else
+  giftFrom?: string | null;
+  giftNote?: string | null;
 };
+
+// The welcome for a gifted term opens with who it is from and their message.
+function giftBanner(d: DropEmailData): string {
+  if (!d.isGift) return '';
+  return `<div style="margin:0 0 16px;background:#FAEEDA;border-radius:10px;padding:14px 16px;text-align:center;">
+      <div style="font-size:26px;line-height:1;">🎁</div>
+      <p style="margin:8px 0 0;font-size:15px;color:${INK};"><strong>${d.giftFrom ? esc(d.giftFrom) : 'Someone who knows you love making things'}</strong> gave you this membership.</p>
+      ${d.giftNote ? `<p style="margin:8px 0 0;font-size:14px;font-style:italic;color:#6b5a45;">"${esc(d.giftNote)}"</p>` : ''}
+    </div>`;
+}
 
 const greet = (name?: string | null) => `<p style="margin:0;font-size:16px;color:${INK};">${name ? `Hi ${esc(String(name).split(' ')[0])},` : 'Hi there,'}</p>`;
 const cover = (d: DropEmailData) => d.coverUrl ? `<img src="${esc(d.coverUrl)}" alt="${esc(d.packTitle || d.monthLabel)}" width="544" style="width:100%;max-width:544px;border-radius:10px;display:block;margin:16px 0 4px;">` : '';
@@ -159,10 +172,13 @@ const pending = `<div style="background:#FFFBF4;border-left:3px solid ${BRONZE};
 /** First pack, sent the moment a membership starts. */
 export function firstPackEmail(d: DropEmailData): { subject: string; html: string; text: string } {
   const hasFiles = !!(d.standardLink || d.bonusLink);
-  const subject = hasFiles
+  const subject = d.isGift
+    ? `🎁 ${d.giftFrom ? `${d.giftFrom} gave` : 'Someone gave'} you a DigitalChiselCo membership`
+    : hasFiles
     ? `Welcome! Your first STL pack is ready: ${d.monthLabel}`
     : `Welcome to the membership. Your ${d.monthLabel} pack arrives shortly`;
   const body = `
+    ${giftBanner(d)}
     ${greet(d.customerName)}
     <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#555;">Welcome to the <strong>${esc(d.planName)}</strong>. You will receive <strong>${d.totalDrops} monthly packs</strong> of fresh bas-relief STL files, and this is pack <strong>1 of ${d.totalDrops}</strong>.</p>
     ${cover(d)}
@@ -174,7 +190,8 @@ export function firstPackEmail(d: DropEmailData): { subject: string; html: strin
     ${termLine(d)}
     <p style="margin:14px 0 0;font-size:13px;color:#777;line-height:1.6;">Every pack also lives in <a href="${SITE}/account" style="color:${BRONZE};">your account</a>, forever. New packs arrive by email automatically each month; nothing to do.</p>`;
   const html = shell({ subject, heading: 'Your membership is live', subheading: `Pack 1 of ${d.totalDrops}`, bodyHtml: body, logoUrl: d.logoUrl, makerBlock: d.makerInvite, preheader: d.packTitle || `Pack 1 of ${d.totalDrops} is ready to download` });
-  const text = `Welcome to the ${d.planName}.\n\nThis is pack 1 of ${d.totalDrops}.\n${d.packTitle ? d.packTitle + '\n' : ''}${d.previewNote ? d.previewNote + '\n' : ''}\n${d.standardLink ? 'Download: ' + d.standardLink + '\n' : ''}${d.bonusLink ? 'Bonus: ' + d.bonusLink + '\n' : ''}\nAll packs: ${SITE}/account`;
+  const giftTxt = d.isGift ? `🎁 ${d.giftFrom || 'Someone'} gave you this membership.${d.giftNote ? `\n"${d.giftNote}"` : ''}\n\n` : '';
+  const text = `${giftTxt}Welcome to the ${d.planName}.\n\nThis is pack 1 of ${d.totalDrops}.\n${d.packTitle ? d.packTitle + '\n' : ''}${d.previewNote ? d.previewNote + '\n' : ''}\n${d.standardLink ? 'Download: ' + d.standardLink + '\n' : ''}${d.bonusLink ? 'Bonus: ' + d.bonusLink + '\n' : ''}\nAll packs: ${SITE}/account`;
   return { subject, html, text: text + (d.makerInvite ? MAKER_BLOCK_TEXT : '') };
 }
 

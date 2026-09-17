@@ -214,6 +214,7 @@ function dropData(s: any, ym: string, pack: Pack | null, dropNumber: number, pla
     hasBonus: !!pack?.bonus_drive_link,
     dropNumber, totalDrops: s.total_drops, isPremium: s.tier === 'premium',
     nextPackLabel: nextYM ? ymLabel(nextYM) : null, endDateLabel: ymdLabel(s.end_date), logoUrl, resend,
+    isGift: !!s.gift_buyer_email, giftFrom: s.gift_from || null, giftNote: s.gift_note || null,
   };
 }
 
@@ -230,6 +231,8 @@ export async function createSubscriptionForPurchase(input: {
   couponCode?: string | null;
   /** Migration from the old system: packs the member already received there. Those months are not re-sent. */
   dropsAlreadySent?: number;
+  /** A gifted term: `email` is the RECIPIENT; these say who gave it. */
+  gift?: { from?: string | null; note?: string | null; buyerEmail?: string | null } | null;
 }): Promise<{ created: boolean; subscriptionId?: string; reason?: string; chainedFrom?: string | null; upgradedFrom?: string | null; creditMonths?: number; startDate?: string }> {
   const db = supabaseAdmin();
   const email = input.email.toLowerCase().trim();
@@ -272,6 +275,9 @@ export async function createSubscriptionForPurchase(input: {
     total_drops: months + creditMonths, price_usd: input.plan.price_usd ?? null,
     is_renewal: isRenewal, order_id: input.orderId || null,
     paddle_transaction_id: input.paddleTransactionId || null,
+    gift_from: input.gift ? (input.gift.from || null) : null,
+    gift_note: input.gift ? (input.gift.note || null) : null,
+    gift_buyer_email: input.gift ? (input.gift.buyerEmail || null) : null,
     source: input.source || 'paddle',
     notes: [input.notes, creditMonths ? `upgrade: ${creditMonths} unused month(s) of the previous term carried over` : null].filter(Boolean).join(' · ') || null,
     coupon_code: input.couponCode || null,
