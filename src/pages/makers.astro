@@ -5,6 +5,7 @@
 import Shell from '../layouts/Shell.astro';
 import MakerMap from '../components/MakerMap.tsx';
 import { supabaseAdmin } from '../lib/supabase';
+import { placeLabel } from '../lib/place';
 // Maker showcase: approved makers with their real work, no contact info —
 // buyers browse, fall in love with the craft, and hire directly from a profile.
 let gallery: any[] = [];
@@ -68,7 +69,7 @@ const MACHINE: Record<string, string> = { cnc_router: 'CNC router', cnc_mill: 'C
                   {m.rating_count > 0
                     ? <span><span class="text-bronze-600">{stars(m.rating_avg)}</span> {Number(m.rating_avg).toFixed(1)} · {m.jobs_completed || 0} job{m.jobs_completed === 1 ? '' : 's'} delivered</span>
                     : <span>New maker · founding member</span>}
-                  {' · '}{[m.city, m.country].filter(Boolean).join(', ')}
+                  {' · '}{placeLabel(m, { withCountry: true })}
                 </div>
                 <div class="flex flex-wrap gap-1.5 mt-2.5">
                   {(m.machine_types || []).slice(0, 3).map((t: string) => <span class="text-[11px] px-2 py-0.5 rounded-full bg-[#2c6a67]/10 text-[#1c4a48] font-medium">{MACHINE[t] || t}</span>)}

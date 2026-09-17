@@ -4,6 +4,7 @@
 // jobs with buyer chat, credits and rating. Noindex.
 import Shell from '../layouts/Shell.astro';
 import { supabaseAdmin } from '../lib/supabase';
+import { placeLabel } from '../lib/place';
 import { verifyMakerToken, signMakerToken } from '../lib/marketplace-token';
 import { CREDIT_PACKS } from '../lib/marketplace';
 const paddleEnv = ((process.env.PADDLE_ENV ?? import.meta.env.PADDLE_ENV) === 'production' ? 'production' : 'sandbox');
@@ -139,7 +140,7 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
                   <div class="flex justify-between gap-3">
                     <div>
                       <div class="font-medium text-ink-900">{jtitle(r)} <span class="text-xs px-2 py-0.5 rounded-full bg-white text-green-700 ml-1">{r.status}</span></div>
-                      <div class="text-xs text-ink-700/60 mt-0.5">{[r.material, r.size].filter(Boolean).join(' · ')} · {[r.city, r.region].filter(Boolean).join(', ')} · buyer: {r.buyer_name || r.buyer_email}</div>
+                      <div class="text-xs text-ink-700/60 mt-0.5">{[r.material, r.size].filter(Boolean).join(' · ')} · {placeLabel(r)} · buyer: {r.buyer_name || r.buyer_email}</div>
                     </div>
                     <div class="text-right"><div class="font-serif text-xl text-bronze-800">${Number(r.agreed_price || 0).toFixed(2)}</div></div>
                   </div>
@@ -210,7 +211,7 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
                       {r.preferred_maker_id === maker.id && <span class="ml-1.5 text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold align-middle">⭐ Buyer picked YOU</span>}
                     </div>
                     <div class="text-xs text-ink-700/60 mt-0.5">{[r.material, r.size, r.finish].filter(Boolean).join(' · ') || 'any material'} · qty {r.quantity}</div>
-                    <div class="text-xs text-ink-700/55 mt-0.5">{[r.city, r.region, r.country].filter(Boolean).join(', ')} · by {r.deadline || 'flexible'} · budget {r.budget || 'open'} · {r.delivery}</div>
+                    <div class="text-xs text-ink-700/55 mt-0.5">{placeLabel(r, { withCountry: true })} · by {r.deadline || 'flexible'} · budget {r.budget || 'open'} · {r.delivery}</div>
                     {r.notes && <p class="text-sm text-ink-700/75 mt-1.5">{r.notes}</p>}
                   </div>
                 </div>

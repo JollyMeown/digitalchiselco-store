@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { geoNaturalEarth1, geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
+import { placeLabel } from '../lib/place';
 import land110 from 'world-atlas/land-110m.json';
 import countries110 from 'world-atlas/countries-110m.json';
 
@@ -136,7 +137,7 @@ export default function MakerMap({ compact = false }: { compact?: boolean } = {}
           <div style={{ fontSize: 12, color: '#e0b876' }}>
             {hover.m.reviews > 0 ? `★ ${hover.m.rating.toFixed(1)} · ${hover.m.reviews} reviews · ${hover.m.jobs} jobs` : 'New maker'}
           </div>
-          <div style={{ fontSize: 11.5, color: '#b9a88f', marginTop: 2 }}>{[hover.m.city, hover.m.region].filter(Boolean).join(', ')}</div>
+          <div style={{ fontSize: 11.5, color: '#b9a88f', marginTop: 2 }}>{placeLabel(hover.m)}</div>
           <div style={{ fontSize: 10.5, color: '#8a7a63', marginTop: 3, fontFamily: 'monospace' }}>{(hover.m.machines || []).map(machineLabel).join(' · ')}</div>
           <div style={{ fontSize: 10.5, color: '#e0b876', marginTop: 4 }}>click to view profile →</div>
         </div>
@@ -145,7 +146,7 @@ export default function MakerMap({ compact = false }: { compact?: boolean } = {}
       {compact && (() => {
         const m = hover?.m || (makers && makers.length ? makers[spot % makers.length] : null);
         if (!m) return null;
-        const place = [m.city, m.region, m.country].filter(Boolean).join(', ');
+        const place = placeLabel(m, { withCountry: true });
         return (
           <a href={m.id ? `/m/${m.id}` : '/makers'} key={m.name}
             style={{ display: 'flex', alignItems: 'center', gap: 11, textDecoration: 'none', marginTop: 10,
