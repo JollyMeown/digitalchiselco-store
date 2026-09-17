@@ -4,7 +4,7 @@ import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import RecentlyViewed from '../../components/RecentlyViewed.astro';
 import TrustBadges from '../../components/TrustBadges.astro';
-import { getProductBySlug, getRelatedProducts, getSettings, getSoldCount } from '../../lib/queries';
+import { getProductBySlug, getRelatedProducts, getSettings, getSoldCount, getBoughtTogether } from '../../lib/queries';
 import { pricing, money } from '../../lib/pricing';
 import { jsonLd } from '../../lib/jsonld';
 import { img } from '../../lib/img';
@@ -50,6 +50,13 @@ try {
   film = (f as any) || null;
 } catch { /* the page works without it */ }
 const related = await getRelatedProducts(p.id, 5, cat?.id || null);   // same collection, best sellers first
+// Frequently bought together: designs real buyers put in the same order as
+// this one (Etsy receipts + website orders, scripts/build_product_pairs.mjs).
+// Shown only when a pair was bought together in at least two orders.
+const together = p.is_bundle ? [] : (await getBoughtTogether(p.id, 2)).map((t) => ({
+  ...t, shown: pricing(t.price_usd, settings.discount_percent).price,
+}));
+const togetherTotal = together.length ? price + together.reduce((n, t) => n + t.shown, 0) : 0;
 const soldCount = await getSoldCount(p.id);
 // Real numbers from Etsy for the same design: how many times it sold this
 // year, how many people favourited it, and what it costs there. All three are
@@ -526,6 +533,81 @@ const breadcrumbLd = {
   <section class="mt-10">
     <TrustBadges />
   </section>
+
+  {together.length > 0 && (
+    <section class="mt-12" id="bought-together">
+      <h2 class="text-xl mb-1">Frequently bought together</h2>
+      <p class="text-sm text-ink-700/70 mb-4">
+        Carvers who bought this design also took {together.length === 1 ? 'this one' : 'these'} in the same order
+        ({Math.max(...together.map((t) => t.together))} orders and counting). Any 2+ designs get an extra 10% off in the cart.
+      </p>
+      <div class="flex flex-col md:flex-row md:items-center gap-4 bg-white border border-black/10 rounded-xl p-4">
+        <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <label class="bt-item flex flex-col items-center w-28 sm:w-32 text-center cursor-pointer"
+            data-id={p.id} data-slug={p.slug} data-title={cleanTitle} data-price={price} data-img={gallery[0] || ''}>
+            <img src={img(gallery[0] || p.image_url, { w: 240, square: true, q: 75 })} alt={cleanTitle} width="120" height="120" loading="lazy" class="w-full aspect-square object-cover rounded-lg border border-black/10" />
+            <span class="mt-1.5 text-[11px] leading-tight text-ink-800 line-clamp-2">This design</span>
+            <span class="text-xs text-bronze-700 font-medium">{money(price)}</span>
+            <input type="checkbox" class="bt-check mt-1 accent-[#854F0B]" checked />
+          </label>
+          {together.map((t) => (
+            <Fragment>
+              <span class="text-2xl text-ink-700/40 font-light" aria-hidden="true">+</span>
+              <label class="bt-item flex flex-col items-center w-28 sm:w-32 text-center cursor-pointer"
+                data-id={t.id} data-slug={t.slug} data-title={String(t.title).split('|')[0].trim()} data-price={t.shown} data-img={t.image_url || ''}>
+                <a href={`/product/${t.slug}`} class="block w-full">
+                  <img src={img(t.image_url, { w: 240, square: true, q: 75 })} alt={String(t.title).split('|')[0].trim()} width="120" height="120" loading="lazy" class="w-full aspect-square object-cover rounded-lg border border-black/10" />
+                </a>
+                <span class="mt-1.5 text-[11px] leading-tight text-ink-800 line-clamp-2">{String(t.title).split('|')[0].trim()}</span>
+                <span class="text-xs text-bronze-700 font-medium">{money(t.shown)}</span>
+                <input type="checkbox" class="bt-check mt-1 accent-[#854F0B]" checked />
+              </label>
+            </Fragment>
+          ))}
+        </div>
+        <div class="md:ml-auto md:text-right shrink-0">
+          <div class="text-sm text-ink-700/70">Total for the selected designs</div>
+          <div class="text-2xl text-bronze-700 font-medium" id="bt-total" data-full={togetherTotal.toFixed(2)}>{money(togetherTotal)}</div>
+          <button type="button" id="bt-add" class="mt-2 bg-bronze-600 text-cream text-sm font-medium px-5 py-2.5 rounded-md hover:bg-bronze-700 transition">
+            Add {together.length + 1} to cart
+          </button>
+        </div>
+      </div>
+      <script is:inline>
+        (function () {
+          var root = document.getElementById('bought-together');
+          if (!root) return;
+          var items = Array.prototype.slice.call(root.querySelectorAll('.bt-item'));
+          var total = document.getElementById('bt-total');
+          var btn = document.getElementById('bt-add');
+          function picked() { return items.filter(function (it) { return it.querySelector('.bt-check').checked; }); }
+          function refresh() {
+            var sel = picked();
+            var sum = sel.reduce(function (n, it) { return n + Number(it.dataset.price || 0); }, 0);
+            total.textContent = '$' + sum.toFixed(2);
+            btn.textContent = sel.length ? ('Add ' + sel.length + ' to cart') : 'Pick at least one';
+            btn.disabled = !sel.length;
+          }
+          items.forEach(function (it) { it.querySelector('.bt-check').addEventListener('change', refresh); });
+          btn.addEventListener('click', function () {
+            var cart = [];
+            try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch (_) {}
+            picked().forEach(function (it) {
+              var d = it.dataset;
+              if (!cart.find(function (x) { return x.id === d.id; })) {
+                cart.push({ id: d.id, slug: d.slug, title: d.title, price: Number(d.price), img: d.img });
+                if (window.dccAction) window.dccAction('add_to_cart', d.id);
+              }
+            });
+            localStorage.setItem('cart', JSON.stringify(cart));
+            window.dispatchEvent(new Event('cart-changed'));
+            try { navigator.sendBeacon('/api/track', new Blob([JSON.stringify({ p: location.pathname, t: 'bought_together' })], { type: 'application/json' })); } catch (_) {}
+            if (window.dccOpenCart) window.dccOpenCart(); else location.href = '/cart';
+          });
+        })();
+      </script>
+    </section>
+  )}
 
   {related.length > 0 && (
     <section class="mt-14">

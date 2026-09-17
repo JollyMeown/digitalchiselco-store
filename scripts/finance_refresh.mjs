@@ -210,3 +210,14 @@ for (const c of Object.keys(channelOk)) {
 await db.from('finance_status').update({ data: status, synced_at: nowIso }).eq('id', 1);
 console.log(`\n✓ wrote ${rows.length} finance_daily rows for [${okChannels.join(', ')}]${okChannels.length < 3 ? ' — FAILED: ' + Object.keys(channelOk).filter((c) => !channelOk[c]).map((c) => c + ' (' + channelError[c] + ')').join('; ') : ''}`);
 if (okChannels.length < Object.keys(channelOk).length) process.exitCode = 2;
+
+// Weekly (Mondays, UTC): rebuild "frequently bought together" from Etsy
+// receipts + website orders. Needs the same local Etsy token, which is why it
+// rides on this task. A failure here never touches the finance numbers above.
+if (new Date().getUTCDay() === 1 && channelOk.etsy) {
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const out = execFileSync(process.execPath, ['scripts/build_product_pairs.mjs', '--apply'], { encoding: 'utf8', timeout: 15 * 60e3 });
+    console.log('pairs:', out.trim().split('\n').pop());
+  } catch (e) { console.log('pairs rebuild failed (finance unaffected):', String(e.message).slice(0, 120)); }
+}

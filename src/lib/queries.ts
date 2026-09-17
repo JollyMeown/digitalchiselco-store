@@ -217,6 +217,24 @@ export async function getSeasonalProducts(col: { keywords?: unknown; title?: str
 // "Related" used to be five random products with no relation at all. Now it
 // is the same collection's best sellers, which is the second sale a buyer of
 // this design is most likely to make; falls back to shop-wide best sellers.
+/** Designs real buyers put in the same order as this one (product_pairs,
+ *  built from Etsy receipts + website orders). Most-often-together first. */
+export async function getBoughtTogether(productId: string, limit = 2): Promise<(ProductCard & { together: number })[]> {
+  try {
+    const { data, error } = await supabase
+      .from('product_pairs')
+      .select(`together, pair:products!product_pairs_pair_id_fkey(${CARD}, active)`)
+      .eq('product_id', productId)
+      .order('together', { ascending: false })
+      .limit(limit * 3);
+    if (error) throw error;
+    return (data || [])
+      .filter((r: any) => r.pair && r.pair.active && r.pair.image_url && !r.pair.is_bundle && Number(r.pair.price_usd) > 0)
+      .slice(0, limit)
+      .map((r: any) => ({ ...r.pair, together: r.together }));
+  } catch (e) { console.error('getBoughtTogether failed:', e); return []; }
+}
+
 export async function getRelatedProducts(excludeId: string, limit = 5, categoryId?: string | null) {
   try {
     if (categoryId) {
