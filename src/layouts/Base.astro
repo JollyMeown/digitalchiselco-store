@@ -214,54 +214,109 @@ const faviconType = settings.favicon_image_url
     <AnnouncementBanner />
     <slot />
 
-    <!-- Exit-intent free-pack popup: shows once per 14 days when the cursor
-         leaves the top of the viewport (desktop). Feeds the double-opt-in
-         subscriber flow → nurture drip. -->
-    <div id="dcc-exit" style="position:fixed;inset:0;background:rgba(42,26,14,.55);z-index:60;display:none;align-items:center;justify-content:center;padding:16px;">
-      <div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:28px;text-align:center;position:relative;border:1px solid #E5DDD0;">
-        <button id="dcc-exit-x" aria-label="Close" style="position:absolute;top:10px;right:14px;font-size:20px;color:#999;background:none;border:none;cursor:pointer;">×</button>
-        <div style="font-size:34px;">🎁</div>
-        <h2 class="font-serif" style="color:#5E380A;font-size:22px;margin:8px 0 4px;">Wait — take 5 free STL files</h2>
-        <p style="font-size:14px;color:#666;margin:0 0 14px;">Our 5 best-selling bas-relief designs, free. CNC-tested, commercial use included.</p>
-        <form id="dcc-exit-form" style="display:flex;gap:8px;">
-          <input id="dcc-exit-email" type="email" required placeholder="you@email.com" style="flex:1;padding:10px 12px;border:1px solid #d8cdbb;border-radius:8px;font-size:14px;" />
-          <button type="submit" style="background:#854F0B;color:#F5EFE3;border:none;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;">Send them</button>
+    <!-- About-to-leave free-pack offer. Free-pack subscribers buy at 13.2%
+         (Sep 2026 growth model), so a visitor who leaves without the pack is
+         the most expensive exit on the site. Desktop: the cursor leaves the top
+         of the window. Phones (never covered before 2026-09-17): a quick
+         scroll back up after reading a good part of the page, shown as a
+         bottom sheet. Never for known emails, buyers, signed-in users or a
+         shopper holding a cart; 14 quiet days after each showing; 3 showings
+         per browser at most. Feeds the double-opt-in subscriber flow. -->
+    <div id="dcc-exit" role="dialog" aria-modal="true" aria-labelledby="dcc-exit-h" style="position:fixed;inset:0;background:rgba(42,26,14,.55);z-index:60;display:none;align-items:center;justify-content:center;padding:16px;">
+      <div id="dcc-exit-card" style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:28px 24px 22px;text-align:center;position:relative;border:1px solid #E5DDD0;box-shadow:0 20px 50px rgba(42,26,14,.25);">
+        <button id="dcc-exit-x" aria-label="Close" style="position:absolute;top:8px;right:10px;width:36px;height:36px;font-size:22px;color:#8a7a66;background:none;border:none;cursor:pointer;">×</button>
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#854F0B;font-weight:600;">Before you go</div>
+        <h2 id="dcc-exit-h" class="font-serif" style="color:#5E380A;font-size:24px;line-height:1.2;margin:6px 0 6px;">5 bas-relief STL files, free</h2>
+        <p style="font-size:14px;color:#5b5145;margin:0 0 12px;line-height:1.5;">Full designs, not samples. CNC-tested and ready for your router, laser or 3D printer, and you can sell what you make from them.</p>
+        <ul style="list-style:none;padding:0;margin:0 0 14px;font-size:12.5px;color:#5b5145;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;">
+          <li>✓ Instant download</li><li>✓ Commercial use</li><li>✓ Unsubscribe anytime</li>
+        </ul>
+        <form id="dcc-exit-form" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <label for="dcc-exit-email" style="position:absolute;left:-9999px;">Email address</label>
+          <input id="dcc-exit-email" type="email" required autocomplete="email" inputmode="email" placeholder="you@email.com" style="flex:1 1 180px;min-width:0;padding:12px;border:1px solid #d8cdbb;border-radius:8px;font-size:16px;" />
+          <button type="submit" style="flex:1 1 auto;background:#854F0B;color:#F5EFE3;border:none;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;">Send my files</button>
         </form>
-        <p id="dcc-exit-msg" style="font-size:12px;margin:10px 0 0;color:#666;"></p>
+        <p id="dcc-exit-msg" aria-live="polite" style="font-size:12.5px;margin:10px 0 0;color:#666;min-height:1em;"></p>
+        <button id="dcc-exit-no" style="margin-top:4px;background:none;border:none;color:#8a7a66;font-size:12px;text-decoration:underline;cursor:pointer;">No thanks</button>
       </div>
     </div>
     <script is:inline>
       (function () {
-        var KEY = 'dcc_exit_seen', SUB = 'dcc_exit_sub';
+        var KEY = 'dcc_exit_seen', SUB = 'dcc_exit_sub', COUNT = 'dcc_exit_n';
+        if (/^\/(cart|account|free|admin|checkout|membership|m\/|maker|login|resend-downloads|unsubscribe)/.test(location.pathname)) return;
         try {
-          if (localStorage.getItem(SUB)) return; // already subscribed via popup — never show again
+          if (localStorage.getItem(SUB)) return;                                   // already has the pack
+          if (localStorage.getItem('dcc_email') || localStorage.getItem('buyer_email')) return;  // known to us
+          if (JSON.parse(localStorage.getItem('cart') || '[]').length) return;     // shopping: do not distract
+          if (Number(localStorage.getItem(COUNT) || 0) >= 3) return;
           if (Date.now() - Number(localStorage.getItem(KEY) || 0) < 14 * 86400000) return;
+          for (var i = 0; i < localStorage.length; i++) { if (/^sb-.*-auth-token$/.test(localStorage.key(i) || '')) return; }  // signed in
         } catch (_) { return; }
-        if (location.pathname.startsWith('/cart') || location.pathname.startsWith('/account') || location.pathname.startsWith('/free') || location.pathname.startsWith('/admin')) return;
-        var box = document.getElementById('dcc-exit');
-        var shown = false;
-        function show() {
-          if (shown) return; shown = true;
-          try { localStorage.setItem(KEY, String(Date.now())); } catch (_) {}
+
+        var box = document.getElementById('dcc-exit'), card = document.getElementById('dcc-exit-card');
+        var start = Date.now(), shown = false;
+        var phone = window.matchMedia('(max-width: 767px)').matches || window.matchMedia('(pointer: coarse)').matches;
+        function track(t) { try { if (window.dccAction) window.dccAction(t); } catch (_) {} }
+        function show(how) {
+          if (shown || Date.now() - start < (phone ? 20000 : 8000)) return;
+          try { if (JSON.parse(localStorage.getItem('cart') || '[]').length) return; } catch (_) {}
+          shown = true;
+          try {
+            localStorage.setItem(KEY, String(Date.now()));
+            localStorage.setItem(COUNT, String(Number(localStorage.getItem(COUNT) || 0) + 1));
+          } catch (_) {}
+          if (phone) {
+            box.style.alignItems = 'flex-end'; box.style.padding = '0';
+            card.style.maxWidth = '100%'; card.style.borderRadius = '16px 16px 0 0';
+            card.style.paddingBottom = 'calc(20px + env(safe-area-inset-bottom))';
+          }
           box.style.display = 'flex';
+          track('exit_offer_shown');
+          track(how === 'scroll' ? 'exit_offer_mobile' : 'exit_offer_desktop');
         }
-        document.addEventListener('mouseout', function (e) {
-          if (!e.relatedTarget && e.clientY <= 0) show();
-        });
-        document.getElementById('dcc-exit-x').addEventListener('click', function () { box.style.display = 'none'; });
-        box.addEventListener('click', function (e) { if (e.target === box) box.style.display = 'none'; });
+        function hide() { box.style.display = 'none'; }
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && shown) hide(); });
+
+        if (!phone) {
+          document.addEventListener('mouseout', function (e) {
+            if (!e.relatedTarget && e.clientY <= 0) show('mouse');
+          });
+        } else {
+          // Reading, then flicking back up toward the address bar: the phone's
+          // version of reaching for the close button.
+          var maxY = 0, lastY = window.scrollY, lastT = Date.now();
+          window.addEventListener('scroll', function () {
+            var y = window.scrollY, t = Date.now();
+            if (y > maxY) maxY = y;
+            var speed = (lastY - y) / Math.max(1, t - lastT);          // px per ms, upward positive
+            var readEnough = maxY > Math.max(900, (document.documentElement.scrollHeight - window.innerHeight) * 0.4);
+            if (readEnough && speed > 1.2 && maxY - y > 300) show('scroll');
+            lastY = y; lastT = t;
+          }, { passive: true });
+        }
+
+        document.getElementById('dcc-exit-x').addEventListener('click', hide);
+        document.getElementById('dcc-exit-no').addEventListener('click', hide);
+        box.addEventListener('click', function (e) { if (e.target === box) hide(); });
         document.getElementById('dcc-exit-form').addEventListener('submit', async function (e) {
           e.preventDefault();
           var msg = document.getElementById('dcc-exit-msg');
-          msg.textContent = 'Sending…';
+          var email = document.getElementById('dcc-exit-email').value.trim();
+          msg.style.color = '#666';
+          msg.textContent = 'Sending...';
           try {
             var res = await fetch('/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ email: document.getElementById('dcc-exit-email').value.trim() }) });
+              body: JSON.stringify({ email: email }) });
             var data = await res.json();
             msg.style.color = res.ok ? '#188038' : '#c00';
-            msg.textContent = res.ok ? '✓ Check your inbox to confirm and get the files!' : (data.error || 'Something went wrong.');
-            if (res.ok) { try { localStorage.setItem(SUB, '1'); localStorage.setItem('dcc_email', document.getElementById('dcc-exit-email').value.trim().toLowerCase()); } catch (_) {} }
-          } catch (_) { msg.style.color = '#c00'; msg.textContent = 'Network error — please try again.'; }
+            msg.textContent = res.ok ? '✓ Sent. Open the email from DigitalChiselCo and tap Confirm to get your files.' : (data.error || 'Something went wrong. Please try again.');
+            if (res.ok) {
+              track('exit_offer_signup');
+              document.getElementById('dcc-exit-form').style.display = 'none';
+              document.getElementById('dcc-exit-no').textContent = 'Close';
+              try { localStorage.setItem(SUB, '1'); localStorage.setItem('dcc_email', email.toLowerCase()); } catch (_) {}
+            }
+          } catch (_) { msg.style.color = '#c00'; msg.textContent = 'Network error. Please try again.'; }
         });
       })();
     </script>

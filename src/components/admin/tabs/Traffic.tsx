@@ -531,6 +531,17 @@ function ShopperActions({ events, names, paid, days }: { events: Ev[]; names: Re
         </div>
       </div>
 
+      {/* The about-to-leave free-pack offer (Base.astro). Phones were never
+          shown it before 2026-09-17, so the phone count is the new reach. */}
+      {count('exit_offer_shown') + prevCount('exit_offer_shown') > 0 && (
+        <div className="mt-3 text-xs text-ink-700 bg-cream/50 border border-bronze-600/15 rounded-lg px-3 py-2">
+          🎁 <b>Free-pack leave offer</b>: shown {count('exit_offer_shown')} (phone {count('exit_offer_mobile')}, computer {count('exit_offer_desktop')})
+          {' · '}signed up <b>{count('exit_offer_signup')}</b>
+          {count('exit_offer_shown') > 0 && ` (${Math.round((100 * count('exit_offer_signup')) / count('exit_offer_shown'))}%)`}
+          <span className="text-ink-700/60"> · {prevLabel}: shown {prevCount('exit_offer_shown')}, signed up {prevCount('exit_offer_signup')}</span>
+        </div>
+      )}
+
       {open && openMetric && (
         <div className="mt-4 bg-cream/40 border border-bronze-600/20 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-3">
