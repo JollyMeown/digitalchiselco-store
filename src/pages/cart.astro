@@ -139,6 +139,16 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         </label>
       )}
       <button id="checkout" class="mt-4 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">Checkout</button>
+      <div id="owned-panel" hidden class="mt-3 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
+        <p class="font-medium">You already own <span id="owned-count">this design</span>:</p>
+        <ul id="owned-list" class="mt-1 list-disc pl-5 text-[13px]"></ul>
+        <p class="mt-2 text-[12px] text-amber-900/80">Your files are waiting in your account, no need to pay again.</p>
+        <div class="mt-2.5 flex flex-wrap gap-2">
+          <button id="owned-remove" type="button" class="bg-bronze-600 text-cream text-xs font-medium px-3 py-2 rounded-md hover:bg-bronze-700">Remove and continue</button>
+          <a id="owned-download" href="/resend-downloads" class="text-xs px-3 py-2 rounded-md border border-bronze-600 text-bronze-700 hover:bg-white">Send me my downloads</a>
+          <button id="owned-anyway" type="button" class="text-xs underline text-ink-700/70 px-1">Buy again anyway</button>
+        </div>
+      </div>
       <div class="mt-2 flex items-center justify-center gap-1.5 flex-wrap text-[11px] text-ink-700/60">
         <span aria-hidden="true">⚡</span><span>One-tap express pay with</span>
         {/* Spelled out in full: Google's StoreBot reads the checkout page to
@@ -654,6 +664,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             items: itemsForCheckout, email: buyerEmail, discount_percent: DISCOUNT,
+            allow_owned: window.__dccAllowOwned === true,
             coupon_code: promo?.code || null, customizations: customizationsPayload,
             currency: (window.dccChosenCcy ? window.dccChosenCcy() : 'USD'),
             gift,
@@ -669,6 +680,12 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
           }),
         });
         const data = await res.json();
+        if (res.status === 409 && data.code === 'already_owned') {
+          showOwned(data.owned || []);
+          btn.disabled = false; btn.textContent = 'Checkout';
+          return;
+        }
+        document.getElementById('owned-panel').hidden = true;
         if (!res.ok || !data.transaction_id) throw new Error(data.error || 'Could not start checkout.');
         // Reveal our on-site inline checkout and render Paddle INSIDE it — fully
         // branded via the dashboard Inline settings — instead of the popup overlay.
@@ -693,6 +710,42 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         alert(err.message || 'Checkout failed. Please try again.');
         btn.disabled = false; btn.textContent = 'Checkout';
       }
+    });
+
+    // "You already own this": checkout-init paused because the buyer's email
+    // already has some of these designs. Offer to drop them, fetch the files,
+    // or buy again on purpose (a spare copy for a friend, say).
+    function showOwned(owned) {
+      const panel = document.getElementById('owned-panel');
+      const list = document.getElementById('owned-list');
+      list.innerHTML = '';
+      owned.forEach((o) => {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = '/product/' + o.slug; a.textContent = o.title; a.className = 'underline';
+        li.appendChild(a); list.appendChild(li);
+      });
+      document.getElementById('owned-count').textContent = owned.length === 1 ? 'this design' : owned.length + ' of these designs';
+      panel.dataset.ids = JSON.stringify(owned.map((o) => o.id));
+      const em = (document.getElementById('buyer-email')?.value || '').trim();
+      if (em) document.getElementById('owned-download').href = '/resend-downloads?email=' + encodeURIComponent(em);
+      panel.hidden = false;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      try { navigator.sendBeacon('/api/track', new Blob([JSON.stringify({ p: '/cart', t: 'already_owned' })], { type: 'application/json' })); } catch (_) {}
+    }
+    document.getElementById('owned-remove')?.addEventListener('click', () => {
+      const ids = JSON.parse(document.getElementById('owned-panel').dataset.ids || '[]');
+      try {
+        const c = JSON.parse(localStorage.getItem('cart') || '[]').filter((x) => !ids.includes(String(x.id)));
+        localStorage.setItem('cart', JSON.stringify(c));
+        window.dispatchEvent(new Event('cart-changed'));
+      } catch (_) {}
+      location.reload();
+    });
+    document.getElementById('owned-anyway')?.addEventListener('click', () => {
+      window.__dccAllowOwned = true;
+      document.getElementById('owned-panel').hidden = true;
+      document.getElementById('checkout')?.click();
     });
 
     // Gift option: reveal the recipient fields when ticked.

@@ -25,6 +25,12 @@ import Breadcrumbs from '../components/Breadcrumbs.astro';
   </main>
   <Footer />
   <script is:inline>
+    // Arriving from the cart's "you already own this" panel: the email is
+    // already known, so fill it in (the buyer still presses Send).
+    try {
+      const pre = new URLSearchParams(location.search).get('email');
+      if (pre) document.getElementById('rd-email').value = pre;
+    } catch (_) {}
     document.getElementById('rd-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('rd-btn');

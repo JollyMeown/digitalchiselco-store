@@ -71,7 +71,7 @@ export const POST: APIRoute = async ({ request }) => {
     if (type !== 'pv') {
       // hero_shop / hero_free: the two doors on the new homepage hero (2026-09-15),
       // so the admin can see which promise visitors take, not just that they left.
-      if (!['view_product', 'add_to_cart', 'buy_now', 'wishlist_add', 'wishlist_remove', 'checkout_start', 'lamp_try', 'hero_shop', 'hero_free', 'pick5_strip'].includes(type)) return new Response(null, { status: 204 });
+      if (!['view_product', 'add_to_cart', 'buy_now', 'wishlist_add', 'wishlist_remove', 'checkout_start', 'lamp_try', 'hero_shop', 'hero_free', 'pick5_strip', 'already_owned'].includes(type)) return new Response(null, { status: 204 });
       const day0 = new Date().toISOString().slice(0, 10);
       const secret0 = process.env.ACCOUNT_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'trk';
       const vh = crypto.createHash('sha256').update(`${ip}|${ua}|${day0}|${secret0}`).digest('hex').slice(0, 32);

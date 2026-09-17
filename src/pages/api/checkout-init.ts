@@ -79,7 +79,7 @@ export const POST: APIRoute = async ({ request }) => {
     // min_subtotal / min_items gates run on DB prices, never browser-claimed ones).
     const [{ data: products }, { data: plans }] = await Promise.all([
       productIds.length
-        ? db.from('products').select('id, title, slug, price_usd, paddle_price_id, is_subscription, membership_plan_slug').in('id', productIds).eq('active', true).gt('price_usd', 0)
+        ? db.from('products').select('id, title, slug, price_usd, paddle_price_id, is_subscription, membership_plan_slug, is_customizable').in('id', productIds).eq('active', true).gt('price_usd', 0)
         : { data: [] as any[] },
       membershipSlugs.length
         ? db.from('membership_plans').select('slug, name, price_usd, paddle_price_id').in('slug', membershipSlugs)
@@ -92,6 +92,27 @@ export const POST: APIRoute = async ({ request }) => {
     // (Owner rule 2026-09-06: no membership plan ever gets a shop-wide discount.)
     const membershipProductIds = new Set<string>((products || []).filter((p: any) => p.is_subscription || p.membership_plan_slug).map((p: any) => String(p.id)));
     const isMembershipLine = (id: unknown) => String(id).startsWith('membership:') || membershipProductIds.has(String(id));
+
+    // "You already own this." A buyer paid twice for the same design on
+    // 2026-09-15 (Jerry, Yggdrasil, 39 minutes apart) after a failed attempt
+    // made him think the first had not gone through. Pause the checkout and let
+    // the cart offer: remove it, download it, or buy again on purpose. Skipped
+    // for gifts (buying for someone else), memberships and personalised designs
+    // (each one is made fresh). The answer only names designs already in THIS
+    // cart, and only to someone about to pay with that email.
+    if (email && !giftData && body.allow_owned !== true) {
+      const plain = (products || []).filter((p: any) => !p.is_subscription && !p.membership_plan_slug && !p.is_customizable);
+      if (plain.length) {
+        const { data: ents } = await db.from('entitlements').select('product_id')
+          .eq('email', email).in('product_id', plain.map((p: any) => p.id));
+        const ownedIds = new Set((ents || []).map((e: any) => String(e.product_id)));
+        if (ownedIds.size) {
+          const owned = plain.filter((p: any) => ownedIds.has(String(p.id)))
+            .map((p: any) => ({ id: String(p.id), title: String(p.title || '').split('|')[0].trim(), slug: p.slug }));
+          return json({ code: 'already_owned', owned, error: 'You already own some of these designs.' }, 409);
+        }
+      }
+    }
 
     // Resolve the fx rate for the requested currency — only trust a rate the
     // cron refreshed within the last 7 days; otherwise charge USD as always.
