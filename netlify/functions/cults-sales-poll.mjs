@@ -6,6 +6,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { pollCultsSales } from '../../src/lib/cults.ts';
 import { sweepUnsentOrderConfirmations } from '../../src/lib/order-email.ts';
+import { sweepPaymentRecovery } from '../../src/lib/pay-recovery.ts';
 
 export const config = { schedule: '*/10 * * * *' };
 
@@ -27,6 +28,15 @@ export default async () => {
     if (s.checked) console.log('[order-email-sweep]', JSON.stringify(s));
   } catch (e) {
     console.error('[order-email-sweep] crashed', e?.message || e);
+  }
+  // Piggyback: failed-payment reminders, decided now rather than booked at
+  // failure time. Sent only two hours on, and only if that buyer has not
+  // paid since (see lib/pay-recovery.ts and migration 136).
+  try {
+    const p = await sweepPaymentRecovery(db, 20);
+    if (p.checked) console.log('[pay-recovery-sweep]', JSON.stringify(p));
+  } catch (e) {
+    console.error('[pay-recovery-sweep] crashed', e?.message || e);
   }
   // Piggyback watchdog: if the NIGHTLY automation hasn't completed a run in
   // over 26h the scheduler itself is dead (the failure mode of Aug 6-17,

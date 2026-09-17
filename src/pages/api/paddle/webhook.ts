@@ -17,7 +17,8 @@ import { verifyWebhookSignature, paddleApi } from '../../../lib/paddle';
 import { send as sendEmail } from '../../../lib/resend';
 import { orderConfirmation, membershipPurchaseNotification } from '../../../lib/email-templates';
 import { createSubscriptionForPurchase, packLink, toYM, STARTER_PLAN_SLUG, STARTER_PACK_MONTH } from '../../../lib/subscriptions';
-import { giftCardEmail, paymentRecoveryEmail } from '../../../lib/marketing-emails';
+import { giftCardEmail } from '../../../lib/marketing-emails';
+import { queuePaymentRecovery, closePaymentRecoveryForEmail } from '../../../lib/pay-recovery';
 import { telegramOwner } from '../../../lib/notify';
 
 const OPS_INBOX = 'jolly@digitalchiselco.com';
@@ -507,6 +508,8 @@ async function handleTransactionCompleted(db: any, txn: any) {
   // orders whose transaction had no server snapshot so ops can review them.
   if (!resumeEmailOnly) {
     must(await db.from('orders').update({ fulfilled_at: new Date().toISOString() }).eq('id', order.id), 'orders.fulfilled_at update');
+    // They finished: any "your order did not go through" still waiting is now wrong.
+    if (email && email !== 'unknown@digitalchiselco.com') await closePaymentRecoveryForEmail(db, email).catch(() => null);
     if (!trusted.fromServer) {
       try {
         await sendEmail({ to: OPS_INBOX, subject: `⚠️ Order #${String(order.id).slice(0, 8)} needs review: no checkout snapshot`,
@@ -1111,13 +1114,10 @@ async function handlePaymentFailed(db: any, txn: any) {
     title: String(it.price?.name || it.price?.description || 'Design'),
     price: Number(it.price?.unit_price?.amount ?? 0) / 100,
   }));
-  const { subject, html, text } = paymentRecoveryEmail({ email, items });
-  const r = await sendEmail({
-    to: email, subject, html, text,
-    scheduledAt: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
-    idempotencyKey: `payfail:${email}:${new Date().toISOString().slice(0, 10)}`,
-    tags: [{ name: 'kind', value: 'payRecovery' }],
-  });
-  if (r.ok) console.log(`[payfail] recovery email scheduled (+2h) for ${email}, txn ${txn.id}`);
-  else console.error(`[payfail] recovery email failed for ${email}: ${r.error}`);
+  // Queue it, do not book it. The 10-minute poller sends it only if, two hours
+  // on, this buyer still has no paid order (lib/pay-recovery.ts). Booking a
+  // Resend email here sent "your order did not go through" to three buyers
+  // who had already paid on a retry.
+  await queuePaymentRecovery(db, { email, txnId: txn.id, items });
+  console.log(`[payfail] recovery queued for ${email}, txn ${txn.id}`);
 }
