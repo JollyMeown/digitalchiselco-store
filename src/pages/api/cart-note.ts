@@ -17,7 +17,9 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     const body = await request.json().catch(() => ({}));
     const email = String(body.email || '').toLowerCase().trim();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return new Response(null, { status: 204 });
+    // No commas or semicolons: "richard1,brath@gmail.com" (2026-09-09) passed the
+    // old check, and its reminder then failed at Resend every night for 9 days.
+    if (!/^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(email)) return new Response(null, { status: 204 });
     if (!(await rateLimit(`cartnote:${clientIp(request)}`, 20, 600))) return new Response(null, { status: 204 });
 
     const items = (Array.isArray(body.items) ? body.items : []).slice(0, 40).map((x: any) => ({

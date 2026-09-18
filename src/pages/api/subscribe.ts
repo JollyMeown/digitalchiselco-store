@@ -4,6 +4,7 @@ import { send as sendEmail } from '../../lib/resend';
 import { signSubscribeToken } from '../../lib/subscribe-token';
 import { freePackConfirmation } from '../../lib/email-templates';
 import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
+import { sendFreePackLink } from '../../lib/free-pack';
 
 export const prerender = false;
 
@@ -32,10 +33,27 @@ export const POST: APIRoute = async ({ request }) => {
     // Always upsert into our subscribers table. confirmed_at stays null until
     // the user clicks the link in the email.
     const db = supabaseAdmin();
-    const { error } = await db
-      .from('subscribers')
-      .upsert({ email, name, source: 'free-pack' }, { onConflict: 'email' });
-    if (error) throw error;
+    const { data: existing } = await db.from('subscribers')
+      .select('email, name, free_pack_token, confirmed_at, unsubscribed_at').eq('email', email).maybeSingle();
+
+    // Already confirmed and still subscribed: they have the pack, so send the
+    // files link straight away instead of a second "confirm your email". On
+    // 2026-09-17, all 7 sign-ups from the new leave offer were people already
+    // on the list (mostly Etsy buyers given the pack on 09-06) who were each
+    // asked to confirm again. Same reply either way, so this cannot be used to
+    // test which addresses are subscribed.
+    if (existing?.confirmed_at && !existing.unsubscribed_at) {
+      await sendFreePackLink(db, existing);
+      return json({ ok: true });
+    }
+
+    // Never overwrite a stored name (or the original source) with a blank.
+    if (!existing) {
+      const { error } = await db.from('subscribers').insert({ email, name, source: 'free-pack' });
+      if (error) throw error;
+    } else if (name) {
+      await db.from('subscribers').update({ name }).eq('email', email);
+    }
 
     // Anonymous→known bridge: stamp today's visitor hash → email (same hash
     // formula as /api/track) so admin analytics can name today's activity.

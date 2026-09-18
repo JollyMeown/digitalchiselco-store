@@ -42,6 +42,23 @@ async function run(request) {
   }
   const db = createClient(env('PUBLIC_SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false } });
   const t0 = Date.now();
+
+  // ONE run per night. Every night from at least 2026-09-06 to 09-17 a second
+  // full copy started exactly 60 s after the first (Netlify re-invoking the
+  // background function), so every queue emptied twice as fast as the owner
+  // set it: 400 Etsy free-pack emails a night instead of 200, 120 article
+  // emails instead of 60. Nobody got a duplicate (each copy took the next
+  // people), but the pace was wrong. The first copy writes its start row
+  // within a second, so any copy arriving later sees it and stands down.
+  try {
+    const since = new Date(Date.now() - 30 * 60000).toISOString();
+    const { data: running } = await db.from('cron_runs').select('id, ran_at').gte('ran_at', since).limit(1);
+    if (running && running.length) {
+      console.warn('[daily-run] another run started at', running[0].ran_at, '(id', running[0].id, ') - standing down');
+      return new Response('already running', { status: 200 });
+    }
+  } catch (e) { console.error('[daily-run] overlap check failed, running anyway', e?.message); }
+
   console.log('[daily-run] started', new Date().toISOString());
   let runId = null;
   try {

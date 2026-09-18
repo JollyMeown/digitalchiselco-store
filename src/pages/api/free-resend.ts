@@ -9,15 +9,12 @@
 // have subscribed.
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
-import { send as sendEmail } from '../../lib/resend';
-import { randomBytes } from 'node:crypto';
-import { freePackLink } from '../../lib/email-templates';
+import { sendFreePackLink } from '../../lib/free-pack';
 import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
 
 export const prerender = false;
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json' } });
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const SITE = ((process.env.PUBLIC_SITE_URL ?? (import.meta as any).env?.PUBLIC_SITE_URL) || 'https://digitalchiselco.com').replace(/\/$/, '');
 const SAME_ANSWER = 'If that address is on our list, your download link is on its way. Check your inbox (and your spam folder).';
 
 export const POST: APIRoute = async ({ request }) => {
@@ -32,27 +29,7 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     const db = supabaseAdmin();
     const { data: sub } = await db.from('subscribers').select('email, name, free_pack_token').eq('email', email).maybeSingle();
-    if (sub) {
-      const { data: gs } = await db.from('growth_settings').select('free_pack_url').eq('id', 1).maybeSingle();
-      // A stored random token, not an HMAC over an env secret. The signed
-      // version failed in production: the same deployment signed a link and
-      // then refused it, because the two functions resolved the secret
-      // differently. The database cannot disagree with itself.
-      let tok = sub.free_pack_token;
-      if (!tok) {
-        tok = randomBytes(24).toString('base64url');
-        await db.from('subscribers').update({ free_pack_token: tok }).eq('email', email);
-      }
-      const url = `${SITE}/free/files?k=${encodeURIComponent(tok)}`;
-      const { subject, html, text } = freePackLink({ name: sub.name, filesUrl: url, packUrl: gs?.free_pack_url || '' });
-      await sendEmail({
-        to: email, subject, html, text,
-        // Timestamped: unlike the one-off confirmation, asking twice must
-        // actually send twice, which is the whole point of the button.
-        idempotencyKey: `free-resend:${email}:${Date.now()}`,
-        tags: [{ name: 'kind', value: 'optin' }],   // user-initiated: bypasses the daily-quota gate
-      });
-    }
+    if (sub) await sendFreePackLink(db, sub);
     return json({ ok: true, message: SAME_ANSWER });
   } catch (e) {
     console.error('[free-resend]', e);

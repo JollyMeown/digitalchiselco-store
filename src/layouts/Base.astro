@@ -309,7 +309,7 @@ const faviconType = settings.favicon_image_url
               body: JSON.stringify({ email: email }) });
             var data = await res.json();
             msg.style.color = res.ok ? '#188038' : '#c00';
-            msg.textContent = res.ok ? '✓ Sent. Open the email from DigitalChiselCo and tap Confirm to get your files.' : (data.error || 'Something went wrong. Please try again.');
+            msg.textContent = res.ok ? '✓ Sent. Check your inbox for an email from DigitalChiselCo (and the spam folder, just in case).' : (data.error || 'Something went wrong. Please try again.');
             if (res.ok) {
               track('exit_offer_signup');
               document.getElementById('dcc-exit-form').style.display = 'none';

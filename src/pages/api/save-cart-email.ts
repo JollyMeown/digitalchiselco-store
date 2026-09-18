@@ -15,7 +15,7 @@ export const POST: APIRoute = async ({ request }) => {
     if (!(await rateLimit(`cartsave:ip:${clientIp(request)}`, 6, 3600))) return json({ ok: false }, 200);
     const body = await request.json().catch(() => ({}));
     const email = String(body.email || '').toLowerCase().trim();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Valid email required.' }, 400);
+    if (!/^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(email)) return json({ error: 'Please check your email address (no commas or spaces).' }, 400);
 
     const items = (Array.isArray(body.items) ? body.items : []).slice(0, 40).map((x: any) => ({
       title: String(x.title || '').slice(0, 160),
