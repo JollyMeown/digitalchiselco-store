@@ -1070,13 +1070,15 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     if (!g.refund_winback_enabled) return;
     const s = { candidates: 0, sent: 0, failed: 0 };
     const { data: refunded } = await db.from('orders')
-      .select('email, refunded_at')
+      .select('email, refunded_at, refund_note')
       .not('refunded_at', 'is', null)
       .lte('refunded_at', daysAgo(30)).gte('refunded_at', daysAgo(37))
       .limit(500);
     const { data: rl } = await fetchAll((a, b) => db.from('refund_winback_log').select('email').range(a, b)).then((data) => ({ data }));
     const alreadySent = new Set((rl || []).map((r) => r.email.toLowerCase()));
+    // A double-charge refund is our correction, not an unhappy buyer: no win-back.
     const cand = [...new Set((refunded || [])
+      .filter((r: any) => !/Duplicate purchase/i.test(r.refund_note || ''))
       .map((r) => (r.email || '').toLowerCase())
       .filter((e) => e && e !== 'unknown@digitalchiselco.com' && !alreadySent.has(e)))].slice(0, 40);
     s.candidates = cand.length;

@@ -30,6 +30,7 @@ import Seasonal from './tabs/Seasonal';
 import DesignBoard from './tabs/DesignBoard';
 import CustomRequests from './tabs/CustomRequests';
 import OrderSoundListener from './OrderSoundListener';
+import DoubleChargeBanner from './DoubleChargeBanner';
 import { inputCls, btnPrimary } from './ui';
 
 type Tab = { key: string; label: string; icon: string; Component: any };
@@ -195,6 +196,7 @@ export default function AdminApp() {
             <h1 className="font-serif text-2xl text-ink-800">{TABS.find((t) => t.key === tab)?.label}</h1>
             <a href="/" className="text-sm text-bronze-600 hover:underline">View storefront ↗</a>
           </div>
+          <DoubleChargeBanner />
           <CustomRequestBanner goRequests={() => setTab('customrequests')} />
           <PendingModerationBanner goProducts={() => { try { sessionStorage.setItem('products_filter', 'pending'); } catch {} setTab('products'); }} />
           <Active />

@@ -16,12 +16,36 @@ export default function Orders() {
   const [showHelp, setShowHelp] = useState(false);
   const [deliv, setDeliv] = useState<Map<string, Delivery>>(new Map());
   const [linkBusy, setLinkBusy] = useState(false);
+  const [refundBusy, setRefundBusy] = useState(false);
+
+  // Real refund through Paddle (the status buttons below only relabel).
+  // The webhook turns the order Refunded and removes its downloads once
+  // Paddle approves.
+  async function refundFull(o: any) {
+    if (!confirm(`Refund the whole order, $${Number(o.total).toFixed(2)}, to ${o.email}?
+
+Paddle sends the money back to their card (5 to 10 business days). Their downloads from THIS order stop working once Paddle approves it.`)) return;
+    setRefundBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/refunds', {
+        method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ action: 'refund', orderId: o.id, mode: 'full' }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      alert(`Refund of ${d.amount} ${d.currency} sent to Paddle. ${d.status === 'approved' ? 'Approved.' : 'Paddle approves it, usually within minutes; the order then turns Refunded by itself.'}`);
+      setOpen({ ...o, refund_requested_at: new Date().toISOString() });
+      load(true);
+    } catch (e: any) { alert('Could not refund: ' + e.message); }
+    setRefundBusy(false);
+  }
 
   useEffect(() => { load(); }, [status, dateFrom, dateTo, showDeleted]);
   useLiveRefresh(() => load(true), 30000);   // keep this tab live (silent, pauses while editing)
   async function load(silent = false) {
     if (!silent) setLoading(true);
-    let q = supabase.from('orders').select('id,email,total,status,currency,provider,provider_order_id,created_at,deleted_at,admin_note,confirmation_sent_at,order_items(id,title,price_usd,qty,order_item_customizations(fields))').order('created_at', { ascending: false }).limit(500);
+    let q = supabase.from('orders').select('id,email,total,status,currency,provider,provider_order_id,created_at,deleted_at,admin_note,confirmation_sent_at,refund_requested_at,refund_note,order_items(id,title,price_usd,qty,order_item_customizations(fields))').order('created_at', { ascending: false }).limit(500);
     if (status !== 'all') q = q.eq('status', status);
     if (dateFrom) q = q.gte('created_at', new Date(dateFrom).toISOString());
     if (dateTo) {
@@ -328,6 +352,9 @@ export default function Orders() {
               <button className={btnGhost} disabled={resending} onClick={() => resendElsewhere(open.id, open.email)} title="Same files, different address. Use this when the buyer's own mailbox rejects our email, which happens silently once an address has hard-bounced.">✉️ Send to another address</button>
               <button className={btnGhost} disabled={linkBusy} onClick={() => accountLink(open.email)} title="Copies a ready-to-paste sign-in link to this buyer's account page, where every file they have ever bought can be re-downloaded. Use it when email cannot reach them at all.">{linkBusy ? 'Making link…' : '🔗 Copy account link'}</button>
               <a href={`/admin/invoice/${open.id}`} target="_blank" className={btnGhost}>Invoice ↗</a>
+              {open.status === 'paid' && open.provider === 'paddle' && (open.refund_requested_at
+                ? <span className="text-xs text-purple-800 bg-purple-50 border border-purple-200 rounded px-2 py-1" title={open.refund_note || ''}>💸 Refund requested {new Date(open.refund_requested_at).toLocaleDateString()}, waiting for Paddle</span>
+                : <button className={btnDanger} disabled={refundBusy} onClick={() => refundFull(open)} title="Sends the money back through Paddle. You do not need to open Paddle.">{refundBusy ? 'Refunding...' : `💸 Refund $${Number(open.total).toFixed(2)}`}</button>)}
               <div className="ml-auto flex gap-2">
                 {open.deleted_at
                   ? <button className={btnPrimary} onClick={() => restore(open.id)}>Restore</button>
