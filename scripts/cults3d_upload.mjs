@@ -57,7 +57,8 @@ const VISIBILITY = val('--visibility', 'PUBLIC');              // PUBLIC | SECRE
 const USAGES = ['3dp', 'cnc_laser'];                           // 3D printing + CNC machining / laser cutting
 const PRICE_FLAG = val('--price', '');
 const ONLY = val('--only', '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean); // publish just these slugs (prefix match), e.g. --only owl-family,bald-eagle                         // optional explicit price override
-const PRICE_OPTIONS = [4.99, 5.99];                            // randomly assigned per listing (looks organic)
+const PRICE_OPTIONS = [4.99, 5.99];
+const WEBSITE_PRICED = new Set();                                // religious/bundle product ids: list at products.price_usd in USD                            // randomly assigned per listing (looks organic)
 const JITTER_MIN = parseInt(val('--jitter', '0'), 10);         // sleep 0..N random minutes before posting (human-like)
 const MAX_TAGS = 12;
 const LEDGER_PATH = 'cults3d_uploaded.json';
@@ -139,6 +140,17 @@ async function fetchProducts() {
     rows.push(...(data || []));
     if (!data || data.length < 1000) break;
   }
+  // Religious and bundle designs list at the WEBSITE price, not the random
+  // 4.99/5.99 (owner, 2026-09-19). scripts/cults3d_reprice.mjs fixed the
+  // listings already live.
+  try {
+    const { data: cats } = await db.from('categories').select('id').in('slug', ['religious-christian', 'premium-bundle-offer']);
+    const catIds = (cats || []).map((c) => c.id);
+    if (catIds.length) {
+      const { data: links } = await db.from('product_categories').select('product_id').in('category_id', catIds).limit(5000);
+      for (const l of links || []) WEBSITE_PRICED.add(l.product_id);
+    }
+  } catch (e) { console.warn('  ! could not load religious/bundle categories:', e.message); }
   // Exclude bundles (and the local ledger as a belt-and-suspenders guard).
   return { products: rows.filter((p) => !done.has(p.id) && p.is_bundle !== true), ledger };
 }
@@ -236,7 +248,8 @@ function buildPayload(p, dlRow, driveMap) {
   for (const raw of (Array.isArray(p.seo_keywords) ? p.seo_keywords : [])) addTag(raw);
   // Staple discovery terms, added only if the product's own keywords left room.
   for (const t of ['bas relief', 'cnc', 'stl', '3d print', 'wall art', 'wood carving']) addTag(t);
-  const price = PRICE_FLAG ? Number(PRICE_FLAG) : PRICE_OPTIONS[Math.floor(Math.random() * PRICE_OPTIONS.length)];
+  const sitePriced = !PRICE_FLAG && WEBSITE_PRICED.has(p.id) && Number(p.price_usd) >= 0.5 && !/carving handbook/i.test(p.title || '');
+  const price = PRICE_FLAG ? Number(PRICE_FLAG) : sitePriced ? Number(p.price_usd) : PRICE_OPTIONS[Math.floor(Math.random() * PRICE_OPTIONS.length)];
   const description = (p.description || p.seo_description || '').trim()
     + `\n\nInstant download with commercial use included. Browse the full collection at ${SITE}`;
   return {
@@ -248,7 +261,7 @@ function buildPayload(p, dlRow, driveMap) {
     imageUrls: uniqueImages,
     fileUrls: id ? [driveFileUrl(id, filename)] : [],
     downloadPrice: Number.isFinite(price) ? Math.round(price * 100) / 100 : null,
-    currency: CURRENCY,
+    currency: sitePriced ? 'USD' : CURRENCY,
     _driveFileId: id,
     _driveFileName: filename,
     _driveSizeMB: drive?.size ? Math.round(Number(drive.size) / 1e6) : null,
