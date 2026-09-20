@@ -313,6 +313,12 @@ const faqLd = {
             <a href="/become-a-maker" class="bg-bronze-600 hover:bg-bronze-700 transition text-cream font-bold rounded-lg px-6 py-3">Apply to become a Maker →</a>
             <a href="/makers" class="border border-cream/40 hover:bg-white/10 transition text-cream font-bold rounded-lg px-6 py-3">See the maker network</a>
           </div>
+          {/* Approved makers had no way back in: the dashboard link only ever
+              existed inside emails, so the first maker had to write and ask
+              (Bruce, 2026-09-20). */}
+          <p class="text-cream/70 text-sm mt-5">
+            Already approved? <a href="/maker" class="text-cream font-bold underline underline-offset-2">Sign in to your maker dashboard</a> to edit your listing, photos and quotes.
+          </p>
         </section>
       </div>
     )}

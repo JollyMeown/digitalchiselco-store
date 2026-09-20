@@ -30,9 +30,8 @@ const categories = await getCategories();
 const hs = await getSettings();
 // Cut Local nav (shown only when the marketplace is live).
 try {
-  const { supabaseAdmin } = await import('../lib/supabase');
-  const { data: gs } = await supabaseAdmin().from('growth_settings').select('marketplace_enabled').eq('id', 1).maybeSingle();
-  if (gs?.marketplace_enabled) {
+  const { marketplaceLive } = await import('../lib/queries');
+  if (await marketplaceLive()) {
     const at = links.findIndex((n) => n.href === '/free');
     links.splice(at >= 0 ? at + 1 : links.length, 0, { href: '/makers', label: 'Get it made' } as any);
   }

@@ -70,6 +70,19 @@ export async function getSettings(): Promise<SiteSettings> {
   } catch (e) { console.error('getSettings failed:', e); return SETTINGS_FALLBACK; }
 }
 
+// Is Cut Local live? Header and Footer both need this on every page, so the
+// answer is held for a minute rather than queried twice per render.
+let mpLive: { at: number; on: boolean } = { at: 0, on: false };
+export async function marketplaceLive(): Promise<boolean> {
+  if (Date.now() - mpLive.at < 60000) return mpLive.on;
+  try {
+    const { supabaseAdmin } = await import('./supabase');
+    const { data } = await supabaseAdmin().from('growth_settings').select('marketplace_enabled').eq('id', 1).maybeSingle();
+    mpLive = { at: Date.now(), on: !!data?.marketplace_enabled };
+  } catch { mpLive = { at: Date.now(), on: mpLive.on }; }
+  return mpLive.on;
+}
+
 /**
  * Customer-facing product search. Splits the query into tokens (so
  * "wolf moon" matches even when the title has them in different orders),

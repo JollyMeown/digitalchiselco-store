@@ -151,6 +151,8 @@ export default function Makers() {
               <div className="text-[11px] uppercase text-ink-700/50 font-semibold mb-1">Internal note</div>
               <textarea defaultValue={open.admin_note || ''} onBlur={(e) => saveNote(open.id, e.target.value)} rows={2} className={inputCls} placeholder="Notes for your team…" />
             </div>
+            {open.status === 'approved' && <SignInLink maker={open} />}
+
             <div className="flex flex-wrap gap-2 pt-2 border-t border-black/5">
               {open.status !== 'approved' && <button className={btnPrimary} onClick={() => setStatus(open.id, 'approved')}>✓ Approve maker</button>}
               {open.status !== 'rejected' && <button className={btnGhost} onClick={() => setStatus(open.id, 'rejected')}>Reject</button>}
@@ -160,6 +162,42 @@ export default function Makers() {
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+// ── Dashboard sign-in link ────────────────────────────────────────────
+// The link only ever existed inside emails, so the first approved maker had
+// to write in and ask where his maker page was (Bruce, 2026-09-20).
+function SignInLink({ maker }: { maker: Maker }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState('');
+  async function call(send: boolean) {
+    setBusy(send ? 'send' : 'copy'); setMsg('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/maker-signin-link', {
+        method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ id: maker.id, send }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || j.error) throw new Error(j.error || `HTTP ${res.status}`);
+      if (send) setMsg(`✓ Sent to ${j.email}. The link works for 30 days.`);
+      else { await navigator.clipboard.writeText(j.link); setMsg('✓ Link copied. Paste it into your own reply.'); }
+    } catch (e: any) { setMsg('Could not do that: ' + e.message); }
+    setBusy(null);
+  }
+  return (
+    <div className="rounded-lg border border-black/10 bg-cream/40 p-3">
+      <div className="text-[13px] font-bold text-ink-900">🔑 Maker dashboard link</div>
+      <p className="text-[11px] text-ink-700/60 mt-0.5 mb-2">
+        Where they edit their listing, photos and quotes. They can also get one themselves at <code>/maker</code>.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button className={btnPrimary} disabled={!!busy} onClick={() => call(true)}>{busy === 'send' ? 'Sending…' : '📧 Email the link'}</button>
+        <button className={btnGhost} disabled={!!busy} onClick={() => call(false)}>{busy === 'copy' ? 'Copying…' : '🔗 Copy link'}</button>
+      </div>
+      {msg && <div className="mt-2 text-xs text-ink-700/80">{msg}</div>}
     </div>
   );
 }
