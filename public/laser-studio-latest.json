@@ -1,5 +1,5 @@
 {
-  "version": "2.6",
+  "version": "2.7",
   "url": "https://drive.google.com/file/d/1nzi0B_oDoPi1H7ptQSyUBxXGPq7diN-_/view?usp=sharing",
-  "notes": "🪵 NEW: CNC Match tab. Carved one of our STLs? Photograph the piece on your laser and burn text, shading or the same picture exactly onto the carving.  ✅ One-click auto-align  ✅ Live burn preview on your real piece  ✅ Text in any font, dragged into place  ✅ Registration marks, a repeat-order jig and presets  📖 Illustrated CNC Match Guide built in, plus a new manual chapter."
+  "notes": "CNC Match, improved from your feedback.  🪄 NEW Auto-fit: the built-in AI finds your piece in the photo and drops the design onto it, offline, and tells you how sure it is.  ✋ The design now has real handles: drag to move, corner squares to resize, the round handle to rotate, and the controls stay on screen.  📏 Inches as well as mm, everywhere.  💡 Flatten is now clearly optional, with a full explanation."
 }
