@@ -105,6 +105,7 @@ export const TEMPLATE_HEADINGS: Record<string, string> = {
   customPitch: 'A design made from your own photo 🪵',
   reEngage: 'Are these still useful?',
   midweek: 'Picked by carvers this week 🪵',
+  newRange: 'Something new in the workshop 🪵',
 };
 
 function shell(subject: string, heading: string, bodyHtml: string, email: string): string {
@@ -935,6 +936,30 @@ export function wishlistReminderEmail(d: { email: string; products: (MiniProduct
     d.products.map((p) => `${(p.title || '').split('|')[0].trim()}: ${SITE}/product/${p.slug}`).join('\n') +
     `\n\nYour wishlist: ${SITE}/favorites\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'Saved, not forgotten ❤️', body, d.email), text };
+}
+
+// -- A new range of designs (reusable) ---------------------------------
+// For the day a genuinely new KIND of thing lands, not just more designs:
+// the first coat hangers (2026-09-19) do not belong in the weekly digest,
+// because the news is the object, not the artwork.
+export function newRangeEmail(d: {
+  email: string; heading: string; lead: string; products: MiniProduct[];
+  browseUrl: string; browseLabel: string; note?: string | null; subject?: string;
+}): Out {
+  const subject = d.subject || d.heading;
+  const rows: string[] = [];
+  for (let i = 0; i < d.products.length; i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Hi fellow maker,</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">${esc(d.lead)}</p>
+    ${rows.join('')}
+    ${d.note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin:16px 0 0;">${esc(d.note)}</p>` : ''}
+    ${btn(d.browseUrl, d.browseLabel)}
+    <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">Instant download &middot; commercial use included &middot; reply to this email if you want a size or a change</p>`;
+  const text = `${d.lead}\n\n` +
+    d.products.map((p) => `${(p.title || '').split('|')[0].trim()}: ${SITE}/product/${p.slug}`).join('\n') +
+    `\n\n${d.browseUrl}\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, d.heading, body, d.email), text };
 }
 
 // ── Re-engagement, then sunset (2026-09-20) ──────────────────────────
