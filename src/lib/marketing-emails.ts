@@ -103,6 +103,8 @@ export const TEMPLATE_HEADINGS: Record<string, string> = {
   picks: 'Picked just for you 🪵',
   wishlistReminder: 'Saved, not forgotten ❤️',
   customPitch: 'A design made from your own photo 🪵',
+  reEngage: 'Are these still useful?',
+  midweek: 'Picked by carvers this week 🪵',
 };
 
 function shell(subject: string, heading: string, bodyHtml: string, email: string): string {
@@ -933,6 +935,48 @@ export function wishlistReminderEmail(d: { email: string; products: (MiniProduct
     d.products.map((p) => `${(p.title || '').split('|')[0].trim()}: ${SITE}/product/${p.slug}`).join('\n') +
     `\n\nYour wishlist: ${SITE}/favorites\nUnsubscribe: ${unsubUrl(d.email)}`;
   return { subject, html: shell(subject, 'Saved, not forgotten ❤️', body, d.email), text };
+}
+
+// ── Re-engagement, then sunset (2026-09-20) ──────────────────────────
+// Sent to people who have had several emails and opened none. Honest and
+// short: one question, one button, and a plain promise to stop. Stage 2 says
+// outright that this is the last one, which is the part that makes stopping
+// feel like courtesy rather than a trick.
+export function reEngageEmail(stage: 1 | 2, d: { email: string; products?: MiniProduct[] }): Out {
+  const last = stage === 2;
+  const subject = last ? 'Last email from us (unless you want them)' : 'Still want carving ideas from us?';
+  const keepUrl = `${SITE}/free?keep=1`;
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Hi fellow maker,</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">${last
+      ? 'We have not heard from you in a while, so this is the last email we will send. No hard feelings: an inbox is a busy place.'
+      : 'We send new designs and carving guides every week, but you have not opened one in a while. If they are not useful, we would rather stop than clutter your inbox.'}</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 6px;">Want to keep them? One click is all it takes.</p>
+    ${btn(keepUrl, 'Yes, keep them coming')}
+    ${(d.products || []).length ? `<p style="font-size:13px;color:#777;margin:18px 0 8px;text-align:center;">A few designs makers picked this month:</p>${productGrid(d.products!.slice(0, 3))}` : ''}
+    <p style="font-size:13px;line-height:1.6;color:#777;margin:18px 0 0;">${last
+      ? 'Nothing else is needed from you. Your downloads stay in your account forever, and you can always come back at digitalchiselco.com.'
+      : 'Do nothing and the emails will stop by themselves shortly. Your files and your account are unaffected either way.'}</p>`;
+  const text = `${last ? 'This is the last email we will send.' : 'Still want new designs and carving guides from us?'}\n\nKeep them coming: ${keepUrl}\n\nYour downloads stay in your account either way: ${SITE}/account\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, last ? 'One last hello 👋' : 'Are these still useful?', body, d.email), text };
+}
+
+// ── Midweek picks: what other carvers chose this week ─────────────────
+// Goes to engaged subscribers only. Everything in it is a fact from the
+// week's own orders and views, so it never needs an invented story.
+export function midweekPicksEmail(d: { email: string; products: MiniProduct[]; topTitle?: string | null }): Out {
+  const first = d.products[0];
+  const subject = first ? `This week carvers picked ${String(first.title || '').split('|')[0].trim().slice(0, 42)}` : 'What carvers picked this week';
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">Hi fellow maker,</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">Midweek pick of the designs other carvers chose most in the last seven days. No sale, no countdown, just what is busy on the machines right now:</p>
+    ${productGrid(d.products.slice(0, 3))}
+    ${btn(SITE + '/catalog?sort=popular', 'See what else is popular')}
+    <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">Instant download &middot; commercial use included &middot; carve it on a router, laser or 3D printer</p>`;
+  const text = `What carvers picked this week:\n` +
+    d.products.slice(0, 3).map((p) => `${(p.title || '').split('|')[0].trim()}: ${SITE}/product/${p.slug}`).join('\n') +
+    `\n\n${SITE}/catalog\nUnsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, 'Picked by carvers this week 🪵', body, d.email), text };
 }
 
 // ── Owner weekly report (to the ops inbox, not customers) ─────────────

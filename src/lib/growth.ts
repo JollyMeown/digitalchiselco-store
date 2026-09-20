@@ -52,7 +52,7 @@ const outOfTime = () => Date.now() - RUN_STARTED_AT.t > timeBudgetMs();
 // daily quota is exhausted they are skipped with a visible 'deferred' marker —
 // no doomed API calls, no wasted seconds, and tomorrow they run first thing.
 // (Non-email steps like fx / bundle-of-week / send-time learning still run.)
-const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'etsyFreePack','customPitch', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits', 'makerRecruitDrip', 'makerRecruitDripExtra', 'makerFeeSettlement']);
+const EMAIL_STEPS = new Set(['drip', 'carts', 'followups', 'weekly', 'etsyWelcome', 'etsyFreePack','customPitch', 'browse', 'winback', 'priceDrop', 'referralNudge', 'refundWinback', 'wishlistReminder', 'ownerReport', 'designScout', 'makerJobsNudge', 'makerLowCredits', 'makerRecruitDrip', 'makerRecruitDripExtra', 'makerFeeSettlement', 'reEngage', 'midweek']);
 async function step(stats: Record<string, any>, key: string, fn: () => Promise<void>) {
   if (outOfTime()) { stats[key] = 'skipped: time budget (runs next time)'; return; }
   if (EMAIL_STEPS.has(key) && isQuotaExhausted()) { stats[key] = 'deferred: Resend daily quota reached (runs tomorrow)'; return; }
@@ -187,16 +187,23 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       .sort((a: any, b: any) => Date.parse(a.last_sent_at) - Date.parse(b.last_sent_at))
       .map((r: any) => String(r.email).toLowerCase());
     const pool = [...fresh, ...again];
-    const s: any = { sent: 0, rewaves: 0, failed: 0, poolLeft: Math.max(0, pool.length - target) };
+    const s: any = { sent: 0, rewaves: 0, failed: 0, heldByCap: 0, poolLeft: pool.length };
     if (!pool.length) { stats[statsKey] = 'pool empty: everyone is invited, applied, or inside the 10-day wave cooldown'; return; }
-    for (const em of pool.slice(0, target)) {
-      if (outOfTime()) break;
+    // Walk the pool until `target` invites actually go out. Before 2026-09-20
+    // this sliced the first `target` people and anyone already at their
+    // 4-emails-a-week limit burned a slot and was logged as "failed": on
+    // 09-19 that turned 20 invites into 3 sent and 17 phantom failures.
+    let scanned = 0;
+    for (const em of pool) {
+      if (s.sent >= target || outOfTime()) break;
+      if (++scanned > target * 12) break;
       try {
         const prev = invitedBy.get(em);
         const wave = prev ? (prev.invite_count || 1) : 0;
         if (await isUnsubscribed(db, em)) { await db.from('maker_invites').upsert({ email: em, source: 'drip-skip-unsub', invite_count: RECRUIT_MAX_WAVES, last_sent_at: new Date().toISOString() }, { onConflict: 'email' }); continue; }
         const { subject, html, text } = makerRecruitEmail({ email: em, wave, founding });
         const r2 = await sendEmail({ to: em, subject, html, text, idempotencyKey: `maker-recruit:${em}:w${wave}`, tags: [{ name: 'kind', value: 'makerRecruit' }] });
+        if (r2.held) { s.heldByCap++; continue; }   // at their weekly limit: try the next person
         if (r2.ok && !r2.skipped) {
           s.sent++; if (prev) s.rewaves++;
           await db.from('maker_invites').upsert({ email: em, source: prev?.source || 'drip', invite_count: wave + 1, last_sent_at: new Date().toISOString() }, { onConflict: 'email' });
@@ -208,7 +215,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     stats[statsKey] = s;
   };
 
-  // GUARANTEED pass: 20 recruit invites before the digest can drain the day.
+  // GUARANTEED pass: 60 recruit invites before the digest can drain the day.
   stats.makerRecruitDrip = 'off';
   if (g.maker_recruit_drip_enabled) {
   // ORDER MATTERS (2026-09-09): the one-time welcome runs FIRST. On the
@@ -351,7 +358,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     await step(stats, 'makerRecruitDrip', async () => {
       const { marketingBudgetRemaining } = await import('./resend');
       const budget = await marketingBudgetRemaining();
-      await runRecruitDrip(Math.min(20, budget), 'makerRecruitDrip');
+      await runRecruitDrip(Math.min(60, budget), 'makerRecruitDrip');
     });
   }
 
@@ -505,11 +512,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     await step(stats, 'makerRecruitDripExtra', async () => {
       const { marketingBudgetRemaining } = await import('./resend');
       const budget = await marketingBudgetRemaining();
-      // cap the top-up at 80 (=> max 100 recruit emails/day with the
-      // guaranteed 20): steady daily volume beats one-day blasts for both
-      // sender reputation and reply-handling
-      const target = Math.min(budget - 40, 80);
-      if (target <= 0) { stats.makerRecruitDripExtra = 'no surplus today (guaranteed 20 already sent)'; return; }
+      // cap the top-up at 240 (=> max 300 recruit emails/day with the
+      // guaranteed 60, owner 2026-09-20): steady daily volume beats one-day
+      // blasts for both sender reputation and reply-handling. 60 is left for
+      // the remaining marketing steps.
+      const target = Math.min(budget - 60, 240);
+      if (target <= 0) { stats.makerRecruitDripExtra = 'no surplus today (guaranteed 60 already sent)'; return; }
       await runRecruitDrip(target, 'makerRecruitDripExtra');
     });
   }
@@ -958,10 +966,12 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
   await step(stats, 'browse', async () => {
     if (!g.abandoned_browse_enabled) return;
     const s = { candidates: 0, sent: 0, skipped: 0, failed: 0 };
-    // recent browse events with a known email (last 3 days)
+    // Recent browse events with a known email. Widened 3 -> 7 days on
+    // 2026-09-20: browse, wishlist, cart and price-drop together sent only 31
+    // emails in 30 days, and these are the highest-intent messages we have.
     const { data: evs } = await db.from('browse_events')
       .select('email, product_id, created_at')
-      .gte('created_at', daysAgo(3)).order('created_at', { ascending: false }).limit(3000);
+      .gte('created_at', daysAgo(7)).order('created_at', { ascending: false }).limit(6000);
     // group distinct products per email
     const byEmail = new Map<string, Set<string>>();
     for (const e of evs || []) {
@@ -973,7 +983,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     const { data: already } = await db.from('browse_reminders').select('email');
     const reminded = new Set((already || []).map((r) => r.email.toLowerCase()));
     for (const [email, pidSet] of byEmail) {
-      if (pidSet.size < 3 || reminded.has(email)) { s.skipped++; continue; }
+      if (pidSet.size < 2 || reminded.has(email)) { s.skipped++; continue; }   // 3 -> 2 designs (2026-09-20)
       try {
         const { data: sub } = await db.from('subscribers').select('confirmed_at, unsubscribed_at').ilike('email', email).maybeSingle();
         if (!sub?.confirmed_at || sub.unsubscribed_at) { s.skipped++; continue; }
@@ -1263,8 +1273,8 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     const { data: favs } = await db.from('browse_events')
       .select('email, product_id')
       .eq('source', 'favorite')
-      .lte('created_at', daysAgo(3)).gte('created_at', daysAgo(14))
-      .limit(5000);
+      .lte('created_at', daysAgo(3)).gte('created_at', daysAgo(45))   // 14 -> 45 days (2026-09-20)
+      .limit(8000);
     const byEmail = new Map<string, Set<string>>();
     for (const f of favs || []) {
       const em = (f.email || '').toLowerCase(); if (!em || !f.product_id) continue;
@@ -1273,7 +1283,7 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
     s.candidates = byEmail.size;
     let sends = 0;
     for (const [em, pidSet] of byEmail) {
-      if (sends >= 40) break;
+      if (sends >= 120) break;   // 40 -> 120 (2026-09-20)
       try {
         if (await isUnsubscribed(db, em)) continue;
         let pids = [...pidSet].slice(0, 6);
@@ -1308,6 +1318,95 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       } catch { s.failed++; }
     }
     stats.wishlistReminder = s;
+  });
+
+  // -- 14b. Re-engagement, then sunset -----------------------------------
+  // 818 subscribers had 3+ emails in 60 days and never opened one (measured
+  // 2026-09-20). Two honest emails a week apart, then marketing stops for
+  // them. Spends a little quota now to stop wasting it every week, and
+  // protects the open rates that keep everyone else out of spam.
+  stats.reEngage = 'off';
+  await step(stats, 'reEngage', async () => {
+    if (!g.reengage_enabled) return;
+    const { dormantSubscribers } = await import('./audience');
+    const { reEngageEmail } = await import('./marketing-emails');
+    const s: any = { candidates: 0, first: 0, second: 0, sunset: 0, failed: 0 };
+    const dormant = await dormantSubscribers(db);
+    s.candidates = dormant.length;
+    const { data: picks } = await db.from('products').select('title, slug, image_url, price_usd')
+      .eq('active', true).eq('is_bestseller', true).not('image_url', 'is', null).limit(3);
+    const GAP = 7 * 86400000;
+    let budget = Number(g.reengage_per_night ?? 150);
+    for (const d of dormant) {
+      if (budget <= 0 || outOfTime()) break;
+      const waited = d.sent_at ? Date.now() - Date.parse(d.sent_at) : Infinity;
+      try {
+        if (d.stage >= 2) {
+          // Two asked, no answer: stop marketing to them. They are NOT
+          // unsubscribed, so downloads, receipts and sign-in links still send.
+          if (waited < GAP) continue;
+          const nowIso = new Date().toISOString();
+          await db.from('subscribers').update({ sunset_at: nowIso, suppressed_at: nowIso }).ilike('email', d.email);
+          s.sunset++; continue;
+        }
+        if (d.stage === 1 && waited < GAP) continue;
+        const stage = (d.stage + 1) as 1 | 2;
+        const { subject, html, text } = withOvr('reEngage', reEngageEmail(stage, { email: d.email, products: (picks || []) as MiniProduct[] }), d.email);
+        const r = await sendEmail({ to: d.email, subject, html, text, idempotencyKey: `reengage:${d.email}:s${stage}`, tags: [{ name: 'kind', value: 'reEngage' }] });
+        if (r.held) continue;                      // at their weekly limit, try tomorrow
+        if (r.quota) { stats.reEngage = { ...s, note: 'stopped: daily budget reached' }; return; }
+        if (r.ok && !r.skipped) {
+          await db.from('subscribers').update({ reengage_stage: stage, reengage_sent_at: new Date().toISOString() }).ilike('email', d.email);
+          if (stage === 1) s.first++; else s.second++;
+          budget--;
+        } else s.failed++;
+      } catch { s.failed++; }
+    }
+    stats.reEngage = s;
+  });
+
+  // -- 14c. Midweek picks (Thursdays, engaged subscribers only) ----------
+  // The second weekly touch the bigger quota pays for. Engaged people only,
+  // so the extra volume lands where it is read, and the content is a fact:
+  // the designs other carvers bought and viewed most in the last 7 days.
+  stats.midweek = 'off';
+  await step(stats, 'midweek', async () => {
+    if (!g.midweek_enabled) return;
+    if (new Date().getUTCDay() !== 4) { stats.midweek = 'waiting for Thursday'; return; }
+    const { engagedEmails } = await import('./audience');
+    const { midweekPicksEmail } = await import('./marketing-emails');
+    const s: any = { audience: 0, sent: 0, failed: 0, held: 0 };
+    const since = daysAgo(7);
+    const { data: items } = await db.from('order_items').select('product_id, orders!inner(created_at, status)')
+      .gte('orders.created_at', since).eq('orders.status', 'paid').limit(500);
+    const score = new Map<string, number>();
+    for (const it of (items || []) as any[]) if (it.product_id) score.set(it.product_id, (score.get(it.product_id) || 0) + 3);
+    const { data: views } = await db.from('site_events').select('product_id')
+      .eq('type', 'view_product').gte('day', since.slice(0, 10)).limit(5000);
+    for (const v of (views || []) as any[]) if (v.product_id) score.set(v.product_id, (score.get(v.product_id) || 0) + 1);
+    const topIds = [...score.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id]) => id);
+    if (!topIds.length) { stats.midweek = 'quiet week, nothing to show'; return; }
+    const { data: prods } = await db.from('products').select('id, title, slug, image_url, price_usd')
+      .in('id', topIds).eq('active', true).not('image_url', 'is', null);
+    const products = topIds.map((id) => (prods || []).find((p: any) => p.id === id)).filter(Boolean).slice(0, 3) as MiniProduct[];
+    if (products.length < 3) { stats.midweek = 'not enough designs with images this week'; return; }
+
+    const engaged = await engagedEmails(db, 90);
+    const { data: subs } = await fetchAll((a, b) => db.from('subscribers').select('email')
+      .not('confirmed_at', 'is', null).is('unsubscribed_at', null).is('suppressed_at', null).range(a, b)).then((data) => ({ data }));
+    const list = (subs || []).map((r: any) => String(r.email).toLowerCase()).filter((e: string) => engaged.has(e) && okEmail(e));
+    s.audience = list.length;
+    for (const em of list) {
+      if (outOfTime()) break;
+      try {
+        const { subject, html, text } = withOvr('midweek', midweekPicksEmail({ email: em, products }), em);
+        const r = await sendEmail({ to: em, subject, html, text, idempotencyKey: `midweek:${em}:${new Date().toISOString().slice(0, 10)}`, tags: [{ name: 'kind', value: 'midweek' }] });
+        if (r.held) { s.held++; continue; }
+        if (r.quota) { stats.midweek = { ...s, note: 'stopped: daily budget reached' }; return; }
+        if (r.ok && !r.skipped) s.sent++; else s.failed++;
+      } catch { s.failed++; }
+    }
+    stats.midweek = s;
   });
 
   // ── 15. AI Design Scout (Mondays): demand signals → 5 design ideas ───
