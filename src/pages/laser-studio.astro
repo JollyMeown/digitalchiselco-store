@@ -7,7 +7,7 @@ const s: any = await getSettings();
 // Image slots are admin-managed (Admin → Media → Laser Studio page) with a static
 // fallback; img() right-sizes admin uploads, local files are pre-sized.
 //
-// The HERO is fixed to the v2.6 screenshot on purpose (2026-09-19): the admin
+// The HERO is fixed to the current app screenshot on purpose (2026-09-19): the admin
 // hero slot held the July "11 Sellable Styles" poster, which is out of date
 // (50 looks now) and not a picture of the app. ls_hero_url is left untouched in
 // the database; restore `s.ls_hero_url ||` below to hand the hero back to Admin.
@@ -25,8 +25,8 @@ const BUY = s.ls_buy_url || 'https://www.etsy.com/shop/DigitalChiselCo';
 const STEPS = [
   { t: 'Load the design', p: 'The greyscale file of the relief you carved.' },
   { t: 'Photograph the piece on the laser', p: 'Straight down, or a screenshot of the laser camera view.' },
-  { t: 'Make it measurable', p: 'Find the board corners and flatten the photo to true millimetres.' },
-  { t: 'One-click alignment', p: '"Find it for me" locks the design onto the carving. Snap or pin two points to fine-tune.' },
+  { t: 'Make it measurable', p: 'Find the board corners and flatten the photo to true size, in millimetres or inches.' },
+  { t: 'Auto-fit, then adjust', p: 'The built-in AI finds your piece in the photo and drops the design onto it, offline, and tells you how sure it is. Drag to move, corners to resize, the round handle to rotate.' },
   { t: 'Choose what to burn', p: 'Darken the background floor, scorch the raised tops, outline the relief, tonal shading of the design itself, or your own text.' },
   { t: 'Export for LightBurn', p: 'Burn files plus alignment helpers, sorted in one ZIP.' },
 ];
@@ -47,7 +47,7 @@ const LOOK_GROUPS = [
 
     <!-- ===== HERO ===== -->
     <header class="text-center mb-10 reveal">
-      <p class="text-xs tracking-widest text-bronze-600 mb-3">★ VERSION 2.6 · NOW WITH CNC MATCH</p>
+      <p class="text-xs tracking-widest text-bronze-600 mb-3">★ VERSION 2.7 · CNC MATCH WITH AUTO-FIT</p>
       <h1 class="font-serif text-4xl md:text-6xl text-bronze-800 leading-tight">
         Laser <em class="italic text-bronze-600">Studio</em>
       </h1>
@@ -65,15 +65,15 @@ const LOOK_GROUPS = [
 
     <figure class="rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg mb-16 reveal">
       <img src="/laser-studio/app-v26.webp" srcset="/laser-studio/app-v26-800.webp 800w, /laser-studio/app-v26.webp 1600w" sizes="(max-width: 1024px) 100vw, 1024px"
-           alt="Laser Studio 2.6 on the CNC Match tab: a carved alligator relief photographed on the laser bed, with the design locked onto it"
+           alt="Laser Studio 2.7 on the CNC Match tab: Auto-fit has locked a design onto a carved alligator relief photographed on the laser bed"
            width="1600" height="1000" loading="eager" fetchpriority="high" decoding="async" class="w-full" />
-      <figcaption class="text-center text-xs text-ink-700/60 py-2 bg-cream">Laser Studio 2.6: seven workspaces, one quiet artboard. Here, CNC Match has locked a design onto a real carving.</figcaption>
+      <figcaption class="text-center text-xs text-ink-700/60 py-2 bg-cream">Laser Studio 2.7: seven workspaces, one quiet artboard. Here, CNC Match has locked a design onto a real carving.</figcaption>
     </figure>
 
     <!-- ===== NEW: CNC MATCH ===== -->
     <section id="cnc-match" class="mb-16 scroll-mt-24">
       <div class="text-center reveal">
-        <p class="text-xs tracking-widest text-bronze-600 mb-3">NEW IN 2.6 · CNC MATCH</p>
+        <p class="text-xs tracking-widest text-bronze-600 mb-3">CNC MATCH · NOW WITH AUTO-FIT</p>
         <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">Carved it on the CNC?<br class="hidden md:block"/> Finish it on the laser.</h2>
         <p class="mt-4 text-ink-700/85 max-w-3xl mx-auto">
           Carved one of our STLs on your CNC? Put it on the laser and burn text, shading or the same picture
@@ -112,8 +112,10 @@ const LOOK_GROUPS = [
             <li class="flex gap-2"><span class="text-bronze-600">✓</span> A saved preset to reload the same job later</li>
           </ul>
           <p class="mt-4 text-sm text-ink-700/70">
-            Alignment is typically within about a millimetre. Always check the outline and test on scrap before
-            burning the finished piece.
+            Auto-fit is a starting guess, not a promise: a clamp, a bright offcut, a sheet of paper or a hand in
+            the shot can fool it, and square pieces sometimes land a quarter turn out. It says how sure it is, and
+            you can nudge it by hand. Alignment is typically within about a millimetre. Always check the outline
+            and test on scrap before burning the finished piece.
           </p>
         </div>
         <figure class="img-zoom rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg reveal reveal-d1">
@@ -317,7 +319,7 @@ const LOOK_GROUPS = [
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> One-time purchase, no subscription</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Photos processed on your PC, never uploaded</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Illustrated user manual and CNC Match Guide built in</li>
-        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Automatic notice when a new version is out</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Free updates, with a notice when a new version is out</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Every export sorted for diode, CO2 &amp; vector</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Seven workspaces, from STL to your shop paperwork</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Made by the studio behind 1,200+ STL designs</li>
