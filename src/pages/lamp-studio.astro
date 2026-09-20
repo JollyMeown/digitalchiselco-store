@@ -1,8 +1,9 @@
 ---
 import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
-import { getSettings } from '../lib/queries';
+import { getSettings, designCountLabel } from '../lib/queries';
 const s: any = await getSettings();
+const DESIGNS = await designCountLabel();   // "1,900+", kept true by the database
 // Image slots are admin-manageable (Admin → Media) with static fallbacks.
 const IMG = {
   hero:   s.vls_hero_url   || '/lamp-studio/hero.jpg',
@@ -223,7 +224,7 @@ const DEMO_URL = '/lamp-studio-app/index.html?demo=1&buy=' + encodeURIComponent(
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> 100% offline — your photos never leave your PC</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Illustrated user manual + per-lamp PDF print guides</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Sell what you print — your designs are yours, commercially</li>
-        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Made by the studio behind 1,200+ STL designs</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Made by the studio behind {DESIGNS} STL designs</li>
       </ul>
     </section>
 

@@ -70,6 +70,26 @@ export async function getSettings(): Promise<SiteSettings> {
   } catch (e) { console.error('getSettings failed:', e); return SETTINGS_FALLBACK; }
 }
 
+// How many designs the shop sells, as a round "1,900+" label. Hard-coded
+// numbers on the product pages went stale (they still said 1,200+ at 1,971
+// designs, owner 2026-09-20), so the pages ask for this instead. Rounds DOWN
+// to the nearest hundred, so the claim is always true, and it turns into
+// "2,000+" on its own the day the catalogue gets there.
+let designCount: { at: number; label: string } = { at: 0, label: '1,900+' };
+export async function designCountLabel(): Promise<string> {
+  if (Date.now() - designCount.at < 3600000) return designCount.label;
+  try {
+    const { supabaseAdmin } = await import('./supabase');
+    // Bundles and membership plans are products in the table but not designs.
+    const { count } = await supabaseAdmin().from('products')
+      .select('id', { count: 'exact', head: true }).eq('active', true).eq('is_bundle', false).is('membership_plan_slug', null);
+    if (count && count >= 100) {
+      designCount = { at: Date.now(), label: (Math.floor(count / 100) * 100).toLocaleString('en-US') + '+' };
+    }
+  } catch { /* keep the last good label */ }
+  return designCount.label;
+}
+
 // Is Cut Local live? Header and Footer both need this on every page, so the
 // answer is held for a minute rather than queried twice per render.
 let mpLive: { at: number; on: boolean } = { at: 0, on: false };

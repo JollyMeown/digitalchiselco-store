@@ -3,6 +3,7 @@ import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { getSettings } from '../lib/queries';
 import { img } from '../lib/img';
+import { designCountLabel } from '../lib/queries';
 const s: any = await getSettings();
 // Image slots are admin-managed (Admin → Media → Laser Studio page) with a static
 // fallback; img() right-sizes admin uploads, local files are pre-sized.
@@ -20,6 +21,7 @@ const IMG = {
   tumbler: img(s.ls_tumbler_url, { w: 700 })  || '/laser-studio/tumbler.webp',
   proof:   img(s.ls_proof_url, { w: 700 })    || '/laser-studio/proof.webp',
 };
+const DESIGNS = await designCountLabel();   // "1,900+", kept true by the database
 const BUY = s.ls_buy_url || 'https://www.etsy.com/shop/DigitalChiselCo';
 
 const STEPS = [
@@ -128,7 +130,7 @@ const LOOK_GROUPS = [
       <div class="mt-10 rounded-xl border border-bronze-600/30 bg-gradient-to-br from-cream to-white p-6 md:p-8 text-center reveal">
         <p class="font-serif text-xl md:text-2xl text-bronze-800">Our STL files, then our laser software: one finished piece.</p>
         <p class="mt-2 text-sm text-ink-700/80 max-w-2xl mx-auto">
-          CNC Match was built for the <a href="/catalog" class="text-bronze-600 underline underline-offset-2">1,200+ bas-relief STL files</a> in our shop.
+          CNC Match was built for the <a href="/catalog" class="text-bronze-600 underline underline-offset-2">{DESIGNS} bas-relief STL files</a> in our shop.
           Carve the relief, then personalise every piece on the laser, for weddings, memorials, pets and shop signs.
         </p>
       </div>
@@ -200,7 +202,7 @@ const LOOK_GROUPS = [
             dial the depth, boost the detail. Exports flat single-pass engraves for any laser <em>and</em> true 16-bit
             depth maps for real 3D carving.
           </p>
-          <p class="mt-3 text-sm text-ink-700/70">It pairs perfectly with our <a href="/catalog" class="text-bronze-600 underline underline-offset-2">1,200+ bas-relief STL files</a>, with zero conversion needed.</p>
+          <p class="mt-3 text-sm text-ink-700/70">It pairs perfectly with our <a href="/catalog" class="text-bronze-600 underline underline-offset-2">{DESIGNS} bas-relief STL files</a>, with zero conversion needed.</p>
         </div>
       </div>
       <div class="grid md:grid-cols-2 gap-8 items-center reveal">
@@ -322,7 +324,7 @@ const LOOK_GROUPS = [
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Free updates, with a notice when a new version is out</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Every export sorted for diode, CO2 &amp; vector</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Seven workspaces, from STL to your shop paperwork</li>
-        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Made by the studio behind 1,200+ STL designs</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Made by the studio behind {DESIGNS} STL designs</li>
       </ul>
     </section>
 
