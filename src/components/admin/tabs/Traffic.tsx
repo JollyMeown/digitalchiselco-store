@@ -747,6 +747,11 @@ function OrdersCalendar() {
   const DOW = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const bestDow = dowTotals.some((n) => n > 0) ? DOW[dowTotals.indexOf(Math.max(...dowTotals))] : null;
   const CELL = 15, GAP = 3;
+  // Weekly totals under each column (owner asked for them, 2026-09-20): a
+  // column is one week, so the number below it is that week's paid orders,
+  // with the revenue on hover.
+  const weekly = cols.map((col) => col.reduce((a, c) => ({ n: a.n + c.n, rev: a.rev + c.rev }), { n: 0, rev: 0 }));
+  const bestWeek = Math.max(0, ...weekly.map((w) => w.n));
 
   return (
     <Card>
@@ -756,7 +761,7 @@ function OrdersCalendar() {
       </div>
       {!loaded ? <p className="text-xs text-ink-700/50">Loading…</p> : (
         <div className="overflow-x-auto">
-          <svg width={(cols.length * (CELL + GAP)) + 30} height={7 * (CELL + GAP) + 6}>
+          <svg width={(cols.length * (CELL + GAP)) + 30} height={7 * (CELL + GAP) + 22}>
             {['Mon', 'Wed', 'Fri', 'Sun'].map((lbl, i) => (
               <text key={lbl} x={0} y={[0, 2, 4, 6][i] * (CELL + GAP) + CELL - 3} fontSize={9} fill="#8a7a68">{lbl}</text>
             ))}
@@ -766,11 +771,20 @@ function OrdersCalendar() {
                 <title>{c.day}: {c.n} order{c.n === 1 ? '' : 's'}{c.rev > 0 ? ` · $${c.rev.toFixed(2)}` : ''}</title>
               </rect>
             )))}
+            <text x={0} y={7 * (CELL + GAP) + 13} fontSize={9} fill="#8a7a68">wk</text>
+            {weekly.map((wk, w) => (
+              <text key={`t${w}`} x={30 + w * (CELL + GAP) + CELL / 2} y={7 * (CELL + GAP) + 13} fontSize={9}
+                textAnchor="middle" fill={wk.n === 0 ? '#c9bda9' : wk.n === bestWeek ? '#5E380A' : '#8a7a68'}
+                fontWeight={wk.n === bestWeek && wk.n > 0 ? 700 : 400}>
+                {wk.n || '·'}
+                <title>{`week of ${cols[w][0].day}: ${wk.n} order${wk.n === 1 ? '' : 's'}${wk.rev > 0 ? ` · $${wk.rev.toFixed(2)}` : ''}`}</title>
+              </text>
+            ))}
           </svg>
           <div className="flex items-center gap-1.5 mt-1 text-[10px] text-ink-700/50">
             less
             {['#f1ece1', '#e0c391', '#b8834a', '#854F0B'].map((c) => <span key={c} className="inline-block w-3 h-3 rounded" style={{ background: c }} />)}
-            more · hover a square for the day's orders + revenue
+            more · hover a square for the day, or a number below for that week's total
           </div>
         </div>
       )}
