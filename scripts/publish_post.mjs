@@ -87,7 +87,9 @@ const post = {
   ...(meta.email ? {
     email_subject: meta.email.subject || null,
     email_intro: meta.email.intro || null,
-    email_image_url: meta.email.image ? (img[meta.email.image] || null) : null,
+    // A frame key, or a full URL when the best inside photo is not a frame
+    // (the hanger guide uses the owner's own lifestyle card, 2026-09-20).
+    email_image_url: meta.email.image ? (/^https?:\/\//.test(meta.email.image) ? meta.email.image : (img[meta.email.image] || null)) : null,
     email_in_drip: !!meta.email.drip,
   } : {}),
 };

@@ -250,12 +250,26 @@ export default function SearchConsole() {
 
   const blog = useMemo(() => pages.filter((p) => pathOf(p.page).startsWith('/blog/')), [pages]);
   if (!rows) return null;
-  const tot = rows.reduce((a, r) => ({ i: a.i + r.impressions, c: a.c + r.clicks, pw: a.pw + r.position * r.impressions }), { i: 0, c: 0, pw: 0 });
+  // Google finalises Search Console numbers about 3 days late, so the newest
+  // day or two always look like a cliff and the owner asked why the graph was
+  // falling (2026-09-20: 19 impressions on the last day against ~200 normally).
+  // Everything below judges only the days Google has settled.
+  const settled = (() => {
+    if (rows.length < 4) return rows;
+    const body = rows.slice(0, -3);
+    const typical = body.length ? [...body.map((r) => r.impressions)].sort((a, b) => a - b)[Math.floor(body.length / 2)] : 0;
+    let keep = rows.length;
+    // trim trailing days that hold less than a third of a normal day
+    while (keep > 3 && typical > 0 && rows[keep - 1].impressions < typical * 0.34) keep--;
+    return rows.slice(0, keep);
+  })();
+  const pending = rows.length - settled.length;
+  const tot = settled.reduce((a, r) => ({ i: a.i + r.impressions, c: a.c + r.clicks, pw: a.pw + r.position * r.impressions }), { i: 0, c: 0, pw: 0 });
   const ctr = tot.i ? (tot.c / tot.i) * 100 : 0;
   const pos = tot.i ? tot.pw / tot.i : 0;
-  const half = Math.floor(rows.length / 2);
-  const recent = rows.slice(half).reduce((a, r) => a + r.clicks, 0);
-  const prior = rows.slice(0, half).reduce((a, r) => a + r.clicks, 0);
+  const half = Math.floor(settled.length / 2);
+  const recent = settled.slice(half).reduce((a, r) => a + r.clicks, 0);
+  const prior = settled.slice(0, half).reduce((a, r) => a + r.clicks, 0);
   const delta = prior ? Math.round(((recent - prior) / prior) * 100) : 0;
   const list: any[] = tab === 'blog' ? blog : tab === 'pages' ? pages : queries;
   const queriesFor = (page: string) => pq.filter((r) => r.page === page).slice(0, 8);
@@ -317,7 +331,7 @@ export default function SearchConsole() {
             <Kpi label="Click-through" value={ctr.toFixed(2) + '%'} />
             <Kpi label="Avg position" value={pos ? pos.toFixed(1) : '–'} sub="lower is better" />
           </div>
-          <Chart rows={rows} />
+          <Chart rows={settled} />
           <div className="flex items-center gap-4 mt-1 text-[11px] text-ink-700/60">
             <span className="flex items-center gap-1"><span style={{ width: 10, height: 10, borderRadius: 2, background: IMP, display: 'inline-block' }} />Impressions (left scale)</span>
             <span className="flex items-center gap-1"><span style={{ width: 10, height: 10, borderRadius: 2, background: CLK, display: 'inline-block' }} />Clicks (own scale)</span>
@@ -379,6 +393,7 @@ export default function SearchConsole() {
           {meta.err && <div className="mt-2 text-[11px] text-red-700 break-all">Last sync error: {meta.err}</div>}
           {msg && <div className="mt-2 text-[11px] text-ink-700/70">{msg}</div>}
           <div className="mt-2 text-[10px] text-ink-700/45">
+            {pending > 0 && <span className="text-ink-700/60">The last {pending} day{pending === 1 ? '' : 's'} {pending === 1 ? 'is' : 'are'} still filling in at Google and {pending === 1 ? 'is' : 'are'} left out above, so the line never shows a false drop. </span>}
             Nightly sync re-reads the last 14 days (Google finalises numbers about 3 days late).
             {' '}<button onClick={() => refresh(true)} disabled={busy} className="underline hover:text-bronze-700">Backfill 16 months</button>
           </div>

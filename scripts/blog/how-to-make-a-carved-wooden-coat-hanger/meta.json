@@ -1,0 +1,13 @@
+{
+  "title": "How to Make a Carved Wooden Coat Hanger on a CNC",
+  "excerpt": "A carved hanger is the rare project that gets handled every day. This guide carves one start to finish with our own setup-card numbers: the size to pick and why it changes the stock thickness, the grain rule that decides whether it holds a coat or snaps, feeds for four classes of machine, fitting the screw-in hook, and the finish that must cure before a jacket touches it.",
+  "seo_title": "How to Make a Carved Wooden Coat Hanger on a CNC Router",
+  "seo_description": "Carve a wooden coat hanger on a CNC: sizes and stock thickness, the grain rule that stops it breaking, feeds and speeds for hobby to industrial machines, fitting a screw-in hanger hook, and an oil finish that will not mark clothes.",
+  "cover": "cover",
+  "email": {
+    "subject": "The carving that gets picked up every day",
+    "intro": "Most of what we carve ends up on a wall. A coat hanger is different: it hangs in the wardrobe, it comes out when guests arrive, and somebody always turns it over to look at the fish.\n\nFive new hanger designs landed this week, and the new guide carves one of them start to finish with the real numbers from the setup card: which size to pick and why it decides your board thickness, the grain rule that decides whether it holds a winter coat or snaps at the waist, feeds for every class of machine, and the one bought part you need, a screw-in hook that takes a minute to fit.",
+    "image": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog-refs/hanger-card-base.webp",
+    "drip": true
+  }
+}
