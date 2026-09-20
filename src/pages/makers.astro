@@ -7,7 +7,7 @@
 // /api/mp/makers-list, thumbnails are cut to card size by the transformer, and
 // the whole page is edge cached for 5 minutes.
 import Shell from '../layouts/Shell.astro';
-import MakerMap from '../components/MakerMap.tsx';
+import MakerMapLazy from '../components/MakerMapLazy.tsx';
 import { makerPage, PAGE } from './api/mp/makers-list';
 let gallery: any[] = [];
 let total = 0;
@@ -27,8 +27,13 @@ const MACHINE: Record<string, string> = { cnc_router: 'CNC router', cnc_mill: 'C
       <p class="mt-4 text-ink-700/80 max-w-xl mx-auto">Every glowing dot is a real workshop ready to build. Find any design you love, request it, and let a trusted local maker bring it to life.</p>
     </header>
 
-    <div class="rounded-2xl overflow-hidden border border-bronze-600/25 shadow-lg" style="background:#0e0a04">
-      <MakerMap client:load />
+    {/* The map is the same wrapper the homepage uses: the island that hydrates
+        is tiny and the real map, with every country border on Earth, is fetched
+        by dynamic import in the browser. Server-rendering it put 247 KB of SVG
+        into this page on every visit (2026-09-20). The box keeps its height so
+        nothing jumps when the map arrives. */}
+    <div class="rounded-2xl overflow-hidden border border-bronze-600/25 shadow-lg" style="background:#0e0a04;min-height:320px">
+      <MakerMapLazy client:load />
     </div>
 
     <div class="grid sm:grid-cols-3 gap-4 mt-8 text-center">
