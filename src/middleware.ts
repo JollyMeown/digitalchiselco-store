@@ -86,8 +86,8 @@ async function legacyRedirect(pathname: string): Promise<string | null> {
 // single background fetch renews it, so a price or catalogue change lands
 // within minutes and no visitor ever waits on the origin. The browser itself
 // is still told not to cache, so a back-button never shows a stale price.
-const CACHEABLE = /^\/(?:$|catalog\/?$|collections(?:\/[^/]+)?\/?$|product\/[^/]+\/?$|blog(?:\/[^/]+)?\/?$|designs(?:\/[^/]+)?\/?$|free\/?$|membership\/?$|faq\/?$|our-story\/?$|gift-cards\/?$)/;
-const NEVER_CACHE = /^\/(?:admin|api|account|checkout|maker|requests|cart|search|free\/(?:confirm|files))/;
+const CACHEABLE = /^\/(?:$|catalog\/?$|collections(?:\/[^/]+)?\/?$|product\/[^/]+\/?$|blog(?:\/[^/]+)?\/?$|designs(?:\/[^/]+)?\/?$|free\/?$|membership\/?$|faq\/?$|our-story\/?$|gift-cards\/?$|makers\/?$|m\/[^/]+\/?$)/;
+const NEVER_CACHE = /^\/(?:admin|api|account|checkout|maker(?:$|\/|\?)|requests|cart|search|free\/(?:confirm|files))/;
 
 export const onRequest = defineMiddleware(async (context, next) => {
   if (csrfBlocked(context.request, context.url.pathname)) {

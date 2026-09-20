@@ -1,20 +1,20 @@
 ---
 // Public Cut Local maker directory + animated map. Gated/noindex until launch
-// (flip growth_settings.marketplace_enabled to feature it in nav). The map
-// itself works by direct URL for testing.
+// (flip growth_settings.marketplace_enabled to feature it in nav).
+//
+// Built to scale (owner, 2026-09-20: "this will be a hub of 1000s of makers"):
+// the first page is rendered on the server, the rest arrives on demand from
+// /api/mp/makers-list, thumbnails are cut to card size by the transformer, and
+// the whole page is edge cached for 5 minutes.
 import Shell from '../layouts/Shell.astro';
 import MakerMap from '../components/MakerMap.tsx';
-import { supabaseAdmin } from '../lib/supabase';
-import { placeLabel } from '../lib/place';
-// Maker showcase: approved makers with their real work, no contact info —
-// buyers browse, fall in love with the craft, and hire directly from a profile.
+import { makerPage, PAGE } from './api/mp/makers-list';
 let gallery: any[] = [];
+let total = 0;
 try {
-  const db = supabaseAdmin();
-  const { data } = await db.from('makers')
-    .select('id, maker_name, city, region, country, rating_avg, rating_count, jobs_completed, machine_types, materials, portfolio_urls')
-    .eq('status', 'approved').order('rating_avg', { ascending: false }).order('jobs_completed', { ascending: false }).limit(24);
-  gallery = data || [];
+  const first = await makerPage({ limit: PAGE });
+  gallery = first.makers;
+  total = first.total;
 } catch {}
 const stars = (n: number) => '★★★★★'.slice(0, Math.round(n || 0)) + '☆☆☆☆☆'.slice(0, 5 - Math.round(n || 0));
 const MACHINE: Record<string, string> = { cnc_router: 'CNC router', cnc_mill: 'CNC mill', laser: 'Laser', fdm: '3D print', resin: 'Resin print' };
@@ -47,38 +47,61 @@ const MACHINE: Record<string, string> = { cnc_router: 'CNC router', cnc_mill: 'C
     </div>
 
     {gallery.length > 0 && (
-      <section class="mt-10">
+      <section class="mt-10" id="makers">
         <h2 class="font-serif text-2xl sm:text-3xl text-bronze-800 text-center">Meet the makers</h2>
-        <p class="text-sm text-ink-700/65 text-center mt-1.5 max-w-lg mx-auto">Real workshops, real work. Open a profile, see every job they've delivered and what customers said, then hire them directly.</p>
-        <div class="grid sm:grid-cols-2 gap-5 mt-6">
+        <p class="text-sm text-ink-700/65 text-center mt-1.5 max-w-lg mx-auto">Real workshops, real work. Open a profile, see every job they have delivered and what customers said, then hire them directly.</p>
+
+        <div class="mt-5 flex flex-wrap gap-2 justify-center items-center">
+          <input id="mk-q" type="search" placeholder="Search by name, town or country" autocomplete="off"
+                 class="w-full sm:w-72 px-3 py-2 text-sm border border-black/15 rounded-lg bg-white focus:outline-none focus:border-bronze-600" />
+          <select id="mk-machine" class="px-3 py-2 text-sm border border-black/15 rounded-lg bg-white">
+            <option value="">Any machine</option>
+            <option value="cnc_router">CNC router</option>
+            <option value="cnc_mill">CNC mill</option>
+            <option value="laser">Laser</option>
+            <option value="fdm">3D print</option>
+            <option value="resin">Resin print</option>
+          </select>
+          <span id="mk-count" class="text-xs text-ink-700/60" data-total={total}>{total} maker{total === 1 ? '' : 's'}</span>
+        </div>
+
+        <div id="mk-grid" class="grid sm:grid-cols-2 gap-5 mt-6">
           {gallery.map((m) => (
             <a href={`/m/${m.id}`} class="group block bg-white border border-black/10 rounded-2xl overflow-hidden hover:shadow-lg hover:border-bronze-600/40 transition">
-              {(m.portfolio_urls || []).length > 0 && (
+              {m.thumbs.length > 0 && (
                 <div class="grid grid-cols-3 gap-0.5 h-36 overflow-hidden">
-                  {(m.portfolio_urls || []).slice(0, 3).map((u: string) => (
-                    <img src={u} loading="lazy" class="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
+                  {m.thumbs.map((u: string) => (
+                    <img src={u} width="400" height="288" loading="lazy" decoding="async"
+                         class="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
                   ))}
                 </div>
               )}
               <div class="p-4">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-serif text-lg text-bronze-800">{m.maker_name}</span>
+                  <span class="font-serif text-lg text-bronze-800">{m.name}</span>
                   <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">✓ Verified</span>
                 </div>
                 <div class="text-xs text-ink-700/60 mt-1">
-                  {m.rating_count > 0
-                    ? <span><span class="text-bronze-600">{stars(m.rating_avg)}</span> {Number(m.rating_avg).toFixed(1)} · {m.jobs_completed || 0} job{m.jobs_completed === 1 ? '' : 's'} delivered</span>
+                  {m.reviews > 0
+                    ? <span><span class="text-bronze-600">{stars(m.rating)}</span> {m.rating.toFixed(1)} · {m.jobs} job{m.jobs === 1 ? '' : 's'} delivered</span>
                     : <span>New maker · founding member</span>}
-                  {' · '}{placeLabel(m, { withCountry: true })}
+                  {m.place ? ' · ' + m.place : ''}
                 </div>
                 <div class="flex flex-wrap gap-1.5 mt-2.5">
-                  {(m.machine_types || []).slice(0, 3).map((t: string) => <span class="text-[11px] px-2 py-0.5 rounded-full bg-[#2c6a67]/10 text-[#1c4a48] font-medium">{MACHINE[t] || t}</span>)}
-                  {(m.materials || []).slice(0, 3).map((t: string) => <span class="text-[11px] px-2 py-0.5 rounded-full border border-black/10 text-ink-700/60">{t}</span>)}
+                  {m.machines.map((t: string) => <span class="text-[11px] px-2 py-0.5 rounded-full bg-[#2c6a67]/10 text-[#1c4a48] font-medium">{MACHINE[t] || t}</span>)}
+                  {m.materials.map((t: string) => <span class="text-[11px] px-2 py-0.5 rounded-full border border-black/10 text-ink-700/60">{t}</span>)}
                 </div>
                 <div class="text-xs font-bold text-bronze-600 mt-3 group-hover:translate-x-0.5 transition-transform">View profile &amp; hire →</div>
               </div>
             </a>
           ))}
+        </div>
+
+        <p id="mk-empty" class="hidden text-center text-sm text-ink-700/60 py-8">No maker matches that yet. Try a different town, or clear the search.</p>
+        <div class="text-center mt-6">
+          <button id="mk-more" class={total > gallery.length ? 'border border-bronze-600 text-bronze-700 px-6 py-2.5 rounded-lg text-sm hover:bg-bronze-600/10 transition' : 'hidden'}>
+            Show more makers
+          </button>
         </div>
       </section>
     )}
@@ -104,4 +127,57 @@ const MACHINE: Record<string, string> = { cnc_router: 'CNC router', cnc_mill: 'C
       <p class="text-xs text-ink-700/50 mt-3">Are you a maker? <a href="/become-a-maker" class="text-bronze-600 underline">Join Cut Local →</a> · Already approved? <a href="/maker" class="text-bronze-600 underline">Sign in to your dashboard</a></p>
     </div>
   </main>
+
+<script is:inline>
+  (function () {
+    var grid = document.getElementById('mk-grid');
+    if (!grid) return;
+    var more = document.getElementById('mk-more'), countEl = document.getElementById('mk-count');
+    var empty = document.getElementById('mk-empty'), qEl = document.getElementById('mk-q'), mEl = document.getElementById('mk-machine');
+    var PAGE = 24, offset = grid.children.length, total = Number(countEl.dataset.total || 0), busy = false, timer = null;
+    var MACHINE = { cnc_router: 'CNC router', cnc_mill: 'CNC mill', laser: 'Laser', fdm: '3D print', resin: 'Resin print' };
+    var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
+    function stars(n) { n = Math.round(n || 0); return '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n); }
+    function card(m) {
+      var pics = (m.thumbs || []).map(function (u) {
+        return '<img src="' + esc(u) + '" width="400" height="288" loading="lazy" decoding="async" class="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-500" alt="">';
+      }).join('');
+      var tags = (m.machines || []).map(function (t) {
+        return '<span class="text-[11px] px-2 py-0.5 rounded-full bg-[#2c6a67]/10 text-[#1c4a48] font-medium">' + esc(MACHINE[t] || t) + '</span>';
+      }).concat((m.materials || []).map(function (t) {
+        return '<span class="text-[11px] px-2 py-0.5 rounded-full border border-black/10 text-ink-700/60">' + esc(t) + '</span>';
+      })).join('');
+      var line = m.reviews > 0
+        ? '<span class="text-bronze-600">' + stars(m.rating) + '</span> ' + Number(m.rating).toFixed(1) + ' · ' + m.jobs + ' job' + (m.jobs === 1 ? '' : 's') + ' delivered'
+        : 'New maker · founding member';
+      return '<a href="/m/' + esc(m.id) + '" class="group block bg-white border border-black/10 rounded-2xl overflow-hidden hover:shadow-lg hover:border-bronze-600/40 transition">'
+        + (pics ? '<div class="grid grid-cols-3 gap-0.5 h-36 overflow-hidden">' + pics + '</div>' : '')
+        + '<div class="p-4"><div class="flex items-center gap-2 flex-wrap"><span class="font-serif text-lg text-bronze-800">' + esc(m.name) + '</span>'
+        + '<span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">✓ Verified</span></div>'
+        + '<div class="text-xs text-ink-700/60 mt-1">' + line + (m.place ? ' · ' + esc(m.place) : '') + '</div>'
+        + '<div class="flex flex-wrap gap-1.5 mt-2.5">' + tags + '</div>'
+        + '<div class="text-xs font-bold text-bronze-600 mt-3 group-hover:translate-x-0.5 transition-transform">View profile &amp; hire →</div></div></a>';
+    }
+    function load(reset) {
+      if (busy) return;
+      busy = true; more.textContent = 'Loading…';
+      var url = '/api/mp/makers-list?offset=' + (reset ? 0 : offset) + '&limit=' + PAGE
+        + '&q=' + encodeURIComponent(qEl.value.trim()) + '&machine=' + encodeURIComponent(mEl.value);
+      fetch(url).then(function (r) { return r.json(); }).then(function (j) {
+        var list = j.makers || [];
+        if (reset) { grid.innerHTML = ''; offset = 0; total = j.total || 0; }
+        grid.insertAdjacentHTML('beforeend', list.map(card).join(''));
+        offset += list.length;
+        countEl.textContent = total + ' maker' + (total === 1 ? '' : 's');
+        empty.classList.toggle('hidden', total > 0);
+        more.className = offset < total ? 'border border-bronze-600 text-bronze-700 px-6 py-2.5 rounded-lg text-sm hover:bg-bronze-600/10 transition' : 'hidden';
+        more.textContent = 'Show more makers';
+      }).catch(function () { more.textContent = 'Could not load more. Try again.'; })
+        .finally(function () { busy = false; });
+    }
+    more.addEventListener('click', function () { load(false); });
+    qEl.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { load(true); }, 350); });
+    mEl.addEventListener('change', function () { load(true); });
+  })();
+</script>
 </Shell>
