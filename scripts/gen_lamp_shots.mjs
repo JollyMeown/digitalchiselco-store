@@ -51,12 +51,26 @@ the same proportions of height to width, the same rim shape, the same twist. Do 
 do not simplify it, do not add or remove flutes, do not change the opening. Treat image 1 as a
 technical drawing you are photographing, not as inspiration.`;
 
-const MATERIAL = `The object is 3D printed in a single continuous spiral (vase mode) from warm white PLA.
-Show the truthful signature of that process: very fine horizontal layer lines about 0.2 mm apart
-running the full height, a faint spiral seam, and a soft satin surface. The wall is a single
-0.4 mm skin, so when the lamp is on the light passes THROUGH the wall and the whole shade glows
-warm amber from within, brightest between the flutes, with the layer lines visible as fine
-striations in the glow. No gloss, no ceramic, no glass, no fabric.`;
+// Vase mode raises Z continuously, so the nozzle never stops or restarts and
+// there is NO Z-seam at all. An earlier version of this prompt asked for "a
+// faint spiral seam" and every picture came back with a scar up the side; the
+// owner caught it (2026-09-21). A vase-mode print is the smoothest thing an
+// FDM printer makes, and saying so is the whole point of the product.
+const MATERIAL = `The object is 3D printed in ONE continuous spiral (vase mode) from warm white PLA.
+
+ABSOLUTELY NO SEAM. In vase mode the Z axis rises continuously and the nozzle never stops, lifts or
+restarts, so there is no Z-seam, no vertical scar, no diagonal join line, no start or stop blob, and
+no stringing anywhere on the surface. The wall is unbroken all the way around and all the way up.
+Do not draw a seam, a join, a split line or a visible spiral ramp.
+
+The truthful signature is only this: extremely fine, even, continuous horizontal striations about
+0.2 mm apart running the full height, delicate rather than coarse, like fine turned grooves in
+porcelain. The surface is smooth satin and flawless.
+
+The wall is a single skin only 0.4 mm thick, so the shade is thin, light and delicate, and when the
+lamp is on the light passes THROUGH the wall: the whole shade glows warm amber from within, brightest
+between the flutes, with those fine striations reading as soft bands of light rather than ridges.
+No gloss, no ceramic, no glass, no fabric, no visible print defects.`;
 
 // ── the photographer ───────────────────────────────────────────────────────
 // Owner, 2026-09-21: "Act as a product display and best photographer,

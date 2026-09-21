@@ -161,6 +161,21 @@ const bodyParts = safeBody.includes(CALC_MARK) ? safeBody.split(CALC_MARK, 2) : 
   </article>
 
   <style is:global>
+    /* Download grid used by the lampshade guide. Article styling lives in the
+       TEMPLATE, never in the stored body: the sanitizer strips <style> from
+       post content, and an inline block leaks onto the page as visible text
+       (which is exactly what happened on 2026-09-21). */
+    .post-body .lamp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; margin: 1.8em 0; }
+    .post-body .lamp-card { display: block; text-decoration: none; border: 1px solid rgba(0,0,0,.12); border-radius: 10px;
+      overflow: hidden; background: #fff; transition: box-shadow .2s ease, transform .2s ease; }
+    .post-body .lamp-card:hover { box-shadow: 0 8px 22px rgba(65,36,2,.16); transform: translateY(-2px); border-color: rgba(133,79,11,.45); }
+    .post-body .lamp-card img { width: 100%; aspect-ratio: 4/5; object-fit: cover; display: block; margin: 0; border-radius: 0; }
+    .post-body .lamp-name { display: block; padding: 9px 10px 0; font-weight: 600; color: #412402; font-size: 14px; line-height: 1.25; }
+    .post-body .lamp-size { display: block; padding: 3px 10px 11px; font-size: 12px; color: #854F0B; }
+    .post-body .lamp-all { text-align: center; margin: 1.6em 0; }
+    .post-body .lamp-all a { display: inline-block; background: #854F0B; color: #FAEEDA; padding: 14px 30px;
+      border-radius: 8px; font-weight: 600; text-decoration: none; }
+    .post-body .lamp-all a:hover { background: #633806; }
     /* Article body styling lives here rather than in the HTML, because the
        sanitizer strips styling from stored content. Every article, past and
        future, gets the same treatment (owner request, 2026-09-05). */

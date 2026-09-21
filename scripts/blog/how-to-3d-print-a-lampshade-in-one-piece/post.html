@@ -177,16 +177,6 @@
   <li><strong>The combined model</strong>, shade and holder as one piece, which is the one this guide is about.</li>
 </ul>
 
-<style>
-.lamp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; margin:1.6em 0; }
-.lamp-card { display:block; text-decoration:none; border:1px solid rgba(0,0,0,.12); border-radius:10px; overflow:hidden; background:#fff; transition:box-shadow .2s, transform .2s; }
-.lamp-card:hover { box-shadow:0 8px 22px rgba(65,36,2,.16); transform:translateY(-2px); }
-.lamp-card img { width:100%; aspect-ratio:4/5; object-fit:cover; display:block; }
-.lamp-name { display:block; padding:8px 10px 0; font-weight:600; color:#412402; font-size:14px; }
-.lamp-size { display:block; padding:2px 10px 10px; font-size:12px; color:#854F0B; }
-.lamp-all { display:block; text-align:center; margin:1.4em 0; }
-.lamp-all a { display:inline-block; background:#854F0B; color:#FAEEDA; padding:14px 28px; border-radius:8px; font-weight:600; text-decoration:none; }
-</style>
 <div class="lamp-grid">
   <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1ZNUKOyPx1YB4pk5JUpHonEpEtS5ZINKR" rel="nofollow">
     <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/ogee-bell-pendant.jpg" alt="Ogee Bell lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
@@ -263,8 +253,8 @@
 
 <h2 id="faq">Common questions</h2>
 
-<h3>My shade has a visible seam running up it. Why?</h3>
-<p>That is the spiral itself, and it is normal. A continuous helix has to gain one layer height somewhere in each revolution, and that gradual ramp shows as a faint diagonal line. It is far less visible lit than unlit, and it is the price of having no layer-change seam at all.</p>
+<h3>Will I get a seam up the side?</h3>
+<p>No, and that is one of the best reasons to print a shade this way. In a normal print the nozzle starts and stops on every layer, which leaves a Z-seam running up the object. In vase mode the Z axis rises continuously and the nozzle never stops, lifts or retracts, so there is no start point, no stop point, no seam, no blobs and no stringing. The wall is unbroken all the way round and all the way up. If you can see a seam on a vase-mode print, spiral mode was not actually enabled.</p>
 
 <h3>The bottom few centimetres look different from the rest.</h3>
 <p>Those are your solid bottom layers, printing normally before the spiral begins. If the transition looks rough rather than simply different, your bottom layer count is probably landing partway through a feature. Recalculate it against the holder height.</p>
