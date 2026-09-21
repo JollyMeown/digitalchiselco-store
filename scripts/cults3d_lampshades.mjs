@@ -27,6 +27,12 @@
 // greater than or equal to 0.5". Always pass downloadPrice: 0 explicitly.
 //
 // NOTE: needs the VPN OFF. cults3d.com does not resolve through it.
+//
+// TRAP: a creation's id CHANGES when it is published, because the id encodes
+// the slug and the slug is rewritten on publish. Anything holding an id from
+// before publication gets "Creation not found". Re-read ids from
+// myself.creationsBatch (the field is `identifier`, there is no `id` field on
+// Creation) before any update to a live listing.
 import 'dotenv/config';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -128,8 +134,27 @@ bulb and the wall, and use a proper E27 holder, flex and switch.
 Watertight closed manifold, so your slicer opens it with no repair step and no
 warnings. Free for personal use.
 
-Made in Vase Lampshade Studio, which generates the shade and fits the bulb
-holder to whatever shape you make.`;
+----------------------------------------------------------------
+
+WANT A SHAPE THAT IS YOURS? DESIGN ONE FREE, IN YOUR BROWSER
+
+This shade was made in Vase Lampshade Studio, and the Studio runs free in your
+browser. No install, no sign-up, no upload. Drag the sliders, watch the shade
+change, and the bulb holder refits itself to whatever opening you end up with.
+
+    digitalchiselco.com/lamp-studio
+
+That page is the real software, not a video of it:
+  - 105 parametric shade profiles, plus 11 modifiers that stack on any of them
+    (twist, taper, waist, bulge, ribs, flutes, facet, squash, emboss, lean)
+  - E27, E14, B22 or GU10 holder, 8 spoke styles, auto-fitted to your shape
+  - Lithophane mode: emboss a photo into the wall so it appears only when lit
+  - Curved text: names and dates wrapped on the shade, raised or engraved
+  - Your printer's bed drawn around the design, with an oversize warning
+  - The solid-bottom-layer number computed for YOUR holder and layer height
+
+Play with it for free for as long as you like. The paid version is what adds
+STL / OBJ / 3MF export, the fitter files and a print guide per lamp.`;
 }
 
 const CREATE = `
