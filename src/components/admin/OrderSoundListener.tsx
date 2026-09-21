@@ -59,7 +59,9 @@ export default function OrderSoundListener() {
       if (!cancelled && data) settingsRef.current = { enabled: data.order_sound_enabled ?? true, volume: Math.min(100, Math.max(0, Number(data.order_sound_volume) || 80)) };
     }
     loadPrefs();
-    const t = setInterval(loadPrefs, 20000);
+    // Two settings that change about once a year do not need a query every 20
+    // seconds for as long as the admin tab is open.
+    const t = setInterval(loadPrefs, 10 * 60000);
 
     // Baseline: remember the newest alert id at load so history never rings.
     (async () => {

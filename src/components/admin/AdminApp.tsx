@@ -223,7 +223,7 @@ function CustomRequestBanner({ goRequests }: { goRequests: () => void }) {
       } catch {}
     };
     load();
-    const t = setInterval(load, 60000);
+    const t = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 5 * 60000);
     return () => { alive = false; clearInterval(t); };
   }, []);
   if (!rows.length) return null;
@@ -260,7 +260,7 @@ function PendingModerationBanner({ goProducts }: { goProducts: () => void }) {
       } catch {}
     };
     load();
-    const t = setInterval(load, 60000);
+    const t = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 5 * 60000);
     return () => { alive = false; clearInterval(t); };
   }, []);
   if (!n) return null;

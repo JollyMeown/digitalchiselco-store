@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { pageAll } from './pageAll';
 import { Card } from './ui';
+import { useLiveRefresh } from './useLiveRefresh';
 
 type Day = { day: string; clicks: number; impressions: number; ctr: number; position: number };
 type PageRow = { page: string; clicks: number; impressions: number; position: number };
@@ -105,7 +106,10 @@ function IndexCoverage() {
     }
     setRows(out); setTotal(out.length);
   };
-  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
+  // This pulls thousands of rows that Google only refreshes once a day, so a
+  // 30s tick was pure waste; it contributed to the 2026-09-21 database stall.
+  useEffect(() => { load(); }, []);
+  useLiveRefresh(load, 10 * 60000, []);
   async function audit() {
     setBusy(true); setMsg('');
     try {

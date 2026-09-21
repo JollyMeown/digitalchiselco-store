@@ -4,8 +4,9 @@
 // Owner, 2026-09-16: the Shopper actions strip said "1 at cart RIGHT NOW"
 // while every card read zero, because the cart lives in the shopper's browser.
 // This shows the cart itself.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useLiveRefresh } from './useLiveRefresh';
 
 type Item = { id: string; title: string; price: number; slug: string | null; image_url: string | null };
 type Snap = {
@@ -27,6 +28,7 @@ function ago(iso: string): string {
 export default function SavedCarts() {
   const [rows, setRows] = useState<Snap[] | null>(null);
   const [show, setShow] = useState<'open' | 'bought'>('open');
+  const loadRef = useRef<null | (() => Promise<void>)>(null);
   useEffect(() => {
     let alive = true;
     const load = async () => {
@@ -36,9 +38,10 @@ export default function SavedCarts() {
       if (alive) setRows((data as any) || []);
     };
     load();
-    const t = setInterval(load, 20000);
-    return () => { alive = false; clearInterval(t); };
+    loadRef.current = load;
+    return () => { alive = false; };
   }, []);
+  useLiveRefresh(() => loadRef.current?.(), 90000, []);
 
   const view = useMemo(() => {
     const all = rows || [];

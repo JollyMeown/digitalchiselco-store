@@ -7,6 +7,7 @@ import land110 from 'world-atlas/land-110m.json';
 import countries110 from 'world-atlas/countries-110m.json';
 import { supabase } from '../../lib/supabase';
 import { Card } from './ui';
+import { useLiveRefresh } from './useLiveRefresh';
 
 // ISO2 → [lat, lng] centroid for the visitor dots. Covers essentially all real
 // traffic; a country not listed still appears in the side list.
@@ -110,12 +111,11 @@ export default function LiveVisitorMap() {
     setUpdated(new Date());
   }
 
-  useEffect(() => {
-    load(winMs);
-    clearInterval(timer.current);
-    timer.current = setInterval(() => load(winMs), 30000); // refresh every 30s
-    return () => clearInterval(timer.current);
-  }, [winMs]);
+  useEffect(() => { load(winMs); }, [winMs]);
+  // 60s, and only while the admin is at the screen (useLiveRefresh stops once
+  // the page has been idle). A tab parked on a second monitor used to refresh
+  // this all day and night.
+  useLiveRefresh(() => load(winMs), 60000, [winMs]);
 
   const known = rows.filter((r) => r.code !== '??');
   const maxCount = Math.max(1, ...known.map((r) => r.count));

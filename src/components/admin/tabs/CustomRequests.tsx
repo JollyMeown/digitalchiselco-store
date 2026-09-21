@@ -143,8 +143,8 @@ export default function CustomRequests() {
   }
   useEffect(() => {
     load();
-    const t = setInterval(load, 60000);
-    const c = setInterval(() => tick((n) => n + 1), 30000);   // keep the countdowns moving
+    const t = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 3 * 60000);
+    const c = setInterval(() => tick((n) => n + 1), 30000);   // keep the countdowns moving (local, no query)
     return () => { clearInterval(t); clearInterval(c); };
   }, []);
 

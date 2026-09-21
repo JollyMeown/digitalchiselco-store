@@ -72,7 +72,7 @@ export default function MarketingImages() {
   // A batch keeps producing images while this screen is open, so the counts
   // refresh on their own rather than looking stuck.
   useEffect(() => {
-    const t = setInterval(() => { if (!busy) load(tab); }, 30000);
+    const t = setInterval(() => { if (!busy && document.visibilityState === 'visible') load(tab); }, 2 * 60000);
     return () => clearInterval(t);
   }, [tab, load, busy]);
 

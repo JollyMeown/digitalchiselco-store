@@ -6,10 +6,14 @@ import ChannelStats from '../ChannelStats';
 import MerchantStats from '../MerchantStats';
 import SearchConsole from '../SearchConsole';
 import SavedCarts from '../SavedCarts';
+import { useLiveRefresh } from '../useLiveRefresh';
 
 type Visit = { day: string; path: string; referrer_host: string | null; device: string | null; country: string | null; visitor_hash: string | null; campaign?: string | null };
 
 const RANGES = [7, 30, 90] as const;
+/** 20,000 rows is already more than any panel here can show meaningfully, and
+ *  every extra page is another table scan on a small database. */
+const MAX_PAGES = 20;
 
 function BarChart({ points }: { points: { label: string; visitors: number; pageviews: number }[] }) {
   const H = 160, BW = Math.max(10, Math.min(34, Math.floor(560 / Math.max(1, points.length))));
@@ -70,29 +74,37 @@ export default function Traffic() {
 
   useEffect(() => { load(); }, [days]);
   // Keep the whole page LIVE, not just the on-site-now strip: refresh the
-  // event/visit data every 30s and whenever the tab regains focus, so an
-  // action taken while the admin was open shows up without a manual reload.
+  // event/visit data and whenever the tab regains focus, so an action taken
+  // while the admin was open shows up without a manual reload.
   // (Owner test: hearted → carted → checkout while watching the panel; the
   // events landed in the DB instantly but the counters were a stale snapshot.)
-  useEffect(() => {
-    const t = setInterval(() => { if (document.visibilityState === 'visible') load(true); }, 30000);
-    const onFocus = () => load(true);
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(true); });
-    return () => { clearInterval(t); window.removeEventListener('focus', onFocus); };
-  }, [days]);
+  //
+  // But NOT every 30 seconds. This load pulls a month of raw visit and event
+  // rows; at 30s it was tens of thousands of rows a minute, all day, and on
+  // 2026-09-21 it helped pin the database at 100% CPU until it stopped serving
+  // queries. Three minutes is still live enough to watch a shopper move, and
+  // useLiveRefresh stops entirely once the admin walks away.
+  useLiveRefresh(() => load(true), 3 * 60000, [days]);
   async function load(silent = false) {
     if (!silent) setLoading(true);   // background refreshes must not blank the panel
     const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
     const sinceTs = new Date(Date.now() - days * 86400000).toISOString();
+    // Keyset paging, not .range(): a deep OFFSET makes Postgres walk and throw
+    // away every row before the window, so page 30 costs thirty times page 1.
+    // Walking backwards on ts uses the index and each page costs the same.
     const out: Visit[] = [];
-    for (let from = 0; from < 60000; from += 1000) {
-      const { data } = await supabase.from('site_visits')
-        .select('day, path, referrer_host, device, country, visitor_hash, campaign')
-        .gte('day', since).order('day').range(from, from + 999);
+    let cursor: string | null = null;
+    setCapped(false);
+    for (let page = 0; page < MAX_PAGES; page++) {
+      let q = supabase.from('site_visits')
+        .select('ts, day, path, referrer_host, device, country, visitor_hash, campaign')
+        .gte('day', since).order('ts', { ascending: false }).limit(1000);
+      if (cursor) q = q.lt('ts', cursor);
+      const { data } = await q;
       out.push(...((data || []) as Visit[]));
-      if (!data || data.length < 1000) { setCapped(false); break; }
-      if (from + 1000 >= 60000) setCapped(true);
+      if (!data || data.length < 1000) break;
+      cursor = (data[data.length - 1] as any).ts;
+      if (page === MAX_PAGES - 1) setCapped(true);
     }
     setRows(out);
 
@@ -108,12 +120,16 @@ export default function Traffic() {
     // above already pages for this reason; events must too.
     const evPages = async () => {
       const out: any[] = [];
-      for (let from = 0; from < 60000; from += 1000) {
-        const { data } = await supabase.from('site_events')
+      let cur: string | null = null;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        let q = supabase.from('site_events')
           .select('day, type, product_id, q, n, visitor_hash, ts')
-          .gte('day', evSince).order('ts', { ascending: false }).range(from, from + 999);
+          .gte('day', evSince).order('ts', { ascending: false }).limit(1000);
+        if (cur) q = q.lt('ts', cur);
+        const { data } = await q;
         out.push(...(data || []));
         if (!data || data.length < 1000) break;
+        cur = (data[data.length - 1] as any).ts;
       }
       return out;
     };
@@ -262,11 +278,8 @@ function LampStudio({ days }: { days: number }) {
       live: uniq(liveRows || []),
     });
   };
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 20000);   // keep live-now fresh
-    return () => clearInterval(t);
-  }, [days]);
+  useEffect(() => { load(); }, [days]);
+  useLiveRefresh(load, 90000, [days]);   // keep live-now fresh, without hammering
   if (!d) return null;
   const convo = d.viewers ? Math.round((d.triers / d.viewers) * 100) : 0;
   return (
@@ -344,22 +357,20 @@ type RangeKey = typeof PANEL_RANGES[number]['key'];
 
 function LiveNow() {
   const [live, setLive] = useState<{ onSite: number; onCart: number } | null>(null);
-  useEffect(() => {
-    let stop = false;
-    async function poll() {
-      try {
-        const since = new Date(Date.now() - 5 * 60000).toISOString();
-        const { data } = await supabase.from('site_visits').select('visitor_hash, path').gte('ts', since).limit(2000);
-        const rows = data || [];
-        const onSite = new Set(rows.map((r: any) => r.visitor_hash || Math.random())).size;
-        const onCart = new Set(rows.filter((r: any) => r.path === '/cart' || r.path.startsWith('/checkout')).map((r: any) => r.visitor_hash || Math.random())).size;
-        if (!stop) setLive({ onSite, onCart });
-      } catch { /* keep last value */ }
-    }
-    poll();
-    const t = setInterval(poll, 15000);
-    return () => { stop = true; clearInterval(t); };
-  }, []);
+  const poll = async () => {
+    try {
+      const since = new Date(Date.now() - 5 * 60000).toISOString();
+      const { data } = await supabase.from('site_visits').select('visitor_hash, path').gte('ts', since).limit(2000);
+      const rows = data || [];
+      const onSite = new Set(rows.map((r: any) => r.visitor_hash || Math.random())).size;
+      const onCart = new Set(rows.filter((r: any) => r.path === '/cart' || r.path.startsWith('/checkout')).map((r: any) => r.visitor_hash || Math.random())).size;
+      setLive({ onSite, onCart });
+    } catch { /* keep last value */ }
+  };
+  useEffect(() => { poll(); }, []);
+  // 45s, and only while the admin is actually at the screen. The window it
+  // reads is five minutes wide, so a faster tick told us nothing new.
+  useLiveRefresh(poll, 45000, []);
   if (!live) return null;
   return (
     <div className="flex items-center gap-4 flex-wrap ml-auto">
