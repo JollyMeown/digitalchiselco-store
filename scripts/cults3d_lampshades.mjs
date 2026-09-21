@@ -33,7 +33,7 @@ const args = process.argv.slice(2);
 const val = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 ? (args[i + 1] ?? d) : d; };
 const APPLY = args.includes('--apply');
 const VISIBILITY = val('visibility', 'SECRET');
-const CATEGORY_ID = val('category-id', '');
+const CATEGORY_ID = val('category-id', 'Q2F0ZWdvcnkvMzA');   // Home
 const LICENSE_CODE = val('license-code', 'CC-BY-NC-ND');
 const LOCALE = 'EN';
 
@@ -189,8 +189,11 @@ if (!APPLY) {
 }
 
 if (!CATEGORY_ID) { console.error('need --category-id (run cults3d_upload.mjs --list-categories)'); process.exit(1); }
+const LIMIT = Number(val('limit', 0)) || Infinity;
 const done = existsSync(LEDGER) ? JSON.parse(readFileSync(LEDGER, 'utf8')) : {};
+let made = 0;
 for (const p of payloads) {
+  if (made >= LIMIT) break;
   if (done[p.key]) { console.log(`skip ${p.key} (already at ${done[p.key].url})`); continue; }
   try {
     for (const i of p.imageLocals) await pushImage(i.local, i.key);
@@ -204,6 +207,7 @@ for (const p of payloads) {
     done[p.key] = { id: c.creation.id, url: c.creation.url, at: new Date().toISOString() };
     writeFileSync(LEDGER, JSON.stringify(done, null, 2));
     console.log(`OK ${p.key} -> ${c.creation.url}`);
+    made++;
   } catch (e) {
     console.error(`FAIL ${p.key}: ${e.message.slice(0, 200)}`);
   }
