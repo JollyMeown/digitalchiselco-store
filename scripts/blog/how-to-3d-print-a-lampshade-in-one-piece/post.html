@@ -1,0 +1,282 @@
+<p>There is a particular disappointment that comes with printing a lampshade. The shade itself comes out beautifully. Then you print the bulb holder as a separate part, discover it is a millimetre out, glue it in anyway, and spend the rest of the lamp's life looking at a ring that sits very slightly crooked.</p>
+
+<p>It does not have to work that way. A lampshade is the one object that vase mode was made for, and with one number entered into your slicer you can print the shade and its E27 holder as a single continuous spiral. No supports, no glue, nothing to assemble, and nothing to sit crooked.</p>
+
+<figure>
+  <img src="{{IMG:hero}}" alt="A 3D printed lampshade glowing warm on a walnut side table at dusk, the fine layer lines visible through the light" loading="lazy" />
+</figure>
+
+<h2 id="contents">What this guide covers</h2>
+<ul>
+  <li><a href="#why">Why a lampshade is the best thing vase mode makes</a></li>
+  <li><a href="#vase">What vase mode actually does</a></li>
+  <li><a href="#number">The one number: solid bottom layers</a></li>
+  <li><a href="#settings">The settings that decide whether it glows</a></li>
+  <li><a href="#material">Filament, colour, and the light that comes through</a></li>
+  <li><a href="#size">Size, and your bed</a></li>
+  <li><a href="#safety">The bulb rule, which matters more than any of this</a></li>
+  <li><a href="#fit">Standing it up, or hanging it</a></li>
+  <li><a href="#free">Twelve shades to download</a></li>
+  <li><a href="#own">Making your own shape</a></li>
+  <li><a href="#faq">Common questions</a></li>
+</ul>
+
+<h2 id="why">Why a lampshade is the best thing vase mode makes</h2>
+
+<p>Most vase-mode prints are vases, and a vase in vase mode has a problem: it is a single wall about half a millimetre thick, so it will not hold water without a coating, and it dents if you grip it.</p>
+
+<p>A lampshade has no such problem. It holds nothing, nobody grips it, and the one property that makes vase mode awkward everywhere else is exactly the property you want here. A single thin wall is <em>translucent</em>. Light does not bounce off it, it passes through it, and the whole shade becomes the light source rather than a lid on top of one.</p>
+
+<p>That thin wall is also why printed shades look the way they do. Every layer line becomes a fine horizontal striation in the glow, and every flute or rib becomes a soft vertical band where the light has slightly further to travel. A shade that looks plain and white in daylight turns into something quite different when you switch it on.</p>
+
+<figure>
+  <img src="{{IMG:pair}}" alt="The same printed lampshade shown twice, one switched off and matte white, one lit and glowing warm from within" loading="lazy" />
+</figure>
+
+<h2 id="vase">What vase mode actually does</h2>
+
+<p>Vase mode goes by several names. Cura calls it Spiralize Outer Contour, PrusaSlicer and Orca call it Spiral Vase, Bambu Studio calls it Spiral Mode. They all do the same thing.</p>
+
+<p>Normally a printer lays down a layer, lifts, and starts the next one, leaving a small seam where each layer begins and ends. In vase mode the Z axis rises continuously while the nozzle traces the outline, so the print is one unbroken helix from bottom to top. There is no layer change, no seam, and no retraction.</p>
+
+<p>Three consequences follow, and they are worth understanding before you print rather than after:</p>
+
+<ul>
+  <li><strong>One wall, one perimeter.</strong> There is no infill and there are no top layers, because there is nowhere for them to go. Wall thickness equals your extrusion width, and that is the only lever you have.</li>
+  <li><strong>No overhangs can be supported.</strong> Supports are impossible in vase mode. The model has to be printable by its own geometry, which means no part of the wall can lean out further than your printer will bridge.</li>
+  <li><strong>The model must be a single closed loop at every height.</strong> One continuous outline, all the way up. A model with two separate towers cannot spiral.</li>
+</ul>
+
+<p>The last point is the one that usually catches people out, and it is the reason the bulb holder question is harder than it looks.</p>
+
+<h2 id="number">The one number: solid bottom layers</h2>
+
+<p>Here is the trick that makes the one-piece print possible.</p>
+
+<p>Every slicer that offers vase mode also lets you keep a number of <strong>solid bottom layers</strong> before the spiral begins. Below that height the printer behaves normally, laying down complete solid layers with infill and perimeters. Above it, it switches to the continuous spiral.</p>
+
+<p>So if the bulb holder occupies the bottom 10 mm of the model, and you tell the slicer to print 10 mm of solid layers before spiralising, the holder prints as a proper solid part with its ring and spokes, and the shade above it prints as a single-wall spiral. One print, one piece, no join.</p>
+
+<p>The number your slicer wants is layers, not millimetres, so you divide:</p>
+
+<p style="text-align:center; font-size:1.15em; margin:1.4em 0;"><strong>Solid bottom layers = holder height &divide; layer height</strong></p>
+
+<p>A 10 mm holder at 0.2 mm layers is 50. The same holder at 0.3 mm layers is 34 (round up, never down). Get this wrong in the generous direction and you simply have a slightly taller solid base, which is harmless. Get it wrong the other way and the spiral starts partway up the holder, which produces exactly the mess you would expect.</p>
+
+<figure>
+  <img src="{{IMG:detail}}" alt="Close macro of the base of a lit printed lampshade showing the spoked bulb holder printed as part of the same piece" loading="lazy" />
+</figure>
+
+<p>Where the setting lives:</p>
+
+<ul>
+  <li><strong>Cura:</strong> Bottom Layers, under Shell. Spiralize Outer Contour is under Special Modes.</li>
+  <li><strong>PrusaSlicer and Orca:</strong> Bottom solid layers, under Layers and perimeters. Spiral vase is under Layers and perimeters as well.</li>
+  <li><strong>Bambu Studio:</strong> Bottom shell layers, under Quality. Spiral mode is under Others.</li>
+</ul>
+
+<p>One warning that applies to all of them: turning spiral mode on will silently change other settings, because it has to. Infill goes to zero, top layers go to zero, and in some slicers the wall count is forced to one. Do not fight it, and do not turn spiral mode on <em>after</em> you have carefully set everything else.</p>
+
+<h2 id="settings">The settings that decide whether it glows</h2>
+
+<p>A printed shade can look like fine porcelain or like a grey bucket, and the difference is almost entirely in four settings.</p>
+
+<h3>Extrusion width, which is your wall thickness</h3>
+
+<p>This is the important one. In vase mode your wall is exactly as thick as your extrusion width, and wall thickness controls how much light gets through.</p>
+
+<ul>
+  <li><strong>0.4 mm</strong> on a 0.4 mm nozzle gives the brightest, most translucent shade. It is also delicate.</li>
+  <li><strong>0.6 to 0.8 mm</strong> is the sweet spot for most shades. Still clearly translucent, noticeably more rigid, and more forgiving of a slightly uneven first layer.</li>
+  <li><strong>1.0 mm and above</strong> starts to block light. The shade becomes an object with a lamp inside it rather than a glowing thing.</li>
+</ul>
+
+<p>You can push a 0.4 mm nozzle to 0.8 mm width without difficulty. Slow it down a little if the extruder complains.</p>
+
+<h3>Layer height, which is your texture</h3>
+
+<p>Layer lines are not a defect here, they are the surface finish. At 0.12 mm the wall looks almost smooth and slightly waxy. At 0.2 mm you get a fine even striation that catches the light beautifully. At 0.3 mm the lines become a deliberate ribbed texture, and the print takes noticeably less time.</p>
+
+<p>There is no wrong answer, but pick one before you calculate your bottom layers, not after.</p>
+
+<h3>Temperature and cooling</h3>
+
+<p>Run slightly hotter than you would for a normal print, around 5 to 10 degrees above your usual, because a single wall with no neighbours cools very fast and layer adhesion is the only thing holding the shade together. Then run your part cooling fan at full, because that same single wall has nothing to lean on while it sets.</p>
+
+<p>The combination sounds contradictory and is not: hot enough to weld to the layer below, cooled fast enough to stand up.</p>
+
+<h3>Speed</h3>
+
+<p>Slower than you think. 30 to 40 mm/s gives a visibly more even wall than 60, and on a tall shade the difference is obvious because any wobble is lit from within and magnified. This is one of the few prints where the surface is the product.</p>
+
+<figure>
+  <img src="{{IMG:bed}}" alt="A finished single-wall lampshade standing on the textured print bed of a desktop 3D printer just after the print completed" loading="lazy" />
+</figure>
+
+<h2 id="material">Filament, colour, and the light that comes through</h2>
+
+<p>Plain PLA is the right default. It prints easily, it is dimensionally stable, and it is pleasantly translucent at a thin wall.</p>
+
+<p>Colour matters more than brand. Natural, white and cream give a warm even glow. Light greys and pale pastels work. Anything dark, saturated or heavily pigmented will block most of the light and you will have made a sculpture rather than a lamp. Silk filaments look striking unlit and tend to look slightly blotchy lit, because the metallic pigment is not evenly distributed.</p>
+
+<p>PETG is the alternative worth knowing about. It is more heat tolerant than PLA, which matters if your fitting runs warm, and it is often clearer. It is also stringier and less forgiving in a single wall, so print it slower still.</p>
+
+<p>Avoid ABS and ASA here. The warping behaviour that makes them difficult in general is considerably worse on a tall, thin, unsupported wall.</p>
+
+<h2 id="size">Size, and your bed</h2>
+
+<p>A table lamp shade wants to be roughly 200 to 240 mm tall and 180 to 200 mm across. That happens to be almost exactly what a 220 &times; 220 &times; 250 mm printer will take, which is the commonest size there is.</p>
+
+<p>Two things to check before you slice:</p>
+
+<ul>
+  <li><strong>Width at the widest point, not the base.</strong> A flared shade can have a base that fits comfortably and a rim that fouls the gantry.</li>
+  <li><strong>Height including the holder.</strong> The holder is part of the print now, so its 10 mm counts.</li>
+</ul>
+
+<p>Every shade in the free set below is already sized to clear an Ender 3 bed with margin, so you can print any of them without measuring anything.</p>
+
+<h2 id="safety">The bulb rule, which matters more than any of this</h2>
+
+<p>PLA begins to soften at around 60 degrees Celsius. A traditional incandescent bulb runs far hotter than that at its surface, and a halogen hotter still.</p>
+
+<p><strong>Use LED bulbs only. Nothing else. No exceptions.</strong></p>
+
+<p>A cool-running LED of around 6 to 9 watts is ample for a table lamp and will sit comfortably below anything that could soften the print. Beyond that:</p>
+
+<ul>
+  <li>Leave an air gap between the bulb and the wall. Do not choose a bulb so large it touches.</li>
+  <li>Prefer a bulb whose own body stays cool to the touch after twenty minutes. Some cheap LEDs put a surprising amount of heat into their base.</li>
+  <li>Use a proper E27 lamp holder with the correct flex and a certified inline switch or plug. The printed part holds the fitting; it is not the fitting.</li>
+  <li>If you are not confident about mains wiring, buy a ready-made lamp base with a cord and switch already fitted and simply mount the shade on it.</li>
+</ul>
+
+<p>None of this is difficult and all of it is worth saying plainly, because a printed plastic shade with the wrong bulb in it is a genuinely bad idea.</p>
+
+<h2 id="fit">Standing it up, or hanging it</h2>
+
+<p>The same shade does both, which is the pleasant part of putting the holder at the mouth.</p>
+
+<p><strong>As a table lamp</strong>, mount it on any standard E27 base with an upward-facing lamp holder. The printed ring drops over the holder and the spokes take the weight. A slim weighted base looks best, because the shade is very light and a heavy-looking base reads as more stable than it needs to be.</p>
+
+<p><strong>As a pendant</strong>, hang the same print mouth downward from a standard ceiling rose and flex. This is where the fluted profiles earn their keep: a ribbed single wall throws a wide fan of light and shadow up across the ceiling, and the effect is considerably better than the shade costs.</p>
+
+<figure>
+  <img src="{{IMG:pendant}}" alt="The same printed shade hung as a pendant over a dining table, throwing a fan of light and shadow across the ceiling" loading="lazy" />
+</figure>
+
+<p>Hang a pendant about 700 mm above a table top. Higher and the pool of light spreads and weakens, lower and people look straight into the opening.</p>
+
+<h2 id="free">Twelve shades to download</h2>
+
+<p>Below are twelve shades, free, every one of them designed in the Studio and sized to print on a 220 mm bed. Each download includes three files:</p>
+
+<ul>
+  <li><strong>The shade alone</strong>, single wall, for printing in vase mode.</li>
+  <li><strong>The holder alone</strong>, floored and support free, if you would rather print the two parts separately.</li>
+  <li><strong>The combined model</strong>, shade and holder as one piece, which is the one this guide is about.</li>
+</ul>
+
+<style>
+.lamp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; margin:1.6em 0; }
+.lamp-card { display:block; text-decoration:none; border:1px solid rgba(0,0,0,.12); border-radius:10px; overflow:hidden; background:#fff; transition:box-shadow .2s, transform .2s; }
+.lamp-card:hover { box-shadow:0 8px 22px rgba(65,36,2,.16); transform:translateY(-2px); }
+.lamp-card img { width:100%; aspect-ratio:4/5; object-fit:cover; display:block; }
+.lamp-name { display:block; padding:8px 10px 0; font-weight:600; color:#412402; font-size:14px; }
+.lamp-size { display:block; padding:2px 10px 10px; font-size:12px; color:#854F0B; }
+.lamp-all { display:block; text-align:center; margin:1.4em 0; }
+.lamp-all a { display:inline-block; background:#854F0B; color:#FAEEDA; padding:14px 28px; border-radius:8px; font-weight:600; text-decoration:none; }
+</style>
+<div class="lamp-grid">
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1ZNUKOyPx1YB4pk5JUpHonEpEtS5ZINKR" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/ogee-bell-pendant.jpg" alt="Ogee Bell lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Ogee Bell</span>
+    <span class="lamp-size">220 &times; 198 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1YTpWaeZln5qFqM9kOiYKTnDRKxdLCYS2" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/twisted-star-pendant.jpg" alt="Twisted Star lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Twisted Star</span>
+    <span class="lamp-size">232 &times; 172 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1EYfJFu17sFU2UWXI8tBK0rEyV4uGPrU4" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/nautilus-spiral-pendant.jpg" alt="Nautilus Spiral lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Nautilus Spiral</span>
+    <span class="lamp-size">228 &times; 162 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1ff-Q0NNo-BrW5RdGwkrKLwD8ix6NgBLK" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/basket-weave-pendant.jpg" alt="Basket Weave lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Basket Weave</span>
+    <span class="lamp-size">222 &times; 197 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1pLJAFnyRv9JnxuvvjRF1QwFLCr9OSQE6" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/barley-twist-pendant.jpg" alt="Barley Twist lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Barley Twist</span>
+    <span class="lamp-size">236 &times; 189 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1zCZp3mE_j67Nbmy1Zh-yLNbgZKVmm_1W" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/tulip-flare-pendant.jpg" alt="Tulip Flare lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Tulip Flare</span>
+    <span class="lamp-size">215 &times; 200 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1VdAd89w43aCPL2KOv53ri8_CFkx9kyxE" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/onion-dome-pendant.jpg" alt="Onion Dome lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Onion Dome</span>
+    <span class="lamp-size">210 &times; 192 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1TxdnBvM1CcZ_l9hmiLaoh9ocBaPeRNQx" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/fan-pleats-pendant.jpg" alt="Fan Pleats lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Fan Pleats</span>
+    <span class="lamp-size">226 &times; 197 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1RaBzfDZzjQ1lLyoB5AUKORd5UkXfAhVz" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/faceted-drum-pendant.jpg" alt="Faceted Drum lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Faceted Drum</span>
+    <span class="lamp-size">208 &times; 185 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1hhKq9BT97xdOwylKIcLoV0Lv_MAFOQyU" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/cable-column-pendant.jpg" alt="Cable Column lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Cable Column</span>
+    <span class="lamp-size">242 &times; 191 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=1ZPInBsXhlSoYW2MrfpPg8s7c215kg6RE" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/pinecone-pendant.jpg" alt="Pinecone lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Pinecone</span>
+    <span class="lamp-size">215 &times; 187 mm &middot; download</span>
+  </a>
+  <a class="lamp-card" href="https://drive.google.com/uc?export=download&amp;id=13SkHHJ9FtM7f942x5p4NnnMAiOwIk27H" rel="nofollow">
+    <img src="https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/lamps/bamboo-pendant.jpg" alt="Bamboo lampshade, 3D printed in one piece and hanging as a pendant" loading="lazy" />
+    <span class="lamp-name">Bamboo</span>
+    <span class="lamp-size">238 &times; 187 mm &middot; download</span>
+  </a>
+</div>
+<p class="lamp-all"><a href="https://drive.google.com/uc?export=download&amp;id=1BBnI5mKLF9byU29qeV7jEvprJVtMnlej" rel="nofollow">Download all twelve in one file (48 MB)</a></p>
+
+<p>All of them are watertight closed manifolds, so your slicer will open them without a repair step and without a warning.</p>
+
+<h2 id="own">Making your own shape</h2>
+
+<p>Twelve shades is a start, not a range. If you want a shade that is yours rather than one of a set, that is what Vase Lampshade Studio does: 105 parametric profiles you can stretch, twist, flute and taper, a photo you can emboss into the wall as a lithophane so it appears only when the lamp is lit, text that wraps on a curved baseline, and the E27, E14, B22 or GU10 holder generated to fit whatever opening your shape ends up with.</p>
+
+<p>It computes the solid-layer number from this guide for your exact holder height and layer height, checks the result against your printer's bed, and writes a one-page print guide for each design you make. The export is always a closed manifold, so there is never a repair step.</p>
+
+<p>You can design a shade in it right now without buying anything. The full version adds STL, OBJ and 3MF export, the fitter files and the per-lamp print guide.</p>
+
+<h2 id="faq">Common questions</h2>
+
+<h3>My shade has a visible seam running up it. Why?</h3>
+<p>That is the spiral itself, and it is normal. A continuous helix has to gain one layer height somewhere in each revolution, and that gradual ramp shows as a faint diagonal line. It is far less visible lit than unlit, and it is the price of having no layer-change seam at all.</p>
+
+<h3>The bottom few centimetres look different from the rest.</h3>
+<p>Those are your solid bottom layers, printing normally before the spiral begins. If the transition looks rough rather than simply different, your bottom layer count is probably landing partway through a feature. Recalculate it against the holder height.</p>
+
+<h3>Can I print this without the built-in holder?</h3>
+<p>Yes. Print the shade file on its own in vase mode with a normal small number of bottom layers, and print the holder file separately as an ordinary solid part. You are then back to gluing, which is what this guide exists to avoid, but it works.</p>
+
+<h3>Is a single wall strong enough?</h3>
+<p>For a shade, comfortably. It is stiffer than it looks because the flutes act as ribs, and the only load it carries is its own weight. It will dent if you squeeze it, so pick it up by the base.</p>
+
+<h3>Will it yellow over time?</h3>
+<p>Natural PLA can yellow slightly with prolonged UV exposure, so a shade in a sunny window will change more than one in a hallway. With an LED bulb there is no meaningful UV from the lamp itself.</p>
+
+<h3>What about PETG for a brighter glow?</h3>
+<p>PETG is often clearer than PLA and tolerates more heat, so it is a reasonable choice. Drop your speed further and expect a little stringing at the rim. Everything else in this guide applies unchanged.</p>

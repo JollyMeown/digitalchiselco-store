@@ -1,0 +1,12 @@
+{
+  "title": "How to 3D Print a Lampshade in One Piece, Bulb Holder and All",
+  "excerpt": "Most lampshade STLs leave you gluing a separate bulb ring into the bottom. This guide prints the whole lamp as one continuous vase-mode spiral with the E27 holder already part of it: the one number your slicer needs, the wall and layer settings that decide whether it glows or looks grey, the safety rule about bulbs that nobody mentions, and twelve free shades sized for a 220 mm bed.",
+  "seo_title": "3D Print a Lampshade in One Piece: Vase Mode STL with Built-in E27 Holder",
+  "seo_description": "Print a 3D lampshade in one continuous vase-mode spiral with the bulb holder built in. The solid-bottom-layer calculation, wall and layer settings for a warm glow, LED safety, and twelve free lampshade STL files for a 220 mm bed.",
+  "cover": "cover",
+  "email": {
+    "subject": "Print the whole lamp in one go, holder and all",
+    "intro": "Every lampshade file we could find has the same flaw: the bulb holder is a separate part you print, then glue, and it never quite sits straight.\n\nThere is a better way, and it comes down to one number in your slicer. This guide prints the shade and its E27 holder as a single continuous spiral, no supports, no glue, nothing to assemble. Twelve shades to download free at the end, all sized to fit a 220 mm bed.",
+    "drip": true
+  }
+}

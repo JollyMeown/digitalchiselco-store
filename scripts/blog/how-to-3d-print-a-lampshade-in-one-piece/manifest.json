@@ -1,0 +1,26 @@
+[
+ {
+  "key": "cover",
+  "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-3d-print-a-lampshade-in-one-piece/cover.jpg"
+ },
+ {
+  "key": "hero",
+  "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-3d-print-a-lampshade-in-one-piece/hero.jpg"
+ },
+ {
+  "key": "pair",
+  "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-3d-print-a-lampshade-in-one-piece/pair.jpg"
+ },
+ {
+  "key": "detail",
+  "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-3d-print-a-lampshade-in-one-piece/detail.jpg"
+ },
+ {
+  "key": "bed",
+  "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-3d-print-a-lampshade-in-one-piece/bed.jpg"
+ },
+ {
+  "key": "pendant",
+  "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/how-to-3d-print-a-lampshade-in-one-piece/pendant.jpg"
+ }
+]
