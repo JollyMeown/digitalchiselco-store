@@ -37,16 +37,58 @@ const fmt = (d: string) => new Date(d).toLocaleDateString('en-US', { day: 'numer
 const revised = post.updated_at && post.published_at
   && (new Date(post.updated_at).getTime() - new Date(post.published_at).getTime()) > 36 * 3600e3;
 
-// Three more guides for the foot of the page, newest first, never this one.
-// Rendered from the database so every article stays cross-linked as new
-// guides are published, with nobody editing old ones.
+// Four more guides for the foot of the page, never this one.
+//
+// This used to be "the three newest", which meant all seventeen articles
+// pointed at the same three and every other article had exactly one inbound
+// link in the whole site, from /blog. Search Console showed the result on
+// 2026-09-21: five guides sitting at "Discovered, currently not indexed" or
+// "URL is unknown to Google". A page with one internal link looks unimportant,
+// so Google finds it and declines to index it.
+//
+// Now: two slots go to guides Google has NOT indexed yet, so every new article
+// earns links from articles that are already ranking, and the rest rotate
+// deterministically by slug so the links are stable between renders and the
+// load is spread evenly instead of piling onto the newest three.
+const relatedCache: { at: number; posts: any[]; weak: Set<string> } = (globalThis as any).__dccRelated
+  || ((globalThis as any).__dccRelated = { at: 0, posts: [], weak: new Set<string>() });
+
+async function allPosts() {
+  if (Date.now() - relatedCache.at < 10 * 60000 && relatedCache.posts.length) return relatedCache;
+  const db = supabaseAdmin();
+  const [{ data: posts }, { data: gsc }] = await Promise.all([
+    db.from('posts').select('slug, title, cover_image_url').eq('status', 'published').order('published_at', { ascending: false }).limit(200),
+    db.from('gsc_url_status').select('url, verdict').like('url', '%/blog/%').limit(400),
+  ]);
+  const indexed = new Set((gsc || []).filter((g: any) => g.verdict === 'PASS')
+    .map((g: any) => String(g.url).replace(/\/$/, '').split('/blog/')[1]).filter(Boolean));
+  relatedCache.posts = posts || [];
+  relatedCache.weak = new Set((posts || []).map((p: any) => p.slug).filter((s: string) => !indexed.has(s)));
+  relatedCache.at = Date.now();
+  return relatedCache;
+}
+
+/** Stable per-slug offset, so the same article always shows the same links. */
+function seedOf(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 let related: any[] = [];
 try {
-  const { data } = await supabaseAdmin().from('posts')
-    .select('slug, title, excerpt, cover_image_url')
-    .eq('status', 'published').neq('slug', slug!)
-    .order('published_at', { ascending: false }).limit(3);
-  related = data || [];
+  const { posts, weak } = await allPosts();
+  const others = posts.filter((p: any) => p.slug !== slug);
+  const pick: any[] = [];
+  const seed = seedOf(String(slug || ''));
+  // up to two that Google has not indexed yet, rotated so one article does not
+  // carry all of them
+  const notYet = others.filter((p: any) => weak.has(p.slug));
+  for (let i = 0; i < notYet.length && pick.length < 2; i++) pick.push(notYet[(seed + i) % notYet.length]);
+  // fill from everything else, stepping through the list from a per-slug start
+  const rest = others.filter((p: any) => !pick.some((q) => q.slug === p.slug));
+  for (let i = 0; i < rest.length && pick.length < 4; i++) pick.push(rest[(seed + i) % rest.length]);
+  related = pick.filter((p, i, a) => p && a.findIndex((q) => q.slug === p.slug) === i);
 } catch {}
 
 // Long guides need a contents list that jumps, so headings keep their id,
@@ -104,7 +146,7 @@ const bodyParts = safeBody.includes(CALC_MARK) ? safeBody.split(CALC_MARK, 2) : 
     {related.length > 0 && (
       <aside class="mt-14 pt-8 border-t border-bronze-600/20">
         <h2 class="font-serif text-xl text-bronze-800 mb-4">Keep reading</h2>
-        <div class="grid sm:grid-cols-3 gap-4">
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {related.map((r) => (
             <a href={`/blog/${r.slug}`} class="block rounded-lg border border-black/10 bg-white overflow-hidden hover:shadow-md transition">
               {r.cover_image_url && <img src={r.cover_image_url} alt="" loading="lazy" class="w-full aspect-[16/9] object-cover" />}
