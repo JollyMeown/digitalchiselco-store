@@ -123,6 +123,8 @@
 
 <p>Avoid ABS and ASA here. The warping behaviour that makes them difficult in general is considerably worse on a tall, thin, unsupported wall.</p>
 
+<p>If you print more than lamps, the same translucency trick is what makes a <a href="/blog/3d-printing-bas-relief-stl">printed bas-relief</a> read properly when it is backlit.</p>
+
 <h2 id="size">Size, and your bed</h2>
 
 <p>A table lamp shade wants to be roughly 200 to 240 mm tall and 180 to 200 mm across. That happens to be almost exactly what a 220 &times; 220 &times; 250 mm printer will take, which is the commonest size there is.</p>
@@ -134,7 +136,7 @@
   <li><strong>Height including the holder.</strong> The holder is part of the print now, so its 10 mm counts.</li>
 </ul>
 
-<p>Every shade in the free set below is already sized to clear an Ender 3 bed with margin, so you can print any of them without measuring anything.</p>
+<p>Every shade in the free set below is already sized to clear an Ender 3 bed with margin, so you can print any of them without measuring anything. If you do want to resize one, the rules are the same as for any model, and we cover them in <a href="/blog/how-to-scale-stl-files-for-cnc-routers">scaling STL files without breaking them</a>.</p>
 
 <h2 id="safety">The bulb rule, which matters more than any of this</h2>
 
@@ -245,16 +247,33 @@
 
 <h2 id="own">Making your own shape</h2>
 
-<p>Twelve shades is a start, not a range. If you want a shade that is yours rather than one of a set, that is what Vase Lampshade Studio does: 105 parametric profiles you can stretch, twist, flute and taper, a photo you can emboss into the wall as a lithophane so it appears only when the lamp is lit, text that wraps on a curved baseline, and the E27, E14, B22 or GU10 holder generated to fit whatever opening your shape ends up with.</p>
+<p>Twelve shades is a start, not a range. Every one of them came out of <a href="/lamp-studio">Vase Lampshade Studio</a>, which is the tool we built to make them, and if you want a shade that is yours rather than one of a set, that is what it is for.</p>
 
-<p>It computes the solid-layer number from this guide for your exact holder height and layer height, checks the result against your printer's bed, and writes a one-page print guide for each design you make. The export is always a closed manifold, so there is never a repair step.</p>
+<p>The thing that makes it different from opening a CAD package is that it already knows it is designing a lamp. It does not hand you a surface and wish you luck. It fits the bulb holder, it does the vase-mode arithmetic, and it refuses to export anything a slicer will complain about.</p>
 
-<p>You can design a shade in it right now without buying anything. The full version adds STL, OBJ and 3MF export, the fitter files and the per-lamp print guide.</p>
+<h3>What it does</h3>
+<ul>
+  <li><strong>105 shade profiles.</strong> Ogee bells, twisted stars, pumpkins, nautilus spirals, basket weaves, reeded columns. Every one is parametric, so height, radii, flutes, twist and taper are yours to drag, and eleven deformation modifiers stack on top of any profile.</li>
+  <li><strong>The holder, fitted to your shape.</strong> E27, E14, B22 or GU10, with eight spoke styles, generated to match whatever opening your design ends up with. If the opening is too small for the ring, it tells you the exact measurement rather than exporting something that cannot work.</li>
+  <li><strong>The solid-layer number, computed.</strong> The calculation from this guide, done for your holder height and your layer height, printed in the export step so you can type it straight into your slicer.</li>
+  <li><strong>Lithophane and text.</strong> Emboss a photograph into the wall so it appears only when the lamp is lit, or wrap names and dates on a curved baseline, raised, engraved or glowing.</li>
+  <li><strong>Your printer, checked.</strong> Pick your machine or enter a custom bed, and the build volume appears around the design. Outgrow it and the validator names the failing dimension before you waste filament.</li>
+  <li><strong>Watertight, every time.</strong> Every STL, OBJ and 3MF is a closed, consistently oriented manifold. No repair step, no Netfabb, no warnings.</li>
+  <li><strong>A print guide per lamp.</strong> One click writes a PDF for that exact design: mode, walls, computed bottom layers, materials and assembly.</li>
+</ul>
+
+<p>It runs on Windows 10 and 11 as a desktop app, and there is a browser version you can use without installing anything. Nothing is uploaded, ever. It is a one-time purchase with free v1.x updates and a commercial licence included, so anything you design is yours to sell.</p>
+
+<p><a class="dl-btn" href="/lamp-studio">Design a lamp in it free, right now</a></p>
+
+<p>The playground on that page is the real software, not a video of it. Every shape, modifier, photo and text tool works. The full version is what adds the exports, the fitter files and the print guide.</p>
 
 <h2 id="faq">Common questions</h2>
 
 <h3>Will I get a seam up the side?</h3>
-<p>No, and that is one of the best reasons to print a shade this way. In a normal print the nozzle starts and stops on every layer, which leaves a Z-seam running up the object. In vase mode the Z axis rises continuously and the nozzle never stops, lifts or retracts, so there is no start point, no stop point, no seam, no blobs and no stringing. The wall is unbroken all the way round and all the way up. If you can see a seam on a vase-mode print, spiral mode was not actually enabled.</p>
+<p>No, and that is one of the best reasons to print a shade this way. In a normal print the nozzle starts and stops on every layer, which leaves a Z-seam running up the object.</p>
+
+<p>In vase mode the Z axis rises continuously and the nozzle never stops, lifts or retracts, so there is no start point, no stop point, no seam, no blobs and no stringing. The wall is unbroken all the way round and all the way up. If you can see a seam on a vase-mode print, spiral mode was not actually enabled.</p>
 
 <h3>The bottom few centimetres look different from the rest.</h3>
 <p>Those are your solid bottom layers, printing normally before the spiral begins. If the transition looks rough rather than simply different, your bottom layer count is probably landing partway through a feature. Recalculate it against the holder height.</p>
