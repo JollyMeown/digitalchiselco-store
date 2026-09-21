@@ -17,6 +17,15 @@
 // Created SECRET by default: the owner reviews on Cults3D and flips each one
 // public. See the standing rule, drafts only.
 //
+// madeWithAi is FALSE and that is correct: these models are parametric
+// geometry produced by the owner's own software (mesh-core.js is pure maths),
+// not a text-to-3D generation. The LISTING PHOTOGRAPHS are Gemini-made, which
+// is a separate question from the model declaration.
+//
+// TRAP on updateCreation: it validates a price it was never given, so an
+// update that omits downloadPrice fails a free listing with "Price must be
+// greater than or equal to 0.5". Always pass downloadPrice: 0 explicitly.
+//
 // NOTE: needs the VPN OFF. cults3d.com does not resolve through it.
 import 'dotenv/config';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -125,7 +134,7 @@ holder to whatever shape you make.`;
 
 const CREATE = `
 mutation Create($name:String!,$description:String!,$imageUrls:[String!]!,$fileUrls:[String!]!,$locale:LocaleEnum!,$categoryId:ID!,$downloadPrice:Float,$currency:CurrencyEnum,$licenseCode:String,$tagNames:[String!],$visibility:CreationVisibilityEnum){
-  createCreation(name:$name, description:$description, imageUrls:$imageUrls, fileUrls:$fileUrls, locale:$locale, categoryId:$categoryId, downloadPrice:$downloadPrice, currency:$currency, licenseCode:$licenseCode, tagNames:$tagNames, visibility:$visibility, madeWithAi:true){
+  createCreation(name:$name, description:$description, imageUrls:$imageUrls, fileUrls:$fileUrls, locale:$locale, categoryId:$categoryId, downloadPrice:$downloadPrice, currency:$currency, licenseCode:$licenseCode, tagNames:$tagNames, visibility:$visibility, madeWithAi:false){
     creation { id url(locale:$locale) }
     errors
   }
