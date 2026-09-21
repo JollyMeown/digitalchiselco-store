@@ -1,3 +1,24 @@
+// ⚠️ OBSOLETE. DO NOT RUN. Kept only as a record of how the catalog was built.
+//
+// Checkout no longer uses paddle_product_id / paddle_price_id at all. Every
+// line is sent to Paddle as an AD-HOC item priced from products.price_usd (see
+// src/pages/api/checkout-init.ts, "Always send the storefront price as an
+// ad-hoc line so products.price_usd is the single source of truth"), precisely
+// so a stale synced Paddle price can never override the live website price.
+// Memberships are the same (owner rule 2026-09-06).
+//
+// So the 743 active products with a null paddle_price_id on 2026-09-21 are NOT
+// a gap to be filled. Filling them would create ~1,486 Paddle catalogue entries
+// that nothing reads, each priced 20% BELOW the real price because of
+// DEFAULT_DISCOUNT below, sitting there for some future code path to pick up by
+// mistake. The 1,248 products that do carry these ids are historical, and their
+// Paddle prices are already stale for the same reason.
+//
+// If Paddle ever needs a real catalogue again (subscriptions, Paddle-hosted
+// checkout links), rewrite this to keep prices in step with products.price_usd
+// on every change. Until then it stays behind the guard below.
+//
+// ── original notes ────────────────────────────────────────────────────────
 // Sync Supabase products → Paddle catalog (products + prices).
 // On each run, this script:
 //   1. Fetches products from Supabase missing paddle_price_id
@@ -152,6 +173,22 @@ async function syncMembershipPlans() {
 }
 
 (async () => {
+  if (!process.argv.includes('--yes-i-know-this-is-unused')) {
+    console.error([
+      '',
+      'REFUSING TO RUN. Checkout does not use paddle_price_id.',
+      '',
+      'Every cart line goes to Paddle as an ad-hoc item priced from',
+      'products.price_usd, so a synced catalogue price would only ever be a',
+      'stale number waiting to be used by mistake. Worse, this script writes',
+      `prices ${DEFAULT_DISCOUNT}% below the real price.`,
+      '',
+      'Read the header of this file before you override with',
+      '  --yes-i-know-this-is-unused',
+      '',
+    ].join('\n'));
+    process.exit(1);
+  }
   console.log(`=== Paddle sync (${PADDLE_ENV}) ===`);
   await syncMembershipPlans();   // always sync plans (cheap, max 2-3 rows)
   if (!PLANS_ONLY) await syncProducts();
