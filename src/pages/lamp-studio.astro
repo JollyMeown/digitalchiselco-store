@@ -22,14 +22,22 @@ const DEMO_URL = '/lamp-studio-app/index.html?demo=1&buy=' + encodeURIComponent(
   price="14.99"
   currency="USD"
   availability="in stock"
-  scrollPastBanner={true}
+  hideBanner={true}
+  fullWidth={true}
 >
-  <Breadcrumbs crumbs={[{ label: 'Lampshade Studio' }]} />
+  <!-- This page sells a piece of software, so it drops the storefront
+       furniture: no elk banner, no category sidebar. Owner, 2026-09-21:
+       "keep full page webapp so that everybody sees the controls". The live
+       Studio now sits directly under the headline, edge to edge, above the
+       fold on a laptop, instead of six feature cards down the page. -->
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 pt-5">
+    <Breadcrumbs crumbs={[{ label: 'Lampshade Studio' }]} />
+  </div>
 
-  <article class="max-w-5xl mx-auto">
+  <article class="max-w-5xl mx-auto px-4 sm:px-6 pb-2">
 
     <!-- ===== HERO ===== -->
-    <header class="text-center mb-10 reveal">
+    <header class="text-center mb-7 reveal">
       <p class="text-xs tracking-widest text-bronze-600 mb-3">★ NEW FROM DIGITALCHISELCO · DESKTOP + WEB SOFTWARE</p>
       <h1 class="font-serif text-4xl md:text-6xl text-bronze-800 leading-tight">
         Vase Lampshade <em class="italic text-bronze-600">Studio</em>
@@ -44,6 +52,49 @@ const DEMO_URL = '/lamp-studio-app/index.html?demo=1&buy=' + encodeURIComponent(
       </div>
       <p class="mt-3 text-xs text-ink-700/60">Windows 10/11 desktop app + browser playground · <strong class="text-bronze-700">$14.99 one-time</strong> · 100% offline · nothing uploaded, ever</p>
     </header>
+  </article>
+
+  <!-- ===== LIVE PLAYGROUND, edge to edge, before anything else ===== -->
+  <!-- Measured before this change: 100 people reached the page in 60 days and
+       59 of them tried the tool, but it sat below six feature cards, so the
+       controls were never the first thing anyone saw. -->
+  <section id="playground" class="mb-14">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 text-center reveal mb-5">
+      <p class="text-xs tracking-widest text-bronze-600 mb-2">THIS IS THE REAL SOFTWARE, RUNNING RIGHT HERE</p>
+      <h2 class="font-serif text-2xl md:text-3xl text-bronze-800">Design a lamp before you buy anything</h2>
+      <p class="mt-2 text-sm text-ink-700/80 max-w-2xl mx-auto">
+        Every shape, modifier, photo and text tool is live below. Nothing to install, nothing uploaded.
+        The full version adds STL / OBJ / 3MF export, the bulb fitter and your per-lamp PDF print guide.
+      </p>
+    </div>
+    <div class="border-y-2 border-bronze-600/30 shadow-xl bg-[#0b0f17]">
+      <iframe
+        src={DEMO_URL}
+        title="Vase Lampshade Studio — free playground"
+        class="w-full block"
+        style="height: min(86vh, 1100px); min-height: 560px; border: 0;"
+        allow="fullscreen"
+      ></iframe>
+    </div>
+    <p class="mt-3 text-xs text-ink-700/60 text-center px-4">Runs entirely in your browser, nothing is uploaded. Works best on a desktop or laptop.</p>
+  </section>
+
+  <article class="max-w-5xl mx-auto px-4 sm:px-6">
+
+    <!-- Price hook, right where the "I want this" moment happens -->
+    <div class="mb-16 max-w-2xl mx-auto border-2 border-bronze-600/40 rounded-xl p-8 text-center bg-gradient-to-br from-cream to-white shadow-lg reveal">
+      <p class="text-xs tracking-widest text-bronze-600 mb-2">LOVE WHAT YOU JUST MADE?</p>
+      <h3 class="font-serif text-2xl md:text-3xl text-bronze-800">Take it off the screen and onto your printer.</h3>
+      <p class="mt-3 text-ink-700/85 max-w-lg mx-auto">The full Studio unlocks watertight STL / OBJ / 3MF export, the built-in fitter and your per-lamp PDF print guide.</p>
+      <p class="mt-6">
+        <span class="text-ink-700/45 line-through text-lg align-middle mr-2">$19.99</span>
+        <strong class="font-serif text-5xl md:text-6xl text-bronze-800 align-middle">$14.99</strong>
+        <span class="text-sm text-ink-700/70 align-middle ml-2">once.<br class="hidden md:block"/> Yours forever.</span>
+      </p>
+      <p class="mt-2 text-sm text-ink-700/75">Less than a spool of filament. The first lamp you print pays for it.</p>
+      <a href={BUY} class="mt-6 inline-block bg-bronze-600 text-cream px-10 py-4 rounded-md text-base font-semibold hover:bg-bronze-700 hover:shadow-xl hover:-translate-y-0.5 transition-all shadow">Unlock the full Studio for $14.99 →</a>
+      <p class="mt-3 text-xs text-ink-700/60">Instant download · free v1.x updates · commercial licence included · no subscription, ever</p>
+    </div>
 
     <figure class="rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg mb-16 reveal max-w-3xl mx-auto">
       <img src={IMG.hero} alt="3D printable lampshade designed in Vase Lampshade Studio — glowing vase-mode table lamp with built-in E27 fitter, printed in one piece with no supports" width="1254" height="1254" loading="eager" fetchpriority="high" decoding="async" class="w-full" />
@@ -89,44 +140,6 @@ const DEMO_URL = '/lamp-studio-app/index.html?demo=1&buy=' + encodeURIComponent(
             <p class="mt-2 text-sm text-ink-700/85 leading-relaxed">{c.p}</p>
           </div>
         ))}
-      </div>
-    </section>
-
-    <!-- ===== LIVE PLAYGROUND ===== -->
-    <section id="playground" class="mb-16">
-      <div class="text-center reveal">
-        <p class="text-xs tracking-widest text-bronze-600 mb-3">DON'T TAKE OUR WORD FOR IT</p>
-        <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">Design one right now — free</h2>
-        <p class="mt-3 text-ink-700/85 max-w-2xl mx-auto">
-          This is the real Studio, running live in your browser. Play with every shape, modifier, photo and text
-          tool. The full version adds STL/OBJ/3MF export, the fitter files and the PDF print guide.
-        </p>
-      </div>
-      <div class="mt-8 rounded-xl overflow-hidden border border-bronze-600/40 shadow-xl reveal bg-[#0b0f17]">
-        <iframe
-          src={DEMO_URL}
-          title="Vase Lampshade Studio — free playground"
-          class="w-full block"
-          style="height: min(90vh, 1060px); border: 0;"
-          loading="lazy"
-          allow="fullscreen"
-        ></iframe>
-      </div>
-      <p class="mt-3 text-xs text-ink-700/60 text-center">Runs entirely in your browser — nothing is uploaded. Works best on desktop.</p>
-
-      <!-- Price hook, right where the "I want this" moment happens -->
-      <div class="mt-10 max-w-2xl mx-auto border-2 border-bronze-600/40 rounded-xl p-8 text-center bg-gradient-to-br from-cream to-white shadow-lg reveal">
-        <p class="text-xs tracking-widest text-bronze-600 mb-2">LOVE WHAT YOU JUST MADE?</p>
-        <h3 class="font-serif text-2xl md:text-3xl text-bronze-800">Take it off the screen and onto your printer.</h3>
-        <p class="mt-3 text-ink-700/85 max-w-lg mx-auto">The full Studio unlocks watertight STL / OBJ / 3MF export, the built-in fitter and your per-lamp PDF print guide.</p>
-        <p class="mt-6">
-          <span class="text-ink-700/45 line-through text-lg align-middle mr-2">$19.99</span>
-          <strong class="font-serif text-5xl md:text-6xl text-bronze-800 align-middle">$14.99</strong>
-          <span class="text-sm text-ink-700/70 align-middle ml-2">once.<br class="hidden md:block"/> Yours forever.</span>
-        </p>
-        <p class="mt-2 text-sm text-ink-700/75">Less than a spool of filament. The first lamp you print pays for it.</p>
-        <a href={BUY} class="mt-6 inline-block bg-bronze-600 text-cream px-10 py-4 rounded-md text-base font-semibold hover:bg-bronze-700 hover:shadow-xl hover:-translate-y-0.5 transition-all shadow">Unlock the full Studio for $14.99 →</a>
-        <p class="mt-3 text-xs text-ink-700/60">Instant download · free v1.x updates · commercial licence included · no subscription, ever</p>
       </div>
     </section>
 
@@ -243,6 +256,20 @@ const DEMO_URL = '/lamp-studio-app/index.html?demo=1&buy=' + encodeURIComponent(
     </section>
 
   </article>
+
+  <!-- Sticky buy bar. Someone who has spent five minutes designing a lamp
+       should never have to hunt for the price. Appears once the playground is
+       behind them, hides again at the price card so it never covers it. -->
+  <div id="vls-bar" class="fixed inset-x-0 bottom-0 z-40 translate-y-full transition-transform duration-300 print:hidden">
+    <div class="mx-auto max-w-5xl m-3 rounded-xl border border-bronze-600/35 bg-white/96 backdrop-blur shadow-2xl px-4 py-3 flex items-center gap-3 flex-wrap justify-center sm:justify-between">
+      <div class="text-sm text-ink-700/85 text-center sm:text-left">
+        <b class="text-bronze-800">Like what you designed?</b>
+        <span class="hidden sm:inline"> Export it, print it, keep it. </span>
+        <span class="text-ink-700/55 line-through mr-1">$19.99</span><b class="text-bronze-800">$14.99</b> once.
+      </div>
+      <a href={BUY} class="bg-bronze-600 text-cream px-6 py-2.5 rounded-md text-sm font-semibold hover:bg-bronze-700 transition shadow">Unlock the full Studio →</a>
+    </div>
+  </div>
 </Shell>
 
 <style is:global>
@@ -255,6 +282,29 @@ const DEMO_URL = '/lamp-studio-app/index.html?demo=1&buy=' + encodeURIComponent(
   .img-zoom:hover img { transform: scale(1.03); }
   @media (prefers-reduced-motion: reduce) { .js-anim .reveal { opacity: 1; transform: none; transition: none; } }
 </style>
+
+<script is:inline>
+  // Sticky buy bar: show it once the playground has scrolled past, hide it
+  // again while the big price card is on screen so the two never fight.
+  (function () {
+    var bar = document.getElementById('vls-bar');
+    var play = document.getElementById('playground');
+    if (!bar || !play) return;
+    var card = document.querySelector('a[href][class*="px-10"]');
+    function tick() {
+      var pastTool = play.getBoundingClientRect().bottom < 60;
+      var cardVisible = false;
+      if (card) { var r = card.getBoundingClientRect(); cardVisible = r.top < (window.innerHeight || 800) && r.bottom > 0; }
+      bar.classList.toggle('translate-y-full', !pastTool || cardVisible);
+    }
+    var t = 0;
+    window.addEventListener('scroll', function () {
+      var n = Date.now(); if (n - t < 120) return; t = n; tick();
+    }, { passive: true });
+    window.addEventListener('resize', tick, { passive: true });
+    tick();
+  })();
+</script>
 
 <script is:inline>
   (function () {
