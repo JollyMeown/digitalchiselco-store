@@ -7,7 +7,14 @@
 import { useState } from 'react';
 
 export type Series = { key: string; label: string; color: string };
-export type Point = { label: string; values: Record<string, number>; muted?: boolean };
+export type Point = {
+  label: string; values: Record<string, number>; muted?: boolean;
+  /** Small line printed under the month label, e.g. a revenue-to-ads ratio. */
+  foot?: string;
+  footTone?: 'good' | 'ok' | 'bad';
+};
+
+const FOOT_COLOR = { good: '#1f9254', ok: '#ba7517', bad: '#c0392b' } as const;
 
 const money = (n: number) => {
   if (n >= 1000) { const k = n / 1000; return '$' + (Number.isInteger(k) ? k : k.toFixed(k >= 10 ? 0 : 1)) + 'k'; }
@@ -50,10 +57,11 @@ export default function Chart3D({
   const y = (v: number) => PAD_T + H - (v / top) * H;
   const ticks: number[] = [];
   for (let t = 0; t <= top + 1e-9; t += step) ticks.push(+t.toFixed(6));
+  const hasFoot = points.some((p) => p.foot);
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H + PAD_T + 34}`} width="100%" style={{ maxWidth: '100%', overflow: 'visible' }}
+      <svg viewBox={`0 0 ${W} ${H + PAD_T + 34 + (hasFoot ? 14 : 0)}`} width="100%" style={{ maxWidth: '100%', overflow: 'visible' }}
         role="img" aria-label={title || '3D bar chart'} onMouseLeave={() => setHover(null)}>
         <defs>
           {series.map((s) => (
@@ -121,6 +129,10 @@ export default function Chart3D({
               })}
               <text x={x0 + groupW / 2} y={H + PAD_T + 15} fontSize={9.5} textAnchor="middle"
                 fill={p.muted ? '#c3bbae' : '#8a7a68'} fontWeight={hover?.i === i ? 700 : 400}>{p.label}</text>
+              {p.foot && (
+                <text x={x0 + groupW / 2} y={H + PAD_T + 28} fontSize={9.5} textAnchor="middle" fontWeight={600}
+                  fill={p.muted ? '#c3bbae' : FOOT_COLOR[p.footTone || 'ok']}>{p.foot}</text>
+              )}
             </g>
           );
         })}

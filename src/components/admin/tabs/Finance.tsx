@@ -346,7 +346,18 @@ function EtsyAds({ daily, gran, limit }: { daily: Daily[]; gran: Gran; limit: nu
       </div>
       <Chart3D
         title="Etsy profit and ad spend"
-        points={buckets.map((b) => ({ label: b.label, values: { profit: Math.max(0, b.profit), ad: b.ad } }))}
+        points={buckets.map((b) => {
+          // Revenue earned per $1 of Promoted Listings, printed under each
+          // month (owner, 2026-09-21). Coloured against the standing ad rule:
+          // aim for ads at 18% of revenue (5.6x), never past 25% (4.0x).
+          const r = b.ad > 0 ? b.rev / b.ad : 0;
+          return {
+            label: b.label,
+            values: { profit: Math.max(0, b.profit), ad: b.ad },
+            foot: b.ad > 0 ? `${r.toFixed(1)}x` : '',
+            footTone: (r >= 5.6 ? 'good' : r >= 4 ? 'ok' : 'bad') as 'good' | 'ok' | 'bad',
+          };
+        })}
         series={[
           { key: 'profit', label: 'Etsy profit (after fees and ads)', color: '#1f9254' },
           { key: 'ad', label: 'Ad spend', color: '#993c1d' },
@@ -355,6 +366,12 @@ function EtsyAds({ daily, gran, limit }: { daily: Daily[]; gran: Gran; limit: nu
       <p className="text-[11px] text-ink-700/45 mt-2 leading-relaxed">
         Green is what the {gran} actually left you, red is what you paid Etsy for Promoted Listings. When the red bar grows
         faster than the green one, the extra advertising is buying revenue that no longer pays for itself.
+        <br />
+        The figure under each {gran} is <b>Etsy revenue divided by ad spend</b>: how many dollars of sales each advertising
+        dollar brought in. <span style={{ color: '#1f9254', fontWeight: 600 }}>Green 5.6x or better</span> means ads are at
+        or under 18% of revenue, which is the target. <span style={{ color: '#ba7517', fontWeight: 600 }}>Amber 4.0x to 5.6x</span>{' '}
+        is acceptable but drifting. <span style={{ color: '#c0392b', fontWeight: 600 }}>Red under 4.0x</span> means ads have
+        passed 25% of revenue, the ceiling, and the budget should come down.
       </p>
     </Card>
   );

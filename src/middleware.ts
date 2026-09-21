@@ -6,6 +6,8 @@
 // clickjacking and XSS). This middleware sets them on every SSR response so the
 // whole site is covered. (netlify.toml still covers the static assets.)
 import { defineMiddleware } from 'astro:middleware';
+import { maintenancePage, maintenanceJson, plannedMaintenance } from './lib/maintenance';
+import { databaseUnreachable } from './lib/supabase';
 
 const SECURITY_HEADERS: Record<string, string> = {
   // NOTE: no X-Frame-Options. The Laser Studio desktop app's "My Shop" tab embeds
@@ -89,9 +91,21 @@ async function legacyRedirect(pathname: string): Promise<string | null> {
 const CACHEABLE = /^\/(?:$|catalog\/?$|collections(?:\/[^/]+)?\/?$|product\/[^/]+\/?$|blog(?:\/[^/]+)?\/?$|designs(?:\/[^/]+)?\/?$|free\/?$|membership\/?$|faq\/?$|our-story\/?$|gift-cards\/?$|makers\/?$|m\/[^/]+\/?$)/;
 const NEVER_CACHE = /^\/(?:admin|api|account|checkout|maker(?:$|\/|\?)|requests|cart|search|free\/(?:confirm|files))/;
 
+// ── Maintenance page ──────────────────────────────────────────────────
+// The admin panel is deliberately NOT covered: when something is broken the
+// owner (and I) need to see the real error, not a friendly page.
+const MAINTENANCE_EXEMPT = /^\/(?:admin|api\/admin|api\/paddle|api\/webhook)/;
+function downstairs(path: string, planned: boolean): Response {
+  return path.startsWith('/api/') ? maintenanceJson(planned) : maintenancePage(planned);
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   if (csrfBlocked(context.request, context.url.pathname)) {
     return new Response('Cross-site POST form submissions are forbidden', { status: 403 });
+  }
+  // Planned maintenance: MAINTENANCE_MODE=1 in the Netlify environment.
+  if (plannedMaintenance() && !MAINTENANCE_EXEMPT.test(context.url.pathname)) {
+    return downstairs(context.url.pathname, true);
   }
   if (context.request.method === 'GET') {
     const path = context.url.pathname;
@@ -107,7 +121,27 @@ export const onRequest = defineMiddleware(async (context, next) => {
       if (to) return context.redirect(to, 301);
     }
   }
-  const response = await next();
+  // A page that cannot reach Supabase throws, and Netlify turns that into its
+  // own 502 with our domain on it. Serve our page instead, with a 503 so search
+  // engines treat it as temporary and keep the ranking. (2026-09-21 outage.)
+  let response: Response;
+  try {
+    response = await next();
+  } catch (err) {
+    console.error('[middleware] page render failed:', (err as any)?.message || err);
+    if (MAINTENANCE_EXEMPT.test(context.url.pathname)) throw err;
+    return downstairs(context.url.pathname, false);
+  }
+  if (response.status >= 500 && !MAINTENANCE_EXEMPT.test(context.url.pathname)) {
+    return downstairs(context.url.pathname, false);
+  }
+  // A storefront page swallows its own query errors and renders an empty shop,
+  // which looks fine and is not. If a query failed outright while this page was
+  // rendering, say so honestly instead of showing a catalogue with nothing in it.
+  if (context.request.method === 'GET' && databaseUnreachable()
+      && !MAINTENANCE_EXEMPT.test(context.url.pathname) && CACHEABLE.test(context.url.pathname)) {
+    return downstairs(context.url.pathname, false);
+  }
   try {
     const path = context.url.pathname;
     if (context.request.method === 'GET' && response.status === 200 && CACHEABLE.test(path) && !NEVER_CACHE.test(path)
