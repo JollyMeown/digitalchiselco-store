@@ -1,0 +1,549 @@
+---
+// "Will it cut?" — drop an STL, find out whether your machine can make it.
+//
+// This is a traffic asset, not a sales page. Makers link to tools and bookmark
+// them; nobody bookmarks a product page. So it is ungated, free, has no signup
+// and works on a file the visitor already owns, whoever they bought it from.
+//
+// The whole analysis runs in the browser. Nothing is uploaded, which is both a
+// real privacy guarantee and the reason this costs nothing to run at any volume.
+//
+// Every term a beginner would not know carries a tooltip. That is deliberate:
+// the intermediate crowd already has answers, and the beginner is the one who
+// searches, gets stuck, and remembers where the help came from.
+import Shell from '../../layouts/Shell.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { MACHINES, CLASSES } from '../../lib/stl-analyse';
+import { jsonLd } from '../../lib/jsonld';
+
+const ld = jsonLd({
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: 'Will it cut? STL checker for CNC',
+  applicationCategory: 'DesignApplication',
+  operatingSystem: 'Any browser',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  description: 'Check any STL against your CNC machine: size, relief depth, detail loss by bit size, estimated cut time and file health. Runs entirely in your browser.',
+});
+---
+<Shell
+  title="Will it cut? Free STL checker for CNC routers · DigitalChiselCo"
+  description="Drop in any STL and find out if your CNC can cut it: fit against your work area, relief depth, how much detail your bit will lose, estimated cut time and file health. Free, no signup, and your file never leaves your computer."
+  fullWidth={true}
+>
+  <script type="application/ld+json" set:html={ld} />
+
+  <div class="wic">
+    <div class="wic-wrap">
+      <Breadcrumbs crumbs={[{ label: 'Tools', href: '/tools' }, { label: 'Will it cut?' }]} />
+
+      <header class="wic-hero">
+        <h1>Will it cut?</h1>
+        <p class="lede">
+          Drop in any STL file and find out whether your machine can actually make it, before you
+          clamp down a board. Works on any file from anywhere, not just ours.
+        </p>
+        <p class="privacy">
+          <strong>Your file never leaves your computer.</strong> There is no upload. The whole thing runs
+          inside this page, which you can verify by turning off your wifi and using it anyway.
+        </p>
+      </header>
+
+      <!-- ── drop zone ─────────────────────────────────────────────────── -->
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose an STL file or drop one here">
+        <input id="file" type="file" accept=".stl,model/stl" hidden />
+        <div class="drop-in">
+          <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke-linecap="round"/>
+          </svg>
+          <p class="drop-t">Drop an STL here, or click to choose</p>
+          <p class="drop-s">Binary or ASCII. Large files are fine.</p>
+        </div>
+      </div>
+      <div id="progress" class="progress" hidden><div id="bar"></div><span id="ptext">Reading…</span></div>
+      <p id="err" class="err" hidden></p>
+
+      <!-- ── results ───────────────────────────────────────────────────── -->
+      <div id="out" hidden>
+        <div class="grid2">
+          <figure class="preview">
+            <canvas id="pv" width="520" height="520" aria-label="Shaded preview of the model seen from above"></canvas>
+            <figcaption>What the cutter sees, looking straight down. This is generated from your file.</figcaption>
+          </figure>
+
+          <div class="verdict" id="verdict"></div>
+        </div>
+
+        <!-- setup -->
+        <section class="panel">
+          <h2>Your setup</h2>
+          <div class="fields">
+            <label class="f">
+              <span>Machine
+                <button class="tip" type="button" data-tip="Pick the closest match. These are real cutting areas, which are always a little smaller than the size printed on the box once the gantry and your clamps are in the way.">?</button>
+              </span>
+              <select id="machine">
+                {MACHINES.map((m, i) => <option value={i}>{m.name} ({m.x} x {m.y} mm)</option>)}
+                <option value="custom">Custom size…</option>
+              </select>
+            </label>
+            <div class="f two" id="customWrap" hidden>
+              <label><span>Width mm</span><input id="cw" type="number" value="600" min="20" /></label>
+              <label><span>Depth mm</span><input id="cd" type="number" value="400" min="20" /></label>
+            </div>
+            <label class="f">
+              <span>Machine class
+                <button class="tip" type="button" data-tip="How rigid your machine is. A belt-driven hobby machine has to take lighter cuts than a ball-screw machine, so the same job takes it much longer. If you are unsure, pick the slower one: the estimate will be pessimistic rather than a nasty surprise.">?</button>
+              </span>
+              <select id="cls">{CLASSES.map((c, i) => <option value={i} selected={i === 1}>{c.name}</option>)}</select>
+            </label>
+            <label class="f">
+              <span>Finishing bit
+                <button class="tip" type="button" data-tip="A ball nose is a round-tipped cutter. It is what carves the 3D detail, because a flat cutter cannot follow a curved surface. The number is the full width of the cutter, so a 3 mm ball nose has a 1.5 mm radius tip.">?</button>
+              </span>
+              <select id="ball">
+                <option value="1.5">1.5 mm ball nose</option>
+                <option value="3" selected>3 mm ball nose (1/8 inch)</option>
+                <option value="6">6 mm ball nose (1/4 inch)</option>
+              </select>
+            </label>
+            <label class="f">
+              <span>Stepover <output id="soOut">10%</output>
+                <button class="tip" type="button" data-tip="How far the cutter moves sideways between passes, as a percentage of its width. Smaller means smoother and much slower. Around 10% is the usual choice for a finishing pass. Going below about 8% mostly buys you extra hours, not extra detail.">?</button>
+              </span>
+              <input id="so" type="range" min="5" max="30" value="10" step="1" />
+            </label>
+            <label class="f">
+              <span>Scale <output id="scOut">100%</output>
+                <button class="tip" type="button" data-tip="Resize the whole model. Careful: scaling a relief changes its DEPTH by the same amount, so a model scaled to half size is also half as deep and will look flat. Watch the depth figure as you drag this.">?</button>
+              </span>
+              <input id="sc" type="range" min="25" max="300" value="100" step="5" />
+            </label>
+          </div>
+        </section>
+
+        <!-- numbers -->
+        <section class="panel">
+          <h2>What is in the file</h2>
+          <div id="facts" class="facts"></div>
+        </section>
+
+        <section class="panel">
+          <h2>How much detail your bit will lose
+            <button class="tip" type="button" data-tip="A round cutter cannot reach into a corner tighter than its own tip. This works out, for your actual file, how deep the detail is that each bit would smooth over. It is the same maths the cutter performs on the wood.">?</button>
+          </h2>
+          <div id="detail" class="bars"></div>
+          <p class="note" id="detailNote"></p>
+        </section>
+
+        <section class="panel">
+          <h2>Roughly how long it will take
+            <button class="tip" type="button" data-tip="An estimate, not a quote. It assumes a 6 mm cutter for roughing and your chosen ball nose for finishing, with no tool changes and no dawdling. Your own CAM software is the real answer. Treat this as the difference between an afternoon and a weekend.">?</button>
+          </h2>
+          <div id="time" class="times"></div>
+        </section>
+
+        <section class="panel share">
+          <h2>Share the result</h2>
+          <p>Stuck on something, or want a second opinion? Take the card and post it wherever you are asking.</p>
+          <div class="share-row">
+            <button id="dl" class="btn" type="button">Download result card</button>
+            <button id="cp" class="btn ghost" type="button">Copy summary as text</button>
+          </div>
+          <p class="note" id="shareNote" hidden></p>
+        </section>
+      </div>
+
+      <section class="panel faq">
+        <h2>Questions people ask</h2>
+        <details><summary>Is my file really not uploaded?</summary><p>Really. Everything happens in the page. Disconnect from the internet after this page loads and the tool still works, which is the easiest way to prove it to yourself.</p></details>
+        <details><summary>My file is in inches, not millimetres</summary><p>STL files carry no units at all, which is the single most common cause of a model arriving 25 times too big or too small. This tool assumes millimetres. If the dimensions look about 25 times too small, your file is in inches, so use the scale slider at 2540%.</p></details>
+        <details><summary>It says my model is not flat backed</summary><p>A relief carving is meant to be flat on the back, so it can sit on the machine bed and be cut from above. If yours is round on both sides it is a full 3D model, which needs either a rotary axis, or cutting in two halves and gluing them.</p></details>
+        <details><summary>What is an open edge?</summary><p>A hole in the mesh. A watertight model has every edge shared by exactly two triangles. A few open edges usually cut fine. Thousands mean the file is damaged and your software may refuse it or produce strange toolpaths.</p></details>
+        <details><summary>Can I trust the time estimate?</summary><p>As a rough order of magnitude, yes. It is deliberately simple and does not know about your ramping, your lead-ins or your tool changes. If it says four hours, expect somewhere between three and six.</p></details>
+      </section>
+
+      <p class="foot">
+        Built by <a href="/">DigitalChiselCo</a>. If it gets something wrong on your file,
+        <a href="/contact">tell us</a> and we will fix it. More on the numbers behind this in the
+        <a href="/blog/cnc-valet-tray-and-serving-tray">tray guide</a> and
+        <a href="/blog/how-to-scale-stl-files-for-cnc-routers">scaling STL files</a>.
+      </p>
+    </div>
+  </div>
+
+  <div id="tipbox" class="tipbox" hidden role="tooltip"></div>
+</Shell>
+
+<script>
+  import { parseSTL, analyse, cutTime, fmtTime, MACHINES, CLASSES, type Analysis } from '../../lib/stl-analyse';
+
+  const $ = (id: string) => document.getElementById(id)!;
+  let A: Analysis | null = null;
+  let fileName = '';
+
+  // ── tooltips ──────────────────────────────────────────────────────────
+  const tipbox = $('tipbox');
+  let openTip: HTMLElement | null = null;
+  const closeTip = () => { tipbox.hidden = true; openTip?.setAttribute('aria-expanded', 'false'); openTip = null; };
+  document.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('.tip') as HTMLElement | null;
+    if (!b) { if (!tipbox.contains(e.target as Node)) closeTip(); return; }
+    e.preventDefault();
+    if (openTip === b) return closeTip();
+    tipbox.textContent = b.dataset.tip || '';
+    tipbox.hidden = false;
+    const r = b.getBoundingClientRect();
+    const w = Math.min(320, window.innerWidth - 24);
+    tipbox.style.width = w + 'px';
+    tipbox.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + 'px';
+    tipbox.style.top = (window.scrollY + r.bottom + 8) + 'px';
+    b.setAttribute('aria-expanded', 'true');
+    openTip = b;
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTip(); });
+
+  // ── file intake ───────────────────────────────────────────────────────
+  const drop = $('drop'), input = $('file') as HTMLInputElement;
+  drop.addEventListener('click', () => input.click());
+  drop.addEventListener('keydown', (e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', (e: any) => {
+    e.preventDefault(); drop.classList.remove('over');
+    if (e.dataTransfer?.files?.[0]) load(e.dataTransfer.files[0]);
+  });
+  input.addEventListener('change', () => { if (input.files?.[0]) load(input.files[0]); });
+
+  function setProgress(p: number, label?: string) {
+    $('progress').hidden = false;
+    ($('bar') as HTMLElement).style.width = Math.round(p * 100) + '%';
+    if (label) $('ptext').textContent = label;
+  }
+
+  async function load(file: File) {
+    $('err').hidden = true;
+    $('out').hidden = true;
+    fileName = file.name;
+    setProgress(0.05, `Reading ${file.name}…`);
+    try {
+      const buf = await file.arrayBuffer();
+      setProgress(0.12, 'Parsing triangles…');
+      await new Promise((r) => setTimeout(r, 16));        // let the bar paint
+      const pos = parseSTL(buf);
+      if (pos.length < 9) throw new Error('No triangles found in this file.');
+      setProgress(0.2, 'Measuring…');
+      await new Promise((r) => setTimeout(r, 16));
+      A = analyse(pos, (p) => setProgress(0.2 + p * 0.78));
+      setProgress(1, 'Done');
+      $('progress').hidden = true;
+      $('out').hidden = false;
+      drawPreview();
+      render();
+      $('out').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e: any) {
+      $('progress').hidden = true;
+      $('err').hidden = false;
+      $('err').textContent = e?.message || 'Could not read that file.';
+    }
+  }
+
+  // ── preview: shade the height grid so it looks like the real thing ────
+  function drawPreview() {
+    if (!A) return;
+    const cv = $('pv') as HTMLCanvasElement, ctx = cv.getContext('2d')!;
+    const { w, h } = A.grid, H = A.height;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < H.length; i++) { const v = H[i]; if (Number.isNaN(v)) continue; if (v < lo) lo = v; if (v > hi) hi = v; }
+    const span = hi - lo || 1;
+    const img = ctx.createImageData(w, h);
+    // light from the upper left, the same direction the article photographs use
+    const LX = -0.55, LY = -0.55, LZ = 0.63;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x, o = i * 4;
+        const z = H[i];
+        if (Number.isNaN(z)) { img.data[o] = 250; img.data[o + 1] = 247; img.data[o + 2] = 240; img.data[o + 3] = 255; continue; }
+        const zx = (H[i + (x < w - 1 ? 1 : 0)] - H[i - (x > 0 ? 1 : 0)]);
+        const zy = (H[i + (y < h - 1 ? w : 0)] - H[i - (y > 0 ? w : 0)]);
+        const sx = Number.isNaN(zx) ? 0 : zx, sy = Number.isNaN(zy) ? 0 : zy;
+        const k = 2.2 / (A.grid.cell || 1);
+        let nx = -sx * k, ny = -sy * k, nz = 1;
+        const len = Math.hypot(nx, ny, nz); nx /= len; ny /= len; nz /= len;
+        const lam = Math.max(0, nx * LX + ny * LY + nz * LZ);
+        const amb = 0.36 + 0.24 * ((z - lo) / span);
+        const v = Math.min(1, amb + 0.72 * lam);
+        img.data[o] = Math.round(196 * v + 24);
+        img.data[o + 1] = Math.round(152 * v + 18);
+        img.data[o + 2] = Math.round(96 * v + 12);
+        img.data[o + 3] = 255;
+      }
+    }
+    const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+    tmp.getContext('2d')!.putImageData(img, 0, 0);
+    const s = Math.min(cv.width / w, cv.height / h);
+    ctx.fillStyle = '#FAF7F0'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(tmp, (cv.width - w * s) / 2, (cv.height - h * s) / 2, w * s, h * s);
+  }
+
+  // ── render ────────────────────────────────────────────────────────────
+  const mm = (v: number) => `${v.toFixed(1)} mm`;
+  const inch = (v: number) => `${(v / 25.4).toFixed(2)}"`;
+  const both = (v: number) => `${mm(v)} <span class="alt">(${inch(v)})</span>`;
+
+  function machine() {
+    const sel = ($('machine') as HTMLSelectElement).value;
+    if (sel === 'custom') return { name: 'Your machine', x: +($('cw') as HTMLInputElement).value, y: +($('cd') as HTMLInputElement).value, z: 100 };
+    return MACHINES[+sel];
+  }
+  const scale = () => +($('sc') as HTMLInputElement).value / 100;
+
+  function render() {
+    if (!A) return;
+    const s = scale(), M = machine();
+    const sx = A.size.x * s, sy = A.size.y * s, depth = A.reliefDepth * s;
+    ($('scOut') as HTMLOutputElement).value = Math.round(s * 100) + '%';
+    ($('soOut') as HTMLOutputElement).value = ($('so') as HTMLInputElement).value + '%';
+
+    // fits either way round, because you can turn the board
+    const fitsA = sx <= M.x && sy <= M.y, fitsB = sy <= M.x && sx <= M.y;
+    const fits = fitsA || fitsB;
+    const maxFit = Math.min(M.x / A.size.x, M.y / A.size.y, M.y / A.size.x === Infinity ? Infinity : Math.max(M.x / A.size.y, M.y / A.size.x));
+    const fitPct = Math.floor(Math.min(M.x / A.size.x, M.y / A.size.y) * 100);
+
+    $('verdict').innerHTML = fits
+      ? `<div class="v ok"><div class="v-h">Yes, this fits</div>
+         <p>At ${Math.round(s * 100)}% it is ${mm(sx)} by ${mm(sy)}, and your ${M.name} has ${M.x} by ${M.y} mm of travel.
+         ${!fitsA && fitsB ? '<strong>Turn the board 90 degrees</strong> and it fits.' : ''}</p></div>`
+      : `<div class="v no"><div class="v-h">Not at this size</div>
+         <p>It is ${mm(sx)} by ${mm(sy)} and your ${M.name} gives you ${M.x} by ${M.y} mm.
+         Scale to about <strong>${fitPct}%</strong> and it will fit, but read the depth warning below before you do.</p></div>`;
+
+    // facts
+    const openPct = A.triangles ? (A.openEdges / (A.triangles * 3)) * 100 : 0;
+    const flat = A.flatBack > 0.8;
+    const stock = depth + 8;
+    // openEdges is -1 when the check was skipped, which only happens on very
+    // large meshes. Saying so is better than implying a clean bill of health.
+    const meshText = A.openEdges < 0
+      ? 'Not checked, this mesh is very large'
+      : A.openEdges === 0
+        ? 'Watertight, no holes'
+        : `${A.openEdges.toLocaleString()} open edges${openPct < 1 ? ', probably fine' : ', this file is damaged'}`;
+    const meshTone = A.openEdges < 0 ? '' : A.openEdges === 0 ? 'good' : openPct < 1 ? '' : 'warn';
+    $('facts').innerHTML = `
+      <div class="fact"><div class="fk">Size</div><div class="fv">${both(sx)} <span class="x">×</span> ${both(sy)}</div></div>
+      <div class="fact"><div class="fk">Carved depth <button class="tip" type="button" data-tip="How far the deepest cut goes below the highest point. This is the number that decides how thick your board has to be, and it changes when you scale the model.">?</button></div>
+        <div class="fv">${both(depth)}</div></div>
+      <div class="fact"><div class="fk">Board thickness you need <button class="tip" type="button" data-tip="The carved depth plus about 8 mm of material left underneath. Any less and the panel will cup as the wood moves, or break while you are handling it.">?</button></div>
+        <div class="fv">${both(stock)} <span class="alt">or more</span></div></div>
+      <div class="fact"><div class="fk">Triangles</div><div class="fv">${A.triangles.toLocaleString()}</div></div>
+      <div class="fact"><div class="fk">Flat back? <button class="tip" type="button" data-tip="A relief should be flat on its back so it lies on the machine bed and is cut from one side. If it is not flat, it is a full 3D model and needs a different approach entirely.">?</button></div>
+        <div class="fv ${flat ? 'good' : 'warn'}">${flat ? 'Yes, cuts from one side' : 'No, this is a full 3D model'}</div></div>
+      <div class="fact"><div class="fk">Mesh health <button class="tip" type="button" data-tip="Open edges are holes in the mesh. A perfect model has none. A handful will cut fine. Thousands mean a damaged file.">?</button></div>
+        <div class="fv ${meshTone}">${meshText}</div></div>`;
+
+    // detail loss
+    const ok = A.detailLoss.filter((d) => d.measurable);
+    const maxLoss = Math.max(...ok.map((d) => d.max * s), 0.001);
+    $('detail').innerHTML = A.detailLoss.map((d) => {
+      if (!d.measurable) {
+        return `<div class="row">
+          <div class="row-l">${d.radius} mm ball nose</div>
+          <div class="row-track"><span class="row-v muted">too small to measure on a part this size</span></div>
+          <div class="row-n"></div></div>`;
+      }
+      const lost = d.max * s;
+      const tone = lost < 0.3 ? 'good' : lost < 1 ? '' : 'warn';
+      return `<div class="row">
+        <div class="row-l">${d.radius} mm ball nose</div>
+        <div class="row-track"><div class="row-bar ${tone}" style="width:${Math.max(2, 86 * lost / maxLoss)}%"></div>
+        <span class="row-v">${lost.toFixed(2)} mm lost</span></div>
+        <div class="row-n">${d.areaAffected}% of the surface</div></div>`;
+    }).join('');
+
+    if (!ok.length) {
+      $('detailNote').innerHTML = `This model is large enough that every bit here is finer than the tool can resolve, which is itself the answer: at this size, bit choice is not what limits your detail.`;
+    } else {
+      const best = ok[0], worst = ok[ok.length - 1];
+      const unmeasured = A.detailLoss.length - ok.length;
+      const tail = unmeasured ? ` The smaller bits are finer than this tool can resolve on a part this size, so they are not shown.` : '';
+      $('detailNote').innerHTML = (worst.max * s > 0.8
+        ? `A ${worst.radius} mm bit would smooth over up to ${(worst.max * s).toFixed(2)} mm of this carving across ${worst.areaAffected}% of its surface, which you would see. ${best !== worst ? `The ${best.radius} mm bit loses ${(best.max * s).toFixed(2)} mm.` : ''} On a face, fur or lettering, use the smallest bit you have and accept the longer pass.`
+        : `This model is forgiving. Even the ${worst.radius} mm bit only loses ${(worst.max * s).toFixed(2)} mm, so you can cut it with a larger tool and save hours.`) + tail;
+    }
+
+    // time
+    const cls = CLASSES[+($('cls') as HTMLSelectElement).value];
+    const ball = +($('ball') as HTMLSelectElement).value;
+    const so = +($('so') as HTMLInputElement).value;
+    const t = cutTime(A, cls, ball, so, s);
+    $('time').innerHTML = `
+      <div class="t"><div class="tk">Roughing</div><div class="tv">${fmtTime(t.roughMin)}</div><div class="tn">clearing waste with a flat cutter</div></div>
+      <div class="t"><div class="tk">Finishing</div><div class="tv">${fmtTime(t.finishMin)}</div><div class="tn">${t.passes.toLocaleString()} passes with the ${ball} mm ball nose</div></div>
+      <div class="t big"><div class="tk">Total, roughly</div><div class="tv">${fmtTime(t.totalMin * 0.8)} to ${fmtTime(t.totalMin * 1.5)}</div><div class="tn">machine time, not counting setup</div></div>`;
+  }
+
+  for (const id of ['machine', 'cls', 'ball', 'so', 'sc', 'cw', 'cd']) {
+    $(id).addEventListener('input', () => {
+      $('customWrap').hidden = ($('machine') as HTMLSelectElement).value !== 'custom';
+      render();
+    });
+  }
+
+  // ── share ─────────────────────────────────────────────────────────────
+  function summary() {
+    if (!A) return '';
+    const s = scale(), M = machine();
+    const cls = CLASSES[+($('cls') as HTMLSelectElement).value];
+    const ball = +($('ball') as HTMLSelectElement).value;
+    const t = cutTime(A, cls, ball, +($('so') as HTMLInputElement).value, s);
+    return [
+      `${fileName} — checked with Will it cut? (digitalchiselco.com/tools/will-it-cut)`,
+      `Size: ${mm(A.size.x * s)} x ${mm(A.size.y * s)}, carved depth ${mm(A.reliefDepth * s)}`,
+      `Board needed: ${mm(A.reliefDepth * s + 8)} thick or more`,
+      `Machine: ${M.name} (${M.x} x ${M.y} mm) — ${A.size.x * s <= M.x && A.size.y * s <= M.y ? 'fits' : 'does NOT fit at this size'}`,
+      `Mesh: ${A.triangles.toLocaleString()} triangles, ${A.openEdges < 0 ? 'mesh check skipped (very large)' : A.openEdges === 0 ? 'watertight' : A.openEdges + ' open edges'}, ${A.flatBack > 0.8 ? 'flat backed' : 'not flat backed'}`,
+      `Detail lost: ${A.detailLoss.map((d) => `${d.radius}mm bit ${(d.max * s).toFixed(2)}mm`).join(', ')}`,
+      `Estimated cut: ${fmtTime(t.totalMin * 0.8)} to ${fmtTime(t.totalMin * 1.5)} on a ${cls.name} machine`,
+    ].join('\n');
+  }
+
+  $('cp').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(summary()); note('Copied. Paste it wherever you are asking.'); }
+    catch { note('Could not reach the clipboard. Select the text and copy it by hand.'); }
+  });
+  function note(t: string) { const n = $('shareNote'); n.hidden = false; n.textContent = t; }
+
+  $('dl').addEventListener('click', () => {
+    if (!A) return;
+    const s = scale(), M = machine();
+    const cls = CLASSES[+($('cls') as HTMLSelectElement).value];
+    const ball = +($('ball') as HTMLSelectElement).value;
+    const t = cutTime(A, cls, ball, +($('so') as HTMLInputElement).value, s);
+    const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 630;
+    const c = cv.getContext('2d')!;
+    c.fillStyle = '#FAF7F0'; c.fillRect(0, 0, 1200, 630);
+    c.drawImage($('pv') as HTMLCanvasElement, 40, 75, 480, 480);
+    c.fillStyle = '#2b1d10';
+    c.font = '600 40px Georgia, serif';
+    c.fillText('Will it cut?', 560, 110);
+    c.font = '20px system-ui, sans-serif'; c.fillStyle = '#5c4a38';
+    c.fillText(fileName.slice(0, 40), 560, 145);
+    const lines: [string, string][] = [
+      ['Size', `${mm(A.size.x * s)} × ${mm(A.size.y * s)}`],
+      ['Carved depth', mm(A.reliefDepth * s)],
+      ['Board needed', `${mm(A.reliefDepth * s + 8)}+`],
+      ['Machine', `${M.name}`],
+      ['Fits?', (A.size.x * s <= M.x && A.size.y * s <= M.y) ? 'Yes' : 'Not at this size'],
+      ['Mesh', A.openEdges < 0 ? 'Not checked (very large)' : A.openEdges === 0 ? 'Watertight' : `${A.openEdges.toLocaleString()} open edges`],
+      ['Cut time', `${fmtTime(t.totalMin * 0.8)} to ${fmtTime(t.totalMin * 1.5)}`],
+    ];
+    let y = 205;
+    for (const [k, v] of lines) {
+      c.fillStyle = '#5c4a38'; c.font = '20px system-ui, sans-serif'; c.fillText(k, 560, y);
+      c.fillStyle = '#2b1d10'; c.font = '600 24px system-ui, sans-serif'; c.fillText(v, 760, y);
+      y += 46;
+    }
+    c.fillStyle = '#854F0B'; c.font = '19px system-ui, sans-serif';
+    c.fillText('digitalchiselco.com/tools/will-it-cut', 560, 585);
+    const a = document.createElement('a');
+    a.download = (fileName.replace(/\.stl$/i, '') || 'will-it-cut') + '-check.png';
+    a.href = cv.toDataURL('image/png');
+    a.click();
+    note('Card saved. It has no personal information on it, just the numbers.');
+  });
+</script>
+
+<style is:global>
+  .wic { background: #FFFDF8; color: #2b1d10; }
+  .wic-wrap { max-width: 56rem; margin: 0 auto; padding: 0 1rem 5rem; }
+  .wic-hero { padding: 2rem 0 1.25rem; }
+  .wic-hero h1 { font-family: Fraunces, Georgia, serif; font-size: clamp(2rem, 6vw, 3.1rem); margin: 0 0 .75rem; line-height: 1.05; }
+  .wic .lede { font-size: 1.1rem; line-height: 1.6; margin: 0 0 1rem; max-width: 40rem; }
+  .wic .privacy { font-size: .9rem; background: #F3F7F1; border-left: 3px solid #2f7d32; border-radius: .3rem; padding: .7rem .9rem; margin: 0; max-width: 40rem; }
+
+  .drop { border: 2px dashed rgba(43,29,16,.28); border-radius: .8rem; background: #fff; padding: 2.5rem 1rem; text-align: center; cursor: pointer; transition: .15s; }
+  .drop:hover, .drop.over, .drop:focus-visible { border-color: #854F0B; background: #FFFBF4; outline: none; }
+  .drop-in svg { color: #854F0B; }
+  .drop-t { font-size: 1.05rem; margin: .6rem 0 .2rem; font-weight: 600; }
+  .drop-s { font-size: .82rem; color: #5c4a38; margin: 0; }
+  .progress { margin-top: 1rem; background: #efe7da; border-radius: 999px; height: 26px; position: relative; overflow: hidden; }
+  .progress #bar { height: 100%; width: 0; background: #854F0B; transition: width .2s; }
+  .progress span { position: absolute; inset: 0; display: grid; place-items: center; font-size: .78rem; color: #2b1d10; }
+  .err { background: #fdecec; border-left: 3px solid #c0392b; padding: .7rem .9rem; border-radius: .3rem; margin-top: 1rem; }
+
+  .grid2 { display: grid; gap: 1rem; margin-top: 1.5rem; }
+  @media (min-width: 780px) { .grid2 { grid-template-columns: 1fr 1fr; align-items: start; } }
+  .preview { margin: 0; background: #fff; border: 1px solid rgba(43,29,16,.14); border-radius: .7rem; padding: .75rem; }
+  .preview canvas { width: 100%; height: auto; display: block; border-radius: .4rem; background: #FAF7F0; }
+  .preview figcaption { font-size: .78rem; color: #5c4a38; margin-top: .5rem; }
+
+  .v { border-radius: .7rem; padding: 1.1rem 1.2rem; border: 1px solid rgba(43,29,16,.14); background: #fff; }
+  .v-h { font-family: Fraunces, Georgia, serif; font-size: 1.5rem; margin-bottom: .4rem; }
+  .v.ok { border-left: 4px solid #2f7d32; } .v.ok .v-h { color: #2f7d32; }
+  .v.no { border-left: 4px solid #b4530f; } .v.no .v-h { color: #b4530f; }
+  .v p { margin: 0; line-height: 1.6; font-size: .95rem; }
+
+  .panel { background: #fff; border: 1px solid rgba(43,29,16,.14); border-radius: .7rem; padding: 1.1rem 1.2rem; margin-top: 1rem; }
+  .panel h2 { font-family: Fraunces, Georgia, serif; font-size: 1.25rem; margin: 0 0 .9rem; }
+  .fields { display: grid; gap: .9rem; }
+  @media (min-width: 680px) { .fields { grid-template-columns: 1fr 1fr; } }
+  /* min-width:0 everywhere a control sits in a grid or flex track. Without it
+     a <select> is sized by its widest option, so "Mid hobby (Shapeoko, X-Carve,
+     Onefinity)" pushed the whole page sideways on a phone. */
+  .fields, .f, .f.two label { min-width: 0; }
+  .f { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
+  .f > span { display: flex; align-items: center; gap: .4rem; color: #5c4a38; flex-wrap: wrap; }
+  .f select, .f input { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+  .f select, .f input[type=number] { padding: .5rem .6rem; border: 1px solid rgba(43,29,16,.24); border-radius: .4rem; background: #fff; font: inherit; }
+  .f input[type=range] { accent-color: #854F0B; }
+  .f.two { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .f.two label { display: flex; flex-direction: column; gap: .3rem; }
+  output { font-variant-numeric: tabular-nums; color: #2b1d10; font-weight: 600; }
+
+  .tip { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #854F0B; color: #854F0B; background: #fff; font-size: 11px; line-height: 1; cursor: pointer; flex: 0 0 auto; }
+  .tip:hover { background: #854F0B; color: #fff; }
+  .tipbox { position: absolute; z-index: 60; background: #2b1d10; color: #fff; font-size: .82rem; line-height: 1.45; padding: .7rem .8rem; border-radius: .45rem; box-shadow: 0 8px 24px rgba(0,0,0,.24); }
+
+  .facts { display: grid; gap: .75rem; }
+  @media (min-width: 560px) { .facts { grid-template-columns: 1fr 1fr; } }
+  .fact { border-top: 1px solid rgba(43,29,16,.1); padding-top: .6rem; }
+  .fk { font-size: .78rem; color: #5c4a38; display: flex; align-items: center; gap: .35rem; }
+  .fv { font-size: 1.05rem; margin-top: .15rem; font-variant-numeric: tabular-nums; }
+  .fv .alt { font-size: .8rem; color: #5c4a38; }
+  .fv .x { color: #5c4a38; margin: 0 .15rem; }
+  .fv.good { color: #2f7d32; } .fv.warn { color: #b4530f; }
+
+  .bars { display: flex; flex-direction: column; gap: .5rem; }
+  .bars .row { display: grid; grid-template-columns: 9rem 1fr 9rem; gap: .6rem; align-items: center; }
+  @media (max-width: 620px) { .bars .row { grid-template-columns: 1fr; gap: .15rem; } .bars .row-n { text-align: left; } }
+  .row-l { font-size: .84rem; }
+  .row-track { display: flex; align-items: center; gap: .5rem; }
+  .row-bar { height: 14px; background: #854F0B; border-radius: 0 4px 4px 0; }
+  .row-bar.good { background: #2f7d32; } .row-bar.warn { background: #b4530f; }
+  .row-v { font-size: .8rem; font-variant-numeric: tabular-nums; }
+  .row-v.muted { color: #5c4a38; font-style: italic; }
+  .row-n { font-size: .75rem; color: #5c4a38; text-align: right; }
+  .note { font-size: .88rem; color: #5c4a38; line-height: 1.55; margin: .9rem 0 0; }
+
+  .times { display: grid; gap: .75rem; }
+  @media (min-width: 620px) { .times { grid-template-columns: 1fr 1fr 1.2fr; } }
+  .t { border-top: 1px solid rgba(43,29,16,.1); padding-top: .6rem; }
+  .t.big .tv { color: #854F0B; }
+  .tk { font-size: .78rem; color: #5c4a38; }
+  .tv { font-family: Fraunces, Georgia, serif; font-size: 1.35rem; margin: .1rem 0; }
+  .tn { font-size: .74rem; color: #5c4a38; }
+
+  .share-row { display: flex; gap: .6rem; flex-wrap: wrap; }
+  .btn { background: #854F0B; color: #fff; border: 0; padding: .6rem 1rem; border-radius: .45rem; font: inherit; cursor: pointer; }
+  .btn:hover { background: #633806; }
+  .btn.ghost { background: #fff; color: #854F0B; border: 1px solid #854F0B; }
+  .faq details { border-top: 1px solid rgba(43,29,16,.1); padding: .6rem 0; }
+  .faq summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
+  .faq p { margin: .5rem 0 0; font-size: .9rem; line-height: 1.6; color: #3a2a1a; }
+  .foot { font-size: .85rem; color: #5c4a38; margin-top: 1.5rem; }
+  .wic a { color: #854F0B; text-decoration: underline; }
+</style>
