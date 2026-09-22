@@ -1,6 +1,5 @@
 ---
 import Logo from './Logo.astro';
-import SocialProof from './SocialProof.astro';
 import MobileBottomBar from './MobileBottomBar.astro';
 import Concierge from './Concierge.astro';
 import { getCategories, getSettings } from '../lib/queries';
@@ -119,7 +118,12 @@ try {
     <a href="/cart" class="dcc-cart-go block text-center bg-bronze-600 text-cream py-2.5 rounded-md hover:bg-bronze-700 transition">View cart &amp; checkout</a>
   </div>
 </aside>
-<SocialProof />
+{/* Social-proof toast switched OFF site-wide, 2026-09-22. A reader wrote in to
+    say the "Someone just bought X" popups were covering the article he was
+    reading on a phone. He was right: on a guide page the toast interrupts the
+    one thing the page exists to do, and those guides are what bring people in.
+    The component and /api/social-proof are left intact, so restoring it is a
+    one-line change if it ever earns its place back on product pages only. */}
 <MobileBottomBar />
 <Concierge />
 <style is:global>
