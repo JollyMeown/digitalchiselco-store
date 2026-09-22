@@ -1,0 +1,298 @@
+---
+// The State of CNC Relief Carving 2026.
+//
+// This page exists to be CITED, not to sell. It is the one thing on this site
+// nobody else can publish: 365 days of real sales across a 1,226 design
+// catalogue, with the method stated plainly enough that a sceptic can attack it.
+//
+// Two rules were followed while building it and both matter more than the
+// design. First, the figures are BAKED IN at build time from a checked-in JSON
+// snapshot, so a number a journalist quotes today still reads the same in a
+// year. Second, the maturity control (see the method section) throws away 776
+// designs that are too new to have sold; without it the catalogue appears to
+// have a 55% failure rate and a spectacular fake finding about title length.
+import Shell from '../../layouts/Shell.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import data from '../../../scripts/blog/state-of-cnc-relief-carving-2026/report_data.json';
+import { jsonLd } from '../../lib/jsonld';
+
+const { concentration: C, subjects, priceBands, categories, cohort } = data as any;
+const fmt = (n: number) => n.toLocaleString('en-US');
+const PUB = '2026-09-22';
+
+// Charts are hand-built SVG rather than a library: one dependency fewer, and a
+// bar chart is twelve lines of geometry. Each bar carries its value as a real
+// label, which is also what discharges the palette's contrast relief rule.
+const subjectsByRate = [...subjects].filter((s: any) => s.designs >= 20).sort((a: any, b: any) => b.perDesign - a.perDesign);
+const maxPerDesign = Math.max(...subjectsByRate.map((s: any) => s.perDesign));
+const bands = priceBands.filter((b: any) => b.designs >= 10);
+const maxBand = Math.max(...bands.map((b: any) => b.perDesign));
+const cats = categories.slice(0, 12);
+const maxCat = Math.max(...cats.map((c: any) => c.perDesign));
+
+const ld = jsonLd({
+  '@context': 'https://schema.org',
+  '@type': 'Report',
+  headline: 'The State of CNC Relief Carving 2026',
+  datePublished: PUB,
+  author: { '@type': 'Organization', name: 'DigitalChiselCo' },
+  publisher: { '@type': 'Organization', name: 'DigitalChiselCo' },
+  description: `An analysis of ${fmt(C.sales)} real sales across ${fmt(C.designs)} CNC relief carving designs over 365 days.`,
+  license: 'https://creativecommons.org/licenses/by/4.0/',
+});
+---
+<Shell
+  title="The State of CNC Relief Carving 2026 · DigitalChiselCo"
+  description={`We analysed ${fmt(C.sales)} real sales across ${fmt(C.designs)} relief carving designs over 365 days. What subjects sell, what price actually does to demand, and how concentrated the market really is.`}
+  fullWidth={true}
+>
+  <script type="application/ld+json" set:html={ld} />
+  <div class="rpt">
+    <div class="rpt-wrap">
+      <Breadcrumbs crumbs={[{ label: 'Reports', href: '/reports' }, { label: 'State of CNC Relief Carving 2026' }]} />
+
+      <header class="rpt-hero">
+        <p class="rpt-eyebrow">First-party data · {data.window}</p>
+        <h1>The State of CNC Relief Carving 2026</h1>
+        <p class="rpt-lede">
+          Everybody in this trade argues about what sells. Almost nobody has the numbers, because the
+          shops that have them do not publish them. We do, so here they are: <strong>{fmt(C.sales)} real sales</strong>
+          across <strong>{fmt(C.designs)} designs</strong> over a full year, with the method written out so you can
+          decide for yourself how much to trust it.
+        </p>
+        <p class="rpt-sub">
+          Free to quote, chart and republish with a link back. No signup, no email wall.
+        </p>
+      </header>
+
+      <section class="rpt-tiles" aria-label="Headline figures">
+        <div class="tile"><div class="tile-n">{fmt(C.designs)}</div><div class="tile-l">designs in the study</div></div>
+        <div class="tile"><div class="tile-n">{fmt(C.sales)}</div><div class="tile-l">sales over 365 days</div></div>
+        <div class="tile"><div class="tile-n">{Math.round(100 * C.neverSold / C.designs)}%</div><div class="tile-l">never sold once</div></div>
+        <div class="tile"><div class="tile-n">{C.top10pcShare}%</div><div class="tile-l">of sales go to the top 10%</div></div>
+      </section>
+
+      <!-- ── 1 ─────────────────────────────────────────────────────────── -->
+      <section class="rpt-sec">
+        <h2 id="concentration">1. Most designs sell nothing, and that is normal</h2>
+        <p>
+          Of {fmt(C.designs)} designs that have been on sale for a full year, <strong>{fmt(C.neverSold)} never sold a single copy</strong>.
+          The top {C.topHalfCount} designs, {(100 * C.topHalfCount / C.designs).toFixed(1)}% of the catalogue, account for half of all sales.
+          The top 10% account for {C.top10pcShare}%.
+        </p>
+        <p>
+          This is the number that should change how you think about building a catalogue. A designer measuring
+          themselves by hit rate will conclude they are failing. They are not. In a catalogue this size a
+          {' '}<strong>{Math.round(100 * C.neverSold / C.designs)}% miss rate is the cost of finding the {C.topHalfCount} that carry everything.</strong>
+          {' '}The implication is uncomfortable for anyone selling a "proven winners" pack: the winners are only
+          visible afterwards.
+        </p>
+      </section>
+
+      <!-- ── 2 ─────────────────────────────────────────────────────────── -->
+      <section class="rpt-sec">
+        <h2 id="price">2. The expensive designs sell more, not fewer</h2>
+        <p>
+          This is the finding that surprised us most, and the one we expect to be argued with hardest.
+          Designs priced at $15 to $20 average <strong>{bands.find((b: any) => b.band === '$15 to $20')?.perDesign} sales each</strong>.
+          Designs priced at $5 to $8 average <strong>{bands.find((b: any) => b.band === '$5 to $8')?.perDesign}</strong>.
+          That is the cheap tier selling roughly a fifth as often per design, at a third of the price.
+        </p>
+
+        <figure class="chart">
+          <figcaption>Average sales per design, by price band</figcaption>
+          <div class="bars">
+            {bands.map((b: any) => (
+              <div class="row" title={`${b.band}: ${b.perDesign} sales per design across ${b.designs} designs, ${b.hitRate}% of them sold at least once`}>
+                <div class="row-l">{b.band}</div>
+                <div class="row-track">
+                  <div class="row-bar" style={`width:${Math.max(2, 86 * b.perDesign / maxBand)}%`}></div>
+                  <span class="row-v">{b.perDesign}</span>
+                </div>
+                <div class="row-n">{b.designs} designs</div>
+              </div>
+            ))}
+          </div>
+        </figure>
+
+        <p class="caveat">
+          <strong>Read this one carefully.</strong> Price is not causing the sales. The expensive designs are
+          the large, complex, multi-figure scenes that took the longest to make, and the cheap tier is where
+          almost the whole catalogue sits ({bands.find((b: any) => b.band === '$5 to $8')?.designs} of {fmt(C.designs)} designs).
+          The honest claim is narrower than "raise your prices": <strong>pricing low did not buy volume.</strong>
+          The cheap tier holds {bands.find((b: any) => b.band === '$5 to $8')?.revenueShare}% of revenue while
+          holding {Math.round(100 * bands.find((b: any) => b.band === '$5 to $8')?.designs / C.designs)}% of the catalogue.
+          The $15 to $20 band is 20 designs, so treat it as a direction, not a decimal.
+        </p>
+      </section>
+
+      <!-- ── 3 ─────────────────────────────────────────────────────────── -->
+      <section class="rpt-sec">
+        <h2 id="subjects">3. What people actually carve</h2>
+        <p>
+          Subjects are matched on listing titles, and a design can belong to more than one, so these describe
+          demand for a theme rather than slices of a pie. Sorted by sales per design, which is the number that
+          matters if you are deciding what to make next, rather than by total sales, which mostly tells you what
+          a shop happened to make a lot of.
+        </p>
+
+        <figure class="chart">
+          <figcaption>Average sales per design, by subject (subjects with 20+ designs)</figcaption>
+          <div class="bars">
+            {subjectsByRate.map((s: any) => (
+              <div class="row" title={`${s.name}: ${s.perDesign} sales per design, ${s.hitRate}% sold at least once, average price $${s.avgPrice}`}>
+                <div class="row-l">{s.name}</div>
+                <div class="row-track">
+                  <div class="row-bar" style={`width:${Math.max(2, 86 * s.perDesign / maxPerDesign)}%`}></div>
+                  <span class="row-v">{s.perDesign}</span>
+                </div>
+                <div class="row-n">{s.hitRate}% sold</div>
+              </div>
+            ))}
+          </div>
+        </figure>
+
+        <p>
+          Religious work is the largest single block by total volume at {subjects.find((s: any) => s.name === 'Religious')?.share}% of all sales,
+          and it also carries the highest average price at ${subjects.find((s: any) => s.name === 'Religious')?.avgPrice}.
+          But deer and elk is the most reliable thing in the catalogue per design.
+          Nautical has the highest hit rate of any subject at {subjects.find((s: any) => s.name === 'Nautical and sea life')?.hitRate}%:
+          almost everything in it sells something.
+        </p>
+        <p>
+          The quiet lesson is in the gap between volume and rate. Floral and botanical has
+          {' '}{subjects.find((s: any) => s.name === 'Floral and botanical')?.designs} designs producing
+          {' '}{subjects.find((s: any) => s.name === 'Floral and botanical')?.perDesign} sales each.
+          Deer and elk has {subjects.find((s: any) => s.name === 'Deer and elk')?.designs} producing
+          {' '}{subjects.find((s: any) => s.name === 'Deer and elk')?.perDesign}. Making more of the first category
+          feels productive and is not.
+        </p>
+      </section>
+
+      <!-- ── 4 ─────────────────────────────────────────────────────────── -->
+      <section class="rpt-sec">
+        <h2 id="categories">4. The same picture by shop category</h2>
+        <p>Categories are the shop's own taxonomy rather than title matching, so this is a second, independent cut of the same year.</p>
+        <figure class="chart">
+          <figcaption>Average sales per design, by category (categories with 15+ designs, top 12)</figcaption>
+          <div class="bars">
+            {cats.map((c: any) => (
+              <div class="row" title={`${c.name}: ${c.perDesign} sales per design across ${c.designs} designs`}>
+                <div class="row-l">{c.name}</div>
+                <div class="row-track">
+                  <div class="row-bar alt" style={`width:${Math.max(2, 86 * c.perDesign / maxCat)}%`}></div>
+                  <span class="row-v">{c.perDesign}</span>
+                </div>
+                <div class="row-n">{c.hitRate}% sold</div>
+              </div>
+            ))}
+          </div>
+        </figure>
+      </section>
+
+      <!-- ── method ────────────────────────────────────────────────────── -->
+      <section class="rpt-sec method">
+        <h2 id="method">Method, and what we threw away</h2>
+        <p>
+          <strong>The data.</strong> Every figure comes from one shop's own sales records over
+          {' '}{data.window}. Sales counts are per design. No buyer, order or personal detail is used anywhere
+          in this report, and nothing below the aggregate level is published.
+        </p>
+        <p>
+          <strong>The maturity control, which is the important part.</strong> The raw catalogue contains
+          {' '}{fmt(cohort.excluded)} designs that were excluded, almost all of them because they were added in the last
+          few months and have not had a year to sell. Including them would have produced a much more dramatic
+          report: a 55% failure rate instead of {Math.round(100 * C.neverSold / C.designs)}%, and a striking
+          finding that listing titles over 90 characters sell nothing at all. Both are artefacts. The long titles
+          belong to the new designs. We only study designs that were on sale before
+          {' '}{cohort.rule.replace('listed on Etsy and created before ', '')}.
+        </p>
+        <p>
+          <strong>What this is not.</strong> This is one shop, selling digital files, mostly to buyers in
+          English-speaking countries, on one marketplace. It describes that demand well and it should not be
+          read as the whole world market. Subject buckets overlap by design. Bands with few designs are labelled
+          with their counts so you can discount them yourself.
+        </p>
+        <p>
+          <strong>Corrections.</strong> If you find an error, say so and we will fix it and note the change here.
+          A report nobody can check is marketing, not data.
+        </p>
+      </section>
+
+      <section class="rpt-sec cite">
+        <h2 id="cite">Use this</h2>
+        <p>
+          Free to reproduce, including the charts, for any purpose including commercial, with a link back to
+          this page. No permission needed and no email required.
+        </p>
+        <p class="cite-line">
+          <em>The State of CNC Relief Carving 2026</em>, DigitalChiselCo. https://digitalchiselco.com/reports/state-of-cnc-relief-carving-2026
+        </p>
+        <p>
+          Questions about the method, or want a cut of the data we did not publish?
+          {' '}<a href="/contact">Ask</a>. If you run a shop and want to pool anonymised numbers for next
+          year's edition so it stops being one shop's view, that is exactly what we want to do.
+        </p>
+      </section>
+    </div>
+  </div>
+</Shell>
+
+<style is:global>
+  /* Chart colours are the brand bronze plus one validated contrast hue, and
+     both modes were checked with the palette validator rather than by eye:
+     light #854F0B / #2a78d6, dark #BE7F31 / #3987e5, all checks pass. Every
+     bar also carries a printed value, which is what makes the chart readable
+     without colour at all. */
+  .rpt {
+    --rpt-surface: #FFFDF8;
+    --rpt-card: #ffffff;
+    --rpt-ink: #2b1d10;
+    --rpt-ink-2: #5c4a38;
+    --rpt-line: rgba(43, 29, 16, .14);
+    --rpt-bar: #854F0B;
+    --rpt-bar-alt: #2a78d6;
+    background: var(--rpt-surface);
+    color: var(--rpt-ink);
+  }
+  /* Deliberately single-theme. The storefront around this page is light only,
+     so a dark report would render as a dark island between a light header and
+     a light footer. The dark steps (#BE7F31 / #3987e5) are validated and kept
+     in the note above for whenever the rest of the site grows a dark mode. */
+
+  .rpt-wrap { max-width: 48rem; margin: 0 auto; padding: 0 1rem 5rem; }
+  .rpt-hero { padding: 2rem 0 1rem; }
+  .rpt-eyebrow { font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; color: var(--rpt-ink-2); margin: 0 0 .75rem; }
+  .rpt-hero h1 { font-family: Fraunces, Georgia, serif; font-size: clamp(1.9rem, 5vw, 3rem); line-height: 1.08; text-wrap: balance; margin: 0 0 1rem; color: var(--rpt-ink); }
+  .rpt-lede { font-size: 1.125rem; line-height: 1.65; color: var(--rpt-ink); margin: 0 0 .75rem; }
+  .rpt-sub { font-size: .9rem; color: var(--rpt-ink-2); margin: 0; }
+
+  .rpt-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; margin: 2rem 0 1rem; }
+  @media (min-width: 720px) { .rpt-tiles { grid-template-columns: repeat(4, 1fr); } }
+  .tile { background: var(--rpt-card); border: 1px solid var(--rpt-line); border-radius: .6rem; padding: 1rem; }
+  .tile-n { font-family: Fraunces, Georgia, serif; font-size: 1.9rem; line-height: 1; color: var(--rpt-bar); font-variant-numeric: tabular-nums; }
+  .tile-l { font-size: .8rem; color: var(--rpt-ink-2); margin-top: .4rem; line-height: 1.35; }
+
+  .rpt-sec { margin: 3rem 0 0; }
+  .rpt-sec h2 { font-family: Fraunces, Georgia, serif; font-size: 1.6rem; line-height: 1.2; margin: 0 0 .9rem; color: var(--rpt-ink); text-wrap: balance; }
+  .rpt-sec p { line-height: 1.7; margin: 0 0 1rem; color: var(--rpt-ink); }
+  .rpt-sec a { color: var(--rpt-bar); text-decoration: underline; }
+  .caveat { background: var(--rpt-card); border-left: 3px solid var(--rpt-bar); border-radius: .3rem; padding: .9rem 1rem; font-size: .95rem; }
+  .method p, .cite p { font-size: .95rem; }
+  .cite-line { background: var(--rpt-card); border: 1px solid var(--rpt-line); border-radius: .4rem; padding: .75rem .9rem; font-size: .85rem; word-break: break-word; }
+
+  .chart { margin: 1.5rem 0 1.25rem; padding: 1rem; background: var(--rpt-card); border: 1px solid var(--rpt-line); border-radius: .6rem; }
+  .chart figcaption { font-size: .85rem; color: var(--rpt-ink-2); margin-bottom: .9rem; }
+  .bars { display: flex; flex-direction: column; gap: .5rem; }
+  .row { display: grid; grid-template-columns: 8.5rem 1fr 5rem; align-items: center; gap: .6rem; }
+  @media (max-width: 560px) {
+    .row { grid-template-columns: 1fr; gap: .15rem; }
+    .row-n { text-align: left; }
+  }
+  .row-l { font-size: .82rem; color: var(--rpt-ink); line-height: 1.25; }
+  .row-track { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+  .row-bar { height: 14px; background: var(--rpt-bar); border-radius: 0 4px 4px 0; flex: 0 0 auto; }
+  .row-bar.alt { background: var(--rpt-bar-alt); }
+  .row-v { font-size: .8rem; font-variant-numeric: tabular-nums; color: var(--rpt-ink); }
+  .row-n { font-size: .75rem; color: var(--rpt-ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+</style>
