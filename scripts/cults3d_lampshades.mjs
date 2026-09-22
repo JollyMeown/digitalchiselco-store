@@ -153,8 +153,13 @@ That page is the real software, not a video of it:
   - Your printer's bed drawn around the design, with an oversize warning
   - The solid-bottom-layer number computed for YOUR holder and layer height
 
-Play with it for free for as long as you like. The paid version is what adds
-STL / OBJ / 3MF export, the fitter files and a print guide per lamp.`;
+Play with it for free for as long as you like.
+
+The full version is a STANDALONE WINDOWS DESKTOP APPLICATION. You download it,
+install it on your own machine and it runs completely offline, with no account
+and no subscription. It adds watertight STL / OBJ / 3MF export, the bulb fitter
+files and a print guide written for each lamp you make. One payment, yours to
+keep, commercial licence included.`;
 }
 
 const CREATE = `
