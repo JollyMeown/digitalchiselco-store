@@ -5,6 +5,7 @@ import { supabaseAdmin } from '../../lib/supabase';
 import { jsonLd } from '../../lib/jsonld';
 import xss from 'xss';
 import PriceCalculator from '../../components/PriceCalculator.tsx';
+import { img } from '../../lib/img';
 
 const { slug } = Astro.params;
 let post: any = null;
@@ -105,7 +106,14 @@ const safeBody = xss(post.body || '', {
 // survives the sanitizer); the body is split there and the island mounted
 // between the halves, since a script can never live inside stored HTML.
 const CALC_MARK = '<div class="dcc-price-calc"></div>';
-const bodyParts = safeBody.includes(CALC_MARK) ? safeBody.split(CALC_MARK, 2) : [safeBody];
+// Article bodies store the raw Supabase object URL, which is the full 2K
+// upload: a tray guide with nine photographs was shipping about 5 MB into a
+// 720 px column. Rewrite every stored <img> through the same transformer the
+// rest of the site uses. 1440 covers the prose column at 2x, and img() leaves
+// non-Supabase hosts (old Etsy CDN links) alone.
+const sized = (html: string) =>
+  html.replace(/(<img\b[^>]*?\bsrc=")([^"]+)(")/gi, (_m, a, url, c) => a + img(url, { w: 1440, q: 72 }) + c);
+const bodyParts = (safeBody.includes(CALC_MARK) ? safeBody.split(CALC_MARK, 2) : [safeBody]).map(sized);
 ---
 <Shell
   title={`${post.seo_title || post.title} · DigitalChiselCo`}
@@ -117,7 +125,7 @@ const bodyParts = safeBody.includes(CALC_MARK) ? safeBody.split(CALC_MARK, 2) : 
 
   <article class="max-w-3xl mx-auto">
     {post.cover_image_url && (
-      <img src={post.cover_image_url} alt={post.title} class="w-full aspect-[16/9] object-cover rounded-lg mb-8" />
+      <img src={img(post.cover_image_url, { w: 1440, q: 72 })} alt={post.title} width="1440" height="810" fetchpriority="high" class="w-full aspect-[16/9] object-cover rounded-lg mb-8" />
     )}
     <header class="mb-8">
       <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">{post.title}</h1>
@@ -149,7 +157,7 @@ const bodyParts = safeBody.includes(CALC_MARK) ? safeBody.split(CALC_MARK, 2) : 
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {related.map((r) => (
             <a href={`/blog/${r.slug}`} class="block rounded-lg border border-black/10 bg-white overflow-hidden hover:shadow-md transition">
-              {r.cover_image_url && <img src={r.cover_image_url} alt="" loading="lazy" class="w-full aspect-[16/9] object-cover" />}
+              {r.cover_image_url && <img src={img(r.cover_image_url, { w: 480, q: 70 })} alt="" loading="lazy" width="480" height="270" class="w-full aspect-[16/9] object-cover" />}
               <div class="p-3">
                 <div class="font-serif text-[15px] leading-snug text-ink-800">{r.title}</div>
               </div>
