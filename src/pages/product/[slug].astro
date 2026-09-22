@@ -5,6 +5,7 @@ import ProductCard from '../../components/ProductCard.astro';
 import RecentlyViewed from '../../components/RecentlyViewed.astro';
 import TrustBadges from '../../components/TrustBadges.astro';
 import { getProductBySlug, getRelatedProducts, getSettings, getSoldCount, getBoughtTogether } from '../../lib/queries';
+import FreePackInline from '../../components/FreePackInline.astro';
 import { pricing, money } from '../../lib/pricing';
 import { jsonLd } from '../../lib/jsonld';
 import { img } from '../../lib/img';
@@ -608,6 +609,8 @@ const breadcrumbLd = {
       </script>
     </section>
   )}
+
+  <FreePackInline variant="bar" source="product" />
 
   {related.length > 0 && (
     <section class="mt-14">

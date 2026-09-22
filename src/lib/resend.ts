@@ -136,7 +136,7 @@ async function refreshBudget(): Promise<void> {
   const [{ count }, { count: mCount }, { data: gs }] = await Promise.all([
     db.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', day + 'T00:00:00Z'),
     db.from('email_send_log').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', monthStart),
-    db.from('growth_settings').select('email_daily_cap, email_daily_reserve, email_monthly_cap, email_max_per_week').eq('id', 1).maybeSingle(),
+    db.from('growth_settings').select('email_daily_cap, email_daily_reserve, email_monthly_cap, email_max_per_week, cold_broadcast_days').eq('id', 1).maybeSingle(),
   ]);
   // DB (admin-editable) is PRIMARY so the owner's control always wins; env is
   // only a fallback if the column is somehow missing.
@@ -144,6 +144,7 @@ async function refreshBudget(): Promise<void> {
   const reserve = Math.min(cap, Math.max(0, Number.isFinite(Number(gs?.email_daily_reserve)) ? Number(gs?.email_daily_reserve) : (!Number.isNaN(RESERVE_ENV) ? RESERVE_ENV : 20)));
   const monthCap = Math.max(100, Number(gs?.email_monthly_cap) || 3000);
   maxPerWeek = Number.isFinite(Number(gs?.email_max_per_week)) ? Math.max(0, Number(gs?.email_max_per_week)) : 4;
+  coldDays = Number.isFinite(Number(gs?.cold_broadcast_days)) ? Math.max(0, Number(gs?.cold_broadcast_days)) : 30;
   reserveCache = { day, count: count || 0, at: Date.now(), cap, reserve, monthCap, monthCount: mCount || 0 };
 }
 
@@ -155,6 +156,42 @@ async function refreshBudget(): Promise<void> {
 // but they count, so broadcasts make room for them. 0 = off.
 let maxPerWeek = 4;
 const BROADCAST_KINDS = new Set(['weekly', 'filmCampaign', 'guideCampaign', 'articleCampaign', 'makerRecruit', 'winback', 'browse', 'price-drop', 'priceDrop', 'wishlistReminder', 'wishlist-reminder', 'referral-nudge', 'referralNudge', 'refundWinback', 'refund-winback', 'product-blast', 'picks']);
+// ── Cold segment (owner 2026-09-22) ─────────────────────────────────────
+// The imported Etsy buyers are 2,119 of a 2,339 list and have bought 7 times
+// ever (0.33%), while the 134 free-pack subscribers have bought 22 times
+// (17.16%). One free-pack signup is worth about fifty Etsy imports. Sending
+// 14,389 emails a month, most of them to the nine-cent segment, does not just
+// waste quota: it teaches the mail providers we are bulk, and that lands on
+// the people who actually buy.
+//
+// So somebody who arrived in a bulk import AND has never opened or clicked
+// anything gets at most one broadcast every `coldDays`. The moment they open
+// one, they stop being cold and rejoin the normal rhythm, which is the point:
+// this is a filter on behaviour, not a punishment for where they came from.
+let coldDays = 30;
+const COLD_SOURCES = ['etsy-buyer', 'Etsy', 'import'];
+
+/** Of `list`, the ones who came from an import and have never engaged. */
+async function coldOnes(db: any, list: string[]): Promise<Set<string>> {
+  const cold = new Set<string>();
+  if (!coldDays || !list.length) return cold;
+  for (let i = 0; i < list.length; i += 200) {
+    const slice = list.slice(i, i + 200);
+    const { data: subs } = await db.from('subscribers')
+      .select('email, source').in('email', slice).in('source', COLD_SOURCES).limit(400);
+    for (const s of subs || []) cold.add(String(s.email).toLowerCase());
+  }
+  if (!cold.size) return cold;
+  // anyone who has EVER opened or clicked is not cold, whatever their source
+  const maybe = [...cold];
+  for (let i = 0; i < maybe.length; i += 200) {
+    const { data: ev } = await db.from('email_events')
+      .select('email').in('email', maybe.slice(i, i + 200)).in('event', ['opened', 'clicked']).limit(4000);
+    for (const e of ev || []) cold.delete(String(e.email).toLowerCase());
+  }
+  return cold;
+}
+
 /** Recipients (lower-cased) that must NOT receive a broadcast right now. */
 export async function overMailed(recipients: string[], kind: string | null): Promise<Set<string>> {
   const out = new Set<string>();
@@ -176,6 +213,24 @@ export async function overMailed(recipients: string[], kind: string | null): Pro
       }
     }
     for (const [email, n] of counts) if (n >= maxPerWeek) out.add(email);
+
+    // Cold subscribers: one broadcast every `coldDays`, not `maxPerWeek` a week.
+    const cold = await coldOnes(db, list);
+    if (cold.size) {
+      const coldSince = new Date(Date.now() - coldDays * 86400000).toISOString();
+      const recent = new Set<string>();
+      const arr = [...cold];
+      for (let i = 0; i < arr.length; i += 200) {
+        const { data } = await db.from('email_send_log')
+          .select('recipient, kind').in('recipient', arr.slice(i, i + 200))
+          .eq('status', 'sent').gte('sent_at', coldSince).limit(20000);
+        for (const r of data || []) {
+          if (!r.kind || TRANSACTIONAL_KINDS.has(r.kind)) continue;
+          recent.add(String(r.recipient).toLowerCase());
+        }
+      }
+      for (const e of recent) out.add(e);
+    }
     if (out.size) {
       // visible in Admin > Automations > Email performance
       await db.from('email_holds').insert([...out].map((recipient) => ({ recipient, kind }))).then(() => null, () => null);

@@ -13,7 +13,8 @@ import { send as sendEmail, sendBatch, isQuotaExhausted, marketingBudgetRemainin
 import {
   articleEmail, dripEmail, cartReminderEmail, reviewRequestEmail, newArrivalsEmail, loyaltyEmail,
   weeklyDigestEmail, abandonedBrowseEmail, etsyWelcomeEmail, customDesignPitchEmail, applyOverride, TEMPLATE_HEADINGS,
-  winbackEmail, priceDropEmail, referralNudgeEmail, refundWinbackEmail,
+  winbackEmail,
+  buyerReturnEmail, priceDropEmail, referralNudgeEmail, refundWinbackEmail,
   wishlistReminderEmail, ownerWeeklyReport, filmEmail, etsyBuyerFreePackEmail,
   type MiniProduct, type TemplateOverride,
 } from './marketing-emails';
@@ -1053,6 +1054,86 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
       }
     }
     stats.winback = s;
+  });
+
+  // ── Buyer return: the warmest audience, previously unmailed ──────────
+  // 2026-09-22: 40 buyers ever, 8 bought twice, and the median gap between two
+  // orders is 3 days with 4 of 10 on the SAME DAY. People buy twice in one
+  // sitting and then never return. Not one July or August buyer came back in
+  // September. winback chases people who stopped opening email; this chases
+  // people who stopped buying, which is a different and much warmer list.
+  stats.buyerReturn = 'off';
+  await step(stats, 'buyerReturn', async () => {
+    if (!g.buyer_return_enabled) return;
+    const s = { candidates: 0, sent: 0, skipped: 0, heldByCap: 0, failed: 0 };
+    const waitDays = Math.max(7, Number(g.buyer_return_days) || 30);
+    const now = Date.now();
+
+    const { data: orders } = await fetchAll((a, b) => db.from('orders')
+      .select('id, email, created_at, customer_name').eq('status', 'paid').range(a, b)).then((data) => ({ data }));
+    // last order per buyer
+    const last = new Map<string, any>();
+    for (const o of orders || []) {
+      const e = String(o.email || '').toLowerCase();
+      if (!e) continue;
+      if (!last.has(e) || new Date(o.created_at) > new Date(last.get(e).created_at)) last.set(e, o);
+    }
+    const { data: already } = await fetchAll((a, b) => db.from('buyer_return_log').select('email').range(a, b)).then((data) => ({ data }));
+    const sentBefore = new Set((already || []).map((r) => String(r.email).toLowerCase()));
+
+    // dormant: last order between waitDays and 365 days ago, never mailed this
+    const due = [...last.entries()].filter(([e, o]) => {
+      const age = (now - new Date(o.created_at).getTime()) / 86400000;
+      return age >= waitDays && age <= 365 && !sentBefore.has(e) && okEmail(e);
+    }).slice(0, 40);
+    s.candidates = due.length;
+    if (!due.length) { stats.buyerReturn = s; return; }
+
+    for (const [email, order] of due) {
+      if (await isUnsubscribed(db, email)) { s.skipped++; continue; }
+      // what did they buy, and what category was it in
+      const { data: items } = await db.from('order_items')
+        .select('product_id, title').eq('order_id', order.id).limit(5);
+      const bought = (items || [])[0];
+      if (!bought) { s.skipped++; continue; }
+      const ownedIds = new Set((items || []).map((i: any) => String(i.product_id)));
+
+      let theme: string | null = null;
+      let picks: MiniProduct[] = [];
+      if (bought.product_id) {
+        const { data: src } = await db.from('products').select('category_id').eq('id', bought.product_id).maybeSingle();
+        if (src?.category_id) {
+          const { data: cat } = await db.from('categories').select('name').eq('id', src.category_id).maybeSingle();
+          theme = cat?.name || null;
+          const { data: same } = await db.from('products')
+            .select('title, slug, image_url, price_usd, id')
+            .eq('active', true).eq('category_id', src.category_id).not('image_url', 'is', null)
+            .order('etsy_sales_365', { ascending: false, nullsFirst: false }).limit(10);
+          picks = ((same || []) as any[]).filter((p) => !ownedIds.has(String(p.id))).slice(0, 3) as MiniProduct[];
+        }
+      }
+      if (picks.length < 3) {
+        // fall back to what is new, so the email is never thin
+        const { data: nw } = await db.from('products').select('title, slug, image_url, price_usd, id')
+          .eq('active', true).not('image_url', 'is', null).order('created_at', { ascending: false }).limit(12);
+        for (const p of (nw || []) as any[]) {
+          if (picks.length >= 3) break;
+          if (ownedIds.has(String(p.id)) || picks.some((x: any) => x.slug === p.slug)) continue;
+          picks.push(p as MiniProduct);
+        }
+      }
+      if (!picks.length) { s.skipped++; continue; }
+
+      const { subject, html, text } = withOvr('buyerReturn',
+        buyerReturnEmail({ email, products: picks, boughtTitle: bought.title || 'one of our designs', theme, name: order.customer_name }), email);
+      const r = await sendEmail({ to: email, subject, html, text, idempotencyKey: hashKey('buyerReturn', [email, order.id]), tags: [{ name: 'kind', value: 'buyerReturn' }] });
+      if (r.held) { s.heldByCap++; continue; }
+      if (r.ok) {
+        s.sent++;
+        await db.from('buyer_return_log').upsert({ email, order_id: order.id, products: picks.map((p: any) => p.slug) }, { onConflict: 'email' });
+      } else s.failed++;
+    }
+    stats.buyerReturn = s;
   });
 
   // ── 9. Send-time learning: each subscriber's most common open hour ───

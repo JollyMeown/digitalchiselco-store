@@ -1,0 +1,82 @@
+---
+// The free-pack offer, for pages that are not /free.
+//
+// Why this exists (measured 2026-09-22): free-pack subscribers convert to
+// buyers at 17.16% while imported Etsy buyers convert at 0.33%, so one
+// free-pack signup is worth roughly fifty imports. It was the single best
+// number in the business and the offer appeared on the homepage, the header,
+// the footer, about and the FAQ, but NOT on the 2,010 product pages or the
+// catalogue, which is where somebody looks at a design and leaves without
+// buying. That is the moment this is for.
+//
+// Deliberately not a popup: the exit-intent offer already owns that moment,
+// and two of them fighting is how people learn to hate a website.
+interface Props { variant?: 'card' | 'bar'; source?: string; }
+const { variant = 'card', source = 'inline' } = Astro.props;
+const id = 'fp-' + Math.random().toString(36).slice(2, 8);
+---
+<section
+  id={id}
+  data-src={source}
+  class={variant === 'bar'
+    ? 'my-8 rounded-xl border border-bronze-600/25 bg-gradient-to-br from-cream to-white px-5 py-4 sm:flex sm:items-center sm:gap-5'
+    : 'my-10 rounded-xl border border-bronze-600/25 bg-gradient-to-br from-cream to-white p-6 text-center'}>
+  <div class={variant === 'bar' ? 'sm:flex-1' : ''}>
+    <p class="text-[11px] tracking-widest text-bronze-600 font-semibold">FREE, NO CATCH</p>
+    <h2 class={variant === 'bar'
+      ? 'font-serif text-lg text-bronze-800 mt-0.5'
+      : 'font-serif text-2xl text-bronze-800 mt-1'}>Not ready to buy? Take five designs free.</h2>
+    <p class="text-sm text-ink-700/80 mt-1">
+      Five full bas-relief STL files, the same quality as everything in the shop, sent straight to your inbox.
+      No card, and you can unsubscribe whenever you like.
+    </p>
+  </div>
+  <form class={variant === 'bar' ? 'mt-3 sm:mt-0 flex gap-2 sm:w-[340px]' : 'mt-4 flex flex-col sm:flex-row gap-2 max-w-md mx-auto'}>
+    <input type="email" name="email" required autocomplete="email" placeholder="you@example.com"
+      class="flex-1 min-w-0 px-3 py-2.5 text-sm border border-black/15 rounded-lg bg-white focus:outline-none focus:border-bronze-600" />
+    <button type="submit"
+      class="bg-bronze-600 text-cream px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-bronze-700 transition whitespace-nowrap">
+      Send them
+    </button>
+  </form>
+  <p class="msg hidden text-sm mt-2.5"></p>
+</section>
+
+<script define:vars={{ id }}>
+  (function () {
+    const root = document.getElementById(id);
+    if (!root) return;
+    const form = root.querySelector('form');
+    const msg = root.querySelector('.msg');
+    const btn = form.querySelector('button');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = form.email.value.trim();
+      if (!email) return;
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const r = await fetch('/api/subscribe', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email, source: root.dataset.src }),
+        });
+        const j = await r.json().catch(() => ({}));
+        msg.classList.remove('hidden');
+        if (r.ok && j.ok !== false) {
+          form.classList.add('hidden');
+          msg.className = 'msg text-sm mt-2.5 text-green-800';
+          msg.textContent = 'On its way. Check your inbox, and your spam folder just in case.';
+          try { window.dccTrack && window.dccTrack('free_pack_signup', { src: root.dataset.src }); } catch {}
+        } else {
+          msg.className = 'msg text-sm mt-2.5 text-red-700';
+          msg.textContent = j.error || 'That did not go through. Try again in a moment.';
+          btn.disabled = false; btn.textContent = 'Send them';
+        }
+      } catch {
+        msg.classList.remove('hidden');
+        msg.className = 'msg text-sm mt-2.5 text-red-700';
+        msg.textContent = 'Could not reach us just now. Try again in a moment.';
+        btn.disabled = false; btn.textContent = 'Send them';
+      }
+    });
+  })();
+</script>

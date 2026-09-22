@@ -678,6 +678,37 @@ export function winbackEmail(d: { email: string; products: MiniProduct[]; code: 
   return { subject, html: shell(subject, 'Come back and carve 🪵', body, d.email), text };
 }
 
+// ── Buyer return: "you carved a wolf, here are three more" ───────────────
+// The warmest audience there is and the one nobody was mailing. Measured
+// 2026-09-22: 40 buyers ever, and not one who bought in July or August came
+// back in September. No discount here on purpose. These people already paid
+// full price once; the reason to return is that we have more of the thing they
+// already chose, not that it is cheaper.
+export function buyerReturnEmail(d: {
+  email: string; products: MiniProduct[]; boughtTitle: string; theme?: string | null; name?: string | null;
+}): Out {
+  const first = (d.name || '').trim().split(/\s+/)[0];
+  const what = d.boughtTitle.split('|')[0].trim();
+  const theme = (d.theme || '').trim();
+  const subject = theme ? `More ${theme.toLowerCase()} designs, picked for you` : 'Three designs that go with your last one';
+  const rows: string[] = [];
+  for (let i = 0; i < Math.min(6, d.products.length); i += 3) rows.push(productGrid(d.products.slice(i, i + 3)));
+  const body = `
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;">${first ? esc(first) + ',' : 'Hello,'}</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">A while back you took home <strong>${esc(what)}</strong>. We hope it cut well.</p>
+    <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">We have carved a good deal more since then${theme ? `, including these ${esc(theme.toLowerCase())} ones` : ''}. If the first went on a wall, these were made to sit beside it.</p>
+    ${rows.join('')}
+    ${btn(SITE + '/catalog?sort=newest', 'See everything new since then')}
+    <p style="font-size:13px;line-height:1.6;color:#777;margin:16px 0 0;">Still have the files? Every design you have bought stays in your account for good, so you can re-download any time you change machine.</p>`;
+  const text = `${first ? first + ',' : 'Hello,'}
+
+A while back you bought ${what}. We have added a lot since then: ${SITE}/catalog?sort=newest
+
+Everything you have bought stays in your account to re-download.
+Unsubscribe: ${unsubUrl(d.email)}`;
+  return { subject, html: shell(subject, theme ? `More ${esc(theme.toLowerCase())}, picked for you` : 'Picked to go with your last one', body, d.email), text };
+}
+
 // ── Product Picks: hand-selected designs sent by the owner to one person ──
 // Used by the Automations "Send hand-picked designs" tool. The shop owner
 // searches the catalog, picks a few designs and adds a personal note; this

@@ -1,5 +1,6 @@
 ---
 import Shell from '../layouts/Shell.astro';
+import FreePackInline from '../components/FreePackInline.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import ProductCard from '../components/ProductCard.astro';
 import Pick5Strip from '../components/Pick5Strip.astro';
@@ -49,4 +50,6 @@ const SORTS = [['best', 'Best sellers'], ['newest', 'Newest'], ['title', 'A to Z
       {page < pages && <a href={qs(page + 1)} class="px-3 py-1.5 border border-black/10 rounded">→</a>}
     </nav>
   )}
+
+  <FreePackInline variant="card" source="catalog" />
 </Shell>
