@@ -1,0 +1,47 @@
+[
+  {
+    "key": "model",
+    "alt": "The 3D model on screen before a single chip is cut",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-valet-tray-and-serving-tray/model.jpg"
+  },
+  {
+    "key": "roughing",
+    "alt": "A flat end mill roughing out the pocket, leaving stepped terraces and heavy curls",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-valet-tray-and-serving-tray/roughing.jpg"
+  },
+  {
+    "key": "finishing",
+    "alt": "A ball nose running the 3D finishing pass, the carving turning smooth behind the cutter",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-valet-tray-and-serving-tray/finishing.jpg"
+  },
+  {
+    "key": "tabs",
+    "alt": "The finished tray still joined to the waste board by small tabs, a flush saw beside it",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-valet-tray-and-serving-tray/tabs.jpg"
+  },
+  {
+    "key": "sanding",
+    "alt": "The freed tray sanded raw and pale, a sanding block and folded paper beside it",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-valet-tray-and-serving-tray/sanding.jpg"
+  },
+  {
+    "key": "oiling",
+    "alt": "Oil going onto one half of the tray, the walnut turning deep brown where the cloth has passed",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-valet-tray-and-serving-tray/oiling.jpg"
+  },
+  {
+    "key": "hero",
+    "alt": "The finished tray on a bedside table at dusk holding a watch, keys and a folding knife",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-valet-tray-and-serving-tray/hero.jpg"
+  },
+  {
+    "key": "serving",
+    "alt": "The larger compartment serving tray holding olives, nuts and cheese on linen",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-valet-tray-and-serving-tray/serving.jpg"
+  },
+  {
+    "key": "cover",
+    "alt": "A finished walnut valet tray on a hall console by the front door, keys just dropped in",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-valet-tray-and-serving-tray/cover.jpg"
+  }
+]

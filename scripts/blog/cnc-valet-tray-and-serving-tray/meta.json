@@ -1,0 +1,12 @@
+{
+  "title": "How to Make a CNC Valet Tray, and the Serving Tray That Comes Next",
+  "excerpt": "A tray is the first project where the pocket matters more than the picture. This guide cuts a valet tray start to finish with real numbers: stock thickness against pocket depth, the floor you must not cut through, clearing toolpaths and the corner problem, tabs that hold without tearing, feeds for four classes of machine, and the food-safe finish rule that decides whether a serving tray is legal to use.",
+  "seo_title": "CNC Valet Tray & Serving Tray STL: Pocket Depth, Feeds and Food-Safe Finish",
+  "seo_description": "Cut a wooden valet tray or EDC catchall on a CNC router: stock and pocket depth, floor thickness, clearing and rest toolpaths, tabs, feeds by machine, and which finishes are genuinely food safe for a serving tray.",
+  "cover": "cover",
+  "email": {
+    "subject": "The tray is where the pocket matters more than the picture",
+    "intro": "Most of what we carve hangs on a wall. A tray is different: it is the first project where the shape of the hole matters more than the picture in it, and where getting the depth wrong by two millimetres means cutting through the floor.\n\nThe new guide cuts a valet tray start to finish with real numbers, then steps up to the compartment serving trays, which are quietly our second best selling line. It also settles the food-safe finish question properly, because a serving tray that food touches has rules a wall panel does not.",
+    "drip": true
+  }
+}
