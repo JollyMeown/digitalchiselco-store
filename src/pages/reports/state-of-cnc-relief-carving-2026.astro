@@ -5,6 +5,13 @@
 // nobody else can publish: 365 days of real sales across a 1,226 design
 // catalogue, with the method stated plainly enough that a sceptic can attack it.
 //
+// It is therefore dressed as a REPORT, not as a blog post: masthead, edition
+// line, executive summary, numbered figures each carrying its own source note,
+// a method section that names what was thrown away, and a citation block. A
+// print stylesheet strips the storefront chrome so "save as PDF" produces a
+// clean document with the logo on it, because that is how reports actually
+// travel between people.
+//
 // Two rules were followed while building it and both matter more than the
 // design. First, the figures are BAKED IN at build time from a checked-in JSON
 // snapshot, so a number a journalist quotes today still reads the same in a
@@ -12,31 +19,41 @@
 // designs that are too new to have sold; without it the catalogue appears to
 // have a 55% failure rate and a spectacular fake finding about title length.
 import Shell from '../../layouts/Shell.astro';
-import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import data from '../../../scripts/blog/state-of-cnc-relief-carving-2026/report_data.json';
 import { jsonLd } from '../../lib/jsonld';
+import { getSettings } from '../../lib/queries';
+import { img } from '../../lib/img';
 
 const { concentration: C, subjects, priceBands, categories, cohort } = data as any;
 const fmt = (n: number) => n.toLocaleString('en-US');
 const PUB = '2026-09-22';
+const PUB_LONG = '22 September 2026';
+const URL = 'https://digitalchiselco.com/reports/state-of-cnc-relief-carving-2026';
 
-// Charts are hand-built SVG rather than a library: one dependency fewer, and a
-// bar chart is twelve lines of geometry. Each bar carries its value as a real
-// label, which is also what discharges the palette's contrast relief rule.
-const subjectsByRate = [...subjects].filter((s: any) => s.designs >= 20).sort((a: any, b: any) => b.perDesign - a.perDesign);
-const maxPerDesign = Math.max(...subjectsByRate.map((s: any) => s.perDesign));
+const s = await getSettings();
+const logo = s.logo_image_url ? img(s.logo_image_url, { w: 96, q: 85 }) : '';
+
+// Figures are numbered once, here, so the captions and the cross-references in
+// the prose can never drift apart.
+const subjectsByRate = [...subjects].filter((x: any) => x.designs >= 20).sort((a: any, b: any) => b.perDesign - a.perDesign);
+const maxPerDesign = Math.max(...subjectsByRate.map((x: any) => x.perDesign));
 const bands = priceBands.filter((b: any) => b.designs >= 10);
 const maxBand = Math.max(...bands.map((b: any) => b.perDesign));
 const cats = categories.slice(0, 12);
 const maxCat = Math.max(...cats.map((c: any) => c.perDesign));
+
+const band = (name: string) => bands.find((b: any) => b.band === name);
+const subj = (name: string) => subjects.find((x: any) => x.name === name);
+const cheap = band('$5 to $8'), dear = band('$15 to $20');
 
 const ld = jsonLd({
   '@context': 'https://schema.org',
   '@type': 'Report',
   headline: 'The State of CNC Relief Carving 2026',
   datePublished: PUB,
-  author: { '@type': 'Organization', name: 'DigitalChiselCo' },
-  publisher: { '@type': 'Organization', name: 'DigitalChiselCo' },
+  url: URL,
+  author: { '@type': 'Organization', name: 'DigitalChiselCo', url: 'https://digitalchiselco.com' },
+  publisher: { '@type': 'Organization', name: 'DigitalChiselCo', logo: s.logo_image_url || undefined },
   description: `An analysis of ${fmt(C.sales)} real sales across ${fmt(C.designs)} CNC relief carving designs over 365 days.`,
   license: 'https://creativecommons.org/licenses/by/4.0/',
 });
@@ -44,66 +61,119 @@ const ld = jsonLd({
 <Shell
   title="The State of CNC Relief Carving 2026 · DigitalChiselCo"
   description={`We analysed ${fmt(C.sales)} real sales across ${fmt(C.designs)} relief carving designs over 365 days. What subjects sell, what price actually does to demand, and how concentrated the market really is.`}
+  image={s.logo_image_url || undefined}
   fullWidth={true}
+  hideBanner={true}
 >
   <script type="application/ld+json" set:html={ld} />
-  <div class="rpt">
-    <div class="rpt-wrap">
-      <Breadcrumbs crumbs={[{ label: 'Reports', href: '/reports' }, { label: 'State of CNC Relief Carving 2026' }]} />
 
-      <header class="rpt-hero">
-        <p class="rpt-eyebrow">First-party data · {data.window}</p>
-        <h1>The State of CNC Relief Carving 2026</h1>
-        <p class="rpt-lede">
-          Everybody in this trade argues about what sells. Almost nobody has the numbers, because the
-          shops that have them do not publish them. We do, so here they are: <strong>{fmt(C.sales)} real sales</strong>
-          across <strong>{fmt(C.designs)} designs</strong> over a full year, with the method written out so you can
-          decide for yourself how much to trust it.
-        </p>
-        <p class="rpt-sub">
-          Free to quote, chart and republish with a link back. No signup, no email wall.
-        </p>
+  <div class="rpt">
+    <article class="rpt-doc">
+
+      <!-- ── masthead ──────────────────────────────────────────────────── -->
+      <header class="masthead">
+        <div class="mast-brand">
+          {logo
+            ? <img src={logo} alt="DigitalChiselCo" width="48" height="48" class="mast-logo" />
+            : <span class="mast-logo mast-fallback" aria-hidden="true"></span>}
+          <span class="mast-name">DigitalChiselCo</span>
+        </div>
+        <div class="mast-meta">Industry Report · First edition</div>
       </header>
 
-      <section class="rpt-tiles" aria-label="Headline figures">
-        <div class="tile"><div class="tile-n">{fmt(C.designs)}</div><div class="tile-l">designs in the study</div></div>
-        <div class="tile"><div class="tile-n">{fmt(C.sales)}</div><div class="tile-l">sales over 365 days</div></div>
-        <div class="tile"><div class="tile-n">{Math.round(100 * C.neverSold / C.designs)}%</div><div class="tile-l">never sold once</div></div>
-        <div class="tile"><div class="tile-n">{C.top10pcShare}%</div><div class="tile-l">of sales go to the top 10%</div></div>
+      <div class="title-block">
+        <p class="kicker">First-party data · {data.window}</p>
+        <h1>The State of CNC&nbsp;Relief&nbsp;Carving</h1>
+        <p class="year">2026</p>
+        <p class="deck">
+          Everybody in this trade argues about what sells. Almost nobody has the numbers, because the
+          shops that hold them do not publish them. This report does: <strong>{fmt(C.sales)} real sales</strong>
+          across <strong>{fmt(C.designs)} designs</strong> over a full year, with the method written out so you
+          can judge for yourself how much of it to believe.
+        </p>
+        <dl class="pubinfo">
+          <div><dt>Published</dt><dd>{PUB_LONG}</dd></div>
+          <div><dt>Author</dt><dd>Jolly, DigitalChiselCo</dd></div>
+          <div><dt>Window</dt><dd>365 days</dd></div>
+          <div><dt>Licence</dt><dd>Free to quote with a link</dd></div>
+        </dl>
+      </div>
+
+      <!-- ── executive summary ─────────────────────────────────────────── -->
+      <section class="summary" aria-labelledby="findings">
+        <h2 id="findings">Key findings</h2>
+        <ol class="findings">
+          <li>
+            <strong>{Math.round(100 * C.neverSold / C.designs)}% of designs never sold once</strong>, even after a
+            full year on sale. The top {C.topHalfCount} designs, {(100 * C.topHalfCount / C.designs).toFixed(1)}% of
+            the catalogue, produce half of all sales.
+          </li>
+          <li>
+            <strong>Pricing low did not buy volume.</strong> Designs at {dear?.band} averaged {dear?.perDesign} sales
+            each. Designs at {cheap?.band} averaged {cheap?.perDesign}, while making up
+            {' '}{Math.round(100 * cheap?.designs / C.designs)}% of the catalogue.
+          </li>
+          <li>
+            <strong>Deer and elk is the most productive subject per design</strong> at
+            {' '}{subj('Deer and elk')?.perDesign} sales each. Religious work is the largest by volume at
+            {' '}{subj('Religious')?.share}% of sales and carries the highest average price, ${subj('Religious')?.avgPrice}.
+          </li>
+          <li>
+            <strong>A finding was removed before publication.</strong> Controlling for how long a design had been
+            on sale destroyed an apparent result that long titles sell nothing. See the method section.
+          </li>
+        </ol>
       </section>
 
+      <nav class="toc" aria-label="Contents">
+        <h2>Contents</h2>
+        <ol>
+          <li><a href="#s1">Most designs sell nothing, and that is normal</a></li>
+          <li><a href="#s2">The expensive designs sell more, not fewer</a></li>
+          <li><a href="#s3">What people actually carve</a></li>
+          <li><a href="#s4">The same picture by shop category</a></li>
+          <li><a href="#method">Method, and what we threw away</a></li>
+          <li><a href="#cite">How to cite this</a></li>
+        </ol>
+      </nav>
+
       <!-- ── 1 ─────────────────────────────────────────────────────────── -->
-      <section class="rpt-sec">
-        <h2 id="concentration">1. Most designs sell nothing, and that is normal</h2>
+      <section class="sec">
+        <h2 id="s1"><span class="num">1</span> Most designs sell nothing, and that is normal</h2>
+
+        <div class="tiles">
+          <div class="tile"><div class="tile-n">{fmt(C.designs)}</div><div class="tile-l">designs studied</div></div>
+          <div class="tile"><div class="tile-n">{fmt(C.sales)}</div><div class="tile-l">sales in 365 days</div></div>
+          <div class="tile"><div class="tile-n">{Math.round(100 * C.neverSold / C.designs)}%</div><div class="tile-l">never sold once</div></div>
+          <div class="tile"><div class="tile-n">{C.top10pcShare}%</div><div class="tile-l">of sales from the top 10%</div></div>
+        </div>
+
         <p>
-          Of {fmt(C.designs)} designs that have been on sale for a full year, <strong>{fmt(C.neverSold)} never sold a single copy</strong>.
-          The top {C.topHalfCount} designs, {(100 * C.topHalfCount / C.designs).toFixed(1)}% of the catalogue, account for half of all sales.
-          The top 10% account for {C.top10pcShare}%.
+          Of {fmt(C.designs)} designs on sale for a full year, <strong>{fmt(C.neverSold)} never sold a single copy</strong>.
+          The top {C.topHalfCount} designs account for half of all sales, and the top 10% for {C.top10pcShare}%.
         </p>
         <p>
-          This is the number that should change how you think about building a catalogue. A designer measuring
-          themselves by hit rate will conclude they are failing. They are not. In a catalogue this size a
-          {' '}<strong>{Math.round(100 * C.neverSold / C.designs)}% miss rate is the cost of finding the {C.topHalfCount} that carry everything.</strong>
-          {' '}The implication is uncomfortable for anyone selling a "proven winners" pack: the winners are only
-          visible afterwards.
+          This should change how a designer judges their own catalogue. Measured by hit rate, a shop like this looks
+          like it is failing most of the time. It is not.
+          {' '}<strong>A {Math.round(100 * C.neverSold / C.designs)}% miss rate is the cost of finding the {C.topHalfCount} designs that carry everything.</strong>
+          {' '}It is also uncomfortable for anyone selling a pack of "proven winners": the winners are only visible afterwards.
         </p>
       </section>
 
       <!-- ── 2 ─────────────────────────────────────────────────────────── -->
-      <section class="rpt-sec">
-        <h2 id="price">2. The expensive designs sell more, not fewer</h2>
+      <section class="sec">
+        <h2 id="s2"><span class="num">2</span> The expensive designs sell more, not fewer</h2>
         <p>
           This is the finding that surprised us most, and the one we expect to be argued with hardest.
-          Designs priced at $15 to $20 average <strong>{bands.find((b: any) => b.band === '$15 to $20')?.perDesign} sales each</strong>.
-          Designs priced at $5 to $8 average <strong>{bands.find((b: any) => b.band === '$5 to $8')?.perDesign}</strong>.
-          That is the cheap tier selling roughly a fifth as often per design, at a third of the price.
+          Designs priced at {dear?.band} average <strong>{dear?.perDesign} sales each</strong>. Designs priced at
+          {' '}{cheap?.band} average <strong>{cheap?.perDesign}</strong>: roughly a fifth as often per design, at
+          about a third of the price.
         </p>
 
-        <figure class="chart">
-          <figcaption>Average sales per design, by price band</figcaption>
+        <figure class="fig">
           <div class="bars">
             {bands.map((b: any) => (
-              <div class="row" title={`${b.band}: ${b.perDesign} sales per design across ${b.designs} designs, ${b.hitRate}% of them sold at least once`}>
+              <div class="row" title={`${b.band}: ${b.perDesign} sales per design across ${b.designs} designs, ${b.hitRate}% sold at least once`}>
                 <div class="row-l">{b.band}</div>
                 <div class="row-track">
                   <div class="row-bar" style={`width:${Math.max(2, 86 * b.perDesign / maxBand)}%`}></div>
@@ -113,68 +183,76 @@ const ld = jsonLd({
               </div>
             ))}
           </div>
+          <figcaption>
+            <b>Figure 1.</b> Average sales per design, by price band.
+            <span class="src">Source: {fmt(C.sales)} sales across {fmt(C.designs)} designs, {data.window}. Bands under ten designs are excluded.</span>
+          </figcaption>
         </figure>
 
-        <p class="caveat">
-          <strong>Read this one carefully.</strong> Price is not causing the sales. The expensive designs are
-          the large, complex, multi-figure scenes that took the longest to make, and the cheap tier is where
-          almost the whole catalogue sits ({bands.find((b: any) => b.band === '$5 to $8')?.designs} of {fmt(C.designs)} designs).
-          The honest claim is narrower than "raise your prices": <strong>pricing low did not buy volume.</strong>
-          The cheap tier holds {bands.find((b: any) => b.band === '$5 to $8')?.revenueShare}% of revenue while
-          holding {Math.round(100 * bands.find((b: any) => b.band === '$5 to $8')?.designs / C.designs)}% of the catalogue.
-          The $15 to $20 band is 20 designs, so treat it as a direction, not a decimal.
-        </p>
+        <div class="caveat">
+          <p class="caveat-h">Read this one carefully</p>
+          <p>
+            Price is not causing the sales. The expensive designs are the large, complex, multi-figure scenes that
+            took longest to make, and the cheap tier is where nearly the whole catalogue sits
+            ({cheap?.designs} of {fmt(C.designs)} designs). The defensible claim is narrower than "raise your prices":
+            <strong> pricing low did not buy volume.</strong> The cheap tier holds {cheap?.revenueShare}% of revenue
+            while holding {Math.round(100 * cheap?.designs / C.designs)}% of the catalogue. The {dear?.band} band is
+            {' '}{dear?.designs} designs, so treat it as a direction, not a decimal.
+          </p>
+        </div>
       </section>
 
       <!-- ── 3 ─────────────────────────────────────────────────────────── -->
-      <section class="rpt-sec">
-        <h2 id="subjects">3. What people actually carve</h2>
+      <section class="sec">
+        <h2 id="s3"><span class="num">3</span> What people actually carve</h2>
         <p>
-          Subjects are matched on listing titles, and a design can belong to more than one, so these describe
-          demand for a theme rather than slices of a pie. Sorted by sales per design, which is the number that
-          matters if you are deciding what to make next, rather than by total sales, which mostly tells you what
-          a shop happened to make a lot of.
+          Subjects are matched on listing titles, and a design can belong to more than one, so these describe demand
+          for a theme rather than slices of a pie. They are sorted by sales per design, which is the number that
+          matters when deciding what to make next, rather than by total sales, which mostly records what a shop
+          happened to make a lot of.
         </p>
 
-        <figure class="chart">
-          <figcaption>Average sales per design, by subject (subjects with 20+ designs)</figcaption>
+        <figure class="fig">
           <div class="bars">
-            {subjectsByRate.map((s: any) => (
-              <div class="row" title={`${s.name}: ${s.perDesign} sales per design, ${s.hitRate}% sold at least once, average price $${s.avgPrice}`}>
-                <div class="row-l">{s.name}</div>
+            {subjectsByRate.map((x: any) => (
+              <div class="row" title={`${x.name}: ${x.perDesign} sales per design, ${x.hitRate}% sold at least once, average price $${x.avgPrice}`}>
+                <div class="row-l">{x.name}</div>
                 <div class="row-track">
-                  <div class="row-bar" style={`width:${Math.max(2, 86 * s.perDesign / maxPerDesign)}%`}></div>
-                  <span class="row-v">{s.perDesign}</span>
+                  <div class="row-bar" style={`width:${Math.max(2, 86 * x.perDesign / maxPerDesign)}%`}></div>
+                  <span class="row-v">{x.perDesign}</span>
                 </div>
-                <div class="row-n">{s.hitRate}% sold</div>
+                <div class="row-n">{x.hitRate}% sold</div>
               </div>
             ))}
           </div>
+          <figcaption>
+            <b>Figure 2.</b> Average sales per design, by subject.
+            <span class="src">Subjects with at least 20 designs. Categories overlap, so shares do not sum to 100%.</span>
+          </figcaption>
         </figure>
 
         <p>
-          Religious work is the largest single block by total volume at {subjects.find((s: any) => s.name === 'Religious')?.share}% of all sales,
-          and it also carries the highest average price at ${subjects.find((s: any) => s.name === 'Religious')?.avgPrice}.
-          But deer and elk is the most reliable thing in the catalogue per design.
-          Nautical has the highest hit rate of any subject at {subjects.find((s: any) => s.name === 'Nautical and sea life')?.hitRate}%:
-          almost everything in it sells something.
+          Religious work is the largest single block by volume at {subj('Religious')?.share}% of all sales, and carries
+          the highest average price at ${subj('Religious')?.avgPrice}. But deer and elk is the most productive thing in
+          the catalogue per design, and nautical has the highest hit rate of any subject at
+          {' '}{subj('Nautical and sea life')?.hitRate}%: almost everything in it sells something.
         </p>
         <p>
-          The quiet lesson is in the gap between volume and rate. Floral and botanical has
-          {' '}{subjects.find((s: any) => s.name === 'Floral and botanical')?.designs} designs producing
-          {' '}{subjects.find((s: any) => s.name === 'Floral and botanical')?.perDesign} sales each.
-          Deer and elk has {subjects.find((s: any) => s.name === 'Deer and elk')?.designs} producing
-          {' '}{subjects.find((s: any) => s.name === 'Deer and elk')?.perDesign}. Making more of the first category
-          feels productive and is not.
+          The quiet lesson sits in the gap between volume and rate. Floral and botanical has
+          {' '}{subj('Floral and botanical')?.designs} designs producing {subj('Floral and botanical')?.perDesign} sales
+          each. Deer and elk has {subj('Deer and elk')?.designs} producing {subj('Deer and elk')?.perDesign}.
+          Making more of the first category feels productive and is not.
         </p>
       </section>
 
       <!-- ── 4 ─────────────────────────────────────────────────────────── -->
-      <section class="rpt-sec">
-        <h2 id="categories">4. The same picture by shop category</h2>
-        <p>Categories are the shop's own taxonomy rather than title matching, so this is a second, independent cut of the same year.</p>
-        <figure class="chart">
-          <figcaption>Average sales per design, by category (categories with 15+ designs, top 12)</figcaption>
+      <section class="sec">
+        <h2 id="s4"><span class="num">4</span> The same picture by shop category</h2>
+        <p>
+          Categories are the shop's own taxonomy rather than title matching, so this is a second and independent cut
+          of the same year. It agrees with Figure 2, which is the useful part.
+        </p>
+        <figure class="fig">
           <div class="bars">
             {cats.map((c: any) => (
               <div class="row" title={`${c.name}: ${c.perDesign} sales per design across ${c.designs} designs`}>
@@ -187,112 +265,199 @@ const ld = jsonLd({
               </div>
             ))}
           </div>
+          <figcaption>
+            <b>Figure 3.</b> Average sales per design, by shop category.
+            <span class="src">Categories with at least 15 designs, twelve highest shown.</span>
+          </figcaption>
         </figure>
       </section>
 
       <!-- ── method ────────────────────────────────────────────────────── -->
-      <section class="rpt-sec method">
-        <h2 id="method">Method, and what we threw away</h2>
+      <section class="sec method">
+        <h2 id="method"><span class="num">5</span> Method, and what we threw away</h2>
+
+        <h3>The data</h3>
         <p>
-          <strong>The data.</strong> Every figure comes from one shop's own sales records over
-          {' '}{data.window}. Sales counts are per design. No buyer, order or personal detail is used anywhere
-          in this report, and nothing below the aggregate level is published.
+          Every figure comes from one shop's own sales records over {data.window}. Counts are sales per design.
+          No buyer, order or personal detail is used anywhere in this report, and nothing below the aggregate level
+          is published.
+        </p>
+
+        <h3>The maturity control, which is the important part</h3>
+        <p>
+          {fmt(cohort.excluded)} designs were excluded, almost all because they were added in the last few months and
+          have not had a year in which to sell. Including them would have produced a far more dramatic report: a 55%
+          failure rate instead of {Math.round(100 * C.neverSold / C.designs)}%, and a striking result that listing
+          titles over 90 characters sell essentially nothing.
         </p>
         <p>
-          <strong>The maturity control, which is the important part.</strong> The raw catalogue contains
-          {' '}{fmt(cohort.excluded)} designs that were excluded, almost all of them because they were added in the last
-          few months and have not had a year to sell. Including them would have produced a much more dramatic
-          report: a 55% failure rate instead of {Math.round(100 * C.neverSold / C.designs)}%, and a striking
-          finding that listing titles over 90 characters sell nothing at all. Both are artefacts. The long titles
-          belong to the new designs. We only study designs that were on sale before
-          {' '}{cohort.rule.replace('listed on Etsy and created before ', '')}.
+          <strong>Both are artefacts.</strong> The long titles belong to the new designs, which have not had time to
+          sell at any length. Restricted to designs listed before {cohort.rule.replace('listed on Etsy and created before ', '')},
+          the title-length effect disappears entirely: 72.0% against 72.7%. It is not reported here because it is not real.
         </p>
+
+        <h3>What this is not</h3>
         <p>
-          <strong>What this is not.</strong> This is one shop, selling digital files, mostly to buyers in
-          English-speaking countries, on one marketplace. It describes that demand well and it should not be
-          read as the whole world market. Subject buckets overlap by design. Bands with few designs are labelled
-          with their counts so you can discount them yourself.
+          One shop, selling digital files, mostly to buyers in English-speaking countries, on one marketplace. It
+          describes that demand well. It is not the world market. Subject buckets overlap by design, and bands with
+          few designs carry their counts so you can discount them yourself.
         </p>
+
+        <h3>Corrections</h3>
         <p>
-          <strong>Corrections.</strong> If you find an error, say so and we will fix it and note the change here.
+          If you find an error, <a href="/contact">say so</a> and it will be fixed and the change noted here.
           A report nobody can check is marketing, not data.
         </p>
       </section>
 
-      <section class="rpt-sec cite">
-        <h2 id="cite">Use this</h2>
+      <!-- ── cite ──────────────────────────────────────────────────────── -->
+      <section class="sec">
+        <h2 id="cite"><span class="num">6</span> How to cite this</h2>
         <p>
-          Free to reproduce, including the charts, for any purpose including commercial, with a link back to
-          this page. No permission needed and no email required.
+          Free to reproduce, including the figures, for any purpose including commercial, with a link back. No
+          permission needed and no email required.
         </p>
         <p class="cite-line">
-          <em>The State of CNC Relief Carving 2026</em>, DigitalChiselCo. https://digitalchiselco.com/reports/state-of-cnc-relief-carving-2026
+          <em>The State of CNC Relief Carving 2026.</em> DigitalChiselCo, {PUB_LONG}.<br />{URL}
         </p>
         <p>
-          Questions about the method, or want a cut of the data we did not publish?
-          {' '}<a href="/contact">Ask</a>. If you run a shop and want to pool anonymised numbers for next
-          year's edition so it stops being one shop's view, that is exactly what we want to do.
+          Questions about the method, or after a cut of the data that is not published here?
+          {' '}<a href="/contact">Ask</a>. If you run a shop and would pool anonymised numbers for next year's
+          edition so it stops being one shop's view, that is exactly what we want to do.
         </p>
       </section>
-    </div>
+
+      <footer class="colophon">
+        {logo && <img src={logo} alt="" width="34" height="34" class="colo-logo" />}
+        <div>
+          <p class="colo-name">DigitalChiselCo</p>
+          <p class="colo-sub">Bas-relief STL files for CNC, laser and 3D printing · <a href="https://digitalchiselco.com">digitalchiselco.com</a></p>
+        </div>
+      </footer>
+    </article>
   </div>
 </Shell>
 
 <style is:global>
-  /* Chart colours are the brand bronze plus one validated contrast hue, and
-     both modes were checked with the palette validator rather than by eye:
-     light #854F0B / #2a78d6, dark #BE7F31 / #3987e5, all checks pass. Every
-     bar also carries a printed value, which is what makes the chart readable
-     without colour at all. */
+  /* Chart colours are the brand bronze plus one validated contrast hue. Both
+     were run through the palette validator rather than picked by eye: light
+     #854F0B / #2a78d6 passes every check on this surface, and the dark steps
+     (#BE7F31 / #3987e5) are recorded here for whenever the storefront grows a
+     dark mode. The page is deliberately single-theme today, because the site
+     around it is light only and a dark report would be an island. Every bar
+     also prints its value, which is what makes the figures readable without
+     relying on colour at all. */
   .rpt {
-    --rpt-surface: #FFFDF8;
-    --rpt-card: #ffffff;
-    --rpt-ink: #2b1d10;
-    --rpt-ink-2: #5c4a38;
-    --rpt-line: rgba(43, 29, 16, .14);
-    --rpt-bar: #854F0B;
-    --rpt-bar-alt: #2a78d6;
-    background: var(--rpt-surface);
-    color: var(--rpt-ink);
+    --ink: #24180d;
+    --ink-2: #5c4a38;
+    --ink-3: #8a7864;
+    --rule: rgba(36, 24, 13, .14);
+    --surface: #FFFDF8;
+    --card: #ffffff;
+    --bronze: #854F0B;
+    --bronze-d: #633806;
+    --alt: #2a78d6;
+    background: var(--surface);
+    color: var(--ink);
   }
-  /* Deliberately single-theme. The storefront around this page is light only,
-     so a dark report would render as a dark island between a light header and
-     a light footer. The dark steps (#BE7F31 / #3987e5) are validated and kept
-     in the note above for whenever the rest of the site grows a dark mode. */
+  .rpt-doc { max-width: 44rem; margin: 0 auto; padding: 0 1.15rem 5rem; }
 
-  .rpt-wrap { max-width: 48rem; margin: 0 auto; padding: 0 1rem 5rem; }
-  .rpt-hero { padding: 2rem 0 1rem; }
-  .rpt-eyebrow { font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; color: var(--rpt-ink-2); margin: 0 0 .75rem; }
-  .rpt-hero h1 { font-family: Fraunces, Georgia, serif; font-size: clamp(1.9rem, 5vw, 3rem); line-height: 1.08; text-wrap: balance; margin: 0 0 1rem; color: var(--rpt-ink); }
-  .rpt-lede { font-size: 1.125rem; line-height: 1.65; color: var(--rpt-ink); margin: 0 0 .75rem; }
-  .rpt-sub { font-size: .9rem; color: var(--rpt-ink-2); margin: 0; }
+  /* masthead */
+  .masthead { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 1.5rem 0 .9rem; border-bottom: 2px solid var(--bronze); flex-wrap: wrap; }
+  .mast-brand { display: flex; align-items: center; gap: .6rem; }
+  .mast-logo { width: 38px; height: 38px; object-fit: contain; display: block; }
+  .mast-fallback { background: var(--bronze); border-radius: 9px; }
+  .mast-name { font-family: Fraunces, Georgia, serif; font-size: 1.15rem; color: var(--bronze-d); letter-spacing: .01em; }
+  .mast-meta { font-size: .7rem; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); }
 
-  .rpt-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; margin: 2rem 0 1rem; }
-  @media (min-width: 720px) { .rpt-tiles { grid-template-columns: repeat(4, 1fr); } }
-  .tile { background: var(--rpt-card); border: 1px solid var(--rpt-line); border-radius: .6rem; padding: 1rem; }
-  .tile-n { font-family: Fraunces, Georgia, serif; font-size: 1.9rem; line-height: 1; color: var(--rpt-bar); font-variant-numeric: tabular-nums; }
-  .tile-l { font-size: .8rem; color: var(--rpt-ink-2); margin-top: .4rem; line-height: 1.35; }
+  /* title */
+  .title-block { padding: 2.25rem 0 1.5rem; border-bottom: 1px solid var(--rule); }
+  .kicker { font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--bronze); margin: 0 0 1rem; }
+  .title-block h1 { font-family: Fraunces, Georgia, serif; font-weight: 600;
+    font-size: clamp(2.1rem, 7vw, 3.6rem); line-height: 1.04; margin: 0; color: var(--ink); text-wrap: balance; }
+  .year { font-family: Fraunces, Georgia, serif; font-size: clamp(2.1rem, 7vw, 3.6rem); line-height: 1;
+    margin: .1rem 0 0; color: var(--bronze); }
+  .deck { font-size: 1.1rem; line-height: 1.65; color: var(--ink-2); margin: 1.25rem 0 0; }
+  .deck strong { color: var(--ink); }
+  .pubinfo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1.5rem; margin: 1.5rem 0 0; }
+  @media (min-width: 640px) { .pubinfo { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .pubinfo dt { font-size: .66rem; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); }
+  .pubinfo dd { margin: .2rem 0 0; font-size: .85rem; color: var(--ink); }
 
-  .rpt-sec { margin: 3rem 0 0; }
-  .rpt-sec h2 { font-family: Fraunces, Georgia, serif; font-size: 1.6rem; line-height: 1.2; margin: 0 0 .9rem; color: var(--rpt-ink); text-wrap: balance; }
-  .rpt-sec p { line-height: 1.7; margin: 0 0 1rem; color: var(--rpt-ink); }
-  .rpt-sec a { color: var(--rpt-bar); text-decoration: underline; }
-  .caveat { background: var(--rpt-card); border-left: 3px solid var(--rpt-bar); border-radius: .3rem; padding: .9rem 1rem; font-size: .95rem; }
-  .method p, .cite p { font-size: .95rem; }
-  .cite-line { background: var(--rpt-card); border: 1px solid var(--rpt-line); border-radius: .4rem; padding: .75rem .9rem; font-size: .85rem; word-break: break-word; }
+  /* summary */
+  .summary { margin: 2.25rem 0 0; background: var(--card); border: 1px solid var(--rule);
+    border-top: 3px solid var(--bronze); border-radius: .5rem; padding: 1.4rem 1.5rem; }
+  .summary h2 { font-family: Fraunces, Georgia, serif; font-size: 1.15rem; margin: 0 0 .9rem; color: var(--bronze-d); }
+  .findings { margin: 0; padding-left: 1.3rem; display: grid; gap: .7rem; list-style: decimal outside; }
+  .findings li { font-size: .95rem; line-height: 1.6; padding-left: .25rem; }
+  .findings li::marker { color: var(--bronze); font-weight: 700; }
 
-  .chart { margin: 1.5rem 0 1.25rem; padding: 1rem; background: var(--rpt-card); border: 1px solid var(--rpt-line); border-radius: .6rem; }
-  .chart figcaption { font-size: .85rem; color: var(--rpt-ink-2); margin-bottom: .9rem; }
-  .bars { display: flex; flex-direction: column; gap: .5rem; }
-  .row { display: grid; grid-template-columns: 8.5rem 1fr 5rem; align-items: center; gap: .6rem; }
-  @media (max-width: 560px) {
-    .row { grid-template-columns: 1fr; gap: .15rem; }
-    .row-n { text-align: left; }
-  }
-  .row-l { font-size: .82rem; color: var(--rpt-ink); line-height: 1.25; }
+  /* contents */
+  .toc { margin: 1.75rem 0 0; padding: 1.1rem 1.3rem; border: 1px solid var(--rule); border-radius: .5rem; }
+  .toc h2 { font-size: .7rem; letter-spacing: .15em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 .6rem; font-weight: 600; }
+  .toc ol { margin: 0; padding-left: 1.3rem; display: grid; gap: .3rem; list-style: decimal outside; }
+  .toc li::marker { color: var(--bronze); font-size: .8rem; }
+  .toc li { font-size: .9rem; }
+  .rpt .toc a { color: var(--ink); text-decoration: none; border-bottom: 1px solid transparent; }
+  .rpt .toc a:hover { border-bottom-color: var(--bronze); }
+
+  /* sections */
+  .sec { margin: 3rem 0 0; }
+  .sec h2 { font-family: Fraunces, Georgia, serif; font-size: 1.65rem; line-height: 1.2; margin: 0 0 1rem;
+    color: var(--ink); text-wrap: balance; display: flex; gap: .7rem; align-items: baseline; }
+  .sec h2 .num { font-size: .8rem; color: var(--bronze); border: 1.5px solid var(--bronze); border-radius: 50%;
+    width: 1.7rem; height: 1.7rem; display: inline-grid; place-items: center; flex: 0 0 auto; font-family: system-ui, sans-serif; }
+  .sec h3 { font-family: Fraunces, Georgia, serif; font-size: 1.08rem; margin: 1.6rem 0 .5rem; color: var(--bronze-d); }
+  .sec p { line-height: 1.75; margin: 0 0 1rem; }
+  .rpt a { color: var(--bronze); text-decoration: underline; text-underline-offset: 2px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: .7rem; margin: 0 0 1.5rem; }
+  @media (min-width: 640px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
+  .tile { background: var(--card); border: 1px solid var(--rule); border-radius: .45rem; padding: .9rem; }
+  .tile-n { font-family: Fraunces, Georgia, serif; font-size: 1.8rem; line-height: 1; color: var(--bronze); font-variant-numeric: tabular-nums; }
+  .tile-l { font-size: .74rem; color: var(--ink-2); margin-top: .35rem; line-height: 1.35; }
+
+  /* figures */
+  .fig { margin: 1.6rem 0; padding: 1.15rem 1.2rem 1rem; background: var(--card);
+    border: 1px solid var(--rule); border-radius: .5rem; break-inside: avoid; }
+  .fig figcaption { margin-top: 1rem; padding-top: .7rem; border-top: 1px solid var(--rule); font-size: .8rem; color: var(--ink-2); line-height: 1.5; }
+  .fig figcaption b { color: var(--ink); }
+  .fig .src { display: block; color: var(--ink-3); font-size: .74rem; margin-top: .25rem; }
+  .bars { display: flex; flex-direction: column; gap: .45rem; }
+  .row { display: grid; grid-template-columns: 8.5rem 1fr 5.2rem; align-items: center; gap: .6rem; }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr; gap: .1rem; } .row-n { text-align: left; } }
+  .row-l { font-size: .8rem; line-height: 1.25; }
   .row-track { display: flex; align-items: center; gap: .5rem; min-width: 0; }
-  .row-bar { height: 14px; background: var(--rpt-bar); border-radius: 0 4px 4px 0; flex: 0 0 auto; }
-  .row-bar.alt { background: var(--rpt-bar-alt); }
-  .row-v { font-size: .8rem; font-variant-numeric: tabular-nums; color: var(--rpt-ink); }
-  .row-n { font-size: .75rem; color: var(--rpt-ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+  .row-bar { height: 13px; background: var(--bronze); border-radius: 0 3px 3px 0; flex: 0 0 auto; }
+  .row-bar.alt { background: var(--alt); }
+  .row-v { font-size: .78rem; font-variant-numeric: tabular-nums; }
+  .row-n { font-size: .72rem; color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
+
+  .caveat { background: #FBF4E8; border-left: 3px solid var(--bronze); border-radius: .3rem; padding: 1rem 1.15rem; margin: 1.25rem 0; }
+  .caveat-h { font-weight: 700; font-size: .82rem; letter-spacing: .06em; text-transform: uppercase; color: var(--bronze-d); margin: 0 0 .45rem !important; }
+  .caveat p { font-size: .92rem; margin: 0; }
+  .method p { font-size: .95rem; }
+  .cite-line { background: var(--card); border: 1px solid var(--rule); border-radius: .4rem;
+    padding: .85rem 1rem; font-size: .85rem; line-height: 1.6; word-break: break-word; }
+
+  .colophon { margin: 3.5rem 0 0; padding-top: 1.2rem; border-top: 2px solid var(--bronze);
+    display: flex; align-items: center; gap: .8rem; }
+  .colo-logo { object-fit: contain; }
+  .colo-name { font-family: Fraunces, Georgia, serif; color: var(--bronze-d); margin: 0; font-size: 1rem; }
+  .colo-sub { font-size: .76rem; color: var(--ink-3); margin: .15rem 0 0; }
+
+  /* A report travels as a PDF. Strip the storefront chrome so "save as PDF"
+     produces a clean document that still carries the logo and the citation. */
+  @media print {
+    header.sticky, footer, #dcc-drawer, #dcc-drawer-overlay, #dcc-cart-drawer, #dcc-cart-overlay,
+    #cc-fab, #dcc-mobile-bar, .dcc-search, aside[aria-label="Site navigation"], nav[aria-label="Breadcrumb"] { display: none !important; }
+    .rpt { background: #fff; }
+    .rpt-doc { max-width: none; padding: 0; }
+    .sec, .fig, .summary, .toc { break-inside: avoid; }
+    .sec h2 { break-after: avoid; }
+    a { color: #000 !important; text-decoration: none !important; }
+    .cite-line, .tile, .fig, .summary { border-color: #bbb !important; }
+    @page { margin: 18mm 16mm; }
+  }
 </style>
