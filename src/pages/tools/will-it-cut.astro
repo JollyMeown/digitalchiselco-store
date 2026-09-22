@@ -159,7 +159,8 @@ const ld = jsonLd({
         <h2>Questions people ask</h2>
         <details><summary>Is my file really not uploaded?</summary><p>Really. Everything happens in the page. Disconnect from the internet after this page loads and the tool still works, which is the easiest way to prove it to yourself.</p></details>
         <details><summary>My file is in inches, not millimetres</summary><p>STL files carry no units at all, which is the single most common cause of a model arriving 25 times too big or too small. This tool assumes millimetres. If the dimensions look about 25 times too small, your file is in inches, so use the scale slider at 2540%.</p></details>
-        <details><summary>It says my model is not flat backed</summary><p>A relief carving is meant to be flat on the back, so it can sit on the machine bed and be cut from above. If yours is round on both sides it is a full 3D model, which needs either a rotary axis, or cutting in two halves and gluing them.</p></details>
+        <details><summary>It says my model needs rotating</summary><p>Reliefs are often exported lying on their side or upside down, usually because the modelling software and the CAM software disagree about which axis is up. We test all six directions, and if one of them has the flat back the model needs, we tell you which way to turn it. Every number on the page then assumes you have.</p></details>
+        <details><summary>It says my model is a full 3D model</summary><p>That means there is no flat face in any of the six directions, so no amount of rotating will let a router reach the whole shape from one side. Cut it as two halves and glue them, use a 4th axis, or 3D print it.</p></details>
         <details><summary>What is an open edge?</summary><p>A hole in the mesh. A watertight model has every edge shared by exactly two triangles. A few open edges usually cut fine. Thousands mean the file is damaged and your software may refuse it or produce strange toolpaths.</p></details>
         <details><summary>Can I trust the time estimate?</summary><p>As a rough order of magnitude, yes. It is deliberately simple and does not know about your ramping, your lead-ins or your tool changes. If it says four hours, expect somewhere between three and six.</p></details>
       </section>
@@ -303,7 +304,15 @@ const ld = jsonLd({
   function render() {
     if (!A) return;
     const s = scale(), M = machine();
-    const sx = A.size.x * s, sy = A.size.y * s, depth = A.reliefDepth * s;
+    const O = A.orientation;
+    // When the model is lying on its side, every number the maker cares about
+    // belongs to the ROTATED model, not the one in the file. Measuring the file
+    // as supplied would tell them a 200 mm tray is 25 mm wide and 200 mm deep.
+    const eff = O.verdict === 'on-its-side' ? O.rotatedSize : A.size;
+    const effDepth = O.verdict === 'on-its-side'
+      ? Math.min(O.rotatedSize.x, O.rotatedSize.y, O.rotatedSize.z)
+      : A.reliefDepth;
+    const sx = eff.x * s, sy = eff.y * s, depth = effDepth * s;
     ($('scOut') as HTMLOutputElement).value = Math.round(s * 100) + '%';
     ($('soOut') as HTMLOutputElement).value = ($('so') as HTMLInputElement).value + '%';
 
@@ -313,13 +322,26 @@ const ld = jsonLd({
     const maxFit = Math.min(M.x / A.size.x, M.y / A.size.y, M.y / A.size.x === Infinity ? Infinity : Math.max(M.x / A.size.y, M.y / A.size.x));
     const fitPct = Math.floor(Math.min(M.x / A.size.x, M.y / A.size.y) * 100);
 
-    $('verdict').innerHTML = fits
+    const orientCard = O.verdict === 'ok' ? '' : O.verdict === 'not-a-relief'
+      ? `<div class="v no"><div class="v-h">This is a full 3D model, not a relief</div>
+         <p>There is no flat face anywhere on it, in any orientation, so a router cannot reach the whole
+         shape from one side however you turn it. Your options are to cut it in two halves and glue them,
+         use a 4th axis, or 3D print it instead. The numbers below still describe the file, but treat the
+         cut time as meaningless for this one.</p></div>`
+      : `<div class="v turn"><div class="v-h">${O.verdict === 'upside-down' ? 'It is upside down' : 'It is lying the wrong way up'}</div>
+         <p>${O.fix} ${O.verdict === 'on-its-side'
+            ? `Rotated, it is <strong>${mm(O.rotatedSize.x)} by ${mm(O.rotatedSize.y)}</strong> and
+               <strong>${mm(Math.min(O.rotatedSize.x, O.rotatedSize.y, O.rotatedSize.z))}</strong> thick,
+               and every figure below already assumes you have done that.`
+            : 'Everything below assumes the flat face ends up on the bed.'}</p></div>`;
+
+    $('verdict').innerHTML = orientCard + (fits
       ? `<div class="v ok"><div class="v-h">Yes, this fits</div>
          <p>At ${Math.round(s * 100)}% it is ${mm(sx)} by ${mm(sy)}, and your ${M.name} has ${M.x} by ${M.y} mm of travel.
          ${!fitsA && fitsB ? '<strong>Turn the board 90 degrees</strong> and it fits.' : ''}</p></div>`
       : `<div class="v no"><div class="v-h">Not at this size</div>
          <p>It is ${mm(sx)} by ${mm(sy)} and your ${M.name} gives you ${M.x} by ${M.y} mm.
-         Scale to about <strong>${fitPct}%</strong> and it will fit, but read the depth warning below before you do.</p></div>`;
+         Scale to about <strong>${fitPct}%</strong> and it will fit, but read the depth warning below before you do.</p></div>`);
 
     // facts
     const openPct = A.triangles ? (A.openEdges / (A.triangles * 3)) * 100 : 0;
@@ -340,8 +362,12 @@ const ld = jsonLd({
       <div class="fact"><div class="fk">Board thickness you need <button class="tip" type="button" data-tip="The carved depth plus about 8 mm of material left underneath. Any less and the panel will cup as the wood moves, or break while you are handling it.">?</button></div>
         <div class="fv">${both(stock)} <span class="alt">or more</span></div></div>
       <div class="fact"><div class="fk">Triangles</div><div class="fv">${A.triangles.toLocaleString()}</div></div>
-      <div class="fact"><div class="fk">Flat back? <button class="tip" type="button" data-tip="A relief should be flat on its back so it lies on the machine bed and is cut from one side. If it is not flat, it is a full 3D model and needs a different approach entirely.">?</button></div>
-        <div class="fv ${flat ? 'good' : 'warn'}">${flat ? 'Yes, cuts from one side' : 'No, this is a full 3D model'}</div></div>
+      <div class="fact"><div class="fk">Which way up <button class="tip" type="button" data-tip="A relief needs one big flat face to lie on the machine bed so it can be cut from above. We test all six directions to see whether this model has one, and if it does but it is pointing the wrong way, we say which way to turn it.">?</button></div>
+        <div class="fv ${O.verdict === 'ok' ? 'good' : O.verdict === 'not-a-relief' ? 'warn' : 'turn'}">${
+          O.verdict === 'ok' ? 'Correct, flat side down'
+          : O.verdict === 'upside-down' ? 'Upside down, flip it'
+          : O.verdict === 'on-its-side' ? 'On its side, rotate it'
+          : 'No flat face in any direction'}</div></div>
       <div class="fact"><div class="fk">Mesh health <button class="tip" type="button" data-tip="Open edges are holes in the mesh. A perfect model has none. A handful will cut fine. Thousands mean a damaged file.">?</button></div>
         <div class="fv ${meshTone}">${meshText}</div></div>`;
 
@@ -405,6 +431,7 @@ const ld = jsonLd({
       `Size: ${mm(A.size.x * s)} x ${mm(A.size.y * s)}, carved depth ${mm(A.reliefDepth * s)}`,
       `Board needed: ${mm(A.reliefDepth * s + 8)} thick or more`,
       `Machine: ${M.name} (${M.x} x ${M.y} mm) — ${A.size.x * s <= M.x && A.size.y * s <= M.y ? 'fits' : 'does NOT fit at this size'}`,
+      `Orientation: ${A.orientation.verdict === 'ok' ? 'correct as supplied' : A.orientation.verdict === 'not-a-relief' ? 'full 3D model, not cuttable from one side' : A.orientation.fix}`,
       `Mesh: ${A.triangles.toLocaleString()} triangles, ${A.openEdges < 0 ? 'mesh check skipped (very large)' : A.openEdges === 0 ? 'watertight' : A.openEdges + ' open edges'}, ${A.flatBack > 0.8 ? 'flat backed' : 'not flat backed'}`,
       `Detail lost: ${A.detailLoss.map((d) => `${d.radius}mm bit ${(d.max * s).toFixed(2)}mm`).join(', ')}`,
       `Estimated cut: ${fmtTime(t.totalMin * 0.8)} to ${fmtTime(t.totalMin * 1.5)} on a ${cls.name} machine`,
@@ -438,6 +465,7 @@ const ld = jsonLd({
       ['Board needed', `${mm(A.reliefDepth * s + 8)}+`],
       ['Machine', `${M.name}`],
       ['Fits?', (A.size.x * s <= M.x && A.size.y * s <= M.y) ? 'Yes' : 'Not at this size'],
+      ['Orientation', A.orientation.verdict === 'ok' ? 'Correct' : A.orientation.verdict === 'not-a-relief' ? 'Full 3D model' : 'Needs rotating'],
       ['Mesh', A.openEdges < 0 ? 'Not checked (very large)' : A.openEdges === 0 ? 'Watertight' : `${A.openEdges.toLocaleString()} open edges`],
       ['Cut time', `${fmtTime(t.totalMin * 0.8)} to ${fmtTime(t.totalMin * 1.5)}`],
     ];
@@ -485,6 +513,8 @@ const ld = jsonLd({
   .v-h { font-family: Fraunces, Georgia, serif; font-size: 1.5rem; margin-bottom: .4rem; }
   .v.ok { border-left: 4px solid #2f7d32; } .v.ok .v-h { color: #2f7d32; }
   .v.no { border-left: 4px solid #b4530f; } .v.no .v-h { color: #b4530f; }
+  .v.turn { border-left: 4px solid #1c5cab; margin-bottom: .7rem; } .v.turn .v-h { color: #1c5cab; }
+  .fv.turn { color: #1c5cab; }
   .v p { margin: 0; line-height: 1.6; font-size: .95rem; }
 
   .panel { background: #fff; border: 1px solid rgba(43,29,16,.14); border-radius: .7rem; padding: 1.1rem 1.2rem; margin-top: 1rem; }

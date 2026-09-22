@@ -52,6 +52,19 @@ export type Analysis = {
   openEdges: number;         // edges used by exactly one triangle: holes
   degenerate: number;        // zero-area triangles
   detailLoss: { radius: number; max: number; mean: number; areaAffected: number; measurable: boolean }[];
+  orientation: Orientation;
+};
+
+export type Orientation = {
+  /** how flat the CURRENT underside is, 0..1 of the footprint it should cover */
+  current: number;
+  /** the face that looks most like the flat back of a relief */
+  best: { axis: 'X' | 'Y' | 'Z'; sign: 1 | -1; score: number };
+  verdict: 'ok' | 'upside-down' | 'on-its-side' | 'not-a-relief';
+  /** plain-English instruction, empty when nothing needs doing */
+  fix: string;
+  /** size in mm once rotated the way `fix` describes */
+  rotatedSize: { x: number; y: number; z: number };
 };
 
 const KEY = (a: string, b: string) => (a < b ? `${a}_${b}` : `${b}_${a}`);
@@ -156,6 +169,85 @@ function closeWithBall(src: Float32Array, w: number, h: number, rCells: number, 
   };
   const dil = pass(src, Math.max, -Infinity);
   return pass(dil, Math.min, Infinity);
+}
+
+/**
+ * Which way up is this thing?
+ *
+ * A relief is a slab with one big flat face: the back, which lies on the bed.
+ * So for each of the six axis directions, add up the area of triangles that
+ * both FACE that direction and SIT at the far extreme of it, then compare that
+ * to the area of the bounding box face it would have to cover. A proper relief
+ * scores near 1 on exactly one direction.
+ *
+ * That single number separates the three cases that matter and which the old
+ * flat-back test lumped together: correctly oriented, lying on its side or
+ * upside down (rotate it, then it cuts fine), and a genuine 3D model with no
+ * flat face anywhere (no rotation will save it).
+ */
+function orient(pos: Float32Array, size: { x: number; y: number; z: number },
+                min: { x: number; y: number; z: number }): Orientation {
+  const max = { x: min.x + size.x, y: min.y + size.y, z: min.z + size.z };
+  const DIRS: { axis: 'X' | 'Y' | 'Z'; sign: 1 | -1; n: [number, number, number]; face: number }[] = [
+    { axis: 'Z', sign: -1, n: [0, 0, -1], face: size.x * size.y },
+    { axis: 'Z', sign: 1, n: [0, 0, 1], face: size.x * size.y },
+    { axis: 'Y', sign: -1, n: [0, -1, 0], face: size.x * size.z },
+    { axis: 'Y', sign: 1, n: [0, 1, 0], face: size.x * size.z },
+    { axis: 'X', sign: -1, n: [-1, 0, 0], face: size.y * size.z },
+    { axis: 'X', sign: 1, n: [1, 0, 0], face: size.y * size.z },
+  ];
+  const area = new Float64Array(6);
+  // A triangle counts only if it is nearly parallel to the face AND sitting on
+  // it. Without the position test every flat step inside the carving would
+  // count towards the back.
+  const tol = Math.max(size.x, size.y, size.z) * 0.02;
+  for (let i = 0; i < pos.length; i += 9) {
+    const ax = pos[i], ay = pos[i + 1], az = pos[i + 2];
+    const bx = pos[i + 3], by = pos[i + 4], bz = pos[i + 5];
+    const cx = pos[i + 6], cy = pos[i + 7], cz = pos[i + 8];
+    const ux = bx - ax, uy = by - ay, uz = bz - az;
+    const vx = cx - ax, vy = cy - ay, vz = cz - az;
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz);
+    if (len < 1e-12) continue;
+    const a2 = len / 2;
+    nx /= len; ny /= len; nz /= len;
+    for (let d = 0; d < 6; d++) {
+      const D = DIRS[d];
+      if (nx * D.n[0] + ny * D.n[1] + nz * D.n[2] < 0.985) continue;   // ~10 degrees
+      const co = D.axis === 'X' ? [ax, bx, cx] : D.axis === 'Y' ? [ay, by, cy] : [az, bz, cz];
+      const edge = D.sign < 0
+        ? (D.axis === 'X' ? min.x : D.axis === 'Y' ? min.y : min.z)
+        : (D.axis === 'X' ? max.x : D.axis === 'Y' ? max.y : max.z);
+      if (Math.abs(Math.max(...co.map((v) => Math.abs(v - edge)))) > tol) continue;
+      area[d] += a2;
+    }
+  }
+  const scores = DIRS.map((D, d) => ({ ...D, score: D.face > 0 ? Math.min(1, area[d] / D.face) : 0 }));
+  const current = scores[0].score;                       // back on -Z, the CNC case
+  const best = [...scores].sort((a, b) => b.score - a.score)[0];
+
+  const R = { x: size.x, y: size.y, z: size.z };
+  let verdict: Orientation['verdict'] = 'not-a-relief';
+  let fix = '';
+  let rotatedSize = { ...R };
+  if (current >= 0.55) {
+    verdict = 'ok';
+  } else if (best.score >= 0.55) {
+    if (best.axis === 'Z') {
+      verdict = 'upside-down';
+      fix = 'Flip it over. The flat face is on top, so the machine is looking at the back of the carving.';
+    } else {
+      verdict = 'on-its-side';
+      fix = best.axis === 'X'
+        ? 'Rotate it 90 degrees about the Y axis. It is standing on its edge.'
+        : 'Rotate it 90 degrees about the X axis. It is standing up rather than lying down.';
+      rotatedSize = best.axis === 'X'
+        ? { x: size.z, y: size.y, z: size.x }
+        : { x: size.x, y: size.z, z: size.y };
+    }
+  }
+  return { current, best: { axis: best.axis, sign: best.sign, score: best.score }, verdict, fix, rotatedSize };
 }
 
 export function analyse(pos: Float32Array, onProgress?: (p: number) => void): Analysis {
@@ -287,6 +379,7 @@ export function analyse(pos: Float32Array, onProgress?: (p: number) => void): An
       measurable: true,
     };
   });
+  const orientation = orient(pos, { x: r.maxX - r.minX, y: r.maxY - r.minY, z: r.maxZ - r.minZ }, { x: r.minX, y: r.minY, z: r.minZ });
   onProgress?.(1);
 
   return {
@@ -299,7 +392,7 @@ export function analyse(pos: Float32Array, onProgress?: (p: number) => void): An
     flatBack: covered ? flat / covered : 0,
     reliefDepth: topMax - topMin,
     volume: Math.abs(vol),
-    openEdges, degenerate, detailLoss,
+    openEdges, degenerate, detailLoss, orientation,
   };
 }
 
