@@ -63,11 +63,66 @@ export type OrderEmailData = {
  * Order confirmation email with download links. Sent immediately after the
  * Paddle webhook fires `transaction.completed`.
  */
+// ── software sold as a download ─────────────────────────────────────────
+//
+// Laser Studio is the first thing sold here that is an application rather
+// than an STL, and a buyer needs different help: the installer is 364 MB,
+// Windows warns about it because there is no code-signing certificate yet,
+// and "download" is not the end of the job the way it is for a design file.
+//
+// It is recognised by the Drive file id of its installer. The brief is
+// explicit that this id never changes, because each release replaces the same
+// file, so it is a stable key. Keying here, inside orderConfirmation, matters:
+// the Paddle webhook and the resend builder each assemble their own item list
+// and then both call this function, so this is the ONE place that reaches
+// every buyer of the software whichever path sends their receipt.
+const SOFTWARE: Record<string, { label: string; html: string; text: string }> = {
+  '1nzi0B_oDoPi1H7ptQSyUBxXGPq7diN-_': {
+    label: 'Download the installer (about 364 MB)',
+    html: `
+      <div style="margin-top:12px;background:#FBF4E8;border-left:3px solid #854F0B;border-radius:0 6px 6px 0;padding:12px 14px;font-size:13px;line-height:1.6;color:#2b1d10;">
+        <strong>Installing Laser Studio</strong><br/>
+        1. The installer is about <strong>364 MB</strong>, so use a steady connection.<br/>
+        2. Run <em>DigitalChiselCo-LaserStudio-Setup.exe</em>, then start Laser Studio from the desktop icon. It opens in your own web browser.<br/>
+        3. Windows may warn that the publisher is unknown. That is because we do not yet have a code-signing certificate, not because anything is wrong. Choose <em>More info</em>, then <em>Run anyway</em>.<br/>
+        4. It needs 64-bit Windows 10 or 11 and about 1.2 GB of free disk space.<br/><br/>
+        <strong>Getting help</strong><br/>
+        The illustrated User Manual and the CNC Match Guide are built into the app, with buttons on the main screen.<br/><br/>
+        <strong>Updates are free</strong><br/>
+        When a new version is out, a banner appears inside the app. This same link always gives you the newest version.<br/><br/>
+        <strong>Your licence</strong><br/>
+        For you, on your own computers. Sell anything you make with it. Please do not share or resell the installer itself.<br/><br/>
+        Anything not working? Reply to this email or write to <a href="mailto:jolly@digitalchiselco.com" style="color:#854F0B;">jolly@digitalchiselco.com</a>. If it will not install or run on a supported Windows PC, we will fix it or refund you.
+      </div>`,
+    text: [
+      '',
+      '  INSTALLING LASER STUDIO',
+      '  1. The installer is about 364 MB, so use a steady connection.',
+      '  2. Run DigitalChiselCo-LaserStudio-Setup.exe, then start it from the desktop icon. It opens in your web browser.',
+      '  3. Windows may warn the publisher is unknown, because we have no code-signing certificate yet. Choose More info, then Run anyway.',
+      '  4. Needs 64-bit Windows 10 or 11 and about 1.2 GB free disk.',
+      '',
+      '  The User Manual and CNC Match Guide are built into the app.',
+      '  Updates are free: a banner appears in the app, and this same link always gives the newest version.',
+      '  Licence: for you, on your own computers. Sell what you make. Do not share or resell the installer.',
+      '  Help: jolly@digitalchiselco.com. If it will not install or run on a supported Windows PC, we fix it or refund you.',
+    ].join('\n'),
+  },
+};
+
+/** The software entry for a download link, if it is one of ours. */
+function softwareFor(links?: { url: string }[]) {
+  for (const l of links || []) {
+    for (const id of Object.keys(SOFTWARE)) if (String(l.url).includes(id)) return SOFTWARE[id];
+  }
+  return null;
+}
+
 export function orderConfirmation(d: OrderEmailData): { subject: string; html: string; text: string } {
   const dateStr = new Date(d.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const subject = d.gift
     ? `🎁 ${d.gift.fromName ? `${d.gift.fromName} sent` : 'Someone sent'} you a gift, your downloads are inside`
-    : `Your DigitalChiselCo download${d.items.length > 1 ? 's are' : ' is'} ready — Order #${d.orderShortId}`;
+    : `Your DigitalChiselCo download${d.items.length > 1 ? 's are' : ' is'} ready: Order #${d.orderShortId}`;
 
   // --- HTML ---
   const itemRowsHtml = d.items.map((it) => {
@@ -84,7 +139,7 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
           ${fields.map((f) => `
             <tr>
               <td style="padding:3px 0;font-size:13px;color:#555;font-family:Helvetica,Arial,sans-serif;">
-                <strong style="color:${BRAND_INK};">${esc(f.label || f.key)}:</strong> ${f.type === 'file_url' && f.value ? `<a href="${esc(f.value)}" style="color:${BRAND_BRONZE};word-break:break-all;">${esc(f.value)}</a>` : esc(f.value || '—')}
+                <strong style="color:${BRAND_INK};">${esc(f.label || f.key)}:</strong> ${f.type === 'file_url' && f.value ? `<a href="${esc(f.value)}" style="color:${BRAND_BRONZE};word-break:break-all;">${esc(f.value)}</a>` : esc(f.value || '-')}
               </td>
             </tr>`).join('')}
         </table>` : '';
@@ -98,16 +153,17 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
             <div style="font-size:15px;color:${BRAND_INK};font-weight:500;">${esc(it.title)} <span style="background:#FAC775;color:${BRAND_BRONZE_DARK};font-size:10px;padding:2px 6px;border-radius:8px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;vertical-align:middle;margin-left:4px;">✎ Custom</span></div>
             <div style="font-size:13px;color:#777;margin-top:2px;">${it.qty}× &middot; ${money(it.price_usd)}</div>
             <div style="margin-top:10px;background:${BRAND_CREAM};border-left:3px solid ${BRAND_BRONZE};padding:12px 14px;border-radius:0 6px 6px 0;font-size:13px;color:${BRAND_INK};line-height:1.55;">
-              ✨ <strong>Your custom design request is in!</strong> Our team is hand-crafting your one-of-a-kind STL based on the details below. We'll email the download link as soon as it's ready — and we'll reach out separately if we need any clarification along the way.
+              ✨ <strong>Your custom design request is in!</strong> Our team is hand-crafting your one-of-a-kind STL based on the details below. We'll email the download link as soon as it's ready, and we'll reach out separately if we need any clarification along the way.
             </div>
             ${fieldsHtml}
           </td>
         </tr>`;
     }
+    const sw = softwareFor(it.download_links);
     const links = (it.download_links || []).map((l) => `
       <a href="${esc(l.url)}" style="display:inline-block;background:${BRAND_BRONZE};color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-size:14px;font-weight:500;margin-top:8px;margin-right:6px;font-family:Helvetica,Arial,sans-serif;">
-        ⬇ Download${l.name ? ' &middot; ' + esc(l.name) : ''}
-      </a>`).join('');
+        ⬇ ${sw ? esc(sw.label) : 'Download' + (l.name ? ' &middot; ' + esc(l.name) : '')}
+      </a>`).join('') + (sw ? sw.html : '');
     const noLinkNote = (!it.download_links || it.download_links.length === 0)
       ? `<div style="font-size:13px;color:#777;margin-top:6px;">Download link will be emailed within a few minutes if not already attached.</div>`
       : '';
@@ -173,7 +229,7 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
                 ${d.customerName ? `Hi ${esc(d.customerName)},` : 'Hi there,'}
               </p>
               <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#555;">
-                Your CNC-ready bas-relief STL${d.items.length > 1 ? ' files are' : ' file is'} prepared and ready to download. Tap any button below to grab the file. Links don't expire — bookmark this email if you want to come back later.
+                Your CNC-ready bas-relief STL${d.items.length > 1 ? ' files are' : ' file is'} prepared and ready to download. Tap any button below to grab the file. Links don't expire, bookmark this email if you want to come back later.
               </p>
               <!-- Primary CTA: full account dashboard -->
               <p style="margin:18px 0 0;text-align:center;">
@@ -248,9 +304,9 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
               <div style="background:#FFFBF4;border-left:3px solid ${BRAND_BRONZE};padding:14px 16px;border-radius:0 6px 6px 0;">
                 <div style="font-size:13px;font-weight:500;color:${BRAND_BRONZE_DARK};margin-bottom:6px;">📌 A few quick tips</div>
                 <ul style="margin:0;padding-left:18px;font-size:13px;color:#555;line-height:1.6;">
-                  <li>Files open in Aspire, VCarve, Carveco, ArtCAM, Fusion 360 — any STL-compatible CAM.</li>
+                  <li>Files open in Aspire, VCarve, Carveco, ArtCAM, Fusion 360, or any STL-compatible CAM.</li>
                   <li>Scale freely to your router bed or 3D printer; the geometry stays clean.</li>
-                  <li>Commercial use is included — sell the pieces you carve.</li>
+                  <li>Commercial use is included: sell the pieces you carve.</li>
                 </ul>
               </div>
             </td>
@@ -321,7 +377,7 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
           <tr>
             <td style="padding:0 28px 28px;">
               <p style="margin:0;font-size:13px;color:#777;line-height:1.6;">
-                Trouble downloading or carving? Reply to this email — a real person reads every message and gets back within 24 hours.
+                Trouble downloading or carving? Reply to this email. A real person reads every message and gets back within 24 hours.
               </p>
               <p style="margin:14px 0 0;font-size:13px;color:#777;">
                 Want to see your full order history? <a href="${SITE}/account" style="color:${BRAND_BRONZE};text-decoration:underline;">Sign into your account</a>.
@@ -351,10 +407,11 @@ export function orderConfirmation(d: OrderEmailData): { subject: string; html: s
   const itemsTxt = d.items.map((it) => {
     if (it.is_customized) {
       const fieldsTxt = (it.customization_fields || [])
-        .map((f) => `    ${f.label || f.key}: ${f.value || '—'}`).join('\n');
-      return `* ${it.title} [CUSTOM] (${it.qty}× ${money(it.price_usd)})\n  Your custom design is being hand-crafted — we'll email the download link once it's ready.\n  Your submitted details:\n${fieldsTxt || '    (no details)'}`;
+        .map((f) => `    ${f.label || f.key}: ${f.value || '-'}`).join('\n');
+      return `* ${it.title} [CUSTOM] (${it.qty}× ${money(it.price_usd)})\n  Your custom design is being hand-crafted, and we'll email the download link once it's ready.\n  Your submitted details:\n${fieldsTxt || '    (no details)'}`;
     }
-    const linksTxt = (it.download_links || []).map((l) => `  - ${l.name ? l.name + ': ' : ''}${l.url}`).join('\n');
+    const swT = softwareFor(it.download_links);
+    const linksTxt = (it.download_links || []).map((l) => `  - ${l.name ? l.name + ': ' : ''}${l.url}`).join('\n') + (swT ? swT.text : '');
     return `* ${it.title} (${it.qty}× ${money(it.price_usd)})\n${linksTxt || '  (link will be sent separately)'}`;
   }).join('\n\n');
   const payLine = d.paymentMethod?.last4
@@ -381,13 +438,13 @@ ${itemsTxt}
 
 ${totalsTxt}
 ${invoiceLink}
-These links don't expire — keep this email for future re-downloads, or sign into your account at ${SITE}/account anytime.
+These links don't expire, so keep this email for future re-downloads, or sign into your account at ${SITE}/account anytime.
 
 Need help? Reply to this email and a real person will help within 24 hours.
 ${d.makerInvite ? `
 Own a CNC, laser or 3D printer? Cut Local sends paid local jobs to makers like you, with the design file included. Free to join, the buyer pays you directly, and we take ${SUCCESS_FEE_PCT}% only on completed jobs: ${SITE}/faq?for=makers
 ` : ''}
-— The DigitalChiselCo team
+The DigitalChiselCo team
 ${SITE}
 `;
 
@@ -463,7 +520,7 @@ What you'll get:
 
 This link is valid for 14 days. If you didn't request this, ignore this email.
 
-— DigitalChiselCo`;
+DigitalChiselCo`;
 
   return { subject, html, text };
 }
@@ -488,7 +545,7 @@ export type MembershipPurchaseData = {
 
 export function membershipPurchaseNotification(d: MembershipPurchaseData): { subject: string; html: string; text: string } {
   const planSummary = d.plans.map((p) => `${p.qty}× ${p.name}`).join(', ');
-  const subject = `🟢 New membership: ${d.customerName || d.customerEmail} — ${planSummary}`;
+  const subject = `🟢 New membership: ${d.customerName || d.customerEmail}, ${planSummary}`;
   const dateStr = new Date(d.createdAt).toLocaleString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
     hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
@@ -522,7 +579,7 @@ export function membershipPurchaseNotification(d: MembershipPurchaseData): { sub
       <tr><td style="padding:8px;border-top:2px solid #333;"><strong>Total paid</strong></td><td style="padding:8px;border-top:2px solid #333;text-align:right;"><strong>$${d.totalPaid.toFixed(2)} ${esc(d.currency)}</strong></td></tr>
     </table>
 
-    <p style="font-size:13px;color:#666;margin:18px 0 0;">— DigitalChiselCo notifier</p>
+    <p style="font-size:13px;color:#666;margin:18px 0 0;">DigitalChiselCo notifier</p>
   </div>
 </body></html>`;
 
@@ -539,7 +596,7 @@ ${d.plans.map((p) => `  - ${p.qty}× ${p.name} ($${p.price_usd.toFixed(2)})`).jo
 
 Total paid: $${d.totalPaid.toFixed(2)} ${d.currency}
 
-— DigitalChiselCo notifier`;
+DigitalChiselCo notifier`;
 
   return { subject, html, text };
 }

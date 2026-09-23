@@ -36,6 +36,11 @@ export function bundle5Eligible(p: { active?: boolean; price_usd?: number | stri
     !p.is_customizable &&
     !String(p.slug || '').startsWith('gift-card-') &&
     !String(p.slug || '').startsWith('catalogue-') &&
+    // Software is not a design and was priced deliberately. Without this,
+    // Laser Studio at $40 plus four $7.99 designs came out at $47.37 for
+    // $71.96 of goods: not free, but a discount nobody chose. The software-
+    // prefix covers any future application too.
+    !String(p.slug || '').startsWith('software-') &&
     !/bundle|membership/i.test(String(p.title || '')) &&
     // Made-to-order work (real labor per sale) is never discounted. Some of
     // these are not flagged is_customizable, so match the title too.

@@ -12,6 +12,12 @@ import { img } from '../../lib/img';
 import { supabase } from '../../lib/supabase';
 
 const { slug } = Astro.params;
+// Software is sold from its own page, not from the STL template. This one
+// would otherwise inherit "works with your CNC", file counts and the rest of a
+// design listing, which is exactly what the sell brief says it must not claim.
+// The catalog card, search and cart all link here by slug, so the redirect is
+// what keeps every one of them honest.
+if (String(slug || '').startsWith('software-laser-studio')) return Astro.redirect('/laser-studio', 301);
 const p = await getProductBySlug(slug!);
 if (!p) return Astro.rewrite('/404');
 

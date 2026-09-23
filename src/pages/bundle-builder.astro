@@ -29,6 +29,7 @@ const { data: prods } = await supabaseAdmin()
   .gt('price_usd', 0)
   .not('slug', 'like', 'gift-card-%')
   .not('slug', 'like', 'catalogue-%')
+  .not('slug', 'like', 'software-%')   // kept in sync with bundle5Eligible
   .not('title', 'ilike', '%bundle%')
   .not('title', 'ilike', '%membership%')
   .not('title', 'ilike', '%personalized%')
