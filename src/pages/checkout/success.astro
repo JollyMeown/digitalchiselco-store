@@ -2,6 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
+import LaserStudioCrossSell from '../../components/LaserStudioCrossSell.astro';
 import { supabaseAdmin } from '../../lib/supabase';
 
 const txnId = Astro.url.searchParams.get('txn') || '';
@@ -190,6 +191,8 @@ const conv = order ? {
             </div>
           </section>
         )}
+
+        <LaserStudioCrossSell where="success" ownedIds={(order.order_items || []).map((i: any) => i.product_id).filter(Boolean)} />
 
         {plan && (
           <div class="mt-8 bg-[#5E380A] text-[#F5EFE3] rounded-xl p-6 text-center">

@@ -77,7 +77,8 @@ const LOOK_GROUPS = [
           <>
             <button class="add-to-cart bg-bronze-600 text-cream px-8 py-3.5 rounded-md text-sm font-medium hover:bg-bronze-700 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow"
               data-id={SITE_PRODUCT.id} data-slug={SITE_PRODUCT.slug} data-title={SITE_PRODUCT.title}
-              data-price={SITE_PRODUCT.price_usd} data-img={SITE_PRODUCT.image_url || ''}>
+              data-price={SITE_PRODUCT.price_usd} data-img={SITE_PRODUCT.image_url || ''}
+              data-label={`Buy Laser Studio, $${Number(SITE_PRODUCT.price_usd).toFixed(0)} →`}>
               Buy Laser Studio, ${Number(SITE_PRODUCT.price_usd).toFixed(0)} →
             </button>
             <a href={BUY} target="_blank" rel="noopener" class="text-sm text-bronze-700 underline self-center">or buy on Etsy</a>
@@ -436,7 +437,8 @@ const LOOK_GROUPS = [
           <>
             <button class="add-to-cart bg-bronze-600 text-cream px-7 py-3 rounded-md text-sm font-medium hover:bg-bronze-700 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow"
               data-id={SITE_PRODUCT.id} data-slug={SITE_PRODUCT.slug} data-title={SITE_PRODUCT.title}
-              data-price={SITE_PRODUCT.price_usd} data-img={SITE_PRODUCT.image_url || ''}>
+              data-price={SITE_PRODUCT.price_usd} data-img={SITE_PRODUCT.image_url || ''}
+              data-label={`Buy Laser Studio, $${Number(SITE_PRODUCT.price_usd).toFixed(0)} →`}>
               Buy Laser Studio, ${Number(SITE_PRODUCT.price_usd).toFixed(0)} →
             </button>
             <a href={BUY} target="_blank" rel="noopener" class="text-sm text-bronze-700 underline self-center">or buy on Etsy</a>

@@ -4,6 +4,7 @@ import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import RecentlyViewed from '../../components/RecentlyViewed.astro';
 import TrustBadges from '../../components/TrustBadges.astro';
+import LaserStudioCrossSell from '../../components/LaserStudioCrossSell.astro';
 import { getProductBySlug, getRelatedProducts, getSettings, getSoldCount, getBoughtTogether } from '../../lib/queries';
 import FreePackInline from '../../components/FreePackInline.astro';
 import { pricing, money } from '../../lib/pricing';
@@ -540,6 +541,8 @@ const breadcrumbLd = {
   <section class="mt-10">
     <TrustBadges />
   </section>
+
+  <LaserStudioCrossSell />
 
   {together.length > 0 && (
     <section class="mt-12" id="bought-together">

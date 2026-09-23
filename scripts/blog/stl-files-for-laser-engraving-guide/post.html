@@ -39,7 +39,7 @@
 <p>You need a grayscale PNG where brightness equals height. Five ways to get one:</p>
 
 <ol>
-  <li><strong>Laser Studio, our own app.</strong> It was built for exactly this step: open the STL, and it renders a true orthographic height map at 8-bit or 16-bit, with the background sitting on black and the highest point on white, at whatever size and DPI you type in. It also does the things the other routes cannot: a 3D-illusion render for machines that only burn tone, nine dithering modes, a calibration wedge for your material, and export straight to the laser. <a href="#laser-studio">There is a section on it below</a>.</li>
+  <li><strong>Laser Studio, our own app.</strong> It was built for exactly this step: open the STL, and it renders a true orthographic height map at 8-bit or 16-bit, with the background sitting on black and the highest point on white, at whatever size and DPI you type in. It also does the things the other routes cannot: a 3D-illusion render for machines that only burn tone, nine dithering modes, a calibration wedge for your material, and export files ready for your own laser software, such as LightBurn. <a href="#laser-studio">There is a section on it below</a>.</li>
   <li><strong>A free browser converter.</strong> Search for a tool called STL2PNG that runs in the browser; it produces a real heightmap with a top view, a resolution setting and a depth offset. A caution about other "STL to PNG" sites: several of the popular ones simply take a <em>screenshot</em> of the model in a 3D viewer. That is a shaded picture, not a depth map, and burned into wood it gives you a rendering with lighting baked in rather than relief. If a converter shows you a rotating model and asks where you want the camera, it is the wrong kind.</li>
   <li><strong>LightBurn itself, from a mesh.</strong> Recent versions of LightBurn can import an STL and render it to a depth map directly, which is the fewest steps if you already own it. Set the resolution to match your engraving DPI, not higher.</li>
   <li><strong>A resin slicer.</strong> Most resin 3D-print slicers can export a depth map of a model lying flat. Import, orient the carved face up, export.</li>
@@ -182,7 +182,7 @@
 <h2 id="laser-studio">Laser Studio: the whole workflow in one app</h2>
 
 <figure>
-  <a href="/laser-studio"><img src="{{IMG:poster}}" alt="Laser Studio poster: photos, 3D models and the night sky turned into ready-to-burn laser files on your own machine; 11 output styles, star maps, sundials, tumblers, boxes; 100 percent offline, one-time purchase" loading="lazy" /></a>
+  <a href="/laser-studio"><img src="{{IMG:poster}}" alt="Laser Studio by DigitalChiselCo: photos, 3D models and the night sky turned into ready-to-burn laser files on your own machine; 50 looks from one photo, CNC Match to burn onto a carving, star maps, coasters and tumbler wraps; one-time purchase with free updates" loading="lazy" /></a>
   <figcaption>Laser Studio. One app, every laser: relief files and photographs in, ready-to-burn files out, on your own machine.</figcaption>
 </figure>
 
@@ -196,7 +196,8 @@
   <li><strong>Nine dithering modes</strong> for photo engraving, plus a compare-all view, and shape masks (circle, heart, badge, hexagon) with a raised border frame.</li>
   <li><strong>Smart export</strong> at the exact size in millimetres, inches or pixels and the DPI your machine wants, for diode and CO2, with a burn-on-wood preview before you commit a board.</li>
   <li><strong>A calibration kit</strong>: a grayscale wedge, a power-and-speed grid and a settings log card, so the "settings to start from" section above becomes measured numbers for your laser and your wood.</li>
-  <li><strong>Product makers built in</strong>: coasters, sundials, tumblers, recipe boards, proof and care cards, so a relief file becomes a thing you can sell.</li>
+  <li><strong>Product makers built in</strong>: coasters, tumbler wraps, star maps, client proofs, job cards and care cards, so a relief file becomes a thing you can sell.</li>
+<li><strong>CNC Match</strong>: carve one of these STLs on your CNC, photograph it on the laser bed, and burn text or shading exactly onto the carving. Alignment is typically within about a millimetre; check the outline and test on scrap first.</li>
 </ul>
 
 <p>It runs offline, it never uploads your files anywhere, and you own it outright rather than renting it. It is <strong>$40</strong>, once.</p>

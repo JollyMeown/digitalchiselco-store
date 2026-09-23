@@ -340,7 +340,8 @@ try {
     document.querySelectorAll('.add-to-cart[data-id]').forEach((btn) => {
       const inCart = ids.has(btn.dataset.id);
       btn.classList.toggle('in-cart', inCart);
-      const label = inCart ? '✓ In cart' : 'Add to cart';
+      // data-label keeps a button's own wording ("Buy Laser Studio, $40") when not in cart
+      const label = inCart ? '✓ In cart' : (btn.dataset.label || 'Add to cart');
       if (btn.textContent !== label) btn.textContent = label;
     });
   }

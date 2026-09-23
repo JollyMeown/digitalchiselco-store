@@ -1,0 +1,92 @@
+---
+// Cross-sell from STL designs to Laser Studio.
+//
+// Every STL in the catalog opens in Laser Studio with no conversion, so the
+// person looking at a design is already holding the thing the software works
+// on. Two reasons they might want it, and the card names both: to turn the
+// design into a laser engrave directly, and, if they carve it on a CNC first,
+// to burn a name or date onto the finished piece with CNC Match.
+//
+// Shown in three places, worded for each:
+//   product  one design page, "this design"
+//   cart     next to the order being built, "these designs"; the cart script
+//            hides it while the cart is empty or already holds the software
+//   success  the thank-you page, right after they bought STLs; skipped when
+//            the order itself contained Laser Studio (pass ownedIds)
+//
+// Honesty rules from the sell brief apply here as much as on the product page:
+// it prepares files and never drives the laser, it is Windows only, and it is
+// sold once with free updates. The card says all three rather than implying
+// otherwise by leaving them out.
+//
+// Renders nothing unless the software product is ACTIVE, so switching the
+// product off in the catalog removes every card at once, with no code change.
+import { supabaseAdmin } from '../lib/supabase';
+
+interface Props { where?: 'product' | 'cart' | 'success'; ownedIds?: string[] }
+const { where = 'product', ownedIds = [] } = Astro.props;
+
+let sw: any = null;
+try {
+  const { data } = await supabaseAdmin().from('products')
+    .select('id, slug, title, price_usd, image_url, active')
+    .eq('slug', 'software-laser-studio').maybeSingle();
+  if (data?.active && Number(data.price_usd) > 0 && !ownedIds.includes(data.id)) sw = data;
+} catch {}
+
+const price = sw ? Number(sw.price_usd).toFixed(0) : '';
+const many = where !== 'product';
+const copy = {
+  eyebrow: where === 'success' ? 'Got a laser as well?' : 'Have a laser too?',
+  h: many ? 'Burn these designs, or burn onto them' : 'Burn this design, or burn onto it',
+  open: many ? 'opens these STLs' : 'opens this STL',
+};
+---
+{sw && (
+  <section class={`lscs ${where === 'cart' ? '' : 'mt-10'}`} id={where === 'cart' ? 'ls-cross' : undefined}
+    data-sw-id={sw.id} hidden={where === 'cart'} aria-labelledby={`lscs-h-${where}`}>
+    <div class="lscs-card">
+      <a href="/laser-studio#cnc-match" class="lscs-img" tabindex="-1" aria-hidden="true">
+        <img src="/laser-studio/cnc-burned-panel-640.webp" alt="" width="640" height="357" loading="lazy" decoding="async" />
+      </a>
+      <div class="lscs-body">
+        <p class="lscs-eyebrow">{copy.eyebrow}</p>
+        <h2 id={`lscs-h-${where}`} class="lscs-h">{copy.h}</h2>
+        <p class="lscs-p">
+          Laser Studio {copy.open} with zero conversion and turns them into a ready-to-burn
+          3D-illusion engrave. Carving on your CNC instead? <strong>CNC Match</strong> lines up a name,
+          a date or shading on a photo of the finished piece, so the laser burns right onto the carving.
+        </p>
+        <p class="lscs-small">Windows desktop app · ${price} once · free updates · it prepares the files, your laser software burns them</p>
+        <div class="lscs-actions">
+          <button class="add-to-cart lscs-btn"
+            data-id={sw.id} data-slug={sw.slug} data-title={sw.title}
+            data-price={sw.price_usd} data-img={sw.image_url || ''} data-label={`Add Laser Studio, $${price}`}>
+            Add Laser Studio, ${price}
+          </button>
+          <a href="/laser-studio#cnc-match" class="lscs-link">See how it works →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+)}
+
+<style>
+  .lscs[hidden] { display: none; }
+  .lscs-card { display: grid; grid-template-columns: 1fr; border: 1px solid rgba(133,79,11,.25);
+    border-radius: .75rem; overflow: hidden; background: linear-gradient(135deg, #FBF4E8, #fff); }
+  @media (min-width: 720px) { .lscs-card { grid-template-columns: 300px 1fr; } }
+  .lscs-img { display: block; min-height: 180px; }
+  .lscs-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .lscs-body { padding: 1.25rem 1.4rem 1.35rem; }
+  .lscs-eyebrow { font-size: .7rem; letter-spacing: .16em; text-transform: uppercase; color: #854F0B; margin: 0 0 .35rem; font-weight: 600; }
+  .lscs-h { font-family: Fraunces, Georgia, serif; font-size: 1.35rem; line-height: 1.2; color: #412402; margin: 0 0 .55rem; text-wrap: balance; }
+  .lscs-p { font-size: .92rem; line-height: 1.6; color: #3a2a1a; margin: 0 0 .5rem; }
+  .lscs-small { font-size: .76rem; color: #6b5a48; margin: 0 0 .9rem; }
+  .lscs-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem; }
+  .lscs-btn { background: #854F0B; color: #FAEEDA; border: 0; padding: .6rem 1.1rem; border-radius: .45rem;
+    font: inherit; font-size: .88rem; font-weight: 500; cursor: pointer; }
+  .lscs-btn:hover { background: #633806; }
+  .lscs-btn:focus-visible, .lscs-link:focus-visible { outline: 2px solid #854F0B; outline-offset: 2px; }
+  .lscs-link { font-size: .86rem; color: #854F0B; text-decoration: underline; }
+</style>
