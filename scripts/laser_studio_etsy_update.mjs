@@ -55,12 +55,16 @@ async function patch(fields) {
   return JSON.parse(text);
 }
 
-let d = live.description;
+// The API hands the description back HTML-encoded (&#39; &quot; &amp;). Sending
+// that back unchanged would store the codes themselves, so decode on read, and
+// write new copy with curly quotes, which Etsy stores as they are.
+const decode = (s) => s.replace(/&#39;/g, '’').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+let d = decode(live.description);
 const before = d;
 const changes = [];
 
 // ── 1. the version line, so the listing dates itself ─────────────────────
-if (!/VERSION 2\.7/i.test(d)) {
+if (!/NOW VERSION 2\.\d/i.test(d)) {
   d = d.replace('🚀 DigitalChiselCo proudly brings you Laser Studio',
     '⭐ NOW VERSION 2.7, with CNC Match and AI Auto-fit\n\n🚀 DigitalChiselCo proudly brings you Laser Studio');
   changes.push('added the version line');
@@ -68,11 +72,11 @@ if (!/VERSION 2\.7/i.test(d)) {
 
 // ── 2. CNC Match, the whole reason 2.7 exists ────────────────────────────
 const CNC = `
-🪵 NEW IN 2.7 — CNC MATCH WITH AI AUTO-FIT
+🪵 CNC MATCH WITH AI AUTO-FIT (new in 2.7, improved in 2.8 and 2.9)
 
 Carved it on the CNC? Finish it on the laser.
 
-Put the carved piece on your laser bed, photograph it straight down, and Laser Studio burns text, shading or the same picture exactly onto the carving. A name and a date under a pet portrait. A darkened background that makes the relief jump off the board. A scorched edge along the raised tops. The finishing touches that turn a carving into a gift.
+Put the carved piece on your laser bed, photograph it straight down, and Laser Studio lines up text, shading or the same picture on the carving so your laser burns right onto it. A name and a date under a pet portrait. A darkened background that makes the relief jump off the board. A scorched edge along the raised tops. The finishing touches that turn a carving into a gift.
 
 How it works:
 
@@ -95,7 +99,9 @@ What you get:
 Honest note on Auto-fit: it is a starting guess, not a promise. A clamp, a bright offcut, a sheet of paper or a hand in the shot can fool it, and square pieces sometimes land a quarter turn out. It tells you how confident it is and you can nudge it by hand. Alignment is typically within about a millimetre. Always check the outline and test on scrap before burning the finished piece.
 
 `;
-if (!/CNC MATCH/i.test(d)) {
+// Test for the section's own heading: the version line above also says "CNC
+// Match", and testing for that phrase is what kept this section off Etsy.
+if (!/CNC MATCH WITH AI AUTO-FIT/.test(d)) {
   d = d.replace('\n🌟 What Is Laser Studio?', `${CNC}\n🌟 What Is Laser Studio?`);
   changes.push('added the CNC Match section');
 }
@@ -201,6 +207,58 @@ if (d.includes('✅ Works completely offline')) {
 }
 
 
+// ── 10. 2.7 -> 2.9: the version line and what the two releases added ─────
+// 2.8 came out of the first customer's real job: a carving rarely comes off
+// the CNC at exactly the file's proportions, so width and height can now be
+// stretched separately. 2.9 asks which laser software you use and starts the
+// export's README with the steps for that one. The WeCreat chapter follows
+// WeCreat's own published LightBurn setup and is labelled untested by us.
+if (d.includes('⭐ NOW VERSION 2.7, with CNC Match and AI Auto-fit')) {
+  d = d.replace('⭐ NOW VERSION 2.7, with CNC Match and AI Auto-fit', '⭐ NOW VERSION 2.9, with CNC Match and AI Auto-fit');
+  changes.push('version line 2.7 -> 2.9');
+}
+if (d.includes('🧰 More In Version 2.7')) {
+  d = d.replace('🧰 More In Version 2.7', '🧰 More In Version 2.9');
+  changes.push('"More In Version" 2.7 -> 2.9');
+}
+if (!/Stretch width or height/.test(d)) {
+  d = d.replace('✅ The burn previewed live on the real piece before the laser fires', `✅ The burn previewed live on the real piece before the laser fires
+✅ Stretch width or height on its own when the carving came out a little different from the file (new in 2.8)
+✅ Tell it which laser software you use (LightBurn with or without a camera, WeCreat and others) and the export opens with the steps for that one (new in 2.9)`);
+  changes.push('added the 2.8 stretch and 2.9 laser-software steps to CNC Match');
+}
+if (!/Using a WeCreat laser/i.test(d)) {
+  d = d.replace('✅ Illustrated user manual, plus a separate illustrated CNC Match Guide built into the app',
+    '✅ Illustrated user manual, plus a separate illustrated CNC Match Guide built into the app, now with a chapter on using a WeCreat laser (based on WeCreat’s published LightBurn setup)');
+  changes.push('mentioned the WeCreat chapter in the guide line');
+}
+
+// ── 11. what the new hero images show and the copy never named ──────────
+// Both ship in the customer build (only the sundial and recipe board are
+// hidden): the game board maker in the export panel, region tools in the
+// background-removal step.
+if (!/Game Board Maker/.test(d)) {
+  d = d.replace('🧾 Care Card\n', `♟️ Game Board Maker
+
+Chess, checkers and cribbage boards at any size from 80 to 600 mm. Engrave the board and cut the outline; cribbage tracks come with the peg holes marked for drilling. No photo needed.
+
+🧾 Care Card
+`);
+  changes.push('added the Game Board Maker (chess, checkers, cribbage)');
+}
+if (!/Region tools/.test(d)) {
+  d = d.replace('✅ Live mask preview', `✅ Live mask preview
+✅ Region tools: frame, keep, cut and lasso areas straight on the canvas
+✅ Auto-protect the subject and auto-frame a plaque on a white backdrop`);
+  changes.push('added the region tools to background removal');
+}
+if (!/Laser Job Cards/.test(d) && d.includes('✅ Client proof cards\n✅ Care cards')) {
+  d = d.replace('✅ Client proof cards\n✅ Care cards', '✅ Laser Job Cards with your own logo\n✅ Quote PDFs for customer estimates\n✅ Client proof cards with scan-to-approve QR\n✅ Care cards');
+  changes.push('seller tools list now names job cards and quote PDFs');
+}
+// straight quotes the old copy carried, as curly ones
+d = d.replace('A "ghost" outline', 'A “ghost” outline').replace(/carving's/g, 'carving’s').replace(/laser's/g, 'laser’s');
+
 // ── 9. no em dashes anywhere, including the ones already there ───────────
 // A house rule, and this rewrite is the moment to clear the eight that the
 // original copy carried. The replacement is chosen per phrase rather than
@@ -232,6 +290,8 @@ if (!APPLY) {
   process.exit(0);
 }
 
+// keep the earliest copy: a later run must not overwrite the original backup
+if (fs.existsSync(BACKUP)) fs.copyFileSync(BACKUP, BACKUP.replace('.json', `_${Date.now()}.json`));
 fs.writeFileSync(BACKUP, JSON.stringify({
   savedAt: new Date().toISOString(), listing_id: LISTING,
   title: live.title, tags: live.tags, description: before,

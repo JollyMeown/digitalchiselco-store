@@ -47,6 +47,11 @@ const STEPS = [
   { t: 'Choose what to burn', p: 'Darken the background floor, scorch the raised tops, outline the relief, tonal shading of the design itself, or your own text.' },
   { t: 'Export for LightBurn', p: 'Burn files plus alignment helpers, sorted in one ZIP.' },
 ];
+const GLANCE = [
+  { f: 'ls-hero-cnc-match-lion', alt: 'Laser Studio overview: CNC Match lines a design up on a carved lion, then the laser burns the detail; 50 looks, star maps, tumbler wraps, coasters, game boards, job cards and quotes' },
+  { f: 'ls-hero-cnc-match-dog', alt: 'CNC Match: carved on the CNC, finished on the laser. 50 looks from one photo, 17 art engines, 31 signature styles, $40 one-time, photos never uploaded' },
+  { f: 'ls-hero-carving-to-product', alt: 'From a CNC carving to a finished laser product, plus the seller toolkit: job cards, client proofs with QR approval, quote PDFs and care cards' },
+];
 const LOOK_GROUPS = [
   { g: 'Photo', n: 2, eg: 'Engrave photo, 3D illusion' },
   { g: 'Art engines', n: 17, eg: 'Pencil sketch, stipple, word portrait, spiral, string art, crosshatch, halftone, mosaic, one-line scribble, flow silk, maze and more' },
@@ -55,7 +60,7 @@ const LOOK_GROUPS = [
 ---
 <Shell
   title="Laser Studio · Photo to Laser File Software for Diode & CO2 | DigitalChiselCo"
-  description="Laser Studio turns photos, STL 3D models and the real night sky into ready-to-burn laser files: 50 looks, star maps, coasters, tumbler wraps and a calibration test grid. New CNC Match burns text or shading exactly onto the pieces you carved. Works with LightBurn, xTool, Glowforge and LaserGRBL."
+  description="Laser Studio turns photos, STL 3D models and the real night sky into ready-to-burn laser files: 50 looks, star maps, coasters, tumbler wraps and a calibration test grid. New CNC Match lines up text or shading so your laser burns it onto the pieces you carved. Works with LightBurn, xTool, Glowforge and LaserGRBL."
   scrollPastBanner={true}
 >
   <Breadcrumbs crumbs={[{ label: 'Laser Studio' }]} />
@@ -64,7 +69,7 @@ const LOOK_GROUPS = [
 
     <!-- ===== HERO ===== -->
     <header class="text-center mb-10 reveal">
-      <p class="text-xs tracking-widest text-bronze-600 mb-3">★ VERSION 2.8 · CNC MATCH, SHAPED BY YOUR FEEDBACK</p>
+      <p class="text-xs tracking-widest text-bronze-600 mb-3">★ VERSION 2.9 · CNC MATCH, SHAPED BY YOUR FEEDBACK</p>
       <h1 class="font-serif text-4xl md:text-6xl text-bronze-800 leading-tight">
         Laser <em class="italic text-bronze-600">Studio</em>
       </h1>
@@ -99,6 +104,20 @@ const LOOK_GROUPS = [
       <figcaption class="text-center text-xs text-ink-700/60 py-2 bg-cream">Laser Studio 2.8: seven workspaces, one quiet artboard. Here, CNC Match has locked a design onto a real carving.</figcaption>
     </figure>
 
+    <!-- ===== AT A GLANCE: the owner's overview posters (same three lead the Etsy listing) ===== -->
+    <section class="mb-16 reveal" aria-labelledby="glance-h">
+      <h2 id="glance-h" class="sr-only">Laser Studio at a glance</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {GLANCE.map((g) => (
+          <a href={`/laser-studio/${g.f}.webp`} target="_blank" rel="noopener" class="block rounded-lg overflow-hidden border border-bronze-600/20 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition">
+            <img src={`/laser-studio/${g.f}-640.webp`} srcset={`/laser-studio/${g.f}-640.webp 640w, /laser-studio/${g.f}.webp 1200w`}
+                 sizes="(max-width: 640px) 100vw, 330px" alt={g.alt} width="640" height="640" loading="lazy" decoding="async" class="w-full aspect-square object-cover" />
+          </a>
+        ))}
+      </div>
+      <p class="mt-2 text-center text-xs text-ink-700/60">Overview posters. Tap one to see it full size.</p>
+    </section>
+
     <!-- ===== NEW: CNC MATCH ===== -->
     <section id="cnc-match" class="mb-16 scroll-mt-24">
       <div class="text-center reveal">
@@ -106,7 +125,7 @@ const LOOK_GROUPS = [
         <h2 class="font-serif text-3xl md:text-4xl text-bronze-800">Carved it on the CNC?<br class="hidden md:block"/> Finish it on the laser.</h2>
         <p class="mt-4 text-ink-700/85 max-w-3xl mx-auto">
           Carved one of our STLs on your CNC? Put it on the laser and burn text, shading or the same picture
-          exactly onto the carving. A name and a date under a pet portrait, a darkened background that makes the relief
+          right onto the carving. A name and a date under a pet portrait, a darkened background that makes the relief
           jump, a scorched edge on the raised tops: the finishing touches that turn a carving into a gift.
         </p>
       </div>
@@ -391,8 +410,13 @@ const LOOK_GROUPS = [
       </ul>
     </section>
 
-    <!-- ===== NEW IN 2.8 + FAQ ===== -->
+    <!-- ===== NEW IN 2.9 / 2.8 + FAQ ===== -->
     <section class="mb-16 max-w-3xl mx-auto reveal">
+      <h2 class="font-serif text-2xl text-bronze-800 mb-4">New in 2.9</h2>
+      <ul class="space-y-2 text-ink-700/90 text-[15px] mb-8">
+        <li>✓ CNC Match asks which laser software you use (LightBurn with or without a camera, WeCreat and others), and the export’s read-me opens with the steps for that one.</li>
+        <li>✓ The guide has a chapter on using a WeCreat laser, based on WeCreat’s own published LightBurn setup. We have not tested it on a WeCreat ourselves.</li>
+      </ul>
       <h2 class="font-serif text-2xl text-bronze-800 mb-4">New in 2.8</h2>
       <ul class="space-y-2 text-ink-700/90 text-[15px]">
         <li>✓ The blue edge bars now stretch width or height on their own, so a design can be squeezed or elongated to match a carving that is not quite in proportion. The brown corner squares still resize evenly.</li>

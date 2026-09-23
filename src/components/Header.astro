@@ -4,8 +4,11 @@ import MobileBottomBar from './MobileBottomBar.astro';
 import Concierge from './Concierge.astro';
 import { getCategories, getSettings } from '../lib/queries';
 // desk: 'none' → mobile drawer only (the logo already links Home);
-// desk: 'xl'   → desktop nav only from 1280px up (keeps the row from
-//                crushing the search box on smaller desktops).
+// desk: 'xl'   → desktop nav only from 1280px up, '2xl' from 1536px up.
+// The desktop row is whitespace-nowrap, so every link costs width: with all
+// of them showing it needed ~1,600px and pushed the page sideways on laptops.
+// Budget (logo + search + padding ≈ 470px): lg ≈ 520px of links, xl ≈ 780,
+// 2xl ≈ 1,050. Links left off the desktop row are all in the footer.
 const links = [
   { href: '/', label: 'Home', desk: 'none' },
   { href: '/collections', label: 'Collections' },
@@ -15,13 +18,13 @@ const links = [
   { href: '/bundle-builder', label: '5 from $25' },
   { href: '/gift-cards', label: 'Gift Cards' },
   { href: '/free', label: 'Free files' },
-  { href: '/tools/will-it-cut', label: 'Will it cut?' },
-  { href: '/lamp-studio', label: 'Lamp Studio' },
+  { href: '/tools/will-it-cut', label: 'Will it cut?', desk: 'xl' },
+  { href: '/lamp-studio', label: 'Lamp Studio', desk: '2xl' },
   { href: '/laser-studio', label: 'Laser Studio', desk: 'xl' },
-  { href: '/about', label: 'Our story', desk: 'xl' },
-  { href: '/blog', label: 'Blog', desk: 'xl' },
+  { href: '/about', label: 'Our story', desk: 'none' },
+  { href: '/blog', label: 'Blog', desk: '2xl' },
   { href: '/requests', label: 'Request a design', desk: 'none' },
-  { href: '/faq', label: 'FAQ', desk: 'xl' },
+  { href: '/faq', label: 'FAQ', desk: 'none' },
   { href: '/account', label: 'Account' },
 ];
 const q = Astro.url.searchParams.get('q') ?? '';
@@ -33,7 +36,7 @@ try {
   const { marketplaceLive } = await import('../lib/queries');
   if (await marketplaceLive()) {
     const at = links.findIndex((n) => n.href === '/free');
-    links.splice(at >= 0 ? at + 1 : links.length, 0, { href: '/makers', label: 'Get it made' } as any);
+    links.splice(at >= 0 ? at + 1 : links.length, 0, { href: '/makers', label: 'Get it made', desk: 'xl' } as any);
   }
 } catch {}
 ---
@@ -56,8 +59,8 @@ try {
     <!-- Desktop nav links + cart: pinned right, never shrinks. Secondary links
          (Laser Studio / Our story / Blog) appear from xl so the row always fits. -->
     <div class="hidden lg:flex items-center gap-3 text-sm text-ink-700 ml-auto whitespace-nowrap shrink-0">
-      {links.filter((l) => l.desk !== 'none').map((l) => <a href={l.href} class={`hover:text-bronze-600 ${l.href === '/free' ? 'text-bronze-600' : ''} ${l.desk === 'xl' ? 'hidden xl:inline' : ''}`}>{l.label}</a>)}
-      <a href="/membership" class="hidden xl:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
+      {links.filter((l) => l.desk !== 'none').map((l) => <a href={l.href} class={`hover:text-bronze-600 ${l.href === '/free' ? 'text-bronze-600' : ''} ${l.desk === 'xl' ? 'hidden xl:inline' : l.desk === '2xl' ? 'hidden 2xl:inline' : ''}`}>{l.label}</a>)}
+      <a href="/membership" class="hidden 2xl:inline-block text-bronze-600 font-medium" aria-label="Become a member">Become a member</a>
       <a href="/favorites" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Wishlist"><span class="text-red-500">❤</span><span class="wish-count text-bronze-600 font-medium"></span></a>
       <a href="/cart" class="font-medium text-ink-800 hover:text-bronze-600" aria-label="Cart">🛒 Cart <span class="cart-count text-bronze-600 font-medium"></span></a>
     </div>
