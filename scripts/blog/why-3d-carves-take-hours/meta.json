@@ -1,0 +1,12 @@
+{
+  "title": "Why Your 3D Carve Takes Six Hours, and What Actually Shortens It",
+  "excerpt": "Stepover is the lever, and almost nobody uses it properly. This guide works through the four things that decide how long a 3D relief takes on a CNC router, with the real arithmetic: why the finishing pass is the whole job, how ridge height and stepover are related by one equation, what a tapered ball nose changes, and which of the usual speed tips are false economies. Includes a free tool that runs the numbers on your own STL.",
+  "seo_title": "Why 3D Relief Carving Takes So Long on a CNC Router (and How to Speed It Up)",
+  "seo_description": "3D relief carve taking six hours or six days? The finishing pass is the whole job. Learn how stepover sets carve time and ridge height, what a tapered ball nose really buys, and how to halve a carve without losing detail. Free STL checker included.",
+  "cover": "cover",
+  "email": {
+    "subject": "Why your 3D carve takes six hours",
+    "intro": "Somebody on the Onefinity forum posted a controller estimate of six days for one relief. That is not a broken machine and it is not a bad file, it is arithmetic, and once you can see the arithmetic you can usually halve it without losing anything you would ever notice.\n\nThe new guide works through what actually sets the clock on a 3D carve: why the finishing pass is effectively the entire job, the one equation linking stepover to the ridges it leaves, what a tapered ball nose really buys you, and which popular speed tips are false economies.",
+    "drip": true
+  }
+}
