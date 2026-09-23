@@ -250,9 +250,14 @@ export function simulate(a: Analysis, opts: {
   const roughClosed = closeWithTool(src, w, h, (opts.roughDia / 2) / cell, 'flat', base);
   const rough = new Float32Array(w * h);
   const sd = Math.max(0.2, opts.stepdown);
+  // Emptiness must stay empty. closeWithTool fills unreachable cells with the
+  // floor value so the morphology has something to work with, but carrying
+  // that into the picture paints the space AROUND the model as solid material,
+  // which made the simulated panels show a slab where the first panel showed
+  // background. Mask against the SOURCE, not the closed result.
   for (let i = 0; i < rough.length; i++) {
     const v = roughClosed[i];
-    rough[i] = Number.isNaN(v) ? NaN : base + Math.ceil((v - base) / sd - 1e-6) * sd;
+    rough[i] = Number.isNaN(src[i]) || Number.isNaN(v) ? NaN : base + Math.ceil((v - base) / sd - 1e-6) * sd;
   }
 
   // finishing: the ball, plus the ridges it leaves between passes
@@ -266,7 +271,7 @@ export function simulate(a: Analysis, opts: {
     const ridge = scallop * 0.5 * (1 - Math.cos(2 * Math.PI * (y / periodCells)));
     for (let x = 0; x < w; x++) {
       const i = y * w + x, v = finishClosed[i];
-      finish[i] = Number.isNaN(v) ? NaN : v + ridge;
+      finish[i] = Number.isNaN(src[i]) || Number.isNaN(v) ? NaN : v + ridge;
     }
   }
 

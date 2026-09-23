@@ -15,6 +15,16 @@ import Shell from '../../layouts/Shell.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import { MACHINES, CLASSES } from '../../lib/stl-analyse';
 import { jsonLd } from '../../lib/jsonld';
+import ProductCard from '../../components/ProductCard.astro';
+import { getProducts } from '../../lib/queries';
+
+// Somebody who has just dropped an STL in here owns a machine and is deciding
+// what to cut this weekend. That is the warmest audience the site gets, and
+// until now the page sent them away with nothing to look at. Bestsellers
+// rather than newest: a visitor with no history is best served by what most
+// other makers actually bought.
+let picks: any[] = [];
+try { picks = (await getProducts(1, 8, 'best'))?.products ?? []; } catch {}
 
 const ld = jsonLd({
   '@context': 'https://schema.org',
@@ -177,6 +187,23 @@ const ld = jsonLd({
         <details><summary>What is an open edge?</summary><p>A hole in the mesh. A watertight model has every edge shared by exactly two triangles. A few open edges usually cut fine. Thousands mean the file is damaged and your software may refuse it or produce strange toolpaths.</p></details>
         <details><summary>Can I trust the time estimate?</summary><p>As a rough order of magnitude, yes. It is deliberately simple and does not know about your ramping, your lead-ins or your tool changes. If it says four hours, expect somewhere between three and six.</p></details>
       </section>
+
+      {picks.length > 0 && (
+        <section class="shop">
+          <div class="shop-head">
+            <h2>Something to cut this weekend</h2>
+            <p>Every design here is a single STL with the relief already modelled, so your only job is the toolpaths. Run any of them back through the checker above before you buy.</p>
+          </div>
+          <div class="shop-grid">
+            {picks.map((p: any) => <ProductCard product={p} />)}
+          </div>
+          <div class="shop-more">
+            <a class="btn" href="/catalog">Browse all designs</a>
+            <a class="btn ghost" href="/collections">Browse by collection</a>
+            <a class="btn ghost" href="/free">Free files</a>
+          </div>
+        </section>
+      )}
 
       <p class="foot">
         Built by <a href="/">DigitalChiselCo</a>. If it gets something wrong on your file,
@@ -890,6 +917,13 @@ const ld = jsonLd({
   .btn { background: #854F0B; color: #fff; border: 0; padding: .6rem 1rem; border-radius: .45rem; font: inherit; cursor: pointer; }
   .btn:hover { background: #633806; }
   .btn.ghost { background: #fff; color: #854F0B; border: 1px solid #854F0B; }
+  .shop { margin-top: 2rem; padding-top: 1.75rem; border-top: 1px solid rgba(43,29,16,.14); }
+  .shop-head h2 { font-family: Fraunces, Georgia, serif; font-size: 1.45rem; margin: 0 0 .4rem; color: #2b1d10; }
+  .shop-head p { font-size: .9rem; color: #5c4a38; line-height: 1.6; margin: 0 0 1.25rem; max-width: 42rem; }
+  .shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; }
+  @media (min-width: 640px) { .shop-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 900px) { .shop-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .shop-more { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.25rem; }
   .faq details { border-top: 1px solid rgba(43,29,16,.1); padding: .6rem 0; }
   .faq summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
   .faq p { margin: .5rem 0 0; font-size: .9rem; line-height: 1.6; color: #3a2a1a; }
