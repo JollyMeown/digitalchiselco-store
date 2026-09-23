@@ -87,6 +87,9 @@ export async function allProducts(): Promise<ProductRow[]> {
       .from('products')
       .select('slug, updated_at, etsy_sales_365, rating_count')
       .eq('active', true)
+      // software is sold from its own page; /product/software-* 301s there,
+      // and a sitemap should list only final URLs (/laser-studio is listed)
+      .not('slug', 'like', 'software-%')
       .order('slug')
       .range(from, from + 999);
     if (error) { console.error('sitemap products page failed:', error); break; }
