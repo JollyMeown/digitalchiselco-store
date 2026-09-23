@@ -11,21 +11,15 @@
 // NEEDS THE VPN OFF: openapi.etsy.com is unreachable through it.
 import 'dotenv/config';
 import fs from 'node:fs';
+// same auth path the finance refresh uses: the token lives in the BRS shop
+// profile, not in .env, and etsy_client handles the refresh.
+import { etsy as etsyCall } from './etsy_client.mjs';
 
-const KEY = process.env.ETSY_API_KEY || process.env.ETSY_KEYSTRING;
-const TOKEN = process.env.ETSY_ACCESS_TOKEN;
-const SHOP = process.env.ETSY_SHOP_ID;
-if (!KEY || !TOKEN || !SHOP) { console.error('need ETSY_API_KEY, ETSY_ACCESS_TOKEN, ETSY_SHOP_ID in .env'); process.exit(1); }
+const SHOP = 61524055;
 
 const LIMIT = (() => { const i = process.argv.indexOf('--limit'); return i > -1 ? Number(process.argv[i + 1]) : Infinity; })();
 
-async function etsy(path) {
-  const r = await fetch('https://openapi.etsy.com/v3/application' + path, {
-    headers: { 'x-api-key': KEY, authorization: `Bearer ${TOKEN}` },
-  });
-  if (!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 160)}`);
-  return r.json();
-}
+const etsy = (path) => etsyCall(path);
 
 const byCountry = {};
 const subjectsByCountry = {};

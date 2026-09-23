@@ -96,8 +96,20 @@ is crisp and the background falls into soft honest bokeh, never a wall of blurre
 
 COMPOSITION. Off-centre, the lamp on a third, with breathing room above it. Layer the frame:
 something soft and out of focus in the near foreground, the lamp sharp in the middle, a quiet
-background with one or two restrained props at most. Natural materials only, oak, linen, plaster,
-stoneware, a little aged brass. Nothing symmetrical, nothing staged, nothing cluttered.
+background with real depth. Nothing symmetrical, nothing that looks staged for a catalogue.
+
+STYLING. This is a real room that somebody lives in and cares about, not a showroom with one object
+in it. Dress it the way an interiors stylist would for a magazine: layered, tactile, and warm.
+Build the frame from soft materials that catch the lamplight, a linen or bouclé cushion, a throw
+folded over an arm, a wool rug, a sheer curtain glowing at the window. Add life at the edges,
+dried stems or eucalyptus in a stoneware jug, a low bowl, a stack of two or three books with worn
+spines, a small tray, a trailing plant, a half-burnt candle. Let the background hold something to
+look into: an open doorway with warm light beyond it, a shelf with a few considered things on it,
+the corner of a framed picture. Keep the palette harmonious and quiet, warm neutrals with oatmeal,
+clay, sage and walnut, one small note of aged brass. Everything should look chosen and placed with
+care, slightly imperfect, lived in. Rich and layered, never cluttered, and never competing with the
+lamp: the lamp is the brightest and sharpest thing in the frame, and everything else is there to
+make the room feel like somewhere you would want to sit.
 
 GRADE. Filmic. Gentle highlight rolloff, slightly cool shadows against the warm glow, deep but
 open blacks, a whisper of grain. Rich and quiet, not saturated, not HDR, not glossy.`;
@@ -147,7 +159,11 @@ running as fine parallel striations through the glow.`,
   // as a pendant when it hangs mouth-down, which is how the E27 holder sits
   // anyway, so this is an honest second use rather than a different product.
   pendant: `SET: the same shade hung as a PENDANT, mouth downward, on a black fabric-covered flex from a
-matte black ceiling rose, about 700 mm above a pale oak dining table. Blue hour.
+matte black ceiling rose, about 700 mm above a pale oak dining table in a warm, lived-in dining
+room at blue hour. Dress the table properly: a rumpled linen runner, two stoneware bowls, a small
+jug of dried stems, a folded napkin, a glass half full. Chairs pulled slightly out of place.
+Beyond the table let the room continue, a sideboard with a few considered things, an open doorway
+with warm light spilling from the next room.
 LIGHT: the pendant is the only warm source. It throws a bright pool onto the oak below and a wide
 fan of shadow rays up across the ceiling, which is the signature of a fluted single-wall shade and
 must be clearly visible. Cool dusk fills the room behind at a much lower level.

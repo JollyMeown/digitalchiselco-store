@@ -80,12 +80,35 @@ async function stlLinkFor(productId) {
   return null;
 }
 
+/** Download with retries. A 96 MB pull over several hours WILL meet a dropped
+ *  connection: the 2026-09-14 run measured 252 designs and then died outright
+ *  on a single ECONNRESET, losing the rest of the night. Transport failures are
+ *  expected here, not exceptional, so they are retried rather than fatal. */
+async function fetchBuf(url, slug) {
+  let last = '';
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) {
+        last = `HTTP ${r.status}`;
+        if (r.status >= 400 && r.status < 500 && r.status !== 429) break;   // a real refusal, not a blip
+      } else {
+        return Buffer.from(await r.arrayBuffer());
+      }
+    } catch (e) {
+      last = String(e?.cause?.code || e?.message || e).slice(0, 60);
+    }
+    if (attempt < 4) await new Promise((res) => setTimeout(res, attempt * 4000));
+  }
+  console.log(`  ${slug}: download failed (${last})`);
+  return null;
+}
+
 async function run(p) {
   const url = await stlLinkFor(p.id);
   if (!url) { console.log(`  ${p.slug}: no downloadable file`); return false; }
-  const r = await fetch(url);
-  if (!r.ok) { console.log(`  ${p.slug}: download failed (${r.status})`); return false; }
-  const buf = Buffer.from(await r.arrayBuffer());
+  const buf = await fetchBuf(url, p.slug);
+  if (!buf) return false;
   const specs = measure(buf);
   if (!specs) { console.log(`  ${p.slug}: not a binary STL (${(buf.length / 1048576).toFixed(1)} MB)`); return false; }
   console.log(`  ${String(p.title).slice(0, 46).padEnd(46)} ${specs.width} x ${specs.height} x ${specs.depth} | ${specs.orientation} | depth ${specs.depth_pct_of_width}% of width | ${specs.triangles.toLocaleString()} triangles | ${specs.file_mb} MB${specs.base_flat ? '' : ' | BASE NOT AT ZERO'}`);
@@ -109,9 +132,15 @@ if (slug) {
     .order('etsy_sales_365', { ascending: false, nullsFirst: false })
     .limit(missing);
   console.log(`measuring ${ps?.length || 0} designs (best sellers first)`);
-  let ok = 0;
-  for (const p of ps || []) { if (await run(p)) ok++; }
-  console.log(`\n${ok} measured and stored`);
+  let ok = 0, failed = 0, n = 0;
+  for (const p of ps || []) {
+    // One bad design must never end the run. Restarting resumes on its own,
+    // since the selection is "model_specs is null".
+    try { if (await run(p)) ok++; else failed++; }
+    catch (e) { failed++; console.log(`  ${p.slug}: ${String(e?.cause?.code || e?.message || e).slice(0, 80)}`); }
+    if (++n % 25 === 0) console.log(`  ... ${n}/${ps.length} processed, ${ok} stored, ${failed} skipped`);
+  }
+  console.log(`\n${ok} measured and stored, ${failed} skipped`);
 } else {
   console.log('usage: --slug <slug> | --missing <n> [--dry]');
 }
