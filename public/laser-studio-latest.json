@@ -1,5 +1,5 @@
 {
-  "version": "2.8",
+  "version": "2.9",
   "url": "https://drive.google.com/file/d/1nzi0B_oDoPi1H7ptQSyUBxXGPq7diN-_/view?usp=sharing",
-  "notes": "CNC Match, shaped by your feedback.  ↔ NEW: the blue edge bars stretch the width or the height on their own, so you can squeeze or elongate a design to match a carving that is not quite in proportion. Brown corner squares still resize evenly.  👁 See-through is now the default overlay and remembers your opacity.  📖 The built-in guide has a new chapter: a real customer job, carved on a CNC then burned on the laser, in photographs."
+  "notes": "CNC Match now asks which laser software you use: LightBurn with a camera, LightBurn without one (for example a WeCreat over USB), WeCreat's own software, or other. The READ ME in every export then opens with the right steps for your setup.  📖 The CNC Match Guide gains a WeCreat chapter and now shows a real customer's carved and burned panel throughout."
 }
