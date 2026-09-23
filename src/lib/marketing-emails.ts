@@ -373,6 +373,106 @@ export function articleEmail(d: { email: string; post: ArticlePost }): Out {
 }
 
 // ── Abandoned cart (one reminder, ~20h later) ────────────────────────
+/** CNC Match announcement. Written for people who already OWN a CNC and have
+ *  carvings sitting on a shelf, which is the only audience this feature means
+ *  anything to. It leads with the customer's own photographs rather than a
+ *  render, because the single question a maker has is whether it really lines
+ *  up on a real board, and a picture of a finished burned panel answers it. */
+export function cncMatchEmail(d: { email: string; name?: string | null }): Out {
+  const e = d.email;
+  const url = `${SITE}/laser-studio?utm_source=email&utm_medium=broadcast&utm_campaign=cnc-match-2026-09#cnc-match`;
+  const tool = `${SITE}/tools/will-it-cut?utm_source=email&utm_medium=broadcast&utm_campaign=cnc-match-2026-09`;
+  const subject = 'Carved it on the CNC? Now finish it on the laser';
+  const hi = d.name ? `Hi ${String(d.name).split(' ')[0]},` : 'Hi,';
+
+  const body = `
+    <p style="margin:0 0 14px">${hi}</p>
+    <p style="margin:0 0 14px">You have carved our files on your CNC. This is about what happens next to those pieces.</p>
+    <p style="margin:0 0 14px">Laser Studio now has <strong>CNC Match</strong>. Put the carved piece on your laser bed,
+      photograph it straight down, and it burns text, shading or the same picture <strong>exactly onto the carving</strong>.
+      A name and a date under a pet portrait. A darkened background that makes the relief jump off the board.
+      A scorched edge along the raised tops.</p>
+
+    <p style="margin:0 0 10px"><strong>A customer did this last week and sent the photographs:</strong></p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px">
+      <tr>
+        <td width="50%" style="padding:0 4px 8px 0">
+          <img src="${SITE}/laser-studio/cnc-carved-on-laser-bed.webp" width="260" alt="The carved panel on his laser bed" style="width:100%;max-width:260px;border-radius:6px;display:block" />
+        </td>
+        <td width="50%" style="padding:0 0 8px 4px">
+          <img src="${SITE}/laser-studio/cnc-carved-and-burned.webp" width="260" alt="The finished piece, carved and then burned" style="width:100%;max-width:260px;border-radius:6px;display:block" />
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 16px;font-size:13px;color:#6b5a48">His carving on the laser bed, and the same piece after the burn. Used with permission.</p>
+
+    <p style="margin:0 0 8px"><strong>How it goes:</strong></p>
+    <p style="margin:0 0 14px;line-height:1.7">
+      1. Load the greyscale file of the relief you carved<br/>
+      2. Photograph the piece on the laser, straight down<br/>
+      3. Mark the board corners so the photo is measurable in real millimetres or inches<br/>
+      4. The built-in AI finds your piece and places the design, offline, and tells you how sure it is<br/>
+      5. Pick what to burn: darkened floor, scorched tops, outline, shading or your own text<br/>
+      6. Export for LightBurn, alignment helpers included, in one ZIP
+    </p>
+
+    <p style="margin:0 0 14px">You get the burn files at the carving's real size, a ghost outline for lining up in your
+      laser's camera view, registration marks for Print and Cut, and an optional jig so repeat orders drop straight into place.</p>
+
+    <p style="margin:0 0 14px;padding:12px 14px;background:#FBF4E8;border-left:3px solid #854F0B;border-radius:4px;font-size:14px">
+      <strong>Being straight with you about Auto-fit:</strong> it is a starting guess, not a promise. A clamp, a bright
+      offcut or a hand in the shot can fool it, and square pieces sometimes land a quarter turn out. It tells you how
+      confident it is and you nudge it by hand. Alignment is typically within about a millimetre. Check the outline and
+      test on scrap before you burn the finished piece.
+    </p>
+
+    ${btn(url, 'See CNC Match, with the real photos')}
+
+    <p style="margin:18px 0 14px">It is part of Laser Studio, a one-time purchase, no subscription, and it runs on your
+      own PC. If you already own it, <strong>the update is free</strong> and it is waiting for you.</p>
+
+    <p style="margin:0 0 14px">Unrelated but new this week, and free with no signup: drop any STL into
+      <a href="${tool}" style="color:#854F0B">Will it cut?</a> and it tells you whether it fits your machine, how deep
+      it is, which bit you need and roughly how long it will take. Your file never leaves your computer.</p>
+
+    <p style="margin:0 0 6px">Jolly</p>
+    <p style="margin:0;color:#6b5a48;font-size:13px">DigitalChiselCo</p>
+  `;
+
+  const text = [
+    hi,
+    '',
+    'You have carved our files on your CNC. This is about what happens next to those pieces.',
+    '',
+    'Laser Studio now has CNC Match. Put the carved piece on your laser bed, photograph it',
+    'straight down, and it burns text, shading or the same picture exactly onto the carving.',
+    '',
+    'How it goes:',
+    '1. Load the greyscale file of the relief you carved',
+    '2. Photograph the piece on the laser, straight down',
+    '3. Mark the board corners so the photo is measurable in millimetres or inches',
+    '4. The built-in AI finds your piece and places the design, offline',
+    '5. Pick what to burn: darkened floor, scorched tops, outline, shading or your own text',
+    '6. Export for LightBurn, alignment helpers included, in one ZIP',
+    '',
+    'Being straight about Auto-fit: it is a starting guess, not a promise. A clamp, a bright',
+    'offcut or a hand in the shot can fool it. Alignment is typically within about a millimetre.',
+    'Check the outline and test on scrap before burning the finished piece.',
+    '',
+    `See it, with a customer's real photos: ${url}`,
+    '',
+    'Part of Laser Studio. One-time purchase, no subscription, runs on your own PC.',
+    'If you already own it, the update is free.',
+    '',
+    `Also new and free, no signup: ${tool} tells you whether any STL will cut on your machine.`,
+    '',
+    'Jolly, DigitalChiselCo',
+    `Unsubscribe: ${unsubUrl(e)}`,
+  ].join('\n');
+
+  return { subject, html: shell(subject, 'Carved it on the CNC? Finish it on the laser', body, e), text };
+}
+
 export function cartReminderEmail(d: { email: string; items: { title: string; price: number; image_url?: string | null; slug?: string | null; etsy_price?: number | null }[]; subtotal: number }): Out {
   const subject = 'Your cart is saved — your designs are waiting';
   // The reason a hesitant buyer was missing: the same file costs more on
