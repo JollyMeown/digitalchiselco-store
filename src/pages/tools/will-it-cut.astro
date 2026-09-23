@@ -167,6 +167,18 @@ const ld = jsonLd({
           <div id="time" class="times"></div>
         </section>
 
+        <section class="panel" id="fasterPanel" hidden>
+          <h2>Make it faster
+            <button class="tip" type="button" data-tip="Every row is run against your actual file. Stepover trades time against the ridges left between passes, and those sand out. The other column, detail the bit cannot reach, is fixed by the cutter you own and no stepover or sanding recovers it. Keeping them apart is the whole point.">?</button>
+          </h2>
+          <p class="note" id="fasterLede"></p>
+          <div id="fasterPick"></div>
+          <div class="ftable-wrap">
+            <table class="ftable" id="fasterTable"></table>
+          </div>
+          <p class="note small">Two different errors, deliberately kept apart. Ridges between passes shrink when you lower the stepover, cost time, and sand out. Detail the bit cannot reach does not change with stepover and sanding never brings it back: that one is a decision about which cutter you own. Times are the same estimate as above, so compare them with each other rather than trusting the absolute number.</p>
+        </section>
+
         <section class="panel share">
           <h2>Share the result</h2>
           <p>Stuck on something, or want a second opinion? Take the card and post it wherever you are asking.</p>
@@ -218,7 +230,7 @@ const ld = jsonLd({
 </Shell>
 
 <script>
-  import { parseSTL, analyse, cutTime, fmtTime, simulate, MACHINES, CLASSES, type Analysis } from '../../lib/stl-analyse';
+  import { parseSTL, analyse, cutTime, fmtTime, simulate, fasterOptions, fastestFreeFor, bigBitOption, MACHINES, CLASSES, type Analysis } from '../../lib/stl-analyse';
 
   const $ = (id: string) => document.getElementById(id)!;
   let A: Analysis | null = null;
@@ -283,6 +295,7 @@ const ld = jsonLd({
       drawPreview();
       render();
       drawSims();
+      drawFaster();
       $('out').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e: any) {
       $('progress').hidden = true;
@@ -521,11 +534,68 @@ const ld = jsonLd({
       <div class="t big"><div class="tk">Total, roughly</div><div class="tv">${fmtTime(t.totalMin * 0.8)} to ${fmtTime(t.totalMin * 1.5)}</div><div class="tn">machine time, not counting setup</div></div>`;
   }
 
+  // ── make it faster ────────────────────────────────────────────────────
+  function drawFaster() {
+    if (!A) return;
+    const s = scale();
+    const cls = CLASSES[+($('cls') as HTMLSelectElement).value];
+    const ball = +($('ball') as HTMLSelectElement).value;
+    const so = +($('so') as HTMLInputElement).value;
+    const options = fasterOptions(A, cls, s);
+    const now = options.find((o) => o.ballDia === ball && o.stepoverPct === so);
+    const best = fastestFreeFor(options, ball);
+    const bigger = bigBitOption(options, ball);
+    $('fasterPanel').hidden = false;
+
+    const bits: string[] = [];
+    if (best && now) {
+      const saved = now.minutes - best.minutes;
+      if (best.stepoverPct === now.stepoverPct) {
+        bits.push(`You are already on the coarsest stepover your ${ball} mm bit can run without the ridges showing. At ${best.stepoverPct}% they are <strong>${best.scallop.toFixed(3)} mm</strong>, which sanding removes.`);
+      } else {
+        bits.push(`At ${now.stepoverPct}% this takes <strong>${fmtTime(now.minutes)}</strong>. Your ${ball} mm bit can run <strong>${best.stepoverPct}%</strong> and finish in <strong>${fmtTime(best.minutes)}</strong>, leaving ridges of <strong>${best.scallop.toFixed(3)} mm</strong>. That is under what 220 grit takes off, so it costs you nothing but ${saved > 0 ? 'saves ' + fmtTime(saved) : 'no time'}.`);
+      }
+    }
+    if (bigger && now) {
+      const lost = bigger.unreachable - (now.unreachable || 0);
+      bits.push(lost > 0.02
+        ? `A <strong>${bigger.ballDia} mm</strong> bit would finish in <strong>${fmtTime(bigger.minutes)}</strong>, but it cannot reach <strong>${lost.toFixed(2)} mm</strong> more of the detail than your ${ball} mm does. That is a choice about the carving, not about time, and no stepover and no sanding brings it back.`
+        : `A <strong>${bigger.ballDia} mm</strong> bit would finish in <strong>${fmtTime(bigger.minutes)}</strong> and, on this particular file, reaches essentially the same detail. Worth using.`);
+    }
+    $('fasterLede').innerHTML = bits.join(' ') || 'Nothing to tune on this file.';
+
+    $('fasterPick').innerHTML = (best && now && best.stepoverPct !== now.stepoverPct)
+      ? `<div class="fpick">
+           <div class="fpick-save">Saves ${fmtTime(now.minutes - best.minutes)}</div>
+           <button class="btn" type="button" id="applyFast">Use ${best.stepoverPct}% stepover</button>
+         </div>`
+      : '';
+    const btn = document.getElementById('applyFast');
+    if (btn && best) btn.addEventListener('click', () => {
+      ($('so') as HTMLInputElement).value = String(best.stepoverPct);
+      render(); drawSims(); drawFaster();
+    });
+
+    $('fasterTable').innerHTML = `
+      <thead><tr><th>Bit</th><th>Stepover</th><th>Time</th><th>Ridges between passes</th><th>Detail it cannot reach</th></tr></thead>
+      <tbody>${options.map((o) => {
+        const isNow = o.ballDia === now?.ballDia && o.stepoverPct === now?.stepoverPct;
+        const isBest = best && o.ballDia === best.ballDia && o.stepoverPct === best.stepoverPct;
+        return `<tr class="${isNow ? 'now' : ''} ${isBest ? 'best' : ''}">
+          <td>${o.ballDia} mm</td><td>${o.stepoverPct}%</td>
+          <td>${fmtTime(o.minutes)}</td>
+          <td class="${o.ridgesFree ? 'good' : 'warn'}">${o.scallop.toFixed(3)} mm${o.ridgesFree ? ' · sands out' : ' · shows'}</td>
+          <td>${o.unreachable ? o.unreachable.toFixed(2) + ' mm' : '<span class="muted">not measurable</span>'}${isNow ? ' · yours' : ''}${isBest ? ' · pick this' : ''}</td>
+        </tr>`;
+      }).join('')}</tbody>`;
+  }
+
   for (const id of ['machine', 'cls', 'ball', 'so', 'sc', 'cw', 'cd']) {
     $(id).addEventListener('input', () => {
       $('customWrap').hidden = ($('machine') as HTMLSelectElement).value !== 'custom';
       render();
       if (id === 'ball' || id === 'so' || id === 'cls') drawSimsSoon();
+      drawFaster();
     });
   }
 
@@ -913,6 +983,18 @@ const ld = jsonLd({
   .tv { font-family: Fraunces, Georgia, serif; font-size: 1.35rem; margin: .1rem 0; }
   .tn { font-size: .74rem; color: #5c4a38; }
 
+  .fpick { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin: .9rem 0 1.1rem;
+    background: #EAF3EA; border-left: 3px solid #2f7d32; border-radius: .4rem; padding: .8rem 1rem; }
+  .fpick-save { font-weight: 700; color: #2f7d32; }
+  .ftable-wrap { overflow-x: auto; }
+  .ftable { width: 100%; border-collapse: collapse; font-size: .84rem; font-variant-numeric: tabular-nums; }
+  .ftable th { text-align: left; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase;
+    color: #8a7864; font-weight: 600; padding: .4rem .55rem; border-bottom: 1px solid rgba(43,29,16,.16); white-space: nowrap; }
+  .ftable td { padding: .42rem .55rem; border-bottom: 1px solid rgba(43,29,16,.07); white-space: nowrap; }
+  .ftable tr.best td { background: #EAF3EA; }
+  .ftable tr.now td { font-weight: 600; }
+  .ftable .good { color: #2f7d32; } .ftable .warn { color: #b4530f; }
+  .ftable .muted { color: #8a7864; font-style: italic; }
   .share-row { display: flex; gap: .6rem; flex-wrap: wrap; }
   .btn { background: #854F0B; color: #fff; border: 0; padding: .6rem 1rem; border-radius: .45rem; font: inherit; cursor: pointer; }
   .btn:hover { background: #633806; }

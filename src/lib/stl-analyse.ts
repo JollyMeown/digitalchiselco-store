@@ -508,6 +508,95 @@ export function analyse(pos: Float32Array, onProgress?: (p: number) => void): An
   };
 }
 
+// ── make it faster ──────────────────────────────────────────────────────
+//
+// The single loudest complaint in CNC relief carving is time. A maker on the
+// Onefinity forum reported a controller estimate of SIX DAYS for one 20 by 12
+// inch relief. Carveco's own training says hours or days is normal. The advice
+// everywhere is generic ("try 15% stepover"), because nobody can say what a
+// given change costs on YOUR file.
+//
+// We can, because detail loss is already measured per cutter on the real
+// surface. Combining that with the scallop height, which is pure geometry,
+// turns a vague trade into a number:
+//
+//   surface error = max(what the cutter cannot reach, ridges between passes)
+//
+// A setting is "free" when that error is below what sanding removes anyway, so
+// the fastest free setting is the recommendation. The non-obvious result, and
+// the reason this is worth computing per file, is that a BIGGER bit at a FINER
+// stepover is often both faster and smoother than a small bit run coarse: the
+// scallop shrinks with stepover but the reach limit does not shrink at all.
+
+export type FasterOption = {
+  ballDia: number;
+  stepoverPct: number;
+  minutes: number;
+  /** ridge height left between passes, mm. THIS is what stepover trades. */
+  scallop: number;
+  /** detail the cutter cannot reach into, mm, 0 when unmeasurable. Fixed per bit. */
+  unreachable: number;
+  /** true when the ridges are below what sanding removes */
+  ridgesFree: boolean;
+};
+
+/** Roughly what 220 grit removes. */
+export const SANDING_MM = 0.05;
+
+/**
+ * The two errors are NOT the same decision and must not be added together.
+ *
+ * SCALLOP is the ridge left between passes. It shrinks as you lower the
+ * stepover, it costs time, and sanding removes it. That is the time/quality
+ * trade, and it is the one worth automating.
+ *
+ * UNREACHABLE is the detail a given ball simply cannot enter. It does not
+ * change with stepover at all, and no amount of sanding brings it back. It is
+ * a consequence of which bit you own, not of how you drive it.
+ *
+ * The first version compared the WORSE of the two against the sanding
+ * threshold. On any detailed relief the unreachable term dominates, so every
+ * row came back "visible" and the panel said nothing useful. Worse, it implied
+ * a finer stepover could recover detail the bit physically cannot reach.
+ *
+ * So: recommend the coarsest stepover whose ridges stay free, FOR THE BIT IN
+ * HAND, and report separately what a different bit would cost in detail.
+ */
+export function fasterOptions(a: Analysis, cls: MachineClass, scale = 1) {
+  const out: FasterOption[] = [];
+  for (const dia of [1.5, 3, 6]) {
+    const m = a.detailLoss.find((d) => d.radius === dia);
+    const unreachable = m?.measurable ? m.max * scale : 0;
+    for (const so of [8, 10, 12, 15, 20, 25, 30]) {
+      const r = dia / 2;
+      const step = dia * (so / 100);
+      const scallop = Math.max(0, r - Math.sqrt(Math.max(0, r * r - (step / 2) * (step / 2))));
+      out.push({
+        ballDia: dia, stepoverPct: so,
+        minutes: cutTime(a, cls, dia, so, scale).totalMin,
+        scallop: Math.round(scallop * 1000) / 1000,
+        unreachable: Math.round(unreachable * 100) / 100,
+        ridgesFree: scallop <= SANDING_MM,
+      });
+    }
+  }
+  return out;
+}
+
+/** The recommendation, for the bit the maker already has fitted. */
+export function fastestFreeFor(options: FasterOption[], ballDia: number): FasterOption | null {
+  const forBit = options.filter((o) => o.ballDia === ballDia && o.ridgesFree);
+  if (!forBit.length) return null;
+  return forBit.reduce((best, o) => (o.minutes < best.minutes ? o : best));
+}
+
+/** A bigger bit is faster but loses detail. Say how much, and let them choose. */
+export function bigBitOption(options: FasterOption[], ballDia: number): FasterOption | null {
+  const bigger = options.filter((o) => o.ballDia > ballDia && o.ridgesFree);
+  if (!bigger.length) return null;
+  return bigger.reduce((best, o) => (o.minutes < best.minutes ? o : best));
+}
+
 /** Cut-time model. Reported as an estimate because that is what it is. */
 export function cutTime(a: Analysis, cls: MachineClass, ballDia: number, stepoverPct: number, scale = 1) {
   const sx = a.size.x * scale, sy = a.size.y * scale, depth = a.reliefDepth * scale;
