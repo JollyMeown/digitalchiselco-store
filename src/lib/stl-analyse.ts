@@ -145,30 +145,137 @@ function raster(pos: Float32Array, target = 320) {
   return { w, h, cell, top, bot, minX, minY, minZ, maxX, maxY, maxZ };
 }
 
-/** Grayscale morphological closing with a disc: exactly what a ball nose leaves. */
-function closeWithBall(src: Float32Array, w: number, h: number, rCells: number, floor: number) {
+/**
+ * Grayscale morphological closing with the SHAPE OF THE TOOL, which is exactly
+ * what a cutter does to a surface: it cannot put its centre anywhere the body
+ * would collide, so the achievable surface is the original closed by the tool.
+ *
+ * The structuring element matters and the first version got it wrong. A flat
+ * disc is a flat end mill. A ball nose is a HEMISPHERE, so each offset in the
+ * disc carries a height sqrt(r^2 - d^2); ignoring that treats a round cutter as
+ * a square one and understates what it can reach into.
+ */
+function closeWithTool(src: Float32Array, w: number, h: number, rCells: number,
+                       shape: 'ball' | 'flat', floor: number) {
   const r = Math.max(1, Math.round(rCells));
-  const off: number[] = [];
-  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (dx * dx + dy * dy <= r * r) off.push(dx, dy);
-  const pass = (input: Float32Array, pick: (a: number, b: number) => number, seed: number) => {
+  const off: number[] = [];      // dx, dy, height offset
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r * r) continue;
+      off.push(dx, dy, shape === 'ball' ? r - Math.sqrt(r * r - d2) : 0);
+    }
+  }
+  const pass = (input: Float32Array, dilate: boolean) => {
     const out = new Float32Array(w * h);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        let best = seed;
-        for (let o = 0; o < off.length; o += 2) {
+        let best = dilate ? -Infinity : Infinity;
+        let any = false;
+        for (let o = 0; o < off.length; o += 3) {
           const nx = x + off[o], ny = y + off[o + 1];
           if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
           const v = input[ny * w + nx];
           if (Number.isNaN(v)) continue;
-          best = pick(best, v);
+          // the tool's own profile, in the units of the height map
+          const g = off[o + 2] * (rCells > 0 ? 1 : 0);
+          const cand = dilate ? v + g : v - g;
+          best = dilate ? Math.max(best, cand) : Math.min(best, cand);
+          any = true;
         }
-        out[y * w + x] = best === seed ? floor : best;
+        out[y * w + x] = any ? best : floor;
       }
     }
     return out;
   };
-  const dil = pass(src, Math.max, -Infinity);
-  return pass(dil, Math.min, Infinity);
+  return pass(pass(src, true), false);
+}
+
+/** Kept for the detail-loss figures, which read better with the true ball. */
+const closeWithBall = (src: Float32Array, w: number, h: number, rCells: number, floor: number) =>
+  closeWithTool(src, w, h, rCells, 'ball', floor);
+
+// ── machining simulation ────────────────────────────────────────────────
+export type SimSurface = { w: number; h: number; cell: number; z: Float32Array };
+export type Sim = {
+  rough: SimSurface;
+  finish: SimSurface;
+  /** ridge height left between finishing passes, mm */
+  scallop: number;
+  /** number of stepdown layers the roughing pass will take */
+  layers: number;
+};
+
+/**
+ * Produce the two surfaces a real job leaves, from the buyer's own file and the
+ * tools they picked, so the page can SHOW the difference instead of asserting
+ * it in a number.
+ *
+ *   roughing  = closed with a FLAT cutter, then quantised into stepdown layers,
+ *               which is where the terraces come from
+ *   finishing = closed with the BALL, plus the scallop ridges left between
+ *               passes, whose height is plain geometry: r - sqrt(r^2 - (s/2)^2)
+ *
+ * It is a surface simulation, not a CAM verification: no holder collisions, no
+ * ramping, no deflection. The page says so.
+ */
+export function simulate(a: Analysis, opts: {
+  roughDia: number; stepdown: number; ballDia: number; stepoverPct: number;
+}): Sim {
+  const ballR = opts.ballDia / 2;
+  // Work at a resolution where the ball spans about five cells: fine enough to
+  // see, cheap enough to redraw while a slider is moving.
+  const k = Math.max(1, Math.round((ballR / a.grid.cell) / 5));
+  const w = Math.ceil(a.grid.w / k), h = Math.ceil(a.grid.h / k);
+  const cell = a.grid.cell * k;
+  const src = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sum = 0, n = 0;
+      for (let yy = y * k; yy < Math.min(a.grid.h, (y + 1) * k); yy++) {
+        for (let xx = x * k; xx < Math.min(a.grid.w, (x + 1) * k); xx++) {
+          const v = a.height[yy * a.grid.w + xx];
+          if (!Number.isNaN(v)) { sum += v; n++; }
+        }
+      }
+      src[y * w + x] = n ? sum / n : NaN;
+    }
+  }
+
+  let base = Infinity;
+  for (let i = 0; i < src.length; i++) { const v = src[i]; if (!Number.isNaN(v) && v < base) base = v; }
+  if (!isFinite(base)) base = 0;
+
+  // roughing: the flat cutter cannot reach in, and it leaves layers behind
+  const roughClosed = closeWithTool(src, w, h, (opts.roughDia / 2) / cell, 'flat', base);
+  const rough = new Float32Array(w * h);
+  const sd = Math.max(0.2, opts.stepdown);
+  for (let i = 0; i < rough.length; i++) {
+    const v = roughClosed[i];
+    rough[i] = Number.isNaN(v) ? NaN : base + Math.ceil((v - base) / sd - 1e-6) * sd;
+  }
+
+  // finishing: the ball, plus the ridges it leaves between passes
+  const finishClosed = closeWithTool(src, w, h, ballR / cell, 'ball', base);
+  const stepMm = opts.ballDia * (opts.stepoverPct / 100);
+  const scallop = Math.max(0, ballR - Math.sqrt(Math.max(0, ballR * ballR - (stepMm / 2) * (stepMm / 2))));
+  const finish = new Float32Array(w * h);
+  const periodCells = Math.max(1e-6, stepMm / cell);
+  for (let y = 0; y < h; y++) {
+    // ridges run along the raster direction, peaking between passes
+    const ridge = scallop * 0.5 * (1 - Math.cos(2 * Math.PI * (y / periodCells)));
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x, v = finishClosed[i];
+      finish[i] = Number.isNaN(v) ? NaN : v + ridge;
+    }
+  }
+
+  return {
+    rough: { w, h, cell, z: rough },
+    finish: { w, h, cell, z: finish },
+    scallop,
+    layers: Math.max(1, Math.ceil((a.reliefDepth || 0) / sd)),
+  };
 }
 
 /**
