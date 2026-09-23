@@ -49,7 +49,7 @@ const LOOK_GROUPS = [
 
     <!-- ===== HERO ===== -->
     <header class="text-center mb-10 reveal">
-      <p class="text-xs tracking-widest text-bronze-600 mb-3">★ VERSION 2.7 · CNC MATCH WITH AUTO-FIT</p>
+      <p class="text-xs tracking-widest text-bronze-600 mb-3">★ VERSION 2.8 · CNC MATCH, SHAPED BY YOUR FEEDBACK</p>
       <h1 class="font-serif text-4xl md:text-6xl text-bronze-800 leading-tight">
         Laser <em class="italic text-bronze-600">Studio</em>
       </h1>
@@ -67,9 +67,9 @@ const LOOK_GROUPS = [
 
     <figure class="rounded-xl overflow-hidden border border-bronze-600/25 shadow-lg mb-16 reveal">
       <img src="/laser-studio/app-v26.webp" srcset="/laser-studio/app-v26-800.webp 800w, /laser-studio/app-v26.webp 1600w" sizes="(max-width: 1024px) 100vw, 1024px"
-           alt="Laser Studio 2.7 on the CNC Match tab: Auto-fit has locked a design onto a carved alligator relief photographed on the laser bed"
+           alt="Laser Studio 2.8 on the CNC Match tab: Auto-fit has locked a design onto a carved alligator relief photographed on the laser bed"
            width="1600" height="1000" loading="eager" fetchpriority="high" decoding="async" class="w-full" />
-      <figcaption class="text-center text-xs text-ink-700/60 py-2 bg-cream">Laser Studio 2.7: seven workspaces, one quiet artboard. Here, CNC Match has locked a design onto a real carving.</figcaption>
+      <figcaption class="text-center text-xs text-ink-700/60 py-2 bg-cream">Laser Studio 2.8: seven workspaces, one quiet artboard. Here, CNC Match has locked a design onto a real carving.</figcaption>
     </figure>
 
     <!-- ===== NEW: CNC MATCH ===== -->
@@ -353,7 +353,7 @@ const LOOK_GROUPS = [
     <section class="mb-8 text-center reveal">
       <h2 class="font-serif text-3xl text-bronze-800">The plain facts</h2>
       <ul class="not-prose mt-5 grid sm:grid-cols-2 gap-3 text-sm max-w-2xl mx-auto text-left text-ink-700/85">
-        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Windows 10 / 11, installs in one click</li>
+        <li class="flex gap-2"><span class="text-bronze-600">✓</span> Windows 10 / 11 only, 64-bit. No Mac or Linux version</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> One-time purchase, no subscription</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Photos processed on your PC, never uploaded</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Illustrated user manual and CNC Match Guide built in</li>
@@ -362,6 +362,44 @@ const LOOK_GROUPS = [
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Seven workspaces, from STL to your shop paperwork</li>
         <li class="flex gap-2"><span class="text-bronze-600">✓</span> Made by the studio behind {DESIGNS} STL designs</li>
       </ul>
+    </section>
+
+    <!-- ===== NEW IN 2.8 + FAQ ===== -->
+    <section class="mb-16 max-w-3xl mx-auto reveal">
+      <h2 class="font-serif text-2xl text-bronze-800 mb-4">New in 2.8</h2>
+      <ul class="space-y-2 text-ink-700/90 text-[15px]">
+        <li>✓ The blue edge bars now stretch width or height on their own, so a design can be squeezed or elongated to match a carving that is not quite in proportion. The brown corner squares still resize evenly.</li>
+        <li>✓ See-through is the default overlay and remembers the opacity you chose.</li>
+        <li>✓ The built-in guide has a new chapter: a real customer job, carved on a CNC and then burned on the laser, in photographs.</li>
+      </ul>
+
+      <h2 class="font-serif text-2xl text-bronze-800 mt-10 mb-4">Questions people ask</h2>
+      <div class="space-y-3">
+        <details class="border-t border-black/10 pt-3">
+          <summary class="cursor-pointer font-medium text-ink-800">Will it run on a Mac?</summary>
+          <p class="mt-2 text-[15px] text-ink-700/90 leading-relaxed">No. Laser Studio is a Windows 10 and 11 application, 64-bit, and there is no Mac or Linux build. It needs about 1.2 GB of free disk space after installing.</p>
+        </details>
+        <details class="border-t border-black/10 pt-3">
+          <summary class="cursor-pointer font-medium text-ink-800">Is it a subscription?</summary>
+          <p class="mt-2 text-[15px] text-ink-700/90 leading-relaxed">No. It is a one-time purchase and updates are free. When a new version is out the app shows a banner, and every customer on version 2.0 or later gets the notice.</p>
+        </details>
+        <details class="border-t border-black/10 pt-3">
+          <summary class="cursor-pointer font-medium text-ink-800">Does it need an internet connection?</summary>
+          <p class="mt-2 text-[15px] text-ink-700/90 leading-relaxed">Not for the work itself. Your photos and files are processed on your own PC and are never uploaded. It reaches out twice only: to check for an update, and once to download the 5 MB upscaler model.</p>
+        </details>
+        <details class="border-t border-black/10 pt-3">
+          <summary class="cursor-pointer font-medium text-ink-800">Does it control my laser?</summary>
+          <p class="mt-2 text-[15px] text-ink-700/90 leading-relaxed">No, and it is worth being clear about this. Laser Studio prepares the files. You burn them with your own machine software, such as LightBurn, xTool Creative Space, LaserGRBL, WeCreat or RDWorks. It never drives the laser itself.</p>
+        </details>
+        <details class="border-t border-black/10 pt-3">
+          <summary class="cursor-pointer font-medium text-ink-800">How accurate is CNC Match?</summary>
+          <p class="mt-2 text-[15px] text-ink-700/90 leading-relaxed">Alignment is typically within about a millimetre. Auto-fit is a starting guess that tells you how confident it is, not a guarantee: a clamp, a bright offcut or a hand in the photograph can fool it. Always check the outline and test on scrap before burning the finished piece.</p>
+        </details>
+        <details class="border-t border-black/10 pt-3">
+          <summary class="cursor-pointer font-medium text-ink-800">What settings should I use for my machine?</summary>
+          <p class="mt-2 text-[15px] text-ink-700/90 leading-relaxed">Yours, and the app helps you find them. Every laser and every material behaves differently, so we do not publish power and speed numbers as if they were tested on your machine. The calibration workspace prints a power and speed grid, a focus ramp and a kerf comb so you can measure your own.</p>
+        </details>
+      </div>
     </section>
 
     <section class="mt-12 mb-4 border border-bronze-600/30 rounded-xl p-8 text-center bg-gradient-to-br from-cream to-white reveal">
