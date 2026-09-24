@@ -1,0 +1,66 @@
+---
+// "Search your model": the large search bar for the homepage, catalog,
+// collection pages and the 404 page. It is a .dcc-search form, so the header
+// script gives it the same live dropdown as the header box (popular searches
+// when empty; collections, designs and "See all" while typing).
+//
+// variant 'hero'    homepage band: headline, big input, popular chips
+//         'inline'  a slim bar at the top of a listing page
+// cat / catName     scope the search to one collection ("Search in Western")
+import { POPULAR_SEARCHES } from '../lib/search-index';
+import { designCountLabel } from '../lib/queries';
+
+interface Props { variant?: 'hero' | 'inline'; cat?: string; catName?: string; chips?: boolean; heading?: string }
+const { variant = 'inline', cat = '', catName = '', chips = variant === 'hero', heading } = Astro.props;
+const count = await designCountLabel();
+const placeholder = catName ? `Search in ${catName}…` : `Search ${count} designs: deer, Jesus, fish…`;
+const hero = variant === 'hero';
+---
+<section class={hero ? 'sbar sbar-hero' : 'sbar sbar-inline'} aria-label="Search designs">
+  <div class={hero ? 'max-w-3xl mx-auto px-4 sm:px-6' : ''}>
+    {hero && (
+      <p class="sbar-h">{heading || 'Search your model'}</p>
+    )}
+    <form action="/search" method="get" role="search" class="dcc-search relative flex">
+      {cat && <input type="hidden" name="cat" value={cat} />}
+      <label class="sr-only" for={`sbar-${variant}-${cat || 'all'}`}>Search designs</label>
+      <span class="sbar-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </span>
+      <input id={`sbar-${variant}-${cat || 'all'}`} type="search" name="q" placeholder={placeholder} autocomplete="off" enterkeyhint="search"
+        class="sbar-input" />
+      <button class="sbar-btn">Search</button>
+      <div class="dcc-suggest hidden absolute top-full left-0 right-0 mt-1 bg-white border border-black/10 rounded-lg shadow-xl z-40 overflow-hidden text-left"></div>
+    </form>
+    {chips && (
+      <div class="sbar-chips">
+        <span class="sbar-chips-l">Popular:</span>
+        {POPULAR_SEARCHES.slice(0, 8).map((w) => <a href={`/search?q=${encodeURIComponent(w)}`}>{w}</a>)}
+        <a href="/search" class="sbar-all">All designs with filters →</a>
+      </div>
+    )}
+    {!hero && cat && (
+      <p class="mt-1.5 text-xs text-ink-700/60"><a href={`/search?cat=${encodeURIComponent(cat)}`} class="text-bronze-700 underline underline-offset-2">Filter this collection</a> by price, shape or best sellers</p>
+    )}
+  </div>
+</section>
+
+<style>
+  .sbar-hero { background: linear-gradient(180deg, #FBF4E8, #fff); border-bottom: 1px solid rgba(0,0,0,.05); padding: 1.4rem 0 1.25rem; }
+  .sbar-h { font-family: Fraunces, Georgia, serif; font-size: 1.35rem; color: #412402; text-align: center; margin: 0 0 .7rem; }
+  @media (min-width: 640px) { .sbar-h { font-size: 1.6rem; } }
+  .sbar-inline { margin: 0 0 1.25rem; }
+  .sbar form { background: #fff; border: 1.5px solid rgba(133,79,11,.35); border-radius: .7rem; box-shadow: 0 2px 10px rgba(65,36,2,.06); align-items: center; }
+  .sbar form:focus-within { border-color: #854F0B; box-shadow: 0 0 0 3px rgba(133,79,11,.15); }
+  .sbar-icon { color: #854F0B; padding-left: .85rem; display: flex; }
+  .sbar-input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; padding: .8rem .7rem; font-size: 1rem; color: #2b2118; }
+  .sbar-hero .sbar-input { padding: .95rem .75rem; font-size: 1.05rem; }
+  .sbar-btn { background: #854F0B; color: #FAEEDA; border: 0; border-radius: .5rem; margin: .3rem; padding: .55rem 1.1rem; font-size: .9rem; font-weight: 500; cursor: pointer; }
+  .sbar-btn:hover { background: #633806; }
+  .sbar-btn:focus-visible { outline: 2px solid #412402; outline-offset: 2px; }
+  .sbar-chips { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; margin-top: .8rem; align-items: center; }
+  .sbar-chips-l { font-size: .75rem; color: #6b5a48; }
+  .sbar-chips a { font-size: .78rem; padding: .28rem .7rem; border-radius: 999px; border: 1px solid rgba(133,79,11,.3); color: #633806; background: #fff; }
+  .sbar-chips a:hover { background: #FAEEDA; }
+  .sbar-chips a.sbar-all { border: 0; background: transparent; text-decoration: underline; text-underline-offset: 2px; }
+</style>

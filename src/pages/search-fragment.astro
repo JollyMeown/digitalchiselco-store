@@ -1,0 +1,17 @@
+---
+// The filters + results block of /search, alone. The search page fetches this
+// on every filter change and swaps it in, so results update without a reload
+// and the markup is the same component the first page load rendered.
+// Logging happens in the browser (/api/search-log), once a search settles,
+// so every keystroke of "deer" is not recorded as d, de, dee, deer.
+import SearchPanel from '../components/SearchPanel.astro';
+import { search, parseParams } from '../lib/search-index';
+import { getSettings } from '../lib/queries';
+
+export const prerender = false;
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+Astro.response.headers.set('Cache-Control', 'private, max-age=30');
+
+const [r, settings] = await Promise.all([search(parseParams(Astro.url.searchParams)), getSettings()]);
+---
+<SearchPanel r={r} discount={settings.discount_percent} />

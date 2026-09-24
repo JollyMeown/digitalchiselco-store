@@ -1,71 +1,217 @@
 ---
+// "Search your model": search + filters over the whole catalog.
+//
+// First load renders on the server (fast, works without JavaScript, and
+// shareable: every filter lives in the address). After that, typing and
+// filters fetch /search-fragment and swap the results in without a reload.
+// With no words it is a browse page: every design, best sellers first, with
+// the same filters, which is where the phone bottom bar's Search button lands.
+//
+// Every settled search is recorded (src/lib/search-log.ts): the words, how
+// many designs matched as typed, the filters, and later which result was
+// clicked and at what position.
 import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
-import ProductCard from '../components/ProductCard.astro';
-import { searchProducts, getSettings, titleVocabulary } from '../lib/queries';
-import { didYouMean } from '../lib/search-smart';
-import { supabaseAdmin } from '../lib/supabase';
+import SearchPanel from '../components/SearchPanel.astro';
+import { search, parseParams, filterPath, literalCount, POPULAR_SEARCHES, type Result } from '../lib/search-index';
+import { getSettings, designCountLabel } from '../lib/queries';
+import { logSearchEvent } from '../lib/search-log';
+import { clientIp } from '../lib/rate-limit';
 
-const q = (Astro.url.searchParams.get('q') || '').trim();
-const results = q ? await searchProducts(q) : [];
-const settings = await getSettings();
+const params = parseParams(Astro.url.searchParams);
+const [settings, count] = await Promise.all([getSettings(), designCountLabel()]);
+let r: Result | null = null;
+try { r = await search(params); } catch (e) { console.error('search failed:', e); }
 
-// Zero results → fuzzy "did you mean" against the live catalog vocabulary
-// (typos: "eagel" → "eagle"). Only offered if the suggestion itself finds
-// something, so we never suggest a dead end.
-let suggestion: string | null = null;
-let suggestionResults: any[] = [];
-if (q && !results.length) {
-  try {
-    const cand = didYouMean(q, await titleVocabulary());
-    if (cand && cand !== q.toLowerCase()) {
-      const r = await searchProducts(cand, 8);
-      if (r.length) { suggestion = cand; suggestionResults = r; }
-    }
-  } catch { /* suggestions are optional */ }
+// The first page of a search is logged here; the browser logs the rest.
+if (r && params.page === 1 && (params.q || filterPath(params) !== '/search')) {
+  await logSearchEvent({
+    request: Astro.request, ip: clientIp(Astro.request), host: Astro.url.hostname, type: 'search',
+    q: params.q, n: literalCount(r), path: filterPath(params) + '#page',
+  });
 }
-
-// Log the search term + result count for the admin search-terms report and
-// Design Scout. Fire-and-forget: analytics must never slow or break the page.
-// A zero-result search stays logged as zero even when we show a suggestion —
-// that miss IS the demand signal.
-if (q) {
-  try {
-    supabaseAdmin().from('site_events')
-      .insert({ type: 'search', path: '/search', q: q.slice(0, 120).toLowerCase(), n: results.length })
-      .then(() => {}, () => {});
-  } catch { /* noop */ }
-}
+const heading = params.q ? `Designs for “${params.q}”` : 'Search every design';
 ---
-<Shell title={q ? `Search: ${q} | DigitalChiselCo` : 'Search STL Files | DigitalChiselCo'} noindex={true}>
-  <Breadcrumbs crumbs={[{ label: 'Search' }]} />
-  <h1 class="text-2xl mb-1">{q ? `Results for “${q}”` : 'Search STL files'}</h1>
-  <p class="text-sm text-ink-700/70 mb-6">{q ? `${results.length} design${results.length === 1 ? '' : 's'} found` : 'Type in the search box above to find designs.'}</p>
-  {results.length > 0 ? (
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-      {results.map((p) => <ProductCard product={p} discount={settings.discount_percent} />)}
+<Shell title={params.q ? `${params.q}: search STL designs | DigitalChiselCo` : 'Search STL designs | DigitalChiselCo'} noindex={true} fullWidth={true} hideBanner={true}>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5">
+    <Breadcrumbs crumbs={[{ label: 'Search' }]} />
+    <h1 id="sp-h1" class="font-serif text-2xl sm:text-3xl text-bronze-800 mb-3">{heading}</h1>
+
+    <form id="sp-qform" action="/search" method="get" role="search" class="sp-qform">
+      <label class="sr-only" for="sp-qin">Search designs</label>
+      <svg class="sp-qicon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="sp-qin" type="search" name="q" value={params.q} autocomplete="off" enterkeyhint="search"
+        placeholder={`Search ${count} designs: deer, Jesus, fish…`} />
+      <button>Search</button>
+    </form>
+    <div id="sp-pop" class="sp-popbar" hidden={!!params.q}>
+      <span>Popular:</span>
+      {POPULAR_SEARCHES.map((w) => <a href={`/search?q=${encodeURIComponent(w)}`} data-sp-link>{w}</a>)}
     </div>
-  ) : q ? (
-    <div>
-      {suggestion ? (
-        <div class="mb-6">
-          <p class="text-lg text-ink-800">Did you mean <a href={`/search?q=${encodeURIComponent(suggestion)}`} class="text-bronze-700 font-medium underline">“{suggestion}”</a>?</p>
-          <p class="text-sm text-ink-700/60 mb-4">Here are a few designs for that:</p>
-          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {suggestionResults.map((p) => <ProductCard product={p} discount={settings.discount_percent} />)}
-          </div>
-          <a href={`/search?q=${encodeURIComponent(suggestion)}`} class="inline-block mt-4 text-sm text-bronze-600 underline">See all results for “{suggestion}” →</a>
-        </div>
-      ) : (
-        <div class="bg-[#FAEEDA] border border-bronze-600/30 rounded-lg px-4 py-4 max-w-2xl">
-          <p class="text-ink-800 font-medium">No designs match “{q}” yet.</p>
-          <p class="text-sm text-ink-700/70 mt-1">We add new designs every week and we build what makers ask for. Try a broader word (“eagle”, “cross”, “deer”, “farm”), or:</p>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <a href="/catalog" class="text-xs px-3 py-1.5 rounded-md bg-bronze-600 text-cream hover:bg-bronze-700">Browse the whole catalog</a>
-            <a href={`/requests?suggest=${encodeURIComponent(q)}`} class="text-xs px-3 py-1.5 rounded-md border border-bronze-600 text-bronze-700 hover:bg-bronze-600/10">💡 Request “{q}” as a new design</a>
-          </div>
+
+    <div class="mt-5">
+      {r ? <SearchPanel r={r} discount={settings.discount_percent} /> : (
+        <div class="sp-down">
+          <p class="font-medium text-ink-800">Search is taking a break for a moment.</p>
+          <p class="text-sm mt-1">Please try again in a minute, or <a href="/catalog" class="underline text-bronze-700">browse the catalog</a> and the <a href="/collections" class="underline text-bronze-700">collections</a>.</p>
         </div>
       )}
     </div>
-  ) : null}
+  </div>
+  <div id="sp-backdrop" class="sp-backdrop" hidden></div>
+
+  <script is:inline>
+    (function () {
+      var qin = document.getElementById('sp-qin');
+      if (!qin || !document.getElementById('sp')) return;
+      var ctl = null, typeT = null, logT = null;
+      var sp = function () { return document.getElementById('sp'); };
+      var lastLogged = (qin.value || '').trim().toLowerCase() + '|' + (sp().dataset.fpath || '');
+
+      function beacon(d) {
+        try { navigator.sendBeacon('/api/search-log', new Blob([JSON.stringify(d)], { type: 'application/json' })); } catch (e) { /* analytics is optional */ }
+      }
+      // one row per settled search: the words + filters that stayed on screen
+      function logNow(via) {
+        var el = sp(); if (!el) return;
+        var q = (qin.value || '').trim().toLowerCase(), f = el.dataset.fpath || '/search';
+        var key = q + '|' + f;
+        if (key === lastLogged || (!q && f === '/search')) return;
+        lastLogged = key;
+        beacon({ t: 'search', q: q, n: Number(el.dataset.lit) || 0, p: f + '#' + via });
+      }
+      function params() {
+        var form = document.getElementById('sp-form');
+        var u = new URLSearchParams();
+        var q = (qin.value || '').trim();
+        if (q) u.set('q', q);                       // words first: a readable address
+        if (form) new FormData(form).forEach(function (v, k) { if (v !== '' && k !== 'q') u.append(k, v); });
+        // A sort still on the page's default was not chosen by anyone: leave it
+        // out, so words typed on the browse page switch to "Best match".
+        var sel = document.querySelector('select[name="sort"]');
+        if (sel && sel.value === sel.dataset.default) u.delete('sort');
+        if (!q && u.get('sort') === 'relevance') u.delete('sort');
+        return u;
+      }
+      function after() {
+        try { window.dccSyncCartButtons && window.dccSyncCartButtons(); } catch (e) {}
+        try { window.dccSyncWishButtons && window.dccSyncWishButtons(); } catch (e) {}
+        try { window.dccConvertCcy && window.dccConvertCcy(); } catch (e) {}
+      }
+      function setAddress(u) {
+        var s = new URLSearchParams(u); s.delete('page');
+        history.replaceState(null, '', '/search' + (s.toString() ? '?' + s : ''));
+        var q = (qin.value || '').trim();
+        var h = document.getElementById('sp-h1');
+        if (h) h.textContent = q ? 'Designs for “' + q + '”' : 'Search every design';
+        document.title = q ? q + ': search STL designs | DigitalChiselCo' : 'Search STL designs | DigitalChiselCo';
+        var pop = document.getElementById('sp-pop'); if (pop) pop.hidden = !!q;
+      }
+      function load(u, opt) {
+        opt = opt || {};
+        if (ctl) ctl.abort();
+        ctl = new AbortController();
+        var cur = sp(); cur.setAttribute('aria-busy', 'true'); cur.style.opacity = opt.append ? '' : '.55';
+        return fetch('/search-fragment?' + u.toString(), { signal: ctl.signal }).then(function (r) { return r.text(); }).then(function (html) {
+          var next = new DOMParser().parseFromString(html, 'text/html').getElementById('sp');
+          if (!next) throw new Error('no results block');
+          if (opt.append) {
+            var grid = document.getElementById('sp-results'), ng = next.querySelector('#sp-results');
+            if (grid && ng) while (ng.firstElementChild) grid.appendChild(ng.firstElementChild);
+            var more = document.querySelector('[data-sp-more]'), nm = next.querySelector('[data-sp-more]');
+            if (more) { if (nm) more.replaceWith(nm); else more.parentElement.remove(); }
+            cur.removeAttribute('aria-busy');
+          } else {
+            var wasOpen = document.getElementById('sp-filters').classList.contains('is-open');
+            cur.replaceWith(next);
+            if (wasOpen) next.querySelector('#sp-filters').classList.add('is-open');
+            setAddress(u);
+          }
+          after();
+          if (opt.log) logNow(opt.log);
+        }).catch(function (e) { if (e && e.name === 'AbortError') return; cur.style.opacity = ''; cur.removeAttribute('aria-busy'); location.href = '/search?' + u.toString(); });
+      }
+
+      // typing: results follow as you type; the search is recorded once you pause
+      qin.addEventListener('input', function () {
+        clearTimeout(typeT); clearTimeout(logT);
+        typeT = setTimeout(function () { load(params()); }, 280);
+        logT = setTimeout(function () { logNow('typed'); }, 1800);
+      });
+      document.getElementById('sp-qform').addEventListener('submit', function (e) {
+        e.preventDefault(); clearTimeout(typeT); clearTimeout(logT); qin.blur();
+        load(params(), { log: 'typed' });
+      });
+      // any filter or the sort menu
+      document.addEventListener('change', function (e) {
+        var t = e.target;
+        if (!t || !t.form || t.form.id !== 'sp-form') return;
+        load(params(), { log: 'filter' });
+      });
+      document.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a');
+        // chips, "clear", collection shortcuts, popular searches: load in place
+        if (a && a.hasAttribute('data-sp-link') && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+          e.preventDefault();
+          var u = new URL(a.href, location.origin).searchParams;
+          qin.value = u.get('q') || '';
+          load(u, { log: 'filter' });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+        if (a && a.hasAttribute('data-sp-more')) {
+          e.preventDefault(); a.setAttribute('aria-busy', 'true'); a.textContent = 'Loading…';
+          load(new URL(a.href, location.origin).searchParams, { append: true });
+          return;
+        }
+        // a result was clicked: which design, at what position, for which words
+        if (a && a.getAttribute('href') && a.getAttribute('href').indexOf('/product/') === 0 && a.closest('#sp-results')) {
+          var card = a.closest('#sp-results > *');
+          var grid = document.getElementById('sp-results');
+          var pos = card ? Array.prototype.indexOf.call(grid.children, card) + 1 : 0;
+          var btn = card && card.querySelector('.add-to-cart');
+          beacon({ t: 'search_click', q: (qin.value || '').trim().toLowerCase(), n: pos, pid: btn ? btn.dataset.id : '', p: '/search' });
+        }
+        // filters drawer on phones
+        var b = e.target.closest && e.target.closest('[data-sp-open],[data-sp-close]');
+        if (b) {
+          var open = b.hasAttribute('data-sp-open');
+          var f = document.getElementById('sp-filters');
+          if (f) f.classList.toggle('is-open', open);
+          document.getElementById('sp-backdrop').hidden = !open;
+          document.documentElement.style.overflow = open ? 'hidden' : '';
+        }
+      });
+      document.getElementById('sp-backdrop').addEventListener('click', function () {
+        var f = document.getElementById('sp-filters'); if (f) f.classList.remove('is-open');
+        this.hidden = true; document.documentElement.style.overflow = '';
+      });
+      // arriving from the phone Search button: put the cursor in the box
+      if (new URLSearchParams(location.search).get('focus') === '1') {
+        var u0 = new URLSearchParams(location.search); u0.delete('focus');
+        history.replaceState(null, '', '/search' + (u0.toString() ? '?' + u0 : ''));
+        qin.focus();
+      }
+    })();
+  </script>
 </Shell>
+
+<style>
+  .sp-qform { display: flex; align-items: center; background: #fff; border: 1.5px solid rgba(133,79,11,.35); border-radius: .7rem; box-shadow: 0 2px 10px rgba(65,36,2,.06); max-width: 46rem; }
+  .sp-qform:focus-within { border-color: #854F0B; box-shadow: 0 0 0 3px rgba(133,79,11,.15); }
+  .sp-qicon { color: #854F0B; margin-left: .85rem; flex-shrink: 0; }
+  .sp-qform input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; padding: .85rem .7rem; font-size: 1rem; color: #2b2118; }
+  .sp-qform button { background: #854F0B; color: #FAEEDA; border-radius: .5rem; margin: .3rem; padding: .55rem 1.1rem; font-size: .9rem; font-weight: 500; }
+  .sp-qform button:hover { background: #633806; }
+  .sp-popbar { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-top: .7rem; font-size: .78rem; color: #6b5a48; }
+  .sp-popbar[hidden] { display: none; }
+  .sp-popbar a { border: 1px solid rgba(133,79,11,.3); border-radius: 999px; padding: .22rem .7rem; color: #633806; background: #fff; }
+  .sp-popbar a:hover { background: #FAEEDA; }
+  .sp-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 55; }
+  @media (min-width: 1024px) { .sp-backdrop { display: none; } }
+  .sp-down { background: #FBF7F0; border: 1px solid rgba(133,79,11,.2); border-radius: .75rem; padding: 1.25rem; max-width: 40rem; }
+</style>
+<style is:global>
+  /* this page has its own big search box; the header's phone box above it would be a second one */
+  header form.dcc-search.md\:hidden { display: none; }
+</style>

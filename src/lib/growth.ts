@@ -1505,10 +1505,19 @@ export async function runGrowthAutomation(): Promise<Record<string, any>> {
         const week = isoWeekKey(new Date());
         const sinceDay = daysAgo(30).slice(0, 10);
         // ── Website signals ──
-        const { data: evs } = await db.from('site_events').select('type, product_id, q, n').gte('day', sinceDay).limit(20000);
+        const { data: evs } = await db.from('site_events').select('type, product_id, q, n, visitor_hash').gte('day', sinceDay).limit(20000);
         const zero = [...new Set((evs || []).filter((e: any) => e.type === 'search' && e.q && (e.n ?? 0) === 0).map((e: any) => String(e.q)))].slice(0, 25);
+        // one count per person per word: since 2026-09-24 a search also logs a
+        // row for each filter change, so raw rows would inflate filtered terms
         const searchCount: Record<string, number> = {};
-        for (const e of evs || []) if ((e as any).type === 'search' && (e as any).q) searchCount[(e as any).q] = (searchCount[(e as any).q] || 0) + 1;
+        const seenSearch = new Set<string>();
+        for (const e of (evs || []) as any[]) {
+          if (e.type !== 'search' || !e.q) continue;
+          const k = `${e.visitor_hash || ''}|${e.q}`;
+          if (seenSearch.has(k)) continue;
+          seenSearch.add(k);
+          searchCount[e.q] = (searchCount[e.q] || 0) + 1;
+        }
         const topSearches = Object.entries(searchCount).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([q, n]) => `${q} (${n}x)`);
         const actIds = [...new Set((evs || []).filter((e: any) => ['add_to_cart', 'wishlist_add', 'buy_now'].includes(e.type) && e.product_id).map((e: any) => e.product_id))].slice(0, 100);
         const { data: actProds } = actIds.length ? await db.from('products').select('title').in('id', actIds) : { data: [] as any[] };

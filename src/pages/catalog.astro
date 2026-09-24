@@ -2,6 +2,7 @@
 import Shell from '../layouts/Shell.astro';
 import FreePackInline from '../components/FreePackInline.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
+import SearchBar from '../components/SearchBar.astro';
 import ProductCard from '../components/ProductCard.astro';
 import Pick5Strip from '../components/Pick5Strip.astro';
 import { getProducts, getSettings, sortOf } from '../lib/queries';
@@ -19,6 +20,7 @@ const SORTS = [['best', 'Best sellers'], ['newest', 'Newest'], ['title', 'A to Z
 <Shell title="Catalog — All STL Files | DigitalChiselCo" scrollPastBanner={true}>
   <Breadcrumbs crumbs={[{ label: 'Catalog' }]} />
   <h1 class="text-3xl mb-1">Every design, in one place</h1>
+  <div class="mt-3"><SearchBar /></div>
   <div class="flex items-center justify-between gap-3 flex-wrap mb-6">
     <p class="text-ink-700/70 text-sm">{total.toLocaleString()} premium bas-relief STL files · ready for CNC, 3D print &amp; laser.</p>
     <!-- Newest-first exists because alphabetical was the only order, which

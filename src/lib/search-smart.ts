@@ -20,28 +20,30 @@ const GROUPS: string[][] = [
   ['cowboy', 'cowgirl', 'western', 'rodeo', 'ranch', 'wild west'],
   ['native', 'american indian', 'indian', 'tribal', 'chief', 'headdress'],
   ['usa', 'us flag', 'american flag', 'america', 'patriotic', 'stars and stripes'],
-  ['eagle', 'bald eagle', 'eagles'],
-  ['deer', 'buck', 'stag', 'whitetail', 'antler', 'antlers', 'elk'],
-  ['fish', 'bass', 'trout', 'fishing', 'angler', 'salmon', 'marlin', 'pike'],
+  ['eagle', 'bald eagle', 'eagles', 'aguila', 'aguia', 'orzel', 'adler'],
+  ['deer', 'buck', 'stag', 'whitetail', 'antler', 'antlers', 'elk', 'ciervo', 'venado', 'veado', 'jelen', 'hirsch'],
+  ['fish', 'bass', 'trout', 'fishing', 'angler', 'salmon', 'marlin', 'pike', 'pesca', 'pescado', 'peixe', 'ryba', 'wedkarstwo', 'fisch'],
   ['duck', 'ducks', 'mallard', 'waterfowl'],
-  ['bear', 'grizzly', 'bears'],
-  ['wolf', 'wolves', 'wolfe'],
-  ['horse', 'horses', 'stallion', 'mare', 'pony', 'equestrian'],
-  ['dog', 'dogs', 'puppy', 'labrador', 'retriever', 'german shepherd', 'husky', 'bulldog'],
-  ['cat', 'cats', 'kitten', 'kitty', 'feline'],
+  ['bear', 'grizzly', 'bears', 'oso', 'urso', 'niedzwiedz'],
+  ['wolf', 'wolves', 'wolfe', 'lobo', 'wilk'],
+  ['horse', 'horses', 'stallion', 'mare', 'pony', 'equestrian', 'caballo', 'cavalo', 'kon', 'pferd'],
+  ['dog', 'dogs', 'puppy', 'labrador', 'retriever', 'german shepherd', 'husky', 'bulldog', 'rottweiler', 'beagle', 'dachshund', 'poodle', 'boxer', 'terrier', 'perro', 'cachorro', 'pies', 'hund'],
+  ['cat', 'cats', 'kitten', 'kitty', 'feline', 'gato', 'kot', 'katze'],
   ['owl', 'owls'],
   ['lion', 'lions', 'leo'],
-  ['jesus', 'christ', 'crucifix', 'cross', 'religious', 'christian', 'last supper', 'holy'],
-  ['mary', 'virgin mary', 'madonna', 'our lady', 'guadalupe'],
-  ['angel', 'angels', 'cherub'],
+  ['jesus', 'christ', 'crucifix', 'cross', 'religious', 'christian', 'holy', 'jezus', 'jesucristo', 'cristo', 'cruz', 'krzyz'],
+  ['last supper', 'ostatnia wieczerza', 'ultima cena', 'santa ceia', 'abendmahl'],
+  ['stations of the cross', 'droga krzyzowa', 'via crucis', 'via sacra', 'estaciones de la cruz', 'kreuzweg'],
+  ['mary', 'virgin mary', 'madonna', 'our lady', 'guadalupe', 'maryja', 'virgen', 'maria', 'matka boska'],
+  ['angel', 'angels', 'cherub', 'aniol', 'anjo'],
   ['skull', 'skulls', 'gothic', 'day of the dead', 'sugar skull', 'calavera'],
   ['dragon', 'dragons', 'fantasy', 'mythical'],
-  ['tree', 'trees', 'tree of life', 'oak', 'forest', 'woodland'],
+  ['tree', 'trees', 'tree of life', 'oak', 'forest', 'woodland', 'arbol', 'arvore', 'drzewo'],
   ['flower', 'flowers', 'floral', 'rose', 'roses', 'botanical', 'lily'],
   ['barn', 'farm', 'farmhouse', 'country', 'rustic', 'countryside', 'tractor'],
   ['boat', 'ship', 'sailboat', 'nautical', 'anchor', 'lighthouse', 'coastal', 'sea'],
   ['plane', 'airplane', 'aircraft', 'ww2', 'wwii', 'warbird', 'aviation'],
-  ['car', 'cars', 'classic car', 'hot rod', 'sedan', 'truck', 'pickup'],
+  ['car', 'cars', 'classic car', 'hot rod', 'sedan', 'truck', 'pickup', 'semi', 'lorry', 'camion'],
   ['motorcycle', 'motorbike', 'harley', 'biker', 'chopper'],
   ['guitar', 'music', 'musical', 'piano', 'violin', 'notes'],
   ['baseball', 'softball', 'pitcher', 'catcher', 'mlb'],
@@ -56,7 +58,7 @@ const GROUPS: string[][] = [
   ['mandala', 'celtic', 'knot', 'geometric', 'pattern'],
   ['tray', 'serving tray', 'platter', 'dish', 'bowl', 'coaster'],
   ['sign', 'welcome sign', 'plaque', 'wall art', 'wall hanging', 'panel'],
-  ['box', 'jewelry box', 'keepsake', 'lid'],
+  ['box', 'jewelry box', 'keepsake', 'lid', 'caixa', 'caja', 'pudelko'],
   ['clock', 'clocks', 'timepiece'],
   ['relief', 'reliefs', 'bas relief', 'bas-relief', '3d relief', 'carving', 'carved'],
   ['stl', 'stl file', 'cnc', 'cnc file', 'router', 'aspire', 'vcarve', 'carveco', '3d model'],
@@ -68,9 +70,27 @@ for (const g of GROUPS) for (const w of g) SYN.set(w, g);
 
 const STOP = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'with', 'in', 'on', 'to', 'my', 'me', 'i', 'file', 'files', 'design', 'designs', 'model', 'models', 'stl', 'cnc', 'relief', 'reliefs', 'carving', 'wood', 'wooden', '3d']);
 
+/** Lowercase, accents off ("krzyżowa" -> "krzyzowa", "águila" -> "aguila"),
+ *  punctuation to spaces, single-spaced. Titles and queries both go through
+ *  this, so a shopper typing with or without accents finds the same designs. */
+export function normalise(s: string): string {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/ł/g, 'l').replace(/ß/g, 'ss').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Multi-word synonyms and translations ("droga krzyzowa", "last supper")
+ *  replaced by the catalog's own phrase, so a phrase is not split into words
+ *  that mean nothing on their own. */
+const PHRASES = [...SYN.keys()].filter((k) => k.includes(' ')).sort((a, b) => b.length - a.length);
+export function canonical(q: string): string {
+  let s = ' ' + normalise(q) + ' ';
+  for (const ph of PHRASES) if (s.includes(' ' + ph + ' ')) s = s.split(' ' + ph + ' ').join(' ' + SYN.get(ph)![0] + ' ');
+  return s.trim();
+}
+
 /** Split a query into meaningful lowercase tokens (drops filler words). */
 export function tokens(q: string): string[] {
-  return q.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).map((t) => t.trim()).filter((t) => t.length >= 2 && !STOP.has(t));
+  return normalise(q).split(/\s+/).map((t) => t.trim()).filter((t) => t.length >= 2 && !STOP.has(t));
 }
 
 /** Expand a query into alternative search terms via synonym groups. Returns

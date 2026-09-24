@@ -1,4 +1,5 @@
 ---
+import SearchBar from '../components/SearchBar.astro';
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import MakerMapLazy from '../components/MakerMapLazy.tsx';
@@ -99,6 +100,10 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
   <Header />
 
   <SiteBanner />
+
+  <!-- "Search your model": most visitors who know what they want arrive here;
+       the bar sits straight under the hero, before the stats (2026-09-24). -->
+  <SearchBar variant="hero" />
 
   <!-- Stats row: proof AFTER the promise. It used to sit above the hero, a full phone screen of numbers before the first sentence (2026-09-15). -->
   <div class="bg-white border-b border-black/5">

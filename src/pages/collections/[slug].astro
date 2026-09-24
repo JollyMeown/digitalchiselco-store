@@ -1,6 +1,7 @@
 ---
 import Shell from '../../layouts/Shell.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import SearchBar from '../../components/SearchBar.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import Pick5Strip from '../../components/Pick5Strip.astro';
 import { getCategoryBySlug, getProductsByCategory, getSettings, sortOf } from '../../lib/queries';
@@ -82,6 +83,8 @@ const faqLd = faq.length ? {
       <p class="text-ink-700/70 text-sm mt-1 mb-4">{total.toLocaleString()} designs · instant download · commercial licence included</p>
     </>
   )}
+
+  <SearchBar cat={category.slug} catName={baseName} />
 
   {intro && (
     <div class="coll-intro max-w-3xl mb-7 text-[15px] leading-relaxed text-ink-800" set:html={intro} />

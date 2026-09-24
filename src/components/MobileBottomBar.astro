@@ -8,8 +8,10 @@
   <a href="/" class="flex flex-col items-center justify-center gap-0.5 py-1.5 flex-1 hover:text-bronze-600">
     <span class="text-[19px] leading-none" aria-hidden="true">🏠</span>Home
   </a>
-  <a href="/catalog" class="flex flex-col items-center justify-center gap-0.5 py-1.5 flex-1 hover:text-bronze-600">
-    <span class="text-[19px] leading-none" aria-hidden="true">🔍</span>Browse
+  <!-- Search opens /search with the cursor in the box; with no words that page
+       is every design with filters, so it also does what "Browse" did. -->
+  <a href="/search?focus=1" class="flex flex-col items-center justify-center gap-0.5 py-1.5 flex-1 hover:text-bronze-600 font-medium text-bronze-700">
+    <span class="text-[19px] leading-none" aria-hidden="true">🔍</span>Search
   </a>
   <a href="/favorites" class="flex flex-col items-center justify-center gap-0.5 py-1.5 flex-1 hover:text-bronze-600" aria-label="Wishlist">
     <span class="text-[19px] leading-none text-red-500" aria-hidden="true">❤</span>

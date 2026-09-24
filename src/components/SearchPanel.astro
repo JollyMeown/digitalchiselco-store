@@ -1,0 +1,224 @@
+---
+// Filters + results for /search. Rendered by /search on first load and by
+// /search-fragment for every filter change after that (the page swaps this
+// block in without reloading), so both always show the same markup.
+import ProductCard from './ProductCard.astro';
+import { PRICE_BUCKETS, SORTS, POPULAR_SEARCHES, toQuery, filterPath, literalCount, type Result, type Params } from '../lib/search-index';
+
+interface Props { r: Result; discount: number }
+const { r, discount } = Astro.props;
+const p = r.params;
+const f = r.facets;
+const href = (over: Partial<Params>) => '/search?' + toQuery({ ...p, page: 1, ...over });
+const SHAPE_LABEL = { square: 'Square', portrait: 'Portrait (tall)', landscape: 'Landscape (wide)' } as const;
+const KIND_LABEL = { single: 'Single designs', bundle: 'Bundles', software: 'Software' } as const;
+const catName = new Map(f.cats.map((c) => [c.slug, c.name]));
+
+// removable chips for every active filter
+const chips: { label: string; href: string }[] = [];
+for (const c of p.cats) chips.push({ label: catName.get(c) || c, href: href({ cats: p.cats.filter((x) => x !== c) }) });
+for (const k of p.price) chips.push({ label: PRICE_BUCKETS.find((b) => b.key === k)?.label || k, href: href({ price: p.price.filter((x) => x !== k) }) });
+for (const s of p.shape) chips.push({ label: SHAPE_LABEL[s], href: href({ shape: p.shape.filter((x) => x !== s) }) });
+if (p.kind) chips.push({ label: KIND_LABEL[p.kind], href: href({ kind: '' }) });
+if (p.best) chips.push({ label: 'Best sellers', href: href({ best: false }) });
+if (p.fresh) chips.push({ label: 'New this month', href: href({ fresh: false }) });
+const activeCount = chips.length;
+const clearAll = '/search' + (p.q ? '?q=' + encodeURIComponent(p.q) : '');
+
+const TOP_CATS = 8;
+const catsShown = f.cats.slice(0, TOP_CATS), catsMore = f.cats.slice(TOP_CATS);
+const left = r.total - r.shown;
+const brandName = r.brand ? r.brand.charAt(0).toUpperCase() + r.brand.slice(1) : '';
+---
+<div id="sp" data-total={r.total} data-lit={literalCount(r)} data-q={p.q} data-fpath={filterPath(p)}>
+  <div class="sp-grid">
+    <aside class="sp-filters" id="sp-filters" aria-label="Filters">
+      <div class="sp-fhead">
+        <span class="font-medium text-ink-800">Filters</span>
+        <button type="button" class="sp-x" data-sp-close aria-label="Close filters">✕</button>
+      </div>
+      <form id="sp-form" action="/search" method="get">
+        <input type="hidden" name="q" value={p.q} />
+
+        <fieldset class="sp-fs">
+          <legend>Show</legend>
+          <label class="sp-opt"><input type="checkbox" name="best" value="1" checked={p.best} /> <span>Best sellers</span> <em>{f.best}</em></label>
+          <label class="sp-opt"><input type="checkbox" name="new" value="1" checked={p.fresh} /> <span>New this month</span> <em>{f.fresh}</em></label>
+        </fieldset>
+
+        {f.cats.length > 0 && (
+          <fieldset class="sp-fs">
+            <legend>Collection</legend>
+            {catsShown.map((c) => (
+              <label class="sp-opt"><input type="checkbox" name="cat" value={c.slug} checked={p.cats.includes(c.slug)} /> <span>{c.name}</span> <em>{c.n}</em></label>
+            ))}
+            {catsMore.length > 0 && (
+              <details class="sp-more" open={catsMore.some((c) => p.cats.includes(c.slug))}>
+                <summary>{catsMore.length} more collections</summary>
+                {catsMore.map((c) => (
+                  <label class="sp-opt"><input type="checkbox" name="cat" value={c.slug} checked={p.cats.includes(c.slug)} /> <span>{c.name}</span> <em>{c.n}</em></label>
+                ))}
+              </details>
+            )}
+          </fieldset>
+        )}
+
+        <fieldset class="sp-fs">
+          <legend>Price</legend>
+          {f.price.map((b) => (
+            <label class={`sp-opt ${b.n === 0 && !p.price.includes(b.key) ? 'is-empty' : ''}`}><input type="checkbox" name="price" value={b.key} checked={p.price.includes(b.key)} /> <span>{b.label}</span> <em>{b.n}</em></label>
+          ))}
+        </fieldset>
+
+        <fieldset class="sp-fs">
+          <legend>Shape <span class="sp-hint" title="Measured from the STL file itself. Designs not yet measured are left out when a shape is chosen.">ⓘ</span></legend>
+          {f.shape.map((s) => (
+            <label class={`sp-opt ${s.n === 0 && !p.shape.includes(s.key) ? 'is-empty' : ''}`}><input type="checkbox" name="shape" value={s.key} checked={p.shape.includes(s.key)} />
+              <span class="sp-shape"><i class={`sp-sh sp-sh-${s.key}`} aria-hidden="true"></i>{SHAPE_LABEL[s.key]}</span> <em>{s.n}</em></label>
+          ))}
+        </fieldset>
+
+        <fieldset class="sp-fs">
+          <legend>Type</legend>
+          <label class="sp-opt"><input type="radio" name="type" value="" checked={!p.kind} /> <span>Everything</span></label>
+          {f.kind.filter((k) => k.n > 0 || p.kind === k.key).map((k) => (
+            <label class="sp-opt"><input type="radio" name="type" value={k.key} checked={p.kind === k.key} /> <span>{KIND_LABEL[k.key]}</span> <em>{k.n}</em></label>
+          ))}
+        </fieldset>
+
+        <noscript><button class="sp-apply">Apply filters</button></noscript>
+      </form>
+      <div class="sp-fdone">
+        <a href={clearAll} class="sp-clear" data-sp-link>Clear</a>
+        <button type="button" class="sp-show" data-sp-close>Show {r.total} design{r.total === 1 ? '' : 's'}</button>
+      </div>
+    </aside>
+
+    <section class="min-w-0" aria-live="polite">
+      <div class="sp-top">
+        <p class="sp-count"><b>{r.total.toLocaleString('en-US')}</b> design{r.total === 1 ? '' : 's'}{p.q && <> for “{p.q}”</>}</p>
+        <button type="button" class="sp-fbtn" data-sp-open aria-controls="sp-filters">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          Filters{activeCount > 0 && <span class="sp-badge">{activeCount}</span>}
+        </button>
+        <label class="sp-sort"><span class="sr-only">Sort by</span>
+          <select name="sort" form="sp-form" data-default={p.q ? 'relevance' : 'best'}>
+            {SORTS.filter((s) => s.key !== 'relevance' || p.q).map((s) => (
+              <option value={s.key} selected={(p.sort === 'relevance' && !p.q ? 'best' : p.sort) === s.key}>{s.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {r.brand && (
+        <p class="sp-note">We don’t sell {brandName} logos or other licensed designs, so here are our own designs on the same subject.</p>
+      )}
+      {r.didYouMean && !r.brand && (
+        <p class="sp-note">Showing results for <b>{r.didYouMean}</b>. We corrected the spelling of “{p.q}”.</p>
+      )}
+      {r.partial && (
+        <p class="sp-note">No design matches every word, so these match at least one of them.</p>
+      )}
+      {r.matchedCats.length > 0 && p.cats.length === 0 && (
+        <p class="sp-colls">Collections:
+          {r.matchedCats.map((c) => <a href={href({ q: '', cats: [c.slug] })} data-sp-link>📁 {c.name}</a>)}
+        </p>
+      )}
+
+      {chips.length > 0 && (
+        <div class="sp-chips">
+          {chips.map((c) => <a href={c.href} data-sp-link aria-label={`Remove filter ${c.label}`}>{c.label} <span aria-hidden="true">✕</span></a>)}
+          <a href={clearAll} data-sp-link class="sp-chip-clear">Clear all</a>
+        </div>
+      )}
+
+      {r.items.length > 0 ? (
+        <>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" id="sp-results">
+            {r.items.map((e, i) => <ProductCard product={e} discount={discount} eager={i < 4 && p.page === 1} />)}
+          </div>
+          {left > 0 && (
+            <div class="text-center mt-8">
+              <a href={'/search?' + toQuery({ ...p, page: p.page + 1 })} class="sp-morebtn" data-sp-more>Show more designs ({left.toLocaleString('en-US')} left)</a>
+            </div>
+          )}
+        </>
+      ) : (
+        <div class="sp-empty">
+          <p class="font-medium text-ink-800 text-lg">{p.q ? <>No designs match “{p.q}”{activeCount ? ' with these filters' : ''}.</> : 'No designs match these filters.'}</p>
+          {activeCount > 0 ? (
+            <p class="mt-2 text-sm"><a href={clearAll} data-sp-link class="text-bronze-700 underline">Remove the filters</a> to see every match.</p>
+          ) : (
+            <>
+              <p class="mt-2 text-sm text-ink-700/75">We add new designs every week and we build what makers ask for. Try one of these, or ask us for it:</p>
+              <div class="sp-pop">
+                {POPULAR_SEARCHES.slice(0, 8).map((w) => <a href={href({ q: w, cats: [], price: [], shape: [], kind: '', best: false, fresh: false, sort: 'relevance' })} data-sp-link>{w}</a>)}
+              </div>
+              {p.q && <a href={`/requests?suggest=${encodeURIComponent(p.q)}`} class="sp-req">💡 Request “{p.q}” as a new design</a>}
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  </div>
+</div>
+
+<style>
+  .sp-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+  @media (min-width: 1024px) { .sp-grid { grid-template-columns: 230px minmax(0, 1fr); gap: 2rem; } }
+
+  /* filters: a column on desktop, a full-height drawer on phones and tablets */
+  .sp-filters { background: #fff; }
+  .sp-fhead, .sp-fdone { display: none; }
+  @media (max-width: 1023px) {
+    .sp-filters { position: fixed; inset: 0 0 0 auto; width: min(340px, 88vw); z-index: 60; transform: translateX(100%); transition: transform .2s ease; box-shadow: -8px 0 30px rgba(0,0,0,.18); display: flex; flex-direction: column; }
+    .sp-filters.is-open { transform: none; }
+    .sp-filters form { flex: 1; overflow-y: auto; padding: 0 1rem 1rem; }
+    .sp-fhead { display: flex; justify-content: space-between; align-items: center; padding: .9rem 1rem; border-bottom: 1px solid rgba(0,0,0,.08); }
+    .sp-fdone { display: flex; gap: .6rem; align-items: center; padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom)); border-top: 1px solid rgba(0,0,0,.08); }
+  }
+  @media (prefers-reduced-motion: reduce) { .sp-filters { transition: none; } }
+  .sp-x { width: 2rem; height: 2rem; border-radius: .4rem; font-size: 1rem; color: #633806; }
+  .sp-show { flex: 1; background: #854F0B; color: #FAEEDA; border-radius: .5rem; padding: .65rem; font-size: .9rem; font-weight: 500; }
+  .sp-clear { font-size: .85rem; color: #633806; text-decoration: underline; padding: .5rem; }
+
+  .sp-fs { border: 0; margin: 0; padding: .9rem 0 .6rem; border-bottom: 1px solid rgba(0,0,0,.07); min-width: 0; }
+  .sp-fs:first-child { padding-top: .2rem; }
+  .sp-fs legend { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: #854F0B; font-weight: 600; margin-bottom: .35rem; float: left; width: 100%; }
+  .sp-fs legend + * { clear: both; }
+  .sp-hint { cursor: help; letter-spacing: 0; text-transform: none; color: #9a8a78; }
+  .sp-opt { display: flex; align-items: center; gap: .5rem; font-size: .86rem; color: #2b2118; padding: .22rem 0; cursor: pointer; min-width: 0; }
+  .sp-opt input { accent-color: #854F0B; width: 1rem; height: 1rem; flex-shrink: 0; }
+  .sp-opt span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sp-opt em { font-style: normal; font-size: .75rem; color: #8a7a68; font-variant-numeric: tabular-nums; }
+  .sp-opt.is-empty { opacity: .45; }
+  .sp-more summary { font-size: .8rem; color: #633806; cursor: pointer; padding: .3rem 0; }
+  .sp-shape { display: inline-flex; align-items: center; gap: .45rem; }
+  .sp-sh { display: inline-block; border: 1.5px solid #854F0B; border-radius: 2px; flex-shrink: 0; }
+  .sp-sh-square { width: 12px; height: 12px; } .sp-sh-portrait { width: 10px; height: 14px; } .sp-sh-landscape { width: 15px; height: 10px; }
+  .sp-apply { margin-top: 1rem; width: 100%; background: #854F0B; color: #FAEEDA; border-radius: .5rem; padding: .6rem; }
+
+  .sp-top { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: .9rem; }
+  .sp-count { flex: 1; min-width: 10rem; font-size: .95rem; color: #3a2a1a; margin: 0; }
+  .sp-count b { font-variant-numeric: tabular-nums; }
+  .sp-fbtn { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid rgba(133,79,11,.4); color: #633806; border-radius: .5rem; padding: .45rem .8rem; font-size: .85rem; background: #fff; }
+  @media (min-width: 1024px) { .sp-fbtn { display: none; } }
+  .sp-badge { background: #854F0B; color: #FAEEDA; border-radius: 999px; font-size: .7rem; min-width: 1.2rem; height: 1.2rem; display: inline-flex; align-items: center; justify-content: center; padding: 0 .3rem; }
+  .sp-sort select { border: 1px solid rgba(0,0,0,.15); border-radius: .5rem; padding: .45rem .6rem; font-size: .85rem; background: #fff; color: #2b2118; max-width: 12rem; }
+
+  .sp-note { background: #FAEEDA; border: 1px solid rgba(133,79,11,.25); border-radius: .5rem; padding: .55rem .8rem; font-size: .88rem; color: #412402; margin: 0 0 .8rem; }
+  .sp-colls { font-size: .85rem; color: #6b5a48; margin: 0 0 .8rem; display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+  .sp-colls a { background: #fff; border: 1px solid rgba(133,79,11,.3); border-radius: 999px; padding: .2rem .65rem; color: #633806; }
+  .sp-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; }
+  .sp-chips a { font-size: .8rem; background: #854F0B; color: #FAEEDA; border-radius: 999px; padding: .25rem .7rem; }
+  .sp-chips a span { opacity: .8; margin-left: .15rem; }
+  .sp-chips a.sp-chip-clear { background: transparent; color: #633806; text-decoration: underline; }
+  .sp-morebtn { display: inline-block; border: 1.5px solid #854F0B; color: #633806; border-radius: .6rem; padding: .7rem 1.4rem; font-size: .9rem; font-weight: 500; }
+  .sp-morebtn:hover { background: #FAEEDA; }
+  .sp-morebtn[aria-busy="true"] { opacity: .6; pointer-events: none; }
+  .sp-empty { background: #FBF7F0; border: 1px solid rgba(133,79,11,.2); border-radius: .75rem; padding: 1.25rem 1.4rem; max-width: 42rem; }
+  .sp-pop { display: flex; flex-wrap: wrap; gap: .4rem; margin: .8rem 0; }
+  .sp-pop a { font-size: .8rem; border: 1px solid rgba(133,79,11,.3); border-radius: 999px; padding: .25rem .75rem; color: #633806; background: #fff; }
+  .sp-req { display: inline-block; font-size: .85rem; background: #854F0B; color: #FAEEDA; border-radius: .5rem; padding: .5rem .9rem; }
+  .sp-fbtn:focus-visible, .sp-morebtn:focus-visible, .sp-chips a:focus-visible, .sp-show:focus-visible { outline: 2px solid #412402; outline-offset: 2px; }
+</style>
