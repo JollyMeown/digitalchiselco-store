@@ -39,7 +39,12 @@ export default function OrderSoundListener() {
     const id = Number(a.id);
     if (!id || seenAlerts.current.has(id)) return;
     seenAlerts.current.add(id);
-    if (lastAlertId.current == null || id > lastAlertId.current) lastAlertId.current = id;
+    // A realtime alert can arrive before the baseline: take it as the baseline
+    // only if the baseline is already known, so it cannot open the door to history.
+    if (lastAlertId.current != null && id > lastAlertId.current) {
+      lastAlertId.current = id;
+      try { localStorage.setItem('admin:lastAlertId', String(id)); } catch { /* private mode */ }
+    }
     if (a.kind === 'website_order') return; // already rung via the `orders` insert
     const icon = a.kind === 'cults_sale' ? '💶' : a.kind === 'website_order' ? '🛒' : String(a.kind || '').startsWith('brs_') ? '🤖' : '🔔';
     // BRS automation summaries are not money: a toast, no cha-ching
@@ -64,10 +69,21 @@ export default function OrderSoundListener() {
     const t = setInterval(loadPrefs, 10 * 60000);
 
     // Baseline: remember the newest alert id at load so history never rings.
-    (async () => {
-      const { data } = await supabase.from('owner_alerts').select('id').order('id', { ascending: false }).limit(1);
-      if (!cancelled) lastAlertId.current = Number(data?.[0]?.id || 0);
-    })();
+    // If that query FAILS (the admin fires many queries at load and each has a
+    // 6 s deadline), the baseline must stay unknown, never become 0: a 0 made
+    // the 20 s poll fetch the ten OLDEST alerts and pop four stale "Membership
+    // pack live" toasts on every visit (owner, 2026-09-25). The last id seen
+    // is also kept in this browser, so even a slow load cannot go backwards.
+    const SEEN_KEY = 'admin:lastAlertId';
+    const stored = (() => { try { return Number(localStorage.getItem(SEEN_KEY)) || 0; } catch { return 0; } })();
+    const baseline = async (): Promise<boolean> => {
+      const { data, error } = await supabase.from('owner_alerts').select('id').order('id', { ascending: false }).limit(1);
+      if (cancelled || error || !Array.isArray(data)) return false;
+      lastAlertId.current = Math.max(Number(data[0]?.id || 0), stored, lastAlertId.current || 0);
+      try { localStorage.setItem(SEEN_KEY, String(lastAlertId.current)); } catch { /* private mode */ }
+      return true;
+    };
+    baseline().catch(() => false);
 
     // ── what sold while this dashboard was closed ──
     // The chime is a live event: it needs this page open and connected, so a
@@ -119,7 +135,9 @@ export default function OrderSoundListener() {
 
     // Polling fallback (20 s): anything newer than the last id we handled.
     const poll = setInterval(async () => {
-      if (cancelled || lastAlertId.current == null || document.visibilityState === 'hidden') return;
+      if (cancelled || document.visibilityState === 'hidden') return;
+      // no baseline yet (the load-time query failed): get one first, show nothing
+      if (lastAlertId.current == null) { await baseline().catch(() => false); return; }
       const { data } = await supabase.from('owner_alerts').select('id,kind,title,body,url').gt('id', lastAlertId.current).order('id', { ascending: true }).limit(10);
       for (const a of data || []) onOwnerAlert(a);
     }, 20000);
