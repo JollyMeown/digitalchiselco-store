@@ -29,6 +29,18 @@ export function unsubSig(email: string): string {
   if (!secret) throw new Error('unsubscribe signing secret not configured (ACCOUNT_TOKEN_SECRET / SUPABASE_SERVICE_ROLE_KEY)');
   return crypto.createHmac('sha256', secret).update(email.toLowerCase()).digest('hex').slice(0, 24);
 }
+/** Every signature this address could legitimately carry. Production signs
+ *  with ACCOUNT_TOKEN_SECRET; emails sent by a local script sign with the
+ *  service-role key (the local .env has no ACCOUNT_TOKEN_SECRET). Verifying
+ *  against only one of them rejected the unsubscribe link in every locally
+ *  sent campaign (CNC Match, Sep 2026): "That link is not valid" (a buyer
+ *  wrote in, 2026-09-25). Both keys are server secrets, so accepting either
+ *  is no weaker. */
+export function unsubSigs(email: string): string[] {
+  const e = email.toLowerCase();
+  const secrets = [...new Set([envAny('ACCOUNT_TOKEN_SECRET'), envAny('SUPABASE_SERVICE_ROLE_KEY')].filter(Boolean) as string[])];
+  return secrets.map((k) => crypto.createHmac('sha256', k).update(e).digest('hex').slice(0, 24));
+}
 // Opaque token: base64url(email).hmac — keeps the address out of the URL in
 // plain text (Netlify logs, browser history). The endpoint still accepts the
 // legacy ?e=&s= form for links already in people's inboxes.

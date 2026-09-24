@@ -13,7 +13,7 @@
 import type { APIRoute } from 'astro';
 import crypto from 'node:crypto';
 import { supabaseAdmin } from '../../lib/supabase';
-import { unsubSig } from '../../lib/marketing-emails';
+import { unsubSigs } from '../../lib/marketing-emails';
 
 export const prerender = false;
 
@@ -40,12 +40,12 @@ function resolveEmail(params: URLSearchParams | FormData): string | null {
     let email = '';
     try { email = Buffer.from(b64, 'base64url').toString('utf8').toLowerCase().trim(); } catch { return null; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return null;
-    return safeEq(sig, unsubSig(email)) ? email : null;
+    return unsubSigs(email).some((x) => safeEq(sig, x)) ? email : null;
   }
   const email = get('e').toLowerCase().trim();
   const sig = get('s');
   if (!email || !sig || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return null;
-  return safeEq(sig, unsubSig(email)) ? email : null;
+  return unsubSigs(email).some((x) => safeEq(sig, x)) ? email : null;
 }
 
 async function doUnsubscribe(email: string) {
