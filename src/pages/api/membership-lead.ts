@@ -1,6 +1,5 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
-import { subscribe as mailerliteSubscribe } from '../../lib/mailerlite';
 import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
 
 export const prerender = false;
@@ -30,13 +29,8 @@ export const POST: APIRoute = async ({ request }) => {
     if (error) throw error;
     await db.from('subscribers').upsert({ email, source: 'membership' }, { onConflict: 'email' });
 
-    // MailerLite double opt-in to the membership-leads group (or free group as fallback).
-    await mailerliteSubscribe({
-      email,
-      name,
-      groupKey: 'membership',
-      fields: { plan: plan_slug || '' },
-    });
+    // (Used to also add the lead to a MailerLite group; MailerLite was
+    // cancelled 2026-09-24. The lead lives in membership_leads + subscribers.)
 
     return json({ ok: true });
   } catch (e) {

@@ -4,7 +4,7 @@ import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { verifySubscribeToken } from '../../lib/subscribe-token';
-import { subscribe as mailerliteSubscribe } from '../../lib/mailerlite';
+import { sendFreePackLink } from '../../lib/free-pack';
 
 export const prerender = false;
 
@@ -16,12 +16,13 @@ const verified = verifySubscribeToken(token);
 let outcome: Outcome = 'invalid';
 let displayEmail = '';
 // The pack link, shown on this page rather than trusted to arrive by email.
-// The MailerLite welcome still goes out, but it is no longer the only copy:
+// The welcome email carries it too, but it is no longer the only copy:
 // people lose it, and every lost copy used to come back to the owner by hand.
 // A stored key, not the signed token: in production the signed link was minted
 // and then rejected by the same deployment, so it is no longer trusted to be
 // the way anyone reaches their files.
 let filesUrl = '';
+let packToken: string | null = null;
 
 if (verified) {
   displayEmail = verified.email;
@@ -30,7 +31,7 @@ if (verified) {
 
     // Look up the row; if it doesn't exist (unlikely — they'd have to forge a
     // valid token without ever submitting the form), insert a fresh confirmed
-    // row so the welcome automation still goes out.
+    // row so the welcome email still goes out.
     const { data: existing } = await db
       .from('subscribers')
       .select('id, name, confirmed_at')
@@ -49,6 +50,7 @@ if (verified) {
         k = (await import('node:crypto')).randomBytes(24).toString('base64url');
         await db.from('subscribers').update({ free_pack_token: k }).eq('email', verified.email);
       }
+      packToken = k;
       filesUrl = `/free/files?k=${encodeURIComponent(k)}`;
     }
 
@@ -62,12 +64,13 @@ if (verified) {
         );
       if (upsert.error) throw upsert.error;
 
-      // Hand off to MailerLite as the file deliverer. status='active'
-      // skips MailerLite's own confirmation email (we already ran our
-      // own HMAC-verified opt-in) and triggers the Free STL Pack
-      // welcome automation that ships the actual files.
-      await mailerliteSubscribe({ email: verified.email, name, groupKey: 'free', status: 'active' }).catch((e) => {
-        console.error('[subscribe-confirm] MailerLite call failed (continuing):', e);
+      // Deliver the pack ourselves, through Resend. This used to be handed to
+      // a MailerLite automation (its one remaining job); the owner cancelled
+      // MailerLite on 2026-09-24, so the site now sends the same "Your 5 free
+      // STL files" email that /api/free-resend sends. A failed send does not
+      // fail the confirmation: the files link is also shown on this page.
+      await sendFreePackLink(db, { email: verified.email, name, free_pack_token: packToken }).catch((e) => {
+        console.error('[subscribe-confirm] free pack email failed (continuing):', e);
       });
       outcome = 'ok';
     } else {
