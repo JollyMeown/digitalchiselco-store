@@ -73,8 +73,14 @@ const DRIVE = {
   'bamboo': '13SkHHJ9FtM7f942x5p4NnnMAiOwIk27H',
 };
 
-const driveFile = (id, name) =>
-  `https://drive.usercontent.com/download?id=${id}&export=download&confirm=t&filename=${encodeURIComponent(name)}`;
+// The drive.usercontent.com form answered Cults with the two bytes "OK"
+// instead of the zip, so all 12 lampshades were created with NO file and
+// moderation switched them off (fixed 2026-09-25 by
+// cults3d_lampshades_fix_files.mjs). The Drive API form with our key serves
+// the real bytes, as the main uploader already does.
+const driveFile = (id, name) => process.env.GOOGLE_API_KEY
+  ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${process.env.GOOGLE_API_KEY}&filename=${encodeURIComponent(name)}`
+  : `https://drive.usercontent.com/download?id=${id}&export=download&confirm=t&filename=${encodeURIComponent(name)}`;
 
 const pub = (key) => `${URL_BASE}/storage/v1/object/public/${BUCKET}/${key}`;
 
