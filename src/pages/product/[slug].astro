@@ -4,6 +4,7 @@ import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import RecentlyViewed from '../../components/RecentlyViewed.astro';
 import TrustBadges from '../../components/TrustBadges.astro';
+import CarveCard from '../../components/CarveCard.astro';
 import LaserStudioCrossSell from '../../components/LaserStudioCrossSell.astro';
 import { getProductBySlug, getRelatedProducts, getSettings, getSoldCount, getBoughtTogether } from '../../lib/queries';
 import FreePackInline from '../../components/FreePackInline.astro';
@@ -436,7 +437,8 @@ const breadcrumbLd = {
       {p.model_specs && (
         <div class="mt-6 border border-black/10 rounded-lg overflow-hidden">
           <div class="bg-cream/50 px-4 py-2 text-xs font-medium text-bronze-800 border-b border-black/10">📐 Design facts</div>
-          <dl class="text-sm divide-y divide-black/5">
+          <CarveCard specs={p.model_specs} id={String(p.id).slice(0, 8)} />
+          <dl class="text-sm divide-y divide-black/5 border-t border-black/10">
             {/* First row, because it is the question that actually arrives:
                 "does it come with multiple format options (like OBJ or DXF) or
                 just STL? And what's the poly count?" (2026-08-31). Answering it
@@ -485,28 +487,9 @@ const breadcrumbLd = {
               </div>
             )}
           </dl>
-          {/* "Which bits, how deep, what size?" is the question every first-time
-              buyer sends (John, 2026-09-14). Everything here is arithmetic on the
-              measured file, so it is never a guess: stock thickness is the model
-              depth plus a 5 mm base; a 400 mm hobby machine gets a fit hint when
-              the model is wider than that. The three bits are the ones every
-              relief needs; a tapered detail bit is named because a straight
-              1/16 inch flexes on a light machine and snaps. */}
-          {p.model_specs.width > 0 && (
-            <div class="px-4 py-3 border-t border-black/10 text-xs text-ink-800 space-y-1.5">
-              <div class="text-[11px] uppercase tracking-wide text-bronze-800 font-medium">Cutting it</div>
-              <div>
-                <b>Stock:</b> at the supplied size you need about {Math.ceil((Number(p.model_specs.depth) + 5) / 5) * 5} mm ({(Math.ceil((Number(p.model_specs.depth) + 5) / 5) * 5 / 25.4).toFixed(1)}") thick material for the full depth plus a base.
-                {Number(p.model_specs.depth) > 25 ? ' For thinner stock, scale Z on its own to 18 to 22 mm: bas-relief reads beautifully compressed.' : ''}
-              </div>
-              {Number(p.model_specs.width) > 400 && (
-                <div><b>Small machine?</b> On a 400 x 400 mm bed scale it to about 380 mm wide ({Math.round(380 / Number(p.model_specs.aspect || 1))} mm tall) and set the depth separately.</div>
-              )}
-              <div><b>Bits:</b> 1/8" (3.175 mm) flat end mill to rough at 1 to 1.5 mm a pass · 1/8" ball nose to finish at 8 to 10% stepover · 1/16" <em>tapered</em> ball nose for the finest areas only.</div>
-              <div><b>Wood:</b> basswood, poplar, cherry or hard maple hold this detail. Avoid red oak and ash: open grain tears out exactly where the fine work lives.</div>
-              <div class="text-ink-700/60">Expect the finishing pass to take hours at this detail level; that is normal. Cut a 200 mm test in scrap first if it is your first relief.</div>
-            </div>
-          )}
+          {/* The "Cutting it" paragraph (same bits for every design, stock only at
+              the supplied size) became the CarveCard above: size, depth, board,
+              bits and time for the size the buyer will actually carve. */}
           <p class="px-4 py-2 text-xs text-ink-700/60 bg-cream/30 border-t border-black/10">
             Opens directly in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360, and on any CNC router, 3D printer or laser
             that reads STL. No OBJ or DXF: a DXF holds flat 2D outlines and cannot carry a three-dimensional relief at all.

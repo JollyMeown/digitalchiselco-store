@@ -1,0 +1,117 @@
+---
+// "What will it take to carve this at my size?" answered on the product page.
+//
+// The questions customers actually email (Apcar 2026-09-24: base size and
+// wood; Mark 2026-09-25: which finishing bit; Dan 2026-09-25: depth of the
+// lettering) are all arithmetic on the measured file, so the page answers
+// them for four common sizes plus the size as supplied:
+//   size      the long side set to 8 / 12 / 18 / 24 in, the other side kept in proportion
+//   depth     the measured relief depth scaled with the size (scaling all axes together)
+//   board     depth + a 1/4 in base, rounded up to a stock thickness you can buy
+//   bits      roughing and finishing bits that suit that size (small carvings need
+//             a finer ball nose; big panels can use a 1/4 in and save hours)
+//   time      the same model as the Will it cut tool (lib/stl-analyse cutTime):
+//             one raster finishing pass at half feed, plus roughing the waste,
+//             on a mid-size hobby machine (Shapeoko / X-Carve / Onefinity class).
+//             The stored specs have no volume, so the waste is taken as 45% of the
+//             block, typical for a relief. Shown as an estimate, never a promise.
+// Pure CSS switching (radio buttons), no script: nothing to load or break.
+interface Specs { width: number; height: number; depth: number; bit_mm?: number; detail_kept_pct?: number; recommended_size_mm?: number }
+interface Props { specs: Specs; id: string }
+const { specs, id } = Astro.props;
+
+const W = Number(specs.width), H = Number(specs.height), D = Number(specs.depth);
+const ok = W > 0 && H > 0 && D > 0;
+const IN = 25.4;
+const nativeLongIn = Math.max(W, H) / IN;
+const FEED = 1800, DOC = 3;                       // mm/min, mm: mid hobby class
+const STOCK = [0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4];
+
+function bitsFor(longIn: number) {
+  if (longIn <= 10) return { rough: '1/8 in end mill', roughDia: 3.175, roughDoc: 1.5, finish: '1/16 in tapered ball nose', finDia: 1.5875, step: 10 };
+  if (longIn <= 20) return { rough: '1/4 in end mill', roughDia: 6.35, roughDoc: DOC, finish: '1/8 in ball nose', finDia: 3.175, step: 10 };
+  return { rough: '1/4 in end mill', roughDia: 6.35, roughDoc: DOC, finish: '1/4 in ball nose (1/8 in for the finest detail, about twice as long)', finDia: 6.35, step: 10 };
+}
+const fmtTime = (min: number) => {
+  const m = Math.max(5, Math.round(min / 5) * 5);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? `${h} h ${r} min` : `${h} h`;
+};
+const f1 = (n: number) => (Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, '');
+// sizes to one decimal (12, 5.1); depths under an inch to two (0.92)
+const fIn = (n: number) => (n < 1 ? (Math.round(n * 100) / 100).toFixed(2) : f1(n));
+
+function at(longIn: number, label: string) {
+  const s = (longIn * IN) / Math.max(W, H);
+  const sx = W * s, sy = H * s, depth = D * s;
+  const b = bitsFor(longIn);
+  const stepover = b.finDia * (b.step / 100);
+  const finishMin = (Math.ceil(Math.min(sx, sy) / stepover) * Math.max(sx, sy)) / (FEED * 0.5);
+  const roughMin = (sx * sy * depth * 0.45) / (b.roughDoc * b.roughDia * 0.4 * FEED);
+  const depthIn = depth / IN;
+  const board = STOCK.find((t) => t >= depthIn + 0.25) ?? null;
+  const tooSmall = !!specs.recommended_size_mm && Math.max(sx, sy) < Number(specs.recommended_size_mm) && b.finDia >= 3;
+  return {
+    key: label, label,
+    wIn: sx / IN, hIn: sy / IN, wMm: Math.round(sx), hMm: Math.round(sy),
+    depthIn, depthMm: depth, board, b, tooSmall,
+    time: fmtTime(roughMin + finishMin), rough: fmtTime(roughMin), finish: fmtTime(finishMin),
+  };
+}
+const sizes = ok ? [
+  at(8, '8 in'), at(12, '12 in'), at(18, '18 in'), at(24, '24 in'),
+  ...(Math.abs(nativeLongIn - 24) > 1.5 && Math.abs(nativeLongIn - 18) > 1.5 && Math.abs(nativeLongIn - 12) > 1 ? [at(nativeLongIn, 'As supplied')] : []),
+] : [];
+const DEFAULT = 1;   // 12 in: the most common panel
+const name = `cc-${id}`;
+---
+{ok && (
+  <div class="cc">
+    <div class="cc-head">Carving it at your size</div>
+    {sizes.map((z, i) => <input type="radio" name={name} id={`${name}-${i}`} class={`cc-r cc-r${i}`} checked={i === DEFAULT} />)}
+    <div class="cc-chips" role="group" aria-label="Carving size (long side)">
+      {sizes.map((z, i) => <label for={`${name}-${i}`} class={`cc-chip cc-c${i}`}>{z.label}</label>)}
+    </div>
+    <div class="cc-panels">
+      {sizes.map((z, i) => (
+        <dl class={`cc-p cc-p${i}`}>
+          <div><dt>Carving size</dt><dd>{fIn(z.wIn)} × {fIn(z.hIn)} in{' '}<span>({z.wMm} × {z.hMm} mm)</span></dd></div>
+          <div><dt>Relief depth</dt><dd>{fIn(z.depthIn)} in{' '}<span>({f1(z.depthMm)} mm)</span></dd></div>
+          <div><dt>Board thickness</dt><dd>{z.board ? `${z.board} in or thicker` : `over 4 in: scale the depth (Z) down to suit your stock`}</dd></div>
+          <div><dt>Rough with</dt><dd>{z.b.rough}, 40% stepover</dd></div>
+          <div><dt>Finish with</dt><dd>{z.b.finish}, {z.b.step}% stepover</dd></div>
+          <div class="cc-time"><dt>Estimated carve time</dt><dd>about {z.time}{' '}<span>(roughing {z.rough}, finishing {z.finish})</span></dd></div>
+          {z.tooSmall && <p class="cc-warn">Below the smallest size where a 1/8 in bit keeps the fine detail ({specs.recommended_size_mm} mm). Use a 1/16 in tapered ball nose, or carve it larger.</p>}
+        </dl>
+      ))}
+    </div>
+    <p class="cc-note">Estimates for a mid-size hobby machine (Shapeoko, X-Carve, Onefinity class). Scaling all three axes together keeps the depth in proportion; for thinner stock scale Z on its own. Hardwoods with fine grain (cherry, hard maple, walnut, basswood) hold this detail best. <a href="/tools/will-it-cut">Check your exact setup in Will it cut</a>, free, nothing uploaded.</p>
+  </div>
+)}
+
+<style>
+  .cc { padding: .85rem 1rem 1rem; border-top: 1px solid rgba(0,0,0,.08); }
+  .cc-head { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #633806; font-weight: 600; margin-bottom: .55rem; }
+  .cc-r { position: absolute; opacity: 0; pointer-events: none; }
+  .cc-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .7rem; }
+  .cc-chip { font-size: .8rem; padding: .3rem .75rem; border-radius: 999px; border: 1px solid rgba(133,79,11,.35); color: #633806; cursor: pointer; user-select: none; background: #fff; }
+  .cc-chip:hover { background: #FAEEDA; }
+  .cc-p { display: none; margin: 0; }
+  .cc-p > div { display: flex; justify-content: space-between; gap: .75rem; padding: .32rem 0; font-size: .84rem; border-bottom: 1px dashed rgba(0,0,0,.07); }
+  .cc-p dt { color: rgba(43,33,24,.62); flex-shrink: 0; }
+  .cc-p dd { margin: 0; text-align: right; color: #2b2118; font-variant-numeric: tabular-nums; }
+  .cc-p dd span { color: rgba(43,33,24,.55); font-size: .78rem; }
+  .cc-time dd { font-weight: 600; }
+  .cc-warn { margin: .5rem 0 0; font-size: .78rem; color: #8a5a10; background: #FBF1DF; border-radius: .4rem; padding: .45rem .6rem; }
+  .cc-note { margin: .7rem 0 0; font-size: .74rem; line-height: 1.5; color: rgba(43,33,24,.6); }
+  .cc-note a { color: #854F0B; text-decoration: underline; text-underline-offset: 2px; }
+  /* the checked size shows its panel and highlights its chip */
+  .cc-r0:checked ~ .cc-panels .cc-p0, .cc-r1:checked ~ .cc-panels .cc-p1, .cc-r2:checked ~ .cc-panels .cc-p2,
+  .cc-r3:checked ~ .cc-panels .cc-p3, .cc-r4:checked ~ .cc-panels .cc-p4 { display: block; }
+  .cc-r0:checked ~ .cc-chips .cc-c0, .cc-r1:checked ~ .cc-chips .cc-c1, .cc-r2:checked ~ .cc-chips .cc-c2,
+  .cc-r3:checked ~ .cc-chips .cc-c3, .cc-r4:checked ~ .cc-chips .cc-c4 { background: #854F0B; color: #FAEEDA; border-color: #854F0B; }
+  .cc-r:focus-visible ~ .cc-chips .cc-chip { outline-offset: 2px; }
+  .cc-r0:focus-visible ~ .cc-chips .cc-c0, .cc-r1:focus-visible ~ .cc-chips .cc-c1, .cc-r2:focus-visible ~ .cc-chips .cc-c2,
+  .cc-r3:focus-visible ~ .cc-chips .cc-c3, .cc-r4:focus-visible ~ .cc-chips .cc-c4 { outline: 2px solid #412402; }
+</style>
