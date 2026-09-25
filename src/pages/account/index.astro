@@ -4,6 +4,7 @@ import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { verifyAccountToken } from '../../lib/account-token';
+import { img } from '../../lib/img';
 import { STARTER_PLAN_SLUG, STARTER_PACK_MONTH } from '../../lib/subscriptions';
 
 export const prerender = false;
@@ -122,6 +123,38 @@ if (session?.email) {
   paidCount = paidOrders.length;
   totalSpent = paidOrders.reduce((s, o) => s + Number(o.total || 0), 0);
   totalFiles = paidOrders.reduce((n, o) => n + (o.order_items || []).reduce((m, it) => m + (it.downloads || []).length, 0), 0);
+}
+
+// ── All-Access pass ───────────────────────────────────────────────────
+// Designs added with the pass have no order, so the order list above never
+// shows them; they get their own section, with the same download links.
+type PassItem = { product_id: string; title: string; slug: string; image_url: string | null; granted_at: string; downloads: DownloadRow[] };
+let passItems: PassItem[] = [];
+let passInfo: { endLabel: string; used: number; limit: number } | null = null;
+if (session?.email) {
+  const db = supabaseAdmin();
+  const { activePass, usedLast30, PASS_FAIR_USE_PER_30D } = await import('../../lib/all-access');
+  const [{ data: ents }, pass] = await Promise.all([
+    db.from('entitlements').select('product_id, granted_at').ilike('email', session.email).eq('source', 'all-access').order('granted_at', { ascending: false }).limit(500),
+    activePass(db, session.email),
+  ]);
+  if (pass) {
+    const [y, m, d] = String(pass.end_date).split('-').map(Number);
+    passInfo = { endLabel: `${d} ${['January','February','March','April','May','June','July','August','September','October','November','December'][m - 1]} ${y}`, used: await usedLast30(db, session.email), limit: PASS_FAIR_USE_PER_30D };
+  }
+  const ids = [...new Set((ents || []).map((e: any) => e.product_id).filter(Boolean))];
+  if (ids.length) {
+    const [{ data: prods }, { data: dls }] = await Promise.all([
+      db.from('products').select('id, title, slug, image_url').in('id', ids),
+      db.from('product_downloads').select('product_id, file_name, download_link').in('product_id', ids),
+    ]);
+    const byId = new Map((prods || []).map((x: any) => [x.id, x]));
+    passItems = (ents || []).map((e: any) => {
+      const pr: any = byId.get(e.product_id) || {};
+      return { product_id: e.product_id, title: String(pr.title || 'Design').split('|')[0].trim(), slug: pr.slug || '', image_url: pr.image_url || null, granted_at: e.granted_at,
+        downloads: (dls || []).filter((x: any) => x.product_id === e.product_id).map((x: any) => ({ file_name: x.file_name, download_link: x.download_link })) };
+    }).filter((x) => x.slug);
+  }
 }
 
 // ── Membership packs ──────────────────────────────────────────────────
@@ -393,6 +426,34 @@ if (session?.email) {
                 });
               })();
             </script>
+          </section>
+        )}
+
+        {(passInfo || passItems.length > 0) && (
+          <section id="pass" class="mb-10 scroll-mt-24">
+            <h2 class="font-serif text-2xl text-bronze-800 mb-1">Your All-Access pass</h2>
+            {passInfo ? (
+              <p class="text-sm text-ink-700/70 mb-4">Active until <strong>{passInfo.endLabel}</strong>. Add any design from its product page with "Add to my downloads". {passInfo.used} of {passInfo.limit} used in the last 30 days.</p>
+            ) : (
+              <p class="text-sm text-ink-700/70 mb-4">Your pass has ended. Designs you added stay here to download.</p>
+            )}
+            {passItems.length > 0 ? (
+              <ul class="divide-y divide-black/10 border-y border-black/10">
+                {passItems.map((it) => (
+                  <li class="py-3 flex items-center gap-3">
+                    <a href={`/product/${it.slug}`} class="w-14 h-14 rounded overflow-hidden bg-cream shrink-0">{it.image_url && <img src={img(it.image_url, { w: 112, square: true, q: 70 })} alt="" width="56" height="56" loading="lazy" class="w-full h-full object-cover" />}</a>
+                    <a href={`/product/${it.slug}`} class="flex-1 min-w-0 text-sm text-ink-800 line-clamp-2">{it.title}</a>
+                    <div class="flex flex-col gap-1 shrink-0">
+                      {it.downloads.length ? it.downloads.map((d, i) => (
+                        <a href={d.download_link} target="_blank" rel="noopener" class="text-xs bg-bronze-600 text-cream px-3 py-1.5 rounded hover:bg-bronze-700 text-center">⬇ Download{it.downloads.length > 1 ? ` ${i + 1}` : ''}</a>
+                      )) : <span class="text-xs text-ink-700/60">Link on its way</span>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p class="text-sm"><a href="/search" class="text-bronze-700 underline">Find a design to add</a></p>
+            )}
           </section>
         )}
 

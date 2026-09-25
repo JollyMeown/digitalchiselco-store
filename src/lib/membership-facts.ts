@@ -29,9 +29,22 @@ export function planFacts(p: PlanLike) {
   };
 }
 
+/** The All-Access Library pass: the single definition (lib/all-access.ts
+ *  imports these). This file has no server imports, so it is safe anywhere. */
+export const ALL_ACCESS_SLUG = 'all-access-year';
+export const PASS_FAIR_USE_PER_30D = 100;
+export const isAllAccess = (p: PlanLike | null | undefined) => p?.slug === ALL_ACCESS_SLUG;
+
 /** Feature lines that carry numbers are generated, never stored, so they can never go stale. */
 export function autoFeatureLines(p: PlanLike): string[] {
   const f = planFacts(p);
+  if (isAllAccess(p)) return [
+    'Download any design in the library, whenever you like',
+    `Every new design added during your ${f.monthsLabel}`,
+    `Up to ${PASS_FAIR_USE_PER_30D} designs every 30 days (fair use)`,
+    `Plus the monthly member pack by email`,
+    `${f.priceLabel} once for ${f.monthsLabel}, no automatic renewal`,
+  ];
   return [
     `${f.files} fresh bas-relief STL designs every month`,
     `${f.totalFiles} designs over ${f.monthsLabel}, ${f.perFileLabel} each`,

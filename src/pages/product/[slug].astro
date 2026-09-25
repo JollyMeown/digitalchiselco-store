@@ -353,6 +353,43 @@ const breadcrumbLd = {
         </script>
       )}
 
+      {/* All-Access pass: filled from the browser (this page is edge-cached, so
+          nothing personal can be rendered into it). Empty for everyone else. */}
+      <div id="pass-slot" data-pid={p.id} hidden class="mt-5 rounded-lg border border-[#2F7A57]/30 bg-[#E9F4EE] px-4 py-3 text-sm"></div>
+      <script is:inline>
+        (function () {
+          var slot = document.getElementById('pass-slot');
+          if (!slot) return;
+          var pid = slot.getAttribute('data-pid');
+          function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+          fetch('/api/member/pass?product=' + encodeURIComponent(pid), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (d.active && d.owned) {
+                slot.innerHTML = '<strong>In your account.</strong> <a href="/account#pass" class="underline">Download it from your account</a>';
+              } else if (d.active && d.covered) {
+                slot.innerHTML = '<p class="font-medium text-[#1E5C40]">Included in your All-Access pass</p>'
+                  + '<button type="button" id="pass-add" class="mt-2 w-full bg-[#2F7A57] text-white py-2.5 rounded-md font-medium hover:bg-[#24613F] transition">Add to my downloads</button>'
+                  + '<p id="pass-msg" class="mt-1.5 text-xs text-[#1E5C40]/80">' + esc(d.used) + ' of ' + esc(d.limit) + ' designs used in the last 30 days</p>';
+                document.getElementById('pass-add').addEventListener('click', function () {
+                  var b = this; b.disabled = true; b.textContent = 'Adding…';
+                  fetch('/api/member/pass', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ product_id: pid }) })
+                    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                    .then(function (x) {
+                      if (x.ok && x.j.ok) slot.innerHTML = '<strong>Added to your account.</strong> <a href="/account#pass" class="underline">Download it now</a>';
+                      else { b.disabled = false; b.textContent = 'Add to my downloads'; document.getElementById('pass-msg').textContent = x.j.error || 'Could not add it. Please try again.'; }
+                    });
+                });
+              } else if (d.offered && !d.signedIn) {
+                slot.className = 'mt-5 text-xs text-ink-700/70';
+                slot.innerHTML = 'All-Access pass holder? <a href="/account" class="underline text-bronze-700">Sign in</a> to add this design to your downloads.';
+              } else { return; }
+              slot.hidden = false;
+            })
+            .catch(function () { /* the normal buy buttons stay as they are */ });
+        })();
+      </script>
+
       <button class="add-to-cart mt-5 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition"
         data-id={p.id} data-slug={p.slug} data-title={cleanTitle} data-price={price} data-img={gallery[0] || ''}>
         Add to cart
