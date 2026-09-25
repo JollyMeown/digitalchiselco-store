@@ -13,6 +13,11 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # The IndexNow key (public/<key>.txt, src/lib/indexnow.ts) is public by
+  # design: search engines fetch it to confirm the site is ours. Netlify's
+  # smart secret detection would otherwise read the 32-hex string as a leaked
+  # secret and stop the deploy.
+  SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "d8645a298486e17b25dc84f748badb5a"
 
 # Netlify Image CDN: allow transforming our Supabase-hosted product images.
 # Used by /pinterest-rss.xml to serve Pin-sized (1200x900) JPEGs from our own
