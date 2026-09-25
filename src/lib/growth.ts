@@ -1599,6 +1599,22 @@ ${ideasHtml}
     stats.indexAudit = await gscInspectSlice(250, { budgetMs: 3 * 60 * 1000 });
   });
 
+  // ── IndexNow: tell Bing (so ChatGPT and Copilot) what is new ─────────
+  // Designs and guides created or edited in the last 26 hours, once a night.
+  // Software pages are skipped (they 301 to /laser-studio).
+  stats.indexNow = 'off';
+  await step(stats, 'indexNow', async () => {
+    const { submitIndexNow, productUrl, postUrl } = await import('./indexnow');
+    const since = new Date(Date.now() - 26 * 3600000).toISOString();
+    const [{ data: prods }, { data: posts }] = await Promise.all([
+      db.from('products').select('slug').eq('active', true).not('slug', 'like', 'software-%').gte('updated_at', since).limit(5000),
+      db.from('posts').select('slug').eq('status', 'published').gte('updated_at', since).limit(500),
+    ]);
+    const urls = [...(prods || []).map((p: any) => productUrl(p.slug)), ...(posts || []).map((p: any) => postUrl(p.slug))];
+    if (!urls.length) { stats.indexNow = 'nothing changed'; return; }
+    stats.indexNow = { urls: urls.length, status: await submitIndexNow(urls) };
+  });
+
   // ── Cut Local maker automations (gated) ──────────────────────────────
   // Nudge makers who have unquoted open jobs near them (max once/20h each),
   // and remind low-credit makers to top up (max once/7d each).
