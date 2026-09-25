@@ -1,0 +1,7 @@
+---
+import LocalLanding from '../../components/LocalLanding.astro';
+import { landingFor } from '../../lib/landing-i18n';
+const landing = landingFor('de', Astro.params.slug || '');
+if (!landing) return Astro.rewrite('/404');
+---
+<LocalLanding landing={landing} />

@@ -8,6 +8,7 @@ import { getCategoryBySlug, getProductsByCategory, getSettings, sortOf } from '.
 import { jsonLd } from '../../lib/jsonld';
 import { img } from '../../lib/img';
 import xss from 'xss';
+import { themeAlternates, THEME_BY_COLLECTION } from '../../lib/landing-i18n';
 
 const { slug } = Astro.params;
 const category = await getCategoryBySlug(slug!);
@@ -52,12 +53,16 @@ const listLd = {
     })),
   },
 };
+// Polish and German versions of this collection (lib/landing-i18n.ts): page 1
+// names them so Google sends those countries to their own language.
+const theme = THEME_BY_COLLECTION[category.slug];
+const alternates = theme && page === 1 && sort === 'best' ? themeAlternates(theme) : [];
 const faqLd = faq.length ? {
   '@context': 'https://schema.org', '@type': 'FAQPage',
   mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: String(f.a).replace(/<[^>]+>/g, '') } })),
 } : null;
 ---
-<Shell title={pageTitle} description={meta} image={category.image_url || undefined} scrollPastBanner={true}>
+<Shell title={pageTitle} description={meta} image={category.image_url || undefined} scrollPastBanner={true} alternates={alternates}>
   <Breadcrumbs crumbs={[{ label: 'Collections', href: '/collections' }, { label: category.name }]} />
   {category.image_url && !isPremium ? (
     <>

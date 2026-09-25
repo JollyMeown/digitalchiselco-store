@@ -3,7 +3,10 @@ import '../styles/global.css';
 import { getSettings } from '../lib/queries';
 import { jsonLd } from '../lib/jsonld';
 import AnnouncementBanner from '../components/AnnouncementBanner.astro';
-interface Props { title?: string; description?: string; image?: string; noindex?: boolean; ogType?: string; price?: number; currency?: string; availability?: string; }
+interface Props { title?: string; description?: string; image?: string; noindex?: boolean; ogType?: string; price?: number; currency?: string; availability?: string;
+  // Localised landing pages (/pl, /de): the page language and its hreflang
+  // siblings, so Google shows each country the version in its own language.
+  lang?: string; alternates?: { hreflang: string; href: string }[]; }
 const {
   title = 'DigitalChiselCo — Premium STL Files for CNC, Laser & 3D Printing',
   description = 'Hundreds of museum-grade bas-relief STL files for CNC routers, 3D printers and laser engravers. Instant download, commercial use included.',
@@ -13,6 +16,8 @@ const {
   price,
   currency = 'USD',
   availability = 'in stock',
+  lang = 'en',
+  alternates = [],
 } = Astro.props;
 // Product Rich Pin metadata — emitted only on product pages (ogType === 'product').
 const priceAmount = typeof price === 'number' ? price.toFixed(2) : null;
@@ -52,13 +57,14 @@ const faviconType = settings.favicon_image_url
   : 'image/svg+xml';
 ---
 <!doctype html>
-<html lang="en">
+<html lang={lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    {alternates.map((a) => <link rel="alternate" hreflang={a.hreflang} href={new URL(a.href, site).href} />)}
     {noindex && <meta name="robots" content="noindex,nofollow" />}
     <link rel="icon" type={faviconType} href={faviconUrl} />
     {settings.favicon_image_url && <link rel="apple-touch-icon" href={settings.favicon_image_url} />}

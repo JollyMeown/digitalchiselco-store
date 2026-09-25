@@ -1,0 +1,137 @@
+---
+// One Polish or German landing page (data in lib/landing-i18n.ts).
+import Shell from '../layouts/Shell.astro';
+import ProductCard from './ProductCard.astro';
+import { getSettings } from '../lib/queries';
+import { search, parseParams, catalogIndex } from '../lib/search-index';
+import { UI, LANDINGS, landingPath, themeAlternates, type Landing } from '../lib/landing-i18n';
+import { jsonLd } from '../lib/jsonld';
+interface Props { landing: Landing }
+const { landing: L } = Astro.props;
+const ui = UI[L.lang];
+const site = (import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
+const settings = await getSettings();
+
+// Each design shows once on the page: a section skips what an earlier one showed.
+const seen = new Set<string>();
+const sections = [];
+for (const s of L.sections) {
+  const r = await search({ ...parseParams(new URLSearchParams()), q: s.q, cats: s.cats || [], sort: s.q ? 'relevance' : 'best' });
+  const items = r.items.filter((e) => !seen.has(e.id)).slice(0, s.limit || 8);
+  items.forEach((e) => seen.add(e.id));
+  if (!items.length) continue;
+  const qs = new URLSearchParams();
+  if (s.seeAll) qs.set('q', s.seeAll);
+  for (const c of s.cats || []) qs.append('cat', c);
+  sections.push({ ...s, items, total: r.total, href: '/search?' + qs.toString() });
+}
+const { entries } = await catalogIndex();
+const count = entries.filter((e) => e.cats.some((c) => L.countCats.includes(c))).length;
+const hero = sections[0]?.items[0]?.image_url || null;
+
+const alternates = themeAlternates(L.theme);
+const others = LANDINGS.filter((l) => l.theme === L.theme && l.lang !== L.lang);
+const url = site + landingPath(L);
+const strip = (h: string) => h.replace(/<[^>]+>/g, '');
+const ld = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'CollectionPage', name: L.h1, description: L.description, url, inLanguage: L.lang,
+      isPartOf: { '@type': 'WebSite', '@id': `${site}#website` },
+      mainEntity: {
+        '@type': 'ItemList', numberOfItems: seen.size,
+        itemListElement: sections.flatMap((s) => s.items).map((p, i) => ({
+          '@type': 'ListItem', position: i + 1, url: `${site}/product/${p.slug}`, name: String(p.title).split('|')[0].trim(),
+        })),
+      },
+    },
+    {
+      '@type': 'FAQPage', inLanguage: L.lang,
+      mainEntity: L.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: strip(f.a) } })),
+    },
+  ],
+};
+---
+<Shell title={L.title} description={L.description} image={hero || undefined} lang={L.lang} alternates={alternates}>
+  <header class="mb-6">
+    <p class="text-[11px] tracking-[0.16em] uppercase text-bronze-700/80 font-medium">{L.eyebrow}</p>
+    <h1 class="font-serif text-2xl sm:text-3xl md:text-4xl text-bronze-800 leading-tight mt-1 text-balance">{L.h1}</h1>
+    <p class="text-ink-700/70 text-sm mt-2">{ui.count(count)}</p>
+    <p class="mt-4 max-w-3xl text-[15px] leading-relaxed text-ink-800">{L.lead}</p>
+    <nav class="mt-4 flex flex-wrap gap-2" aria-label={L.h1}>
+      {sections.map((s, i) => (
+        <a href={`#s${i}`} class="px-3 py-1.5 rounded-full border border-bronze-600/25 bg-white text-sm text-bronze-800 hover:bg-cream">{s.h}</a>
+      ))}
+    </nav>
+  </header>
+
+  {sections.map((s, i) => (
+    <section id={`s${i}`} class="mt-10 scroll-mt-24" aria-labelledby={`s${i}-h`}>
+      <div class="flex items-end justify-between gap-4 mb-1 flex-wrap">
+        <h2 id={`s${i}-h`} class="font-serif text-xl sm:text-2xl text-bronze-800">{s.h}</h2>
+        {s.total > s.items.length && (
+          <a href={s.href} class="text-sm font-medium text-bronze-700 underline whitespace-nowrap">{ui.seeAll} ({s.total}) →</a>
+        )}
+      </div>
+      <p class="text-sm text-ink-700/80 mb-4 max-w-3xl">
+        {s.text}
+        {L.theme === 'religious' && s.q === 'stations of the cross' && (
+          <> <a href="/requests" class="underline text-bronze-700">{ui.requestCta}</a></>
+        )}
+      </p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {s.items.map((p, j) => <ProductCard product={p} discount={settings.discount_percent} eager={i === 0 && j < 4} />)}
+      </div>
+    </section>
+  ))}
+
+  <div class="mt-14 grid gap-6 md:grid-cols-2">
+    <section class="rounded-xl border border-bronze-600/20 bg-white p-5" aria-labelledby="how-h">
+      <h2 id="how-h" class="font-serif text-xl text-bronze-800 mb-3">{ui.howH}</h2>
+      <ol class="space-y-3 text-sm text-ink-800 leading-relaxed">
+        {ui.how.map((t, i) => (
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-bronze-600 text-cream text-xs font-semibold flex items-center justify-center">{i + 1}</span><span>{t}</span></li>
+        ))}
+      </ol>
+    </section>
+    <section class="rounded-xl border border-bronze-600/20 bg-white p-5" aria-labelledby="facts-h">
+      <h2 id="facts-h" class="font-serif text-xl text-bronze-800 mb-3">{ui.factsH}</h2>
+      <ul class="space-y-2 text-sm text-ink-800 leading-relaxed">
+        {ui.facts.map((t) => <li class="flex gap-2"><span class="text-bronze-600" aria-hidden="true">✓</span><span>{t}</span></li>)}
+      </ul>
+    </section>
+  </div>
+
+  <section class="mt-8 rounded-xl bg-[#FAEEDA] border border-bronze-600/25 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+    <div>
+      <h2 class="font-serif text-xl text-bronze-800">{ui.freeH}</h2>
+      <p class="text-sm text-ink-800 mt-1 max-w-xl">{ui.freeText}</p>
+    </div>
+    <a href="/free" class="shrink-0 inline-block text-center bg-bronze-600 text-cream rounded-lg px-5 py-3 font-medium hover:bg-bronze-700">{ui.freeCta}</a>
+  </section>
+
+  <section class="mt-14 max-w-3xl" aria-labelledby="faq-h">
+    <h2 id="faq-h" class="font-serif text-xl text-bronze-800 mb-3">{ui.faqH}</h2>
+    <div class="divide-y divide-bronze-600/15 border-y border-bronze-600/15">
+      {L.faq.map((f) => (
+        <details class="group py-3">
+          <summary class="cursor-pointer list-none flex items-start justify-between gap-3 text-[15px] font-medium text-ink-900">
+            <span>{f.q}</span>
+            <span class="text-bronze-600 transition group-open:rotate-45" aria-hidden="true">+</span>
+          </summary>
+          <div class="coll-intro mt-2 text-sm leading-relaxed text-ink-700" set:html={f.a} />
+        </details>
+      ))}
+    </div>
+    <p class="mt-4 text-sm text-ink-700">{ui.requestText} <a href="/requests" class="underline text-bronze-700">{ui.requestCta}</a></p>
+  </section>
+
+  <p class="mt-10 text-sm text-ink-700/80">
+    {ui.alsoIn}{' '}
+    {others.map((o) => <><a href={landingPath(o)} hreflang={o.lang} lang={o.lang} class="underline text-bronze-700">{UI[o.lang].langName}</a>{' · '}</>)}
+    <a href={L.enPath} hreflang="en" lang="en" class="underline text-bronze-700">English</a>
+  </p>
+
+  <script type="application/ld+json" set:html={jsonLd(ld)} />
+</Shell>

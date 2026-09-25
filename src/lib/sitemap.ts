@@ -22,6 +22,7 @@
 // live, linked from its collection, and crawlable.
 import { supabase } from './supabase';
 import { LANDING_TOPICS } from './landing';
+import { LANDINGS, landingPath } from './landing-i18n';
 
 export const SITE = process.env.PUBLIC_SITE_URL || (import.meta as any).env?.PUBLIC_SITE_URL || 'https://digitalchiselco.com';
 
@@ -71,6 +72,8 @@ export const STATIC_PATHS: Array<{ path: string; priority: number; changefreq: s
   // The report is a citation asset rather than a shop page: high priority,
   // and it never changes once published, which is the point of it.
   { path: '/reports/state-of-cnc-relief-carving-2026', priority: 0.9, changefreq: 'yearly' },
+  // Polish and German landing pages (lib/landing-i18n.ts)
+  ...LANDINGS.map((l) => ({ path: landingPath(l), priority: 0.8, changefreq: 'weekly' })),
   { path: '/terms',       priority: 0.2, changefreq: 'yearly' },
   { path: '/privacy',     priority: 0.2, changefreq: 'yearly' },
   { path: '/refunds',     priority: 0.2, changefreq: 'yearly' },
