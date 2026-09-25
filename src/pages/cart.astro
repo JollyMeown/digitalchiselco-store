@@ -3,21 +3,11 @@
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import Breadcrumbs from '../components/Breadcrumbs.astro';
-import RecentlyViewed from '../components/RecentlyViewed.astro';
-import TrustBadges from '../components/TrustBadges.astro';
-import LaserStudioCrossSell from '../components/LaserStudioCrossSell.astro';
 import { pricing } from '../lib/pricing';
 import { getSettings } from '../lib/queries';
 const settings = await getSettings();
 const { percent } = pricing(1, settings.discount_percent);
 const showCartPromos = (settings as any).cart_promos_active !== false;
-const promoTiers = [
-  { items: 2, percent: 10, code: 'SET10' },
-  { items: 6, percent: 15, code: '2026OFF15' },
-  { items: 10, percent: 20, code: '2026OFF20' },
-  { items: 25, percent: 35, code: '2026OFF35' },
-];
 // Order-bump REMOVED 2026-08-06 (owner: the catalogue is outdated — don't offer
 // it at checkout). The catalogue product itself stays purchasable standalone.
 const bump: { id: string; title: string; price: number } | null = null;
@@ -39,174 +29,162 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
 ---
 <Base title="Cart | DigitalChiselCo">
   <Header />
-  <Breadcrumbs crumbs={[{ label: 'Cart' }]} />
-  <main class="px-6 pb-6 max-w-3xl mx-auto min-h-[40vh]">
-    <h1 class="text-3xl mb-6">Your cart</h1>
-    {showCartPromos && (
-      <div class="mb-6 rounded-lg border border-bronze-600/30 bg-[#FAEEDA] px-4 py-3">
-        <p class="text-sm font-medium text-bronze-800">Save more when you buy more on my 3D models 🎉</p>
-        <p class="mt-1 text-xs text-bronze-800">⭐ Or build your own <a href="/bundle-builder" class="underline font-medium">Pick-any-5 bundle from $25 →</a></p>
-        <ul class="mt-2 space-y-1.5 text-sm text-ink-800">
-          {promoTiers.map((t) => (
-            <li class="flex items-center gap-2 flex-wrap">
-              <span class="text-green-700" aria-hidden="true">☑</span>
-              <span>{t.items} items → <strong>{t.percent}% OFF</strong></span>
-              <code class="sm:ml-auto font-mono text-xs bg-white/70 border border-bronze-600/20 rounded px-2 py-0.5 text-bronze-800">{t.code}</code>
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
-    <div id="empty" class="text-ink-700/70 hidden">Your cart is empty. <a href="/catalog" class="text-bronze-600">Browse the catalog →</a></div>
-    <div id="items" class="divide-y divide-black/10"></div>
-    <div id="summary" class="mt-6 hidden">
-      <!-- Bulk discount upsell hint — appears only when adding more items unlocks a deeper discount -->
-      <div id="tier-hint" class="hidden mb-4 bg-[#FAEEDA] border border-bronze-600/30 rounded-md px-3 py-2.5 text-sm text-bronze-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
-        <span id="tier-hint-text" class="leading-snug">Add more items to unlock a bigger discount.</span>
-        <a href="/catalog" class="flex-shrink-0 text-xs font-medium text-bronze-700 underline whitespace-nowrap self-start sm:self-auto">Add items →</a>
-      </div>
-      {freeGift && (
-        <div id="free-gift-bar" class="mb-4 bg-[#FAEEDA] border border-bronze-600/30 rounded-md px-3 py-2.5" data-threshold={freeGift.threshold}>
-          <div class="flex items-center gap-2.5">
-            <span class="text-xl flex-shrink-0" aria-hidden="true">🎁</span>
-            <p id="free-gift-text" class="text-sm text-bronze-800 leading-snug flex-1">Spend ${freeGift.threshold.toFixed(0)} and unlock a <strong>free surprise design</strong>, matched to your order 🎁</p>
-          </div>
-          <div class="mt-2 h-2 rounded-full bg-white/70 overflow-hidden"><div id="free-gift-fill" class="h-full bg-bronze-600 transition-all" style="width:0%"></div></div>
-        </div>
-      )}
-      <div class="flex justify-between text-sm text-ink-700/60"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
-      <div class="flex justify-between text-sm text-green-700"><span>Discount ({percent}% off)</span><span id="savings">$0.00</span></div>
+  <!-- Cart, redesigned 2026-09-25 (owner: "not cluttered, simple and
+       professionally appealing"). On phones only 18% of carts reached
+       checkout against 52% on desktop: the button sat below nine boxes.
+       Now: designs on the left, one order-summary card on the right (sticky
+       on desktop), and on phones a bottom bar with the total + Checkout.
+       Every id the script below uses is unchanged. -->
+  <main class="cart-page">
+    <div class="cart-head">
+      <h1 class="font-serif text-2xl sm:text-3xl text-bronze-800">Your cart <span id="cart-count" class="cart-count-label"></span></h1>
+      <a href="/catalog" class="cart-continue">Continue shopping</a>
+    </div>
 
-      <!-- Promo code -->
-      <div class="mt-4 border-t border-black/10 pt-4">
-        <details class="group">
-          <summary class="cursor-pointer text-sm text-bronze-700 hover:underline list-none select-none flex items-center gap-1">
-            <span class="group-open:rotate-90 inline-block transition">▸</span> Have a promo code?
-          </summary>
-          <div class="mt-3 flex gap-2">
-            <input id="promo-code" type="text" autocapitalize="characters" placeholder="e.g. 2026OFF15"
-              class="flex-1 px-3 py-2 text-sm border border-black/15 rounded-md font-mono uppercase tracking-wider focus:outline-none focus:border-bronze-600" />
-            <button id="promo-apply" type="button" class="px-4 py-2 text-sm bg-bronze-600 text-cream rounded-md hover:bg-bronze-700 transition">Apply</button>
+    <div id="empty" class="hidden cart-empty">
+      <p class="font-serif text-xl text-bronze-800">Your cart is empty</p>
+      <p class="text-sm text-ink-700/70 mt-1">Find a design to carve, or start with five free files.</p>
+      <div class="mt-4 flex flex-wrap gap-2 justify-center">
+        <a href="/search" class="cart-btn-primary">Search designs</a>
+        <a href="/free" class="cart-btn-ghost">Get 5 free STL files</a>
+      </div>
+    </div>
+
+    <div class="cart-grid">
+      <section aria-label="Designs in your cart" class="min-w-0">
+        <div id="items" class="cart-items"></div>
+        <p id="tier-hint" class="hidden cart-hint"><span id="tier-hint-text"></span> <a href="/catalog">Add designs</a></p>
+      </section>
+
+      <aside id="summary" class="hidden cart-summary" aria-label="Order summary">
+        <h2 class="cart-sum-title">Order summary</h2>
+        <dl class="cart-lines">
+          <div><dt>Subtotal</dt><dd id="subtotal">$0.00</dd></div>
+          <div class="is-save"><dt>Sale ({percent}% off)</dt><dd id="savings">$0.00</dd></div>
+          <div id="promo-row" class="hidden is-save"><dt id="promo-label">Promo</dt><dd id="promo-amount">$0.00</dd></div>
+          <div class="is-total"><dt>Total</dt><dd id="total">$0.00</dd></div>
+        </dl>
+
+        {freeGift && (
+          <div id="free-gift-bar" class="cart-gift-bar" data-threshold={freeGift.threshold}>
+            <p id="free-gift-text">Spend ${freeGift.threshold.toFixed(0)} and get a <strong>free surprise design</strong>.</p>
+            <div class="cart-gift-track"><div id="free-gift-fill" style="width:0%"></div></div>
+          </div>
+        )}
+
+        <details class="cart-promo">
+          <summary>Have a promo code?</summary>
+          <div class="mt-2 flex gap-2">
+            <input id="promo-code" type="text" autocapitalize="characters" placeholder="Code" aria-label="Promo code"
+              class="flex-1 min-w-0 px-3 py-2 text-sm border border-black/15 rounded-md font-mono uppercase tracking-wider focus:outline-none focus:border-bronze-600" />
+            <button id="promo-apply" type="button" class="px-4 py-2 text-sm border border-bronze-600 text-bronze-700 rounded-md hover:bg-bronze-600 hover:text-cream transition">Apply</button>
             <button id="promo-remove" type="button" class="hidden px-3 py-2 text-sm border border-black/15 rounded-md hover:bg-cream">Remove</button>
           </div>
           <p id="promo-msg" class="mt-2 text-xs"></p>
         </details>
-        <div id="promo-row" class="hidden flex justify-between text-sm text-green-700 mt-2"><span id="promo-label">Promo</span><span id="promo-amount">$0.00</span></div>
-      </div>
 
-      <div class="flex justify-between text-lg font-medium mt-3 border-t border-black/10 pt-3"><span>Total</span><span id="total">$0.00</span></div>
-
-      <!-- Email at cart — lets us pre-lock Paddle's email field so the receipt
-           goes to exactly the address the buyer enters here. -->
-      <!-- Gift option: deliver the downloads to a friend's inbox instead -->
-      <div class="mt-4">
-        <label class="flex items-center gap-2 text-sm text-ink-800 cursor-pointer select-none">
-          <input id="gift-check" type="checkbox" class="accent-[#854F0B]" />
-          <span>🎁 This order is a <strong>gift</strong> — send the designs to someone else</span>
-        </label>
-        <div id="gift-fields" class="hidden mt-2 space-y-2 bg-[#FAEEDA] border border-bronze-600/30 rounded-md p-3">
-          <div>
-            <label for="gift-to" class="block text-[11px] text-ink-700/70 mb-0.5">Recipient's email <span class="text-red-600">*</span></label>
-            <input id="gift-to" type="email" inputmode="email" placeholder="friend@email.com" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white" />
-          </div>
-          <div>
-            <label for="gift-from" class="block text-[11px] text-ink-700/70 mb-0.5">Your name (shown on the gift)</label>
-            <input id="gift-from" type="text" maxlength="80" placeholder="e.g. Sarah" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white" />
-          </div>
-          <div>
-            <label for="gift-note" class="block text-[11px] text-ink-700/70 mb-0.5">Gift note (optional)</label>
-            <textarea id="gift-note" rows="2" maxlength="300" placeholder="Happy birthday! Carve something amazing." class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white"></textarea>
-          </div>
-          <p class="text-[11px] text-ink-700/60">They get the download links and your note. You get the receipt.</p>
+        <div class="cart-field">
+          <label for="buyer-email">Email for your download links</label>
+          <input id="buyer-email" type="email" inputmode="email" autocomplete="email" required placeholder="you@email.com" />
+          <p id="buyer-email-msg" class="mt-1 text-xs text-red-600 hidden"></p>
+          <p class="cart-help">Your files and receipt arrive here the moment payment goes through.</p>
         </div>
-      </div>
 
-      <div class="mt-4">
-        <label for="buyer-email" class="block text-xs text-ink-700/70 mb-1">Email for download links and receipt</label>
-        <input id="buyer-email" type="email" inputmode="email" autocomplete="email" required placeholder="you@email.com"
-          class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white" />
-        <p id="buyer-email-msg" class="mt-1 text-xs text-red-600 hidden"></p>
-        <p class="mt-1 text-[11px] text-ink-700/50">We send your STL files and receipt here. This is the same email you'll see in the payment popup.</p>
-        <p class="mt-1 text-[11px] text-bronze-700">🎖 Active member? Use your member email — your <strong>10% member discount</strong> applies automatically at checkout.</p>
-      </div>
-
-      {bump && (
-        <label class="mt-4 flex items-start gap-2.5 bg-[#FAEEDA] border border-bronze-600/30 rounded-md px-3 py-2.5 cursor-pointer select-none">
-          <input id="bump-check" type="checkbox" class="mt-0.5 accent-[#854F0B]" data-bump-id={bump.id} data-bump-price={bump.price} />
-          <span class="text-sm text-bronze-800 leading-snug">
-            <strong>Add the {bump.title}</strong> — browse every design we make, offline, forever.
-            <span class="whitespace-nowrap font-medium">+ ${bump.price.toFixed(2)}</span>
-          </span>
-        </label>
-      )}
-      <button id="checkout" class="mt-4 w-full bg-bronze-600 text-cream py-3 rounded-md hover:bg-bronze-700 transition">Checkout</button>
-      <div id="owned-panel" hidden class="mt-3 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
-        <p class="font-medium">You already own <span id="owned-count">this design</span>:</p>
-        <ul id="owned-list" class="mt-1 list-disc pl-5 text-[13px]"></ul>
-        <p class="mt-2 text-[12px] text-amber-900/80">Your files are waiting in your account, no need to pay again.</p>
-        <div class="mt-2.5 flex flex-wrap gap-2">
-          <button id="owned-remove" type="button" class="bg-bronze-600 text-cream text-xs font-medium px-3 py-2 rounded-md hover:bg-bronze-700">Remove and continue</button>
-          <a id="owned-download" href="/resend-downloads" class="text-xs px-3 py-2 rounded-md border border-bronze-600 text-bronze-700 hover:bg-white">Send me my downloads</a>
-          <button id="owned-anyway" type="button" class="text-xs underline text-ink-700/70 px-1">Buy again anyway</button>
+        <div class="cart-gift">
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input id="gift-check" type="checkbox" class="accent-[#854F0B]" />
+            <span>Sending this as a gift?</span>
+          </label>
+          <div id="gift-fields" class="hidden mt-2 space-y-2">
+            <div>
+              <label for="gift-to" class="block text-[11px] text-ink-700/70 mb-0.5">Their email <span class="text-red-600">*</span></label>
+              <input id="gift-to" type="email" inputmode="email" placeholder="friend@email.com" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white" />
+            </div>
+            <div>
+              <label for="gift-from" class="block text-[11px] text-ink-700/70 mb-0.5">Your name</label>
+              <input id="gift-from" type="text" maxlength="80" placeholder="e.g. Sarah" class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white" />
+            </div>
+            <div>
+              <label for="gift-note" class="block text-[11px] text-ink-700/70 mb-0.5">Note (optional)</label>
+              <textarea id="gift-note" rows="2" maxlength="300" placeholder="Happy birthday! Carve something amazing." class="w-full px-3 py-2 text-sm border border-black/15 rounded-md focus:outline-none focus:border-bronze-600 bg-white"></textarea>
+            </div>
+            <p class="text-[11px] text-ink-700/60">They get the files and your note. You get the receipt.</p>
+          </div>
         </div>
-      </div>
-      <div class="mt-2 flex items-center justify-center gap-1.5 flex-wrap text-[11px] text-ink-700/60">
-        <span aria-hidden="true">⚡</span><span>One-tap express pay with</span>
-        {/* Spelled out in full: Google's StoreBot reads the checkout page to
-            detect e-wallets for the Store quality scorecard, and the short
-            marks " Pay" / "G Pay" were not being recognised. */}
-        <span class="px-1.5 py-0.5 rounded bg-black text-white font-medium leading-none">Apple Pay</span>
-        <span class="px-1.5 py-0.5 rounded border border-black/15 bg-white font-medium leading-none">Google Pay</span>
-        <span class="px-1.5 py-0.5 rounded bg-[#003087] text-white font-medium leading-none">PayPal</span>
-      </div>
-      <p class="text-xs text-ink-700/60 mt-2 text-center">Secure checkout · instant download links emailed after purchase</p>
-      <!-- Naming the seller, with a link a buyer can check, does more for
-           confidence at the pay button than any badge we could draw. -->
-      <p class="text-[11px] text-ink-700/50 mt-1.5 text-center">
-        Sold by <a href="https://www.paddle.com" rel="noopener" target="_blank" class="text-bronze-600 hover:underline">Paddle</a>, our merchant of record:
-        Paddle.com Inc. (USA), Paddle.com (Canada) Ltd. (Canada), or Paddle.com Market Limited, London (UK).
-        <a href="/faq" class="text-bronze-600 hover:underline">More in the FAQ</a>
-      </p>
-      <div class="mt-4"><TrustBadges compact={true} /></div>
+
+        {bump && (
+          <label class="mt-3 flex items-start gap-2.5 text-sm cursor-pointer select-none">
+            <input id="bump-check" type="checkbox" class="mt-0.5 accent-[#854F0B]" data-bump-id={bump.id} data-bump-price={bump.price} />
+            <span>Add the {bump.title} <span class="whitespace-nowrap font-medium">+ ${bump.price.toFixed(2)}</span></span>
+          </label>
+        )}
+
+        <button id="checkout" class="cart-checkout">Checkout</button>
+
+        <div id="owned-panel" hidden class="mt-3 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
+          <p class="font-medium">You already own <span id="owned-count">this design</span>:</p>
+          <ul id="owned-list" class="mt-1 list-disc pl-5 text-[13px]"></ul>
+          <p class="mt-2 text-[12px] text-amber-900/80">Your files are waiting in your account, no need to pay again.</p>
+          <div class="mt-2.5 flex flex-wrap gap-2">
+            <button id="owned-remove" type="button" class="bg-bronze-600 text-cream text-xs font-medium px-3 py-2 rounded-md hover:bg-bronze-700">Remove and continue</button>
+            <a id="owned-download" href="/resend-downloads" class="text-xs px-3 py-2 rounded-md border border-bronze-600 text-bronze-700 hover:bg-white">Send me my downloads</a>
+            <button id="owned-anyway" type="button" class="text-xs underline text-ink-700/70 px-1">Buy again anyway</button>
+          </div>
+        </div>
+
+        <div class="cart-secure">
+          <p><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Secure checkout · instant download</p>
+          {/* Spelled out in full: Google's StoreBot reads the checkout page to
+              detect e-wallets for the Store quality scorecard. */}
+          <p class="cart-pay">Card · PayPal · Apple Pay · Google Pay</p>
+          <p class="cart-mor"><a href="/faq" class="hover:underline">Paddle</a> processes payment as our merchant of record.</p>
+        </div>
+      </aside>
     </div>
   </main>
 
-  <!-- Inline Paddle checkout — branded, embedded on-site (uses the dashboard Inline theme) -->
-  <section id="dcc-checkout-section" class="hidden px-4 sm:px-6 pb-16 max-w-3xl mx-auto">
+  <!-- Phones: total + Checkout always within reach. Hidden while the real
+       button is on screen, and during payment. -->
+  <div id="cart-sticky" class="cart-sticky" hidden>
+    <div class="min-w-0"><span class="block text-[11px] text-ink-700/60 leading-none">Total</span><strong id="cart-sticky-total" class="text-lg">$0.00</strong></div>
+    <button type="button" id="cart-sticky-btn" class="cart-sticky-btn">Checkout</button>
+  </div>
+
+  <!-- Inline Paddle checkout, embedded on-site (dashboard Inline theme) -->
+  <section id="dcc-checkout-section" class="hidden cart-pay-section">
     <button id="dcc-checkout-back" type="button" class="text-sm text-bronze-700 hover:underline mb-4">&larr; Back to cart</button>
     <!-- Exit-save: shown once when the buyer backs out of payment -->
     <div id="dcc-exit-save" class="hidden mb-4 bg-[#FAEEDA] border border-bronze-600/40 rounded-lg px-4 py-3">
       <p class="text-sm text-bronze-800 font-medium">Not ready right now? No problem.</p>
-      <p class="text-xs text-ink-700/70 mt-0.5">I can email you your cart so you can finish in one click later. Nothing is lost either way.</p>
+      <p class="text-xs text-ink-700/70 mt-0.5">We can email you your cart so you can finish in one click later. Nothing is lost either way.</p>
       <div class="mt-2 flex flex-wrap gap-2">
-        <button id="dcc-exit-save-yes" type="button" class="text-xs px-3 py-2 rounded-md bg-bronze-600 text-cream hover:bg-bronze-700 transition">📧 Email me my cart</button>
+        <button id="dcc-exit-save-yes" type="button" class="text-xs px-3 py-2 rounded-md bg-bronze-600 text-cream hover:bg-bronze-700 transition">Email me my cart</button>
         <button id="dcc-exit-save-no" type="button" class="text-xs px-3 py-2 rounded-md border border-black/15 hover:bg-white transition">Just take me back</button>
       </div>
       <p id="dcc-exit-save-msg" class="text-xs mt-2 hidden"></p>
     </div>
-    <h1 class="font-serif text-2xl sm:text-3xl text-bronze-800 mb-1">Complete your purchase</h1>
-    <p class="text-sm text-ink-700/60 mb-5">Secure checkout — your STL files are emailed instantly after payment.</p>
+    <h1 class="font-serif text-2xl sm:text-3xl text-bronze-800">Payment</h1>
+    <p id="pay-summary" class="text-sm text-ink-700/70 mt-1 mb-4">Your files are emailed the moment payment goes through.</p>
     <div class="dcc-inline-frame rounded-xl border border-bronze-600/15 bg-white p-2 sm:p-4 min-h-[420px]"></div>
   </section>
 
-  <!-- Laser Studio: shown by renderCart only while the cart holds designs and not the software -->
-  <div class="px-6 pb-10 max-w-3xl mx-auto"><LaserStudioCrossSell where="cart" /></div>
-
   <!-- Relevant-to-cart upsell (filled by JS using /api/related) -->
-  <section id="upsell-wrap" class="px-6 pb-14 max-w-6xl mx-auto hidden">
-    <h2 id="upsell-title" class="text-xl mb-1">You may also like</h2>
-    <p class="text-sm text-ink-700/60 mb-4">Picked from the same collections as items in your cart.</p>
-    <div id="upsell" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+  <section id="upsell-wrap" class="cart-upsell hidden">
+    <h2 id="upsell-title" class="font-serif text-xl text-bronze-800 mb-3">Complete your collection</h2>
+    <div id="upsell" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
   </section>
 
-  <RecentlyViewed title="Recently viewed" />
   <Footer />
   <!-- Paddle.js — overlay checkout -->
   <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
-  <script is:inline define:vars={{ DISCOUNT: percent, PADDLE_TOKEN: paddleToken, PADDLE_ENV: paddleEnv, SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: supabaseAnonKey }}>
+  <script is:inline define:vars={{ DISCOUNT: percent, SHOW_PROMOS: showCartPromos, PADDLE_TOKEN: paddleToken, PADDLE_ENV: paddleEnv, SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: supabaseAnonKey }}>
     const fmt = (n) => '$' + Number(n).toFixed(2);
     const itemsEl = document.getElementById('items');
     const escAttr = (s) => String(s ?? '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    // a 76px thumbnail, not the full product image (same transform as lib/img.ts)
+    const thumb = (u) => String(u || '').includes('/storage/v1/object/public/')
+      ? String(u).replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=160&height=160&resize=cover&quality=70'
+      : u;
 
     // Customization fields keyed by product_id, fetched once per render
     let customFieldsByProduct = {};
@@ -221,13 +199,20 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       itemsEl.innerHTML = c.map((x, idx) => {
         const fields = customFieldsByProduct[x.id] || [];
         const fieldsHtml = fields.length ? renderCustomFieldsBlock(x, fields, idx) : '';
+        const id = String(x.id || '');
+        const sub = id.startsWith('membership:') ? 'Membership' : id.startsWith('bundle5:') ? 'Pick-any-5 bundle'
+          : String(x.slug || '').startsWith('software-') ? 'Windows software · download link by email' : 'STL file · instant download';
+        const href = id.startsWith('membership:') ? '/membership' : '/product/' + escAttr(x.slug);
         return `
-        <div class="py-4">
-          <div class="flex items-center gap-4">
-            <div class="w-16 h-16 bg-cream rounded overflow-hidden flex-shrink-0">${x.img ? `<img src="${escAttr(x.img)}" class="w-full h-full object-cover">` : ''}</div>
-            <a href="/product/${escAttr(x.slug)}" class="flex-1 text-sm">${escAttr(x.title)}</a>
-            <span class="text-sm">${fmt(x.price)}</span>
-            <button data-id="${escAttr(x.id)}" class="rm text-ink-700/50 hover:text-red-600">✕</button>
+        <div class="cart-item-wrap">
+          <div class="cart-item">
+            <a href="${href}" class="cart-thumb" tabindex="-1" aria-hidden="true">${x.img ? `<img src="${escAttr(thumb(x.img))}" alt="" width="76" height="76">` : ''}</a>
+            <div class="cart-info">
+              <a href="${href}" class="cart-title">${escAttr(x.title)}</a>
+              <span class="cart-sub">${sub}</span>
+              <button type="button" data-id="${escAttr(x.id)}" class="rm cart-rm" aria-label="Remove ${escAttr(x.title)}">Remove</button>
+            </div>
+            <div class="cart-price" data-usd="${Number(x.price) || 0}">${fmt(x.price)}</div>
           </div>
           ${fieldsHtml}
         </div>`;
@@ -244,6 +229,10 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       const promoOff = promo?.discount_amount ? Math.min(subtotalRaw, Number(promo.discount_amount)) : 0;
       const payable = Math.max(0, subtotalRaw - promoOff);
       document.getElementById('total').textContent = fmt(payable);
+      const cnt = document.getElementById('cart-count');
+      if (cnt) cnt.textContent = c.length ? '(' + c.length + (c.length === 1 ? ' design)' : ' designs)') : '';
+      const st = document.getElementById('cart-sticky-total'); if (st) st.textContent = fmt(payable);
+      if (window.__dccSticky) window.__dccSticky();
 
       // Free-gift progress bar (matches the webhook's paid-subtotal check).
       const fgBar = document.getElementById('free-gift-bar');
@@ -254,9 +243,9 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         const pct = thr > 0 ? Math.min(100, Math.round((payable / thr) * 100)) : 0;
         if (fill) fill.style.width = pct + '%';
         if (txt && payable >= thr && thr > 0) {
-          txt.innerHTML = '🎁 <strong>Free gift unlocked!</strong> It will be added to your downloads automatically.';
+          txt.innerHTML = '<strong>Free design unlocked.</strong> It arrives with your downloads.';
         } else if (txt && thr > 0) {
-          txt.innerHTML = 'Spend <strong>' + fmt(thr - payable) + '</strong> more to unlock your <strong>free gift</strong> 🎁';
+          txt.innerHTML = 'Add <strong>' + fmt(thr - payable) + '</strong> more to get a <strong>free surprise design</strong>.';
         }
       }
       const promoRow = document.getElementById('promo-row');
@@ -293,14 +282,16 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       const hintBox = document.getElementById('tier-hint');
       const hintText = document.getElementById('tier-hint-text');
       const next = tiers.find((t) => t.items > itemCount);
-      if (next && itemCount > 0) {
+      if (!SHOW_PROMOS) {
+        hintBox.classList.add('hidden');
+      } else if (next && itemCount > 0) {
         const diff = next.items - itemCount;
-        hintText.innerHTML = '🔥 Add ' + diff + ' more item' + (diff === 1 ? '' : 's') + ' to unlock <strong>' + next.percent + '% OFF</strong> with code <code class="font-mono">' + next.code + '</code>';
+        hintText.innerHTML = 'Add ' + diff + ' more design' + (diff === 1 ? '' : 's') + ' for <strong>' + next.percent + '% off</strong> with code <code class="font-mono">' + next.code + '</code>.';
         hintBox.classList.remove('hidden');
       } else if (itemCount > 0 && tiers.length) {
         const reached = tiers.filter((t) => t.items <= itemCount).pop();
         if (reached && (!promo || promo.code !== reached.code)) {
-          hintText.innerHTML = '✓ You qualify for <strong>' + reached.percent + '% OFF</strong> — apply code <code class="font-mono">' + reached.code + '</code> below.';
+          hintText.innerHTML = 'You qualify for <strong>' + reached.percent + '% off</strong>. <button type="button" class="cart-apply-code" data-code="' + reached.code + '">Apply ' + reached.code + '</button>';
           hintBox.classList.remove('hidden');
         } else {
           hintBox.classList.add('hidden');
@@ -344,8 +335,8 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         const grid = document.getElementById('upsell');
         const title = document.getElementById('upsell-title');
         if (!data.products?.length) { wrap.classList.add('hidden'); return; }
-        title.textContent = ids.length ? 'Complete your collection' : 'You may also like';
-        grid.innerHTML = data.products.map(cardHtml).join('');
+        title.textContent = ids.length ? 'Complete your collection' : 'Popular designs';
+        grid.innerHTML = data.products.slice(0, 4).map(cardHtml).join('');
         wrap.classList.remove('hidden');
         window.dccSyncCartButtons?.(); // reflect in-cart state on upsell cards
       } catch (e) { console.error('upsell load failed', e); }
@@ -395,7 +386,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
           localStorage.removeItem('promo');
           const promoMsg = document.getElementById('promo-msg');
           if (promoMsg) {
-            promoMsg.textContent = '⚠ Promo "' + code + '" removed — ' + (data.error || 'no longer eligible for this cart.');
+            promoMsg.textContent = 'Promo "' + code + '" removed: ' + (data.error || 'it no longer applies to this cart.');
             promoMsg.className = 'mt-2 text-xs text-amber-700';
           }
           renderCart();
@@ -530,7 +521,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         const data = await res.json();
         if (!res.ok || !data.ok) { promoMsg.textContent = '✕ ' + (data.error || 'Code not valid.'); promoMsg.className = 'mt-2 text-xs text-red-600'; return; }
         localStorage.setItem('promo', JSON.stringify({ code: data.code, description: data.description, discount_amount: data.discount_amount, percent_off: data.percent_off }));
-        promoMsg.textContent = '✓ ' + (data.description || data.code) + ' applied — saved ' + fmt(data.discount_amount);
+        promoMsg.textContent = '✓ ' + (data.description || data.code) + ' applied. You save ' + fmt(data.discount_amount) + '.';
         promoMsg.className = 'mt-2 text-xs text-green-700';
         // Pretend the cart "changed" so the revalidator's hash is up to date
         lastCartHash = JSON.stringify(JSON.parse(localStorage.getItem('cart') || '[]').map((x) => x.id).sort());
@@ -605,7 +596,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       // download links land exactly where the buyer expects.
       const buyerEmail = (emailInput?.value || '').trim().toLowerCase();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(buyerEmail)) {
-        emailMsg.textContent = 'Please enter a valid email — we send your downloads here.';
+        emailMsg.textContent = 'Please enter a valid email. Your downloads are sent there.';
         emailMsg.classList.remove('hidden');
         emailInput?.focus();
         return;
@@ -703,6 +694,11 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
         document.getElementById('upsell-wrap')?.classList.add('hidden');
         const lsc = document.getElementById('ls-cross'); if (lsc) lsc.hidden = true;
         document.getElementById('dcc-checkout-section')?.classList.remove('hidden');
+        window.__dccPaying = true; if (window.__dccSticky) window.__dccSticky();
+        try {
+          const n = itemsForCheckout.length, tot = document.getElementById('total')?.textContent || '';
+          document.getElementById('pay-summary').textContent = n + (n === 1 ? ' design' : ' designs') + ' · ' + tot + ' · files emailed to ' + buyerEmail + ' the moment payment goes through.';
+        } catch (_) {}
         window.scrollTo({ top: 0, behavior: 'smooth' });
         Paddle.Checkout.open({
           transactionId: data.transaction_id,
@@ -807,6 +803,43 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       }
     });
 
+    // ── One-tap discount code from the hint ──────────────────────────
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest && e.target.closest('.cart-apply-code');
+      if (!b) return;
+      const box = document.querySelector('.cart-promo'); if (box) box.open = true;
+      promoCodeInput.value = b.dataset.code || '';
+      document.getElementById('promo-apply')?.click();
+    });
+
+    // ── Phone bottom bar: total + Checkout, while the real button is off screen ──
+    (function () {
+      const bar = document.getElementById('cart-sticky');
+      const btn = document.getElementById('checkout');
+      if (!bar || !btn) return;
+      let btnVisible = false;
+      const update = () => {
+        const c = JSON.parse(localStorage.getItem('cart') || '[]');
+        const phone = window.matchMedia('(max-width: 1023px)').matches;
+        bar.hidden = !(phone && c.length && !btnVisible && !window.__dccPaying);
+      };
+      window.__dccSticky = update;
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver((entries) => { btnVisible = entries[0].isIntersecting; update(); }).observe(btn);
+      }
+      window.addEventListener('resize', update);
+      update();
+      document.getElementById('cart-sticky-btn')?.addEventListener('click', () => {
+        const em = (emailInput?.value || '').trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
+          emailInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => emailInput?.focus(), 350);
+          return;
+        }
+        btn.click();
+      });
+    })();
+
     // ── Express fast-track ─────────────────────────────────────────────
     // A "Buy it now" click lands here with ?express=1. If we already know a
     // valid email (returning buyer) and nothing needs personalizing, open the
@@ -830,3 +863,76 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
     })();
   </script>
 </Base>
+
+<style is:global>
+  .cart-page { max-width: 72rem; margin: 0 auto; padding: 1.5rem 1rem 2.5rem; min-height: 40vh; }
+  @media (min-width: 640px) { .cart-page { padding-left: 1.5rem; padding-right: 1.5rem; } }
+  .cart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .cart-count-label { font-family: inherit; font-size: .95rem; color: rgba(43,33,24,.55); font-weight: 400; }
+  .cart-continue { font-size: .85rem; color: #854F0B; text-decoration: underline; text-underline-offset: 3px; }
+  .cart-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; align-items: start; }
+  @media (min-width: 1024px) { .cart-grid { grid-template-columns: minmax(0, 1fr) 360px; gap: 2.5rem; } }
+  .cart-empty { text-align: center; background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: .75rem; padding: 2.5rem 1rem; max-width: 34rem; margin: 1rem auto; }
+  .cart-btn-primary { background: #854F0B; color: #FAEEDA; padding: .6rem 1.1rem; border-radius: .5rem; font-size: .9rem; }
+  .cart-btn-ghost { border: 1px solid rgba(133,79,11,.4); color: #633806; padding: .6rem 1.1rem; border-radius: .5rem; font-size: .9rem; }
+
+  .cart-items { border-top: 1px solid rgba(0,0,0,.08); }
+  .cart-item-wrap { border-bottom: 1px solid rgba(0,0,0,.08); padding: 1rem 0; }
+  .cart-item { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; gap: 1rem; align-items: start; }
+  .cart-thumb { width: 76px; height: 76px; border-radius: .5rem; overflow: hidden; background: #F5EFE3; display: block; }
+  .cart-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .cart-info { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+  .cart-title { font-size: .92rem; line-height: 1.35; color: #2b2118; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .cart-title:hover { color: #854F0B; }
+  .cart-sub { font-size: .76rem; color: rgba(43,33,24,.55); }
+  .cart-rm { align-self: flex-start; font-size: .76rem; color: rgba(43,33,24,.55); text-decoration: underline; text-underline-offset: 2px; margin-top: .3rem; }
+  .cart-rm:hover { color: #A93A2F; }
+  .cart-price { font-size: .95rem; font-weight: 500; color: #2b2118; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cart-hint { margin-top: .9rem; font-size: .84rem; color: #633806; }
+  .cart-hint a { text-decoration: underline; text-underline-offset: 2px; margin-left: .25rem; }
+  .cart-apply-code { font: inherit; font-weight: 600; color: #854F0B; text-decoration: underline; text-underline-offset: 2px; margin-left: .25rem; }
+
+  .cart-summary { background: #fff; border: 1px solid rgba(0,0,0,.09); border-radius: .85rem; padding: 1.25rem; box-shadow: 0 1px 3px rgba(65,36,2,.05); }
+  @media (min-width: 1024px) { .cart-summary { position: sticky; top: 5.5rem; } }
+  .cart-sum-title { font-family: Fraunces, Georgia, serif; font-size: 1.15rem; color: #412402; margin: 0 0 .75rem; }
+  .cart-lines { margin: 0; display: grid; gap: .4rem; }
+  .cart-lines > div { display: flex; justify-content: space-between; font-size: .88rem; color: rgba(43,33,24,.7); }
+  .cart-lines dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .cart-lines .is-save { color: #2F7A57; }
+  .cart-lines .is-save.hidden { display: none; }
+  .cart-lines .is-total { border-top: 1px solid rgba(0,0,0,.08); padding-top: .65rem; margin-top: .25rem; font-size: 1.1rem; font-weight: 600; color: #2b2118; }
+  .cart-gift-bar { margin-top: .9rem; font-size: .8rem; color: #633806; }
+  .cart-gift-bar p { margin: 0 0 .35rem; }
+  .cart-gift-track { height: 4px; border-radius: 99px; background: #F1E7DC; overflow: hidden; }
+  .cart-gift-track > div { height: 100%; background: #854F0B; transition: width .3s; }
+  .cart-promo { margin-top: 1rem; font-size: .85rem; }
+  .cart-promo summary { cursor: pointer; color: #854F0B; list-style: none; }
+  .cart-promo summary::-webkit-details-marker { display: none; }
+  .cart-promo summary::after { content: ' +'; }
+  .cart-promo[open] summary::after { content: ' \2212'; }
+  .cart-field { margin-top: 1rem; }
+  .cart-field label { display: block; font-size: .8rem; font-weight: 500; color: #2b2118; margin-bottom: .3rem; }
+  .cart-field input { width: 100%; padding: .7rem .8rem; font-size: 1rem; border: 1px solid rgba(0,0,0,.18); border-radius: .5rem; background: #fff; }
+  .cart-field input:focus { outline: none; border-color: #854F0B; box-shadow: 0 0 0 3px rgba(133,79,11,.15); }
+  .cart-help { margin: .35rem 0 0; font-size: .74rem; color: rgba(43,33,24,.55); }
+  .cart-gift { margin-top: .75rem; font-size: .84rem; color: rgba(43,33,24,.8); }
+  .cart-checkout { margin-top: 1rem; width: 100%; background: #854F0B; color: #FAEEDA; padding: .9rem; border-radius: .6rem; font-size: 1rem; font-weight: 600; letter-spacing: .01em; transition: background .15s; }
+  .cart-checkout:hover { background: #633806; }
+  .cart-checkout:disabled { opacity: .7; }
+  .cart-checkout:focus-visible, .cart-sticky-btn:focus-visible { outline: 2px solid #412402; outline-offset: 2px; }
+  .cart-secure { margin-top: .9rem; text-align: center; font-size: .74rem; color: rgba(43,33,24,.6); display: grid; gap: .2rem; }
+  .cart-secure p { margin: 0; display: flex; align-items: center; justify-content: center; gap: .35rem; }
+  .cart-pay { letter-spacing: .02em; }
+  .cart-mor a { color: #854F0B; }
+
+  .cart-sticky { position: fixed; left: 0; right: 0; bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px)); z-index: 45; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    background: rgba(255,255,255,.97); backdrop-filter: blur(6px); border-top: 1px solid rgba(0,0,0,.1); padding: .6rem 1rem; box-shadow: 0 -4px 14px rgba(0,0,0,.06); }
+  .cart-sticky[hidden] { display: none; }
+  @media (min-width: 1024px) { .cart-sticky { display: none !important; } }
+  .cart-sticky strong { font-variant-numeric: tabular-nums; color: #2b2118; }
+  .cart-sticky-btn { background: #854F0B; color: #FAEEDA; border-radius: .55rem; padding: .7rem 1.6rem; font-weight: 600; font-size: .95rem; }
+
+  .cart-pay-section { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+  .cart-upsell { max-width: 72rem; margin: 0 auto; padding: 1rem 1rem 3.5rem; border-top: 1px solid rgba(0,0,0,.06); }
+  @media (min-width: 640px) { .cart-upsell { padding-left: 1.5rem; padding-right: 1.5rem; } }
+</style>
