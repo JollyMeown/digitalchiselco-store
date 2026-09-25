@@ -3,12 +3,15 @@
 // carving shown in FULL (object-contain, never cropped) on the right, on a
 // warm cream panel that matches the brand. Stacks (image on top, story below)
 // on mobile, sits side by side from sm+.
+import { img as sized } from '../lib/img';
 interface Props { creation: any; }
 const { creation: c } = Astro.props;
 const linkHref = c.products?.slug ? `/product/${c.products.slug}` : (c.product_url || null);
 // Drop a leading "Customer Spotlight: …" line if present; keep the rest as the story.
 const story = (c.description || '').replace(/^\s*customer spotlight:[^\n]*\n+/i, '').trim();
-const img = (c.gallery && c.gallery[0]) || null;
+// 660px wide (the panel is 336px on desktop, 2x for sharp screens), never
+// the raw customer upload.
+const img = (c.gallery && c.gallery[0]) ? sized(c.gallery[0], { w: 660, q: 78 }) : null;
 ---
 <article class="w-[300px] sm:w-[600px] flex-shrink-0 bg-white border border-black/10 rounded-xl overflow-hidden flex flex-col sm:flex-row shadow-sm">
   <!-- Story — left on desktop, below the image on mobile -->

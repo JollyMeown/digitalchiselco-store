@@ -1,4 +1,5 @@
 ---
+import { img } from '../lib/img';
 // The emailed starter-month offer.
 //
 // This page exists so the starter month can be bought WITHOUT ever appearing
@@ -54,7 +55,7 @@ const saving = plan.original_price_usd ? Math.round((1 - plan.price_usd / plan.o
 
     {pack?.cover_image_url && (
       <figure class="mt-7">
-        <img src={pack.cover_image_url} alt="The starter bundle" loading="eager" width="1200" height="800" class="w-full rounded-xl shadow-md" />
+        <img src={img(pack.cover_image_url, { w: 1200, q: 80 })} alt="The starter bundle" loading="eager" width="1200" height="800" class="w-full rounded-xl shadow-md" />
         <figcaption class="text-sm text-ink-600 mt-2 text-center">The six designs in the starter bundle.</figcaption>
       </figure>
     )}
@@ -65,7 +66,7 @@ const saving = plan.original_price_usd ? Math.round((1 - plan.price_usd / plan.o
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           {items.map((it: any) => (
             <div class="border border-black/10 rounded-lg overflow-hidden bg-white">
-              {it.image_url && <img src={it.image_url} alt={it.title} loading="lazy" width="300" height="300" class="w-full aspect-square object-cover" />}
+              {it.image_url && <img src={img(it.image_url, { w: 300, square: true, q: 75 })} alt={it.title} loading="lazy" width="300" height="300" class="w-full aspect-square object-cover" />}
               <div class="p-2 text-xs leading-snug">{String(it.title || '').split('|')[0].trim()}</div>
             </div>
           ))}

@@ -1,4 +1,5 @@
 ---
+import { img } from '../lib/img';
 import { getSettings } from '../lib/queries';
 interface Props { class?: string; size?: 'sm' | 'md' | 'lg'; hideWordmark?: boolean; }
 const { class: cls = '', size = 'md', hideWordmark = false } = Astro.props;
@@ -7,7 +8,7 @@ const px = size === 'sm' ? 34 : size === 'lg' ? 64 : 44;
 ---
 <a href="/" aria-label="DigitalChiselCo home" class={`inline-flex items-center gap-2.5 ${cls}`}>
   {s.logo_image_url ? (
-    <img src={s.logo_image_url} alt="DigitalChiselCo" width={px} height={px}
+    <img src={img(s.logo_image_url, { w: px * 3 })} alt="DigitalChiselCo" width={px} height={px}
          style={`width:${px}px;height:${px}px;`}
          class="flex-shrink-0 object-contain" />
   ) : (

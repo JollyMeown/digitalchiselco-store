@@ -49,7 +49,7 @@ import RecentlyViewed from '../components/RecentlyViewed.astro';
     const heart = shared ? '' : `<button type="button" class="wish-remove absolute top-2 right-2 w-8 h-8 rounded-full bg-white/85 flex items-center justify-center shadow-sm hover:scale-110 transition" data-id="${p.id}" aria-label="Remove from favorites">❤️</button>`;
     return `<div class="group border border-black/10 rounded-md overflow-hidden bg-white flex flex-col">
       <a href="/product/${p.slug}" class="relative block aspect-square bg-cream overflow-hidden">
-        ${p.img ? `<img src="${p.img}" alt="${t}" loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.03] transition" />` : `<div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">${p.title || ''}</div>`}
+        ${p.img ? `<img src="${window.dccThumb(p.img, 400)}" alt="${t}" loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.03] transition" />` : `<div class="w-full h-full flex items-center justify-center text-bronze-600/40 text-xs p-3 text-center">${p.title || ''}</div>`}
         ${heart}
       </a>
       <div class="p-3 flex flex-col flex-1">

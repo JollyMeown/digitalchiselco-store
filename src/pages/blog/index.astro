@@ -1,4 +1,5 @@
 ---
+import { img } from '../../lib/img';
 import Shell from '../../layouts/Shell.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import { supabaseAdmin } from '../../lib/supabase';
@@ -39,7 +40,7 @@ try {
           <a href={`/blog/${p.slug}`} class="block border border-black/10 rounded-lg overflow-hidden hover:shadow-md transition bg-white">
             <div class="aspect-[16/9] bg-cream overflow-hidden">
               {p.cover_image_url
-                ? <img src={p.cover_image_url} alt={p.title} loading="lazy" class="w-full h-full object-cover hover:scale-[1.03] transition duration-500" />
+                ? <img src={img(p.cover_image_url, { w: 640, q: 72 })} alt={p.title} loading="lazy" class="w-full h-full object-cover hover:scale-[1.03] transition duration-500" />
                 : <div class="w-full h-full flex items-center justify-center text-bronze-600/40 font-serif">{p.title}</div>}
             </div>
             <div class="p-5">

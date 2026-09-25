@@ -10,6 +10,7 @@
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import { img } from '../lib/img';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { supabaseAdmin } from '../lib/supabase';
 
@@ -43,7 +44,9 @@ const products = (prods || []).map((p) => ({
   slug: p.slug,
   title: String(p.title || '').split('|')[0].trim(),
   price: Number(p.price_usd),
-  img: p.image_url || '',
+  // A 300px square thumbnail, not the upload: the grid lists up to 600
+  // designs, and the raw pictures are 1 to 3 MB each (found 2026-09-25).
+  img: p.image_url ? img(p.image_url, { w: 300, square: true, q: 75 }) : '',
 }));
 const avgFive = products.length
   ? (products.slice(0, 200).reduce((s, p) => s + p.price, 0) / Math.min(200, products.length)) * 5

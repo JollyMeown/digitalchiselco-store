@@ -114,6 +114,17 @@ const faviconType = settings.favicon_image_url
       <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Instrument+Sans:wght@400;500;600&display=swap" />
     </noscript>
+    <!-- dccThumb(url, side): the browser-side twin of lib/img.ts, for lists
+         built in scripts (search dropdown, cart suggestions, favourites,
+         quiz). A square, right-sized picture instead of the 1 to 3 MB upload. -->
+    <script is:inline>
+      window.dccThumb = function (u, side) {
+        u = String(u || '');
+        if (u.indexOf('/storage/v1/object/public/') < 0) return u;
+        side = side || 400;
+        return u.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=' + side + '&height=' + side + '&resize=cover&quality=75';
+      };
+    </script>
     <!-- First-party pageview beacon (no cookies, no PII — feeds admin Traffic tab) -->
     <script is:inline>
       (function () {

@@ -496,13 +496,13 @@ if (session?.email) {
                         {p.accessible && p.note && <div class="text-[11px] text-ink-700/60 mt-0.5">{p.note}</div>}
                         {p.accessible && p.items.length > 0 && (
                           <div class="flex gap-1 mt-2 overflow-x-auto">
-                            {p.items.map((it) => it.image_url ? <img src={it.image_url} alt={it.title} title={it.title} loading="lazy" class="w-11 h-11 object-cover rounded border border-black/10 shrink-0" /> : null)}
+                            {p.items.map((it) => it.image_url ? <img src={img(it.image_url, { w: 88, square: true, q: 70 })} alt={it.title} title={it.title} loading="lazy" class="w-11 h-11 object-cover rounded border border-black/10 shrink-0" /> : null)}
                           </div>
                         )}
                         {p.accessible && p.bonusItems.length > 0 && (
                           <div class="flex items-center gap-1 mt-2 overflow-x-auto">
                             <span class="text-[10px] uppercase tracking-wide text-bronze-700 font-semibold shrink-0 mr-1">⭐ Premium bonus</span>
-                            {p.bonusItems.map((it) => it.image_url ? <img src={it.image_url} alt={it.title} title={it.title} loading="lazy" class="w-11 h-11 object-cover rounded border border-[#F1D9A6] shrink-0" /> : null)}
+                            {p.bonusItems.map((it) => it.image_url ? <img src={img(it.image_url, { w: 88, square: true, q: 70 })} alt={it.title} title={it.title} loading="lazy" class="w-11 h-11 object-cover rounded border border-[#F1D9A6] shrink-0" /> : null)}
                           </div>
                         )}
                         {!p.accessible ? (
@@ -606,7 +606,7 @@ if (session?.email) {
                             {/* Medium product thumbnail */}
                             <a href={it.products?.slug ? `/product/${it.products.slug}` : '#'} class="block w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden bg-cream/60 flex-shrink-0">
                               {it.image_url
-                                ? <img src={it.image_url} alt="" class="w-full h-full object-cover" loading="lazy" />
+                                ? <img src={img(it.image_url, { w: 192, square: true, q: 72 })} alt="" class="w-full h-full object-cover" loading="lazy" />
                                 : <div class="w-full h-full flex items-center justify-center text-bronze-600/30 text-xs">no image</div>}
                             </a>
                             <div class="flex-1 min-w-0">

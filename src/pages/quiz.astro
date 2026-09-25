@@ -89,7 +89,7 @@ const themes = [
       const title = (p.title || '').split('|')[0].trim();
       return `<div class="group border border-black/10 rounded-md overflow-hidden bg-white flex flex-col">
         <a href="/product/${p.slug}" class="relative block aspect-square bg-cream overflow-hidden">
-          ${p.image_url ? `<img src="${p.image_url}" alt="${title.replace(/"/g,'&quot;')}" loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.03] transition" />` : ''}
+          ${p.image_url ? `<img src="${window.dccThumb(p.image_url, 400)}" alt="${title.replace(/"/g,'&quot;')}" loading="lazy" class="w-full h-full object-cover group-hover:scale-[1.03] transition" />` : ''}
           <button type="button" class="wish-btn absolute top-2 right-2 w-8 h-8 rounded-full bg-white/85 flex items-center justify-center text-base shadow-sm" data-wish-id="${p.id}" data-wish-slug="${p.slug}" data-wish-title="${title.replace(/"/g,'&quot;')}" data-wish-price="${p.price_usd||0}" data-wish-img="${p.image_url||''}"><span class="wish-icon">🤍</span></button>
         </a>
         <div class="p-3 flex flex-col flex-1">

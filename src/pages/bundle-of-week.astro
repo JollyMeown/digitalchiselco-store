@@ -1,4 +1,5 @@
 ---
+import { img } from '../lib/img';
 // Bundle of the Week — 5 auto-picked designs from a rotating theme, one tap,
 // flat $25. The picks live in site_settings.weekly_bundle (regenerated every
 // Monday by the growth cron when the Automations toggle is ON). Checkout
@@ -50,7 +51,7 @@ const saved = Math.max(0, totalValue - BUNDLE_PRICE);
           {products.map((p) => (
             <a href={`/product/${p.slug}`} class="border border-black/10 rounded-lg overflow-hidden bg-white hover:shadow transition">
               <div class="aspect-square bg-cream overflow-hidden">
-                {p.image_url && <img src={p.image_url} alt={p.title.split('|')[0].trim()} loading="lazy" class="w-full h-full object-cover" />}
+                {p.image_url && <img src={img(p.image_url, { w: 400, square: true, q: 78 })} alt={p.title.split('|')[0].trim()} loading="lazy" class="w-full h-full object-cover" />}
               </div>
               <div class="p-2.5">
                 <div class="text-xs leading-snug text-ink-800 line-clamp-2 min-h-[2.4em]">{p.title.split('|')[0].trim()}</div>

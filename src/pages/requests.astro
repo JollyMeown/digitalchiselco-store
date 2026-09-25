@@ -1,4 +1,5 @@
 ---
+import { img } from '../lib/img';
 // Community design-request board: customers suggest designs, vote on ideas, and
 // see what's planned/in-progress/done. Feeds the owner a ranked backlog of what
 // carvers actually want next.
@@ -60,7 +61,7 @@ const rows = requests || [];
             <span class="text-bronze-600 text-lg leading-none">▲</span>
             <span class="dreq-count font-medium text-sm text-ink-800">{r.votes}</span>
           </button>
-          {r.image_url && <img src={r.image_url} alt="" class="w-16 h-16 rounded object-cover flex-shrink-0" loading="lazy" />}
+          {r.image_url && <img src={img(r.image_url, { w: 128, square: true, q: 72 })} alt="" class="w-16 h-16 rounded object-cover flex-shrink-0" loading="lazy" />}
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="font-medium text-ink-800">{r.title}</span>

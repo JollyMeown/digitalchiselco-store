@@ -317,7 +317,7 @@ try {
       const catHtml = cats.length ? '<div class="px-3 pt-2 pb-1 flex flex-wrap gap-1.5">' + cats.map((c) => `<a href="/search?cat=${encodeURIComponent(c.slug)}" class="text-xs px-2.5 py-1 rounded-full bg-cream text-bronze-800 hover:bg-[#FAEEDA]">📁 ${escH(c.name)}</a>`).join('') + '</div>' : '';
       box.innerHTML = via + catHtml + items.map((p) => `
         <a href="/product/${encodeURIComponent(p.slug)}" data-pid="${escH(p.id || '')}" class="flex items-center gap-2 px-2.5 py-2 hover:bg-cream border-b border-black/5 last:border-0">
-          ${p.image_url ? `<img src="${escH(p.image_url)}" width="36" height="36" class="w-9 h-9 rounded object-cover bg-cream shrink-0" alt="" loading="lazy" />` : ''}
+          ${p.image_url ? `<img src="${escH(window.dccThumb(p.image_url, 72))}" width="36" height="36" class="w-9 h-9 rounded object-cover bg-cream shrink-0" alt="" loading="lazy" />` : ''}
           <span class="text-sm text-ink-800 line-clamp-1 flex-1">${escH(p.title)}</span>
           <span class="text-xs text-bronze-600 font-medium">$${Number(p.price || 0).toFixed(2)}</span>
         </a>`).join('') + `<a href="${searchHref(q, extra())}" class="block px-3 py-2 text-sm text-bronze-700 font-medium hover:bg-cream">See all ${d.total > 6 ? d.total + ' ' : ''}results for “${escH(q)}” with filters →</a>`;

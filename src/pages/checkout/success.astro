@@ -1,4 +1,5 @@
 ---
+import { img } from '../../lib/img';
 import Base from '../../layouts/Base.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
@@ -160,7 +161,7 @@ const conv = order ? {
             <h2 class="font-serif text-2xl text-bronze-800 mb-1">Add one more — one click, no re-typing 🎁</h2>
             <p class="text-sm text-ink-700/70 mb-4">A carver favourite from the same collection, <span class="font-medium text-bronze-700">{addonPct}% off</span> for the next few minutes. It goes to the same email &amp; account.</p>
             <div class="bg-white border-2 border-bronze-600/40 rounded-xl p-4 flex items-center gap-4">
-              {addon.image_url && <img src={addon.image_url} alt={addon.title} class="w-24 h-24 rounded-lg object-cover flex-shrink-0" loading="lazy" />}
+              {addon.image_url && <img src={img(addon.image_url, { w: 192, square: true, q: 75 })} alt={addon.title} class="w-24 h-24 rounded-lg object-cover flex-shrink-0" loading="lazy" />}
               <div class="flex-1 min-w-0">
                 <div class="text-sm text-ink-800 font-medium line-clamp-2">{addon.title.split('|')[0].trim()}</div>
                 <div class="mt-1"><span class="text-bronze-700 font-medium">${addonPrice.toFixed(2)}</span> <span class="text-ink-700/40 line-through text-xs ml-1">${Number(addon.price_usd).toFixed(2)}</span></div>
@@ -181,7 +182,7 @@ const conv = order ? {
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {addonRest.map((r: any) => (
                 <a href={`/product/${r.slug}`} class="bg-white border border-black/10 rounded-xl overflow-hidden hover:border-bronze-600/40 transition">
-                  {r.image_url && <img src={r.image_url} alt={r.title} class="w-full aspect-square object-cover" loading="lazy" />}
+                  {r.image_url && <img src={img(r.image_url, { w: 400, square: true, q: 75 })} alt={r.title} class="w-full aspect-square object-cover" loading="lazy" />}
                   <div class="p-3">
                     <div class="text-sm text-ink-800 line-clamp-2">{r.title.split('|')[0].trim()}</div>
                     <div class="text-bronze-700 font-medium text-sm mt-1">${Number(r.price_usd).toFixed(2)}</div>

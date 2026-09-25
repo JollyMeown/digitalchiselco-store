@@ -1,4 +1,5 @@
 ---
+import { img } from '../../lib/img';
 // Buyer's private view of their request: compare quotes (with maker STAR
 // RATINGS for trust), choose a maker, chat, mark received, leave a rating.
 // Auth: ?t=<request token> (emailed to the buyer). Noindex.
@@ -39,7 +40,7 @@ const title = req ? (req.product_title || 'your design').split('|')[0].trim() : 
       <div id="app" data-token={token} data-req={req.id} data-awarded={req.awarded_maker_id || ''} data-status={req.status}>
         <p class="text-xs tracking-[0.2em] uppercase text-bronze-600 mt-4">Cut Local · your request</p>
         <div class="flex items-center gap-4 mt-2 mb-6">
-          {req.product_image && <img src={req.product_image} class="w-16 h-16 rounded-lg object-cover border border-black/10" />}
+          {req.product_image && <img src={img(req.product_image, { w: 128, square: true, q: 72 })} class="w-16 h-16 rounded-lg object-cover border border-black/10" />}
           <div>
             <h1 class="font-serif text-2xl text-bronze-800 leading-tight">{title}</h1>
             <p class="text-sm text-ink-700/70 mt-0.5">

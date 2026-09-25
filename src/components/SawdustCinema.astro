@@ -46,7 +46,7 @@ const clean = (s: string) => String(s || '').split('|')[0].trim();
         {films.map((f) => {
           const p = f.products;
           const name = clean(f.title || p?.title || 'Our latest design');
-          const poster = f.poster_url || (p?.image_url ? img(p.image_url, { w: 700, q: 78 }) : null);
+          const poster = f.poster_url ? img(f.poster_url, { w: 700, q: 78 }) : (p?.image_url ? img(p.image_url, { w: 700, q: 78 }) : null);
           return (
             <figure class="sc-card group rounded-2xl overflow-hidden bg-black/30 border border-white/10 flex flex-col">
               <div class="sc-player relative aspect-[4/5] bg-black" data-video={f.video_url}>

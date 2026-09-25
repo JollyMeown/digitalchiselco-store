@@ -431,7 +431,7 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
           </div>
           <div class="order-first md:order-last">
             {s.membership_image_url
-              ? <img src={s.membership_image_url} alt="Premium Membership poster" class="w-full h-auto rounded-lg shadow-md max-h-[440px] object-contain bg-cream" />
+              ? <img src={img(s.membership_image_url, { w: 900, q: 80 })} alt="Premium Membership poster" class="w-full h-auto rounded-lg shadow-md max-h-[440px] object-contain bg-cream" />
               : <div class="aspect-[3/4] bg-cream rounded-lg flex items-center justify-center text-bronze-600/40 font-serif text-center px-6 max-h-[440px]">
                   Upload the Premium Membership poster in admin → Media & Hero → "Membership card"
                 </div>}
@@ -446,7 +446,7 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid md:grid-cols-2 gap-8 items-center">
       <div class="dcc-free-img-wrap bg-cream rounded-lg overflow-hidden border border-black/10">
         {s.free_image_url
-          ? <img src={s.free_image_url} alt="Free STL files pack" class="w-full h-auto block dcc-free-img" />
+          ? <img src={img(s.free_image_url, { w: 1000, q: 80 })} alt="Free STL files pack" class="w-full h-auto block dcc-free-img" />
           : <div class="aspect-[4/3] flex items-center justify-center text-bronze-600/40 font-serif text-center px-6">Upload a "free pack" image in admin → Media & Hero</div>}
       </div>
       <div>
