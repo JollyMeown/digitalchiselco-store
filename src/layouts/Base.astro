@@ -3,6 +3,7 @@ import '../styles/global.css';
 import { getSettings } from '../lib/queries';
 import { jsonLd } from '../lib/jsonld';
 import AnnouncementBanner from '../components/AnnouncementBanner.astro';
+import { LANDINGS, landingPath } from '../lib/landing-i18n';
 interface Props { title?: string; description?: string; image?: string; noindex?: boolean; ogType?: string; price?: number; currency?: string; availability?: string;
   // Localised landing pages (/pl, /de): the page language and its hreflang
   // siblings, so Google shows each country the version in its own language.
@@ -35,6 +36,8 @@ const adsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID || 'AW-18375026540';
 // Netlify: get the id from Pinterest Ads -> Conversions -> Tag manager.
 const pinTagId = import.meta.env.PUBLIC_PINTEREST_TAG_ID || '';
 const canonical = new URL(Astro.url.pathname, site).href;
+// Language suggestion bar data: the Polish and German landing pages.
+const localPages = LANDINGS.map((l) => ({ lang: l.lang, theme: l.theme, href: landingPath(l) }));
 const ogImage = image.startsWith('http') ? image : new URL(image, site).href;
 const settings = await getSettings();
 // Active shop-wide sale (auto-applied at checkout) → countdown banner.
@@ -218,6 +221,58 @@ const faviconType = settings.favicon_image_url
       </script>
     )}
     <AnnouncementBanner />
+
+    <!-- Language suggestion. Never an automatic redirect: Google crawls as an
+         English browser and would lose the English pages, and some visitors
+         want English. A browser set to Polish or German instead gets a quiet
+         bar: on a page with an exact local version (hreflang), "this page in
+         your language"; anywhere else, once, the local landing pages. Closing
+         it is remembered. -->
+    <div id="dcc-lang" hidden style="background:#FAEEDA;border-bottom:1px solid rgba(133,79,11,.2);color:#5E380A;font-size:14px;">
+      <div style="max-width:80rem;margin:0 auto;padding:8px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;">
+        <span id="dcc-lang-t"></span>
+        <span id="dcc-lang-links" style="display:inline-flex;gap:12px;flex-wrap:wrap;"></span>
+        <button id="dcc-lang-x" aria-label="Close" style="background:none;border:none;color:#8a7a66;font-size:20px;line-height:1;cursor:pointer;padding:0 4px;">×</button>
+      </div>
+    </div>
+    <script is:inline define:vars={{ pageLang: lang, localPages }}>
+      (function () {
+        try {
+          var KEY = 'dcc_lang_bar';
+          if (localStorage.getItem(KEY) === 'closed') return;
+          var want = '';
+          var langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ''];
+          for (var i = 0; i < langs.length; i++) {
+            var l = String(langs[i] || '').slice(0, 2).toLowerCase();
+            if (l === 'en') return;                      // prefers English first: leave them be
+            if (l === 'pl' || l === 'de') { want = l; break; }
+          }
+          if (!want || want === pageLang) return;
+          if (/^\/(cart|checkout|account|admin|m\/|maker)/.test(location.pathname)) return;
+          var T = {
+            pl: { same: 'Ta strona jest dostępna po polsku.', go: 'Przejdź', any: 'Mamy strony po polsku:', religious: 'Płaskorzeźby religijne', wildlife: 'Dzika przyroda' },
+            de: { same: 'Diese Seite gibt es auch auf Deutsch.', go: 'Ansehen', any: 'Wir haben Seiten auf Deutsch:', religious: 'Religiöse Reliefs', wildlife: 'Wildtiere und Jagd' },
+          }[want];
+          var bar = document.getElementById('dcc-lang'), t = document.getElementById('dcc-lang-t'), box = document.getElementById('dcc-lang-links');
+          function link(href, text) {
+            var a = document.createElement('a'); a.href = href; a.textContent = text + ' →'; a.hreflang = want; a.lang = want;
+            a.style.cssText = 'font-weight:600;color:#854F0B;text-decoration:underline;'; box.appendChild(a);
+          }
+          var alt = document.querySelector('link[rel="alternate"][hreflang="' + want + '"]');
+          t.lang = want;
+          if (alt) { t.textContent = T.same; link(new URL(alt.href).pathname, T.go); }
+          else {
+            if (sessionStorage.getItem(KEY) || localStorage.getItem(KEY) === 'seen') return;   // general hint: once
+            localStorage.setItem(KEY, 'seen');
+            t.textContent = T.any;
+            localPages.filter(function (p) { return p.lang === want; }).forEach(function (p) { link(p.href, T[p.theme]); });
+          }
+          sessionStorage.setItem(KEY, '1');
+          bar.hidden = false;
+          document.getElementById('dcc-lang-x').addEventListener('click', function () { bar.hidden = true; try { localStorage.setItem(KEY, 'closed'); } catch (_) {} });
+        } catch (_) {}
+      })();
+    </script>
     <slot />
 
     <!-- About-to-leave free-pack offer. Free-pack subscribers buy at 13.2%
