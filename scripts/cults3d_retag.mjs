@@ -34,6 +34,16 @@ const CORE = ['bas relief', 'cnc', 'stl', '3d print', 'wall art', 'wood carving'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 if (!USER || !KEY) { console.error('CULTS3D_USERNAME / CULTS3D_API_KEY missing'); process.exit(1); }
 
+// CrowdSec IP ban (2026-09-25): the "Access Denied" page is not a transient
+// block. Retrying it every two hours is exactly the pattern that keeps the ban
+// alive, so the whole run stops at the first one and says what to do.
+function stopIfBanned(status, text) {
+  if (status === 403 && /Access Denied|crowdsec/i.test(String(text).slice(0, 4000))) {
+    console.error('STOPPED: Cults3D has blocked this IP address (CrowdSec). Submit the appeal on cults3d.com, and only re-run once the site loads normally.');
+    process.exit(2);
+  }
+}
+
 async function gql(query, variables = {}) {
   for (let attempt = 0; attempt < 4; attempt++) {
     if (attempt) await sleep(2500 * attempt + Math.floor(Math.random() * 2000));
@@ -47,6 +57,7 @@ async function gql(query, variables = {}) {
       body: JSON.stringify({ query, variables }),
     });
     const text = await res.text();
+    stopIfBanned(res.status, text);
     if (!res.ok) { if (res.status === 403 || res.status >= 500) continue; throw new Error(`${res.status} ${text.slice(0, 200)}`); }
     let json; try { json = JSON.parse(text); } catch { continue; }
     if (json.errors?.length) throw new Error(json.errors.map((e) => e.message).join('; '));

@@ -76,6 +76,16 @@ function authHeader() {
 // intermittently blocking the daily job while local (residential-IP) runs worked.
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
+// CrowdSec IP ban (2026-09-25): the "Access Denied" page is not a transient
+// block. Retrying it every two hours is exactly the pattern that keeps the ban
+// alive, so the whole run stops at the first one and says what to do.
+function stopIfBanned(status, text) {
+  if (status === 403 && /Access Denied|crowdsec/i.test(String(text).slice(0, 4000))) {
+    console.error('STOPPED: Cults3D has blocked this IP address (CrowdSec). Submit the appeal on cults3d.com, and only re-run once the site loads normally.');
+    process.exit(2);
+  }
+}
+
 async function gql(query, variables = {}) {
   let lastStatus = 0, lastText = '';
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -93,6 +103,7 @@ async function gql(query, variables = {}) {
     });
     lastStatus = res.status;
     lastText = await res.text();
+    stopIfBanned(res.status, lastText);
     let json;
     try { json = JSON.parse(lastText); }
     catch {
