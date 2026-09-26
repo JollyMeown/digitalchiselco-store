@@ -7,7 +7,7 @@
 // whole site is covered. (netlify.toml still covers the static assets.)
 import { defineMiddleware } from 'astro:middleware';
 import { maintenancePage, maintenanceJson, plannedMaintenance } from './lib/maintenance';
-import { databaseUnreachable } from './lib/supabase';
+import { databaseUnreachable, withRequestHealth } from './lib/supabase';
 
 const SECURITY_HEADERS: Record<string, string> = {
   // NOTE: no X-Frame-Options. The Laser Studio desktop app's "My Shop" tab embeds
@@ -125,8 +125,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // own 502 with our domain on it. Serve our page instead, with a 503 so search
   // engines treat it as temporary and keep the ranking. (2026-09-21 outage.)
   let response: Response;
+  let ownQueryFailed = false;
   try {
-    response = await next();
+    // Per-request failure tracking: only this request's own queries count.
+    response = await withRequestHealth(async () => {
+      const r = await next();
+      ownQueryFailed = databaseUnreachable();
+      return r;
+    });
   } catch (err) {
     console.error('[middleware] page render failed:', (err as any)?.message || err);
     if (MAINTENANCE_EXEMPT.test(context.url.pathname)) throw err;
@@ -138,7 +144,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // A storefront page swallows its own query errors and renders an empty shop,
   // which looks fine and is not. If a query failed outright while this page was
   // rendering, say so honestly instead of showing a catalogue with nothing in it.
-  if (context.request.method === 'GET' && databaseUnreachable()
+  if (context.request.method === 'GET' && ownQueryFailed
       && !MAINTENANCE_EXEMPT.test(context.url.pathname) && CACHEABLE.test(context.url.pathname)) {
     return downstairs(context.url.pathname, false);
   }
