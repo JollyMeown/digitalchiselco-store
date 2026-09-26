@@ -1615,6 +1615,22 @@ ${ideasHtml}
     stats.indexNow = { urls: urls.length, status: await submitIndexNow(urls) };
   });
 
+  // ── Copycat Watch: Etsy listings reusing our pictures (lib/copycat.ts) ─
+  // 15 of the top 75 designs a night, oldest-checked first (the whole list
+  // about every 5 days), at most 90 s so the other steps keep their time.
+  stats.copycatWatch = 'off';
+  await step(stats, 'copycatWatch', async () => {
+    const { runCopycatBatch } = await import('./copycat');
+    const r = await runCopycatBatch(db as any, { limit: 15, deadlineMs: 90_000 });
+    stats.copycatWatch = r;
+    if (r.newMatches > 0) {
+      try {
+        const { telegramOwner } = await import('./notify');
+        await telegramOwner(`🕵 <b>Copycat Watch</b>: ${r.newMatches} new Etsy listing${r.newMatches === 1 ? '' : 's'} using your pictures or titles. Admin > Copycat Watch.`);
+      } catch { /* the admin tab shows them anyway */ }
+    }
+  });
+
   // ── Cut Local maker automations (gated) ──────────────────────────────
   // Nudge makers who have unquoted open jobs near them (max once/20h each),
   // and remind low-credit makers to top up (max once/7d each).

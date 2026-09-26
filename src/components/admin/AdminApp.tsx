@@ -30,6 +30,7 @@ import Seasonal from './tabs/Seasonal';
 import DesignBoard from './tabs/DesignBoard';
 import CustomRequests from './tabs/CustomRequests';
 import WhatSells from './tabs/WhatSells';
+import CopycatWatch from './tabs/CopycatWatch';
 import OrderSoundListener from './OrderSoundListener';
 import DoubleChargeBanner from './DoubleChargeBanner';
 import { inputCls, btnPrimary } from './ui';
@@ -40,6 +41,7 @@ const TABS: Tab[] = [
   { key: 'overview',    label: 'Overview',     icon: '◎', Component: Overview },
   { key: 'finance',     label: 'Finance',      icon: '💰', Component: Finance },
   { key: 'whatsells',   label: 'What Sells',   icon: '🎯', Component: WhatSells },
+  { key: 'copycat',     label: 'Copycat Watch', icon: '🕵', Component: CopycatWatch },
   { key: 'advertising', label: 'Advertising',  icon: '📣', Component: AdStrategy },
   { key: 'traffic',     label: 'Traffic',      icon: '📊', Component: Traffic },
   { key: 'insights',    label: 'Subscriber Insights', icon: '📈', Component: Insights },
