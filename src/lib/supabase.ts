@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { AsyncLocalStorage } from 'node:async_hooks';
 
 // Read from runtime env (process.env, available in the Netlify SSR function) first,
 // then build-time (import.meta.env, inlined for the browser). This makes SSR work even
@@ -24,26 +23,10 @@ export const isSupabaseConfigured = Boolean(env('PUBLIC_SUPABASE_URL'));
 //      errors and render empty, which looks fine and is not: an empty shop is
 //      worse than an honest "back in a few minutes".
 //
-// 2026-09-26: the failure used to be ONE timestamp shared by the whole
-// function instance ("a query failed in the last 4 s"), so a failed query in
-// any request, a background beacon or an optional widget, turned every
-// product and catalogue page rendered by anyone in the next 4 seconds into
-// the 503 maintenance page. Google Shopping's landing-page checks saw those
-// 503s and stopped showing the catalogue on 2026-09-22 (1,690 impressions
-// and 30 clicks a day down to ~380 and 0). The mark is now kept per request
-// (AsyncLocalStorage): a page is only replaced when ITS OWN queries failed.
+// 2026-09-26: failures are counted per request in lib/request-health.ts
+// (server-only); this file is also bundled for the browser, so it only calls
+// the hook that module registers on globalThis.
 const QUERY_DEADLINE_MS = 6000;
-type RequestHealth = { failures: number };
-const requestHealth = new AsyncLocalStorage<RequestHealth>();
-
-/** Run one request with its own failure counter (middleware wraps next()). */
-export function withRequestHealth<T>(fn: () => Promise<T>): Promise<T> {
-  return requestHealth.run({ failures: 0 }, fn);
-}
-/** True if a query made by THIS request failed outright (network or deadline). */
-export function databaseUnreachable(): boolean {
-  return (requestHealth.getStore()?.failures || 0) > 0;
-}
 
 const timedFetch: typeof fetch = async (input, init) => {
   const ctrl = new AbortController();
@@ -53,8 +36,7 @@ const timedFetch: typeof fetch = async (input, init) => {
   } catch (err) {
     // A 4xx/5xx still resolves, so anything thrown here is the connection
     // itself failing: DNS, refused, reset, or our own deadline.
-    const h = requestHealth.getStore();
-    if (h) h.failures++;
+    try { (globalThis as any).__dccQueryFailed?.(); } catch { /* browser: no-op */ }
     throw err;
   } finally {
     clearTimeout(timer);

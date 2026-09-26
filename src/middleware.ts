@@ -7,7 +7,7 @@
 // whole site is covered. (netlify.toml still covers the static assets.)
 import { defineMiddleware } from 'astro:middleware';
 import { maintenancePage, maintenanceJson, plannedMaintenance } from './lib/maintenance';
-import { databaseUnreachable, withRequestHealth } from './lib/supabase';
+import { databaseUnreachable, withRequestHealth } from './lib/request-health';
 
 const SECURITY_HEADERS: Record<string, string> = {
   // NOTE: no X-Frame-Options. The Laser Studio desktop app's "My Shop" tab embeds
