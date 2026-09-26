@@ -137,7 +137,7 @@ function labels(p: { price_usd: number | null; etsy_sales_365: number | null; is
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase
         .from('products')
-        .select('id, title, slug, price_usd, image_url, gallery, mockup_url, mockup_status, mockup_b_url, mockup_b_status, seo_description, description, is_bundle, etsy_sales_365, product_categories(categories(name))')
+        .select('id, title, slug, price_usd, image_url, feed_image_url, gallery, mockup_url, mockup_status, mockup_b_url, mockup_b_status, seo_description, description, is_bundle, etsy_sales_365, product_categories(categories(name))')
         .eq('active', true)
         // Google's weapons policy will never approve our rifle/scope hunting
         // scenes, so sending them only accrues violations. Excluded here only;
@@ -170,7 +170,10 @@ function labels(p: { price_usd: number | null; etsy_sales_365: number | null; is
         // the hero is one clean design from the bundle; it goes in as the main
         // image and the collage rides along as an additional one.
         const bundleMain = p.is_bundle && gallery.length > 1 ? gallery[1] : null;
-        const mainImage = squareIds.has(String(p.id)) ? `${SITE}/sq/${p.slug}.jpg` : img(bundleMain || p.image_url, { w: 1200, q: 85 });
+        // products.feed_image_url (migration 148): a picture made for Google, used
+        // as the main one when set (the Stations bundle's clean 14-panel grid)
+        const mainImage = p.feed_image_url ? img(p.feed_image_url, { w: 1200, q: 85 })
+          : squareIds.has(String(p.id)) ? `${SITE}/sq/${p.slug}.jpg` : img(bundleMain || p.image_url, { w: 1200, q: 85 });
         const extraImgs = [...lifestyle, ...(bundleMain ? [p.image_url, ...gallery.slice(2)] : gallery.slice(1))]
           .filter(Boolean)
           .slice(0, 10)
