@@ -623,8 +623,15 @@ export async function resolvePackClick(q: { s: string; m: string; k: string; v: 
     const url = kind === 'bonus' ? pack?.bonus_drive_link : pack?.standard_drive_link;
     return url ? { url } : { error: 'this pack has no files yet', status: 404 };
   }
-  const { data: s } = await db.from('member_subscriptions').select('id, email, tier, status, start_date, total_drops, plan_slug').eq('id', q.s).maybeSingle();
+  const { data: s } = await db.from('member_subscriptions').select('id, email, tier, status, start_date, total_drops, drops_sent, plan_slug').eq('id', q.s).maybeSingle();
   if (!s) return { error: 'membership not found', status: 404 };
+  // Only months that have arrived, and for a cancelled, refunded or upgraded
+  // term only the months it actually received (2026-09-27: a cancelled term's
+  // later months, and pre-uploaded future months, were downloadable).
+  const monthIndex = s.plan_slug === STARTER_PLAN_SLUG ? 0 : Array.from({ length: s.total_drops }, (_, k) => toYM(addMonths(s.start_date, k))).indexOf(q.m);
+  const isOwnerTest = String(s.email).toLowerCase() === TEST_INBOX && String(s.start_date) >= '2090';
+  if (!isOwnerTest && s.plan_slug !== STARTER_PLAN_SLUG && q.m > toYM(todayYMD())) return { error: 'this pack unlocks in its own month', status: 403 };
+  if (!['active', 'expired', 'paused'].includes(String(s.status)) && monthIndex >= Number(s.drops_sent || 0)) return { error: 'this membership has ended; months it did not receive are not included', status: 403 };
   const pack = await getMemberPack(db, s.id, q.m);
   const url = kind === 'bonus' ? (s.tier === 'premium' ? pack?.bonus_drive_link : null) : pack?.standard_drive_link;
   if (!url) return { error: 'this pack is not available yet', status: 404 };

@@ -212,7 +212,9 @@ if (session?.email) {
           // "January 1" is what ymLabel makes of the sentinel, so the starter
           // names itself instead.
           monthYM: ym, monthLabel: ym === STARTER_PACK_MONTH ? 'Starter Bundle' : ymLabel(ym),
-          accessible: ym <= currentYM || testTerm, dropNumber: k,
+          // arrived months only; a cancelled, refunded or upgraded term keeps
+          // just the months it received (same rule as resolvePackClick)
+          accessible: (ym <= currentYM || testTerm) && (['active', 'expired', 'paused'].includes(String(s.status)) || k <= Number(s.drops_sent || 0)), dropNumber: k,
           title: pack?.title || null, note: pack?.preview_note || null, cover: pack?.cover_image_url || null,
           items: Array.isArray(pack?.items) ? pack.items.slice(0, 8) : [],
           bonusItems: s.tier === 'premium' && Array.isArray(pack?.bonus_items) ? pack.bonus_items.slice(0, 4) : [],
@@ -250,6 +252,8 @@ for (const o of orders) {
 totalFiles += memberBlocks.reduce((n: number, b: any) =>
   n + (b.packs || []).filter((p: any) => p.accessible && p.standard)
     .reduce((m: number, p: any) => m + (Array.isArray(p.items) ? p.items.length : 0), 0), 0);
+// designs picked with Diamond Select credits count too (each is one design)
+totalFiles += passItems.length;
 
 // ── Referral program: a stable REF-XXXX share code per customer ───────
 // The code IS a real 15% coupon (so it flows through the normal cart discount
@@ -335,6 +339,43 @@ if (session?.email) {
           </div>
           <a href="/account?signout=1" class="text-sm text-bronze-600 underline" data-signout>Sign out</a>
         </div>
+
+        {/* Diamond Select first: for a member it is what they came to the account for */}
+        {(passInfo || passItems.length > 0) && (
+          <section id="diamond" class="mb-10 scroll-mt-24">
+            <span id="pass" aria-hidden="true"></span>
+            <h2 class="font-serif text-2xl text-bronze-800 mb-1">&#9670; Your Diamond Select</h2>
+            {passInfo ? (
+              <div class="mb-4 rounded-lg border border-[#3B5B8C]/25 bg-[#EAF0F8] px-4 py-3 text-sm text-[#213B63]">
+                <p><strong class="text-lg">{passInfo.left}</strong> credit{passInfo.left === 1 ? '' : 's'} to spend. Each one is a single design of your choice: open it and press <strong>Use 1 credit</strong>.</p>
+                <p class="mt-1 text-xs opacity-80">
+                  {passInfo.earned} of {passInfo.total} credits received so far{passInfo.nextLabel ? `, the next 10 on ${passInfo.nextLabel}` : ''}.
+                  {passInfo.inGrace ? ` Your membership ended on ${passInfo.endLabel}; use your credits by ${passInfo.lastLabel}.` : ` Membership runs until ${passInfo.endLabel}, credits can be used until ${passInfo.lastLabel}.`}
+                </p>
+                <p class="mt-2"><a href="/catalog?sort=best" class="underline">Choose from the best sellers</a> · <a href="/catalog?sort=newest" class="underline">the newest designs</a> · <a href="/search?focus=1" class="underline">search</a></p>
+              </div>
+            ) : (
+              <p class="text-sm text-ink-700/70 mb-4">Your Diamond Select membership has ended. Every design you picked stays here to download.</p>
+            )}
+            {passItems.length > 0 ? (
+              <ul class="divide-y divide-black/10 border-y border-black/10">
+                {passItems.map((it) => (
+                  <li class="py-3 flex items-center gap-3">
+                    <a href={`/product/${it.slug}`} class="w-14 h-14 rounded overflow-hidden bg-cream shrink-0">{it.image_url && <img src={img(it.image_url, { w: 112, square: true, q: 70 })} alt="" width="56" height="56" loading="lazy" class="w-full h-full object-cover" />}</a>
+                    <a href={`/product/${it.slug}`} class="flex-1 min-w-0 text-sm text-ink-800 line-clamp-2">{it.title}</a>
+                    <div class="flex flex-col gap-1 shrink-0">
+                      {it.downloads.length ? it.downloads.map((_d, i) => (
+                        <a href={`/api/member/dl?e=${it.entitlement_id}&f=${i}`} target="_blank" rel="noopener" class="text-xs bg-bronze-600 text-cream px-3 py-1.5 rounded hover:bg-bronze-700 text-center">⬇ Download{it.downloads.length > 1 ? ` ${i + 1}` : ''}</a>
+                      )) : <span class="text-xs text-ink-700/60">Link on its way</span>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : passInfo && (
+              <p class="text-sm text-ink-700/70">Nothing picked yet. Your first {passInfo.left} designs are waiting.</p>
+            )}
+          </section>
+        )}
 
         {loyalty && (
           <section class="mb-10 bg-white border border-bronze-600/25 rounded-xl p-5">
@@ -429,42 +470,6 @@ if (session?.email) {
                 });
               })();
             </script>
-          </section>
-        )}
-
-        {(passInfo || passItems.length > 0) && (
-          <section id="diamond" class="mb-10 scroll-mt-24">
-            <span id="pass" aria-hidden="true"></span>
-            <h2 class="font-serif text-2xl text-bronze-800 mb-1">&#9670; Your Diamond Select</h2>
-            {passInfo ? (
-              <div class="mb-4 rounded-lg border border-[#3B5B8C]/25 bg-[#EAF0F8] px-4 py-3 text-sm text-[#213B63]">
-                <p><strong class="text-lg">{passInfo.left}</strong> credit{passInfo.left === 1 ? '' : 's'} to spend. Each one is a single design of your choice: open it and press <strong>Use 1 credit</strong>.</p>
-                <p class="mt-1 text-xs opacity-80">
-                  {passInfo.earned} of {passInfo.total} credits received so far{passInfo.nextLabel ? `, the next 10 on ${passInfo.nextLabel}` : ''}.
-                  {passInfo.inGrace ? ` Your membership ended on ${passInfo.endLabel}; use your credits by ${passInfo.lastLabel}.` : ` Membership runs until ${passInfo.endLabel}, credits can be used until ${passInfo.lastLabel}.`}
-                </p>
-                <p class="mt-2"><a href="/catalog?sort=best" class="underline">Choose from the best sellers</a> · <a href="/catalog?sort=newest" class="underline">the newest designs</a> · <a href="/search?focus=1" class="underline">search</a></p>
-              </div>
-            ) : (
-              <p class="text-sm text-ink-700/70 mb-4">Your Diamond Select membership has ended. Every design you picked stays here to download.</p>
-            )}
-            {passItems.length > 0 ? (
-              <ul class="divide-y divide-black/10 border-y border-black/10">
-                {passItems.map((it) => (
-                  <li class="py-3 flex items-center gap-3">
-                    <a href={`/product/${it.slug}`} class="w-14 h-14 rounded overflow-hidden bg-cream shrink-0">{it.image_url && <img src={img(it.image_url, { w: 112, square: true, q: 70 })} alt="" width="56" height="56" loading="lazy" class="w-full h-full object-cover" />}</a>
-                    <a href={`/product/${it.slug}`} class="flex-1 min-w-0 text-sm text-ink-800 line-clamp-2">{it.title}</a>
-                    <div class="flex flex-col gap-1 shrink-0">
-                      {it.downloads.length ? it.downloads.map((_d, i) => (
-                        <a href={`/api/member/dl?e=${it.entitlement_id}&f=${i}`} target="_blank" rel="noopener" class="text-xs bg-bronze-600 text-cream px-3 py-1.5 rounded hover:bg-bronze-700 text-center">⬇ Download{it.downloads.length > 1 ? ` ${i + 1}` : ''}</a>
-                      )) : <span class="text-xs text-ink-700/60">Link on its way</span>}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : passInfo && (
-              <p class="text-sm text-ink-700/70">Nothing picked yet. Your first {passInfo.left} designs are waiting.</p>
-            )}
           </section>
         )}
 

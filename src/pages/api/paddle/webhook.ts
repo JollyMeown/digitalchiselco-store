@@ -1056,6 +1056,20 @@ async function handleAdjustment(db: any, adj: any) {
     await db.from('orders').update({ status: 'refunded', refunded_at: new Date().toISOString() }).eq('id', order.id);
     const { error: entErr } = await db.from('entitlements').delete().eq('order_id', order.id);
     if (entErr) throw new Error(`entitlement revoke failed for order ${order.id}: ${entErr.message}`);
+    // A membership bought in this order ends too (found 2026-09-27: a fully
+    // refunded member kept getting monthly packs, and a Diamond member kept the
+    // credits and every design picked with them). Refund policy: the licence
+    // ends on refund. Packs already delivered stop unlocking (portal + link).
+    try {
+      const { data: terms } = await db.from('member_subscriptions').select('id, email, plan_slug, start_date').eq('order_id', order.id);
+      for (const t of terms || []) {
+        await db.from('member_subscriptions').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), next_drop_date: null, cancel_reason: 'refunded' }).eq('id', t.id);
+        if (t.plan_slug === DIAMOND_SLUG) {
+          await db.from('entitlements').delete().ilike('email', t.email).eq('source', DIAMOND_SLUG).gte('granted_at', t.start_date);
+        }
+        console.log(`[adjustment] membership ${t.id} (${t.plan_slug}) cancelled by the refund of order ${shortId}`);
+      }
+    } catch (e: any) { console.error('[adjustment] membership cancel on refund failed:', e?.message || e); }
     console.log(`[adjustment] FULL ${action} — order ${shortId} marked refunded, entitlements revoked ($${refunded}).`);
   } else {
     // Stamp refunded_at (order stays 'paid') so the post-refund win-back can
