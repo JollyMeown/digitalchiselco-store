@@ -25,6 +25,20 @@ const flag = (cc?: string | null) => cc && /^[A-Z]{2}$/.test(cc) ? String.fromCo
 const countryName = (cc?: string | null) => { try { return cc ? new Intl.DisplayNames(['en'], { type: 'region' }).of(cc) || cc : 'Unknown'; } catch { return cc || 'Unknown'; } };
 const localTime = (tz?: string | null) => { try { return tz ? new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz }) : ''; } catch { return ''; } };
 const ago = (ms: number) => { const s = Math.max(0, Math.round((Date.now() - ms) / 1000)); return s < 60 ? `${s}s ago` : `${Math.floor(s / 60)} min ago`; };
+// Bot and VPN hints (2026-09-26). Anything that says it is a bot is never
+// recorded (api/track.ts), and the counter needs a browser that runs the page's
+// scripts, so what reaches this list is almost always a person. Two patterns
+// are still worth a badge: page after page under 4 seconds apart (people read
+// for 15 to 40), and a country that does not match the device clock (a VPN or
+// proxy, like the owner's own).
+const TZ_OK: Record<string, RegExp> = { US: /^America\//, CA: /^America\//, MX: /^America\//, BR: /^America\//, GB: /^Europe\/London/, IE: /^Europe\/Dublin/, AU: /^Australia\//, NZ: /^Pacific\/Auckland/, DE: /^Europe\//, FR: /^Europe\//, NL: /^Europe\/Amsterdam/, PL: /^Europe\/Warsaw/, PK: /^Asia\/Karachi/, IN: /^Asia\/(Kolkata|Calcutta)/ };
+function botLike(p: { pages: { ts: string }[] }): boolean {
+  const t = p.pages.map((x) => Date.parse(x.ts)).sort((a, b) => a - b);
+  if (t.length < 10) return false;
+  const gaps = t.slice(1).map((v, i) => (v - t[i]) / 1000).sort((a, b) => a - b);
+  return gaps[gaps.length >> 1] < 4;
+}
+const vpnLike = (v: { country: string | null; tz: string | null }) => !!(v.country && v.tz && TZ_OK[v.country] && !TZ_OK[v.country].test(v.tz));
 const dur = (ms: number) => { const m = Math.round(ms / 60000); return m < 1 ? 'under a minute' : `${m} min`; };
 
 export default function LiveActivity() {
@@ -120,6 +134,8 @@ export default function LiveActivity() {
                   <div className="flex flex-wrap items-baseline gap-x-2">
                     {onCart && <span className="text-[11px] font-bold text-red-600 dcc-live-blink">AT {path.startsWith('/checkout') ? 'CHECKOUT' : 'CART'}</span>}
                     <a href={path} target="_blank" rel="noopener" className="font-medium text-ink-900 hover:underline truncate max-w-full">{pageName(path)}</a>
+                    {botLike(p) && <span className="text-[11px] font-semibold bg-amber-100 text-amber-800 rounded px-1.5" title="Pages under 4 seconds apart: people read for 15 to 40 seconds">🤖 bot-like speed</span>}
+                    {vpnLike(p.now) && <span className="text-[11px] bg-slate-100 text-slate-700 rounded px-1.5" title={`Connection in ${countryName(p.now.country)}, device clock set to ${p.now.tz}`}>VPN / proxy</span>}
                     <span className="text-xs text-ink-700/50">{ago(p.lastMs)}</span>
                   </div>
                   <div className="text-xs text-ink-700/70 mt-0.5">
