@@ -1616,12 +1616,12 @@ ${ideasHtml}
   });
 
   // ── Copycat Watch: Etsy listings reusing our pictures (lib/copycat.ts) ─
-  // 15 of the top 75 designs a night, oldest-checked first (the whole list
-  // about every 5 days), at most 90 s so the other steps keep their time.
+  // 6 of the top 75 designs a night (50 Etsy listings each), oldest-checked
+  // first, so the whole list about every 12 days; at most 90 s.
   stats.copycatWatch = 'off';
   await step(stats, 'copycatWatch', async () => {
     const { runCopycatBatch } = await import('./copycat');
-    const r = await runCopycatBatch(db as any, { limit: 15, deadlineMs: 90_000 });
+    const r = await runCopycatBatch(db as any, { limit: 6, deadlineMs: 90_000 });
     stats.copycatWatch = r;
     if (r.newMatches > 0) {
       try {

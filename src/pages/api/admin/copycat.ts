@@ -1,7 +1,7 @@
 // Admin: Copycat Watch (lib/copycat.ts).
 //   GET                         -> matches (with our design), watch coverage
 //   POST { id, status }         -> mark a match: new | reported | ignored | removed
-//   POST { run: true }          -> check the 3 longest-unchecked designs now
+//   POST { run: true }          -> check the 2 longest-unchecked designs now
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../../lib/supabase';
@@ -51,7 +51,7 @@ export const POST: APIRoute = async ({ request }) => {
   const db = supabaseAdmin();
   if (body.run) {
     const { runCopycatBatch } = await import('../../../lib/copycat');
-    const r = await runCopycatBatch(db, { limit: 3, deadlineMs: 20_000 });
+    const r = await runCopycatBatch(db, { limit: 2, deadlineMs: 18_000 });
     return json({ ok: true, run: r });
   }
   const id = Number(body.id), status = String(body.status || '');

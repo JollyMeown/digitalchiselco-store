@@ -18,11 +18,17 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 const OUR_SHOP_ID = 61524055;                     // DigitalChiselCo on Etsy
 const OUR_SHOP_NAMES = ['DigitalChiselCo', 'CustomReliefCo'];
 export const WATCH_TOP = 75;                      // designs watched: the best sellers
-export const IMAGE_MATCH_MAX = 8;                 // dHash bits (of 64) for "same picture"
+// Two-stage picture test (calibrated 2026-09-26 on the first live run): the
+// 64-bit hash is a quick filter, the 256-bit hash confirms. Our own picture
+// re-uploaded or cropped: coarse 1, fine 15-37. Different deer carvings in the
+// same mockup style: coarse 9-30, fine 89-133. Coarse alone let a "9" through.
+export const COARSE_MAX = 12;                     // 64-bit dHash bits, prefilter
+export const FINE_MAX = 60;                       // 256-bit dHash bits, confirmation
 export const TITLE_MATCH_MIN = 0.8;               // share of meaningful title words in common
-const SEARCH_LIMIT = 25;
+export const TITLE_MIN_WORDS = 5;                 // ...and at least this many shared words (3 common words is just a subject)
+const SEARCH_LIMIT = 50;
 const OUR_PICS = 5;                               // our pictures compared per design
-const THEIR_PICS = 3;                             // their pictures compared per listing
+const THEIR_PICS = 2;                             // their pictures compared per listing (copiers lead with ours)
 
 const env = (n: string) => (typeof process !== 'undefined' ? process.env[n] : undefined) ?? (import.meta as any).env?.[n];
 function etsyKey(): string {
@@ -42,10 +48,10 @@ async function etsy(path: string): Promise<any> {
 
 const STOP = new Set(['stl', 'file', 'files', 'cnc', 'relief', 'bas', '3d', 'carving', 'carved', 'wood', 'wooden', 'router', 'for', 'and', 'the', 'with', 'a', 'of', 'in', 'on', 'design', 'designs', 'wall', 'art', 'model', 'printing', 'print', 'printer', 'digital', 'download', 'instant', 'scene', 'panel', 'decor', 'laser', 'engraving', 'vcarve', 'aspire', 'artcam']);
 export const titleWords = (t: string) => new Set(String(t || '').split('|')[0].toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)));
-function overlap(a: Set<string>, b: Set<string>): number {
-  if (!a.size || !b.size) return 0;
+function overlap(a: Set<string>, b: Set<string>): { share: number; shared: number } {
+  if (!a.size || !b.size) return { share: 0, shared: 0 };
   let n = 0; for (const w of a) if (b.has(w)) n++;
-  return n / Math.max(a.size, b.size);
+  return { share: n / Math.max(a.size, b.size), shared: n };
 }
 
 /** 64-bit difference hash of a picture, as a BigInt. */
@@ -55,12 +61,21 @@ export async function dHash(buf: Buffer): Promise<bigint> {
   for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) h = (h << 1n) | (px[y * 9 + x] > px[y * 9 + x + 1] ? 1n : 0n);
   return h;
 }
+/** 256-bit difference hash (17x16), the finer confirmation. */
+export async function dHashFine(buf: Buffer): Promise<bigint> {
+  const px = await sharp(buf).grayscale().resize(17, 16, { fit: 'fill' }).raw().toBuffer();
+  let h = 0n;
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) h = (h << 1n) | (px[y * 17 + x] > px[y * 17 + x + 1] ? 1n : 0n);
+  return h;
+}
 export function hamming(a: bigint, b: bigint): number { let x = a ^ b, n = 0; while (x) { n += Number(x & 1n); x >>= 1n; } return n; }
-async function hashUrl(url: string): Promise<bigint | null> {
+type Hashes = { coarse: bigint; fine: bigint };
+async function hashUrl(url: string): Promise<Hashes | null> {
   try {
     const r = await fetch(url);
     if (!r.ok) return null;
-    return await dHash(Buffer.from(await r.arrayBuffer()));
+    const buf = Buffer.from(await r.arrayBuffer());
+    return { coarse: await dHash(buf), fine: await dHashFine(buf) };
   } catch { return null; }
 }
 const small = (u: string) => u.includes('/storage/v1/object/public/') ? u.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=240&resize=contain&quality=70' : u;
@@ -85,9 +100,11 @@ export async function runCopycatBatch(db: SupabaseClient, opts: { limit?: number
     if (Date.now() > deadline) break;
     try {
       const ours = [p.image_url, ...(Array.isArray(p.gallery) ? p.gallery : [])].filter(Boolean).filter((u: string, i: number, a: string[]) => a.indexOf(u) === i).slice(0, OUR_PICS);
-      const ourHashes = (await Promise.all(ours.map((u: string) => hashUrl(small(u))))).filter((h): h is bigint => h !== null);
+      const ourHashes = (await Promise.all(ours.map((u: string) => hashUrl(small(u))))).filter((h): h is Hashes => h !== null);
       const ourWords = titleWords(p.title);
-      const kw = [...ourWords].slice(0, 6).join(' ') + ' stl';
+      // the subject in 3 words + stl, the way a buyer types it: "bald eagle mountain
+      // stl" finds 40 listings, the 6-word title found 1
+      const kw = [...ourWords].slice(0, 3).join(' ') + ' stl';
       const found = await etsy(`/listings/active?keywords=${encodeURIComponent(kw)}&limit=${SEARCH_LIMIT}&sort_on=score`);
       const cand = (found.results || []).filter((l: any) => l.shop_id !== OUR_SHOP_ID);
       out.listingsSeen += cand.length;
@@ -95,17 +112,23 @@ export async function runCopycatBatch(db: SupabaseClient, opts: { limit?: number
       if (cand.length) {
         const batch = await etsy(`/listings/batch?listing_ids=${cand.map((l: any) => l.listing_id).join(',')}&includes=Images,Shop`);
         for (const l of batch.results || []) {
+          if (Date.now() > deadline) break;
           const shopName = l.shop?.shop_name || '';
           if (l.shop_id === OUR_SHOP_ID || OUR_SHOP_NAMES.includes(shopName)) continue;
           const imgs = (l.images || []).sort((a: any, b: any) => (a.rank || 0) - (b.rank || 0)).slice(0, THEIR_PICS);
-          let best = 64;
+          let best = 64, confirmed = false;
           for (const im of imgs) {
             const h = await hashUrl(im.url_570xN || im.url_170x135);   // full shape, not the cropped thumbnail
             if (h === null) continue;
-            for (const o of ourHashes) best = Math.min(best, hamming(h, o));
+            for (const o of ourHashes) {
+              const c = hamming(h.coarse, o.coarse);
+              best = Math.min(best, c);
+              if (c <= COARSE_MAX && hamming(h.fine, o.fine) <= FINE_MAX) confirmed = true;
+            }
           }
-          const tOver = overlap(ourWords, titleWords(l.title));
-          const kind = best <= IMAGE_MATCH_MAX ? 'image' : tOver >= TITLE_MATCH_MIN ? 'title' : null;
+          const tOv = overlap(ourWords, titleWords(l.title));
+          const tOver = tOv.share;
+          const kind = confirmed ? 'image' : tOver >= TITLE_MATCH_MIN && tOv.shared >= TITLE_MIN_WORDS ? 'title' : null;
           if (!kind) continue;
           matches++;
           const row = {

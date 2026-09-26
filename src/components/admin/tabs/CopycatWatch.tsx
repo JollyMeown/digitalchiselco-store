@@ -33,7 +33,7 @@ export default function CopycatWatch() {
   useEffect(() => { load(); }, []);
 
   async function runNow() {
-    setBusy('Checking 3 designs on Etsy…');
+    setBusy('Checking 2 designs on Etsy…');
     try { const j = await call('POST', { run: true }); setBusy(`Checked ${j.run.checked} design(s), ${j.run.listingsSeen} Etsy listings looked at, ${j.run.newMatches} new match(es)${j.run.errors?.length ? `. Problems: ${j.run.errors.join('; ')}` : ''}`); await load(); }
     catch (e: any) { setBusy(`Could not run: ${e.message}`); }
   }
@@ -49,15 +49,15 @@ export default function CopycatWatch() {
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <p className="text-sm text-ink-700/80 max-w-3xl">
-            Each night 15 of your 75 best sellers are searched on Etsy the way a buyer would, and every other shop's pictures are compared with yours.
+            Each night 6 of your 75 best sellers are searched on Etsy the way a buyer would, and every other shop's pictures are compared with yours.
             A <b>picture match</b> means they uploaded your render or mockup (resized or recompressed still counts). A <b>title match</b> means they copied your title almost word for word, the weaker sign.
             Your own shops are never listed. New picture matches also send you a Telegram message.
           </p>
-          <button className={btnPrimary} onClick={runNow} disabled={!!busy && busy.startsWith('Checking')}>Check 3 designs now</button>
+          <button className={btnPrimary} onClick={runNow} disabled={!!busy && busy.startsWith('Checking')}>Check 2 designs now</button>
         </div>
         {busy && <p className="text-xs text-ink-700/70 mt-2">{busy}</p>}
         <p className="text-xs text-ink-700/60 mt-2">
-          {c.designsChecked ? `${c.designsChecked} designs checked so far, ${c.listingsSeen} Etsy listings compared. Last check ${new Date(c.lastCheck).toLocaleString()}.` : 'No checks yet: the first run happens tonight, or press "Check 3 designs now".'}
+          {c.designsChecked ? `${c.designsChecked} designs checked so far, ${c.listingsSeen} Etsy listings compared. Last check ${new Date(c.lastCheck).toLocaleString()}.` : 'No checks yet: the first run happens tonight, or press "Check 2 designs now".'}
         </p>
       </Card>
 
