@@ -5,9 +5,17 @@
 // scenes and dropped stations, which would misrepresent the bundle).
 import fs from 'node:fs';
 import sharp from 'sharp';
+const SCENE = (() => { const i = process.argv.indexOf('--scene'); return i > -1 ? process.argv[i + 1] : 'chapel'; })();
+const TAKE = (() => { const i = process.argv.indexOf('--take'); return i > -1 ? process.argv[i + 1] : '1'; })();
 const brs = JSON.parse(fs.readFileSync('D:/000 BUNDLE RELIEF STUDIO/_config/config.json', 'utf8').replace(/^\uFEFF/, ''));
 const KEY = brs.gemini_api_key, MODEL = 'gemini-3-pro-image';
-const prompt = `A photograph of an EMPTY, plain, pale warm limestone wall inside a quiet chapel, shot perfectly square-on to the wall (camera sensor parallel to the wall, no perspective convergence), full frame 35 mm, f/8, tripod, chest height.
+// Owner 2026-09-26: "I want these on cathedral walls, beautiful environment".
+const CATHEDRAL = `A photograph of the side wall of a magnificent Gothic cathedral nave, shot perfectly square-on to the wall (camera sensor parallel to the wall, verticals perfectly vertical, no perspective convergence), full frame 24 mm tilt-shift, f/8, tripod.
+THE WALL, TOP TO BOTTOM: at the top, a row of tall pointed-arch stained glass windows in deep ruby, cobalt and gold, glowing with sunlight, set in finely carved tracery. Below them a richly carved stone string course. Then THE CENTRAL BAND, from about 25 percent to 68 percent of the image height and from about 7 percent to 93 percent of its width: a wide, smooth, EMPTY expanse of honey-coloured dressed limestone ashlar with fine mortar lines, nothing on it at all, where artwork will be hung later. Two slender clustered stone columns frame the band at the far left and far right edges. Below the band a low carved dado of blind Gothic arcading, then a polished marble floor at the very bottom with the backs of the last row of dark oak pews entering along the bottom edge, softly out of focus.
+LIGHT: late afternoon sun through the stained glass throws soft pools of coloured light (ruby, amber, cobalt) across the upper wall and the floor, gentle and diffuse on the central band so it stays evenly lit in warm golden light, plus a few candle flames on a wrought iron stand at the far left edge glowing warmly. Reverent, luminous, awe-inspiring.
+GRADE: rich but natural, filmic, deep warm shadows with detail, luminous glass that does not blow out. A real architectural photograph.
+ABSOLUTELY NOT: nothing at all on the central band (no artwork, no panels, no plaques, no frames, no crosses, no statues, no text, no numbers), no people, no perspective distortion, no CGI look, no fantasy elements.`;
+const prompt = SCENE === 'cathedral' ? CATHEDRAL : `A photograph of an EMPTY, plain, pale warm limestone wall inside a quiet chapel, shot perfectly square-on to the wall (camera sensor parallel to the wall, no perspective convergence), full frame 35 mm, f/8, tripod, chest height.
 LIGHT: soft warm late-morning sunlight from a tall window just outside the frame at the upper left, falling in gentle diagonal shafts across the wall, plus even bounce so the whole wall is readable. The central area of the wall, where artwork will hang in two long rows, is evenly and softly lit, with the sun shafts mostly across the upper part and the edges.
 COMPOSITION: 16:9. The wall fills the frame: fine ashlar limestone blocks with thin mortar lines, a stone floor edge at the very bottom, and the end of a simple oak pew entering from the bottom right corner, slightly out of focus. The middle 80 percent of the wall is clear and uninterrupted.
 GRADE: natural, filmic, restrained saturation, true warm stone. A real photograph.
@@ -18,7 +26,7 @@ for (let attempt = 1; attempt <= 3; attempt++) {
   const j = await r.json();
   const img = (j?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData?.data || p.inline_data?.data);
   if (!img) { console.log(`attempt ${attempt}: ${(j?.error?.message || 'no image').slice(0, 160)}`); continue; }
-  await sharp(Buffer.from(img.inlineData?.data || img.inline_data.data, 'base64')).jpeg({ quality: 94 }).toFile('.mockups/stations/wall.jpg');
-  console.log('wrote .mockups/stations/wall.jpg'); process.exit(0);
+  await sharp(Buffer.from(img.inlineData?.data || img.inline_data.data, 'base64')).jpeg({ quality: 94 }).toFile(`.mockups/stations/wall-${SCENE}-${TAKE}.jpg`);
+  console.log(`wrote .mockups/stations/wall-${SCENE}-${TAKE}.jpg`); process.exit(0);
 }
 process.exit(1);
