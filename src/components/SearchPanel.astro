@@ -3,7 +3,7 @@
 // /search-fragment for every filter change after that (the page swaps this
 // block in without reloading), so both always show the same markup.
 import ProductCard from './ProductCard.astro';
-import { PRICE_BUCKETS, SORTS, POPULAR_SEARCHES, toQuery, filterPath, literalCount, type Result, type Params } from '../lib/search-index';
+import { PRICE_BUCKETS, TIME_BUCKETS, BOARDS, REF_LONG_IN, SORTS, POPULAR_SEARCHES, toQuery, filterPath, literalCount, type Result, type Params } from '../lib/search-index';
 
 interface Props { r: Result; discount: number }
 const { r, discount } = Astro.props;
@@ -19,6 +19,8 @@ const chips: { label: string; href: string }[] = [];
 for (const c of p.cats) chips.push({ label: catName.get(c) || c, href: href({ cats: p.cats.filter((x) => x !== c) }) });
 for (const k of p.price) chips.push({ label: PRICE_BUCKETS.find((b) => b.key === k)?.label || k, href: href({ price: p.price.filter((x) => x !== k) }) });
 for (const s of p.shape) chips.push({ label: SHAPE_LABEL[s], href: href({ shape: p.shape.filter((x) => x !== s) }) });
+for (const k of p.time) chips.push({ label: 'Carve ' + (TIME_BUCKETS.find((b) => b.key === k)?.label || k).toLowerCase(), href: href({ time: p.time.filter((x) => x !== k) }) });
+if (p.board) chips.push({ label: 'Fits a ' + (BOARDS.find((b) => b.key === p.board)?.label || p.board) + ' board', href: href({ board: '' }) });
 if (p.kind) chips.push({ label: KIND_LABEL[p.kind], href: href({ kind: '' }) });
 if (p.best) chips.push({ label: 'Best sellers', href: href({ best: false }) });
 if (p.fresh) chips.push({ label: 'New this month', href: href({ fresh: false }) });
@@ -76,6 +78,23 @@ const brandName = r.brand ? r.brand.charAt(0).toUpperCase() + r.brand.slice(1) :
             <label class={`sp-opt ${s.n === 0 && !p.shape.includes(s.key) ? 'is-empty' : ''}`}><input type="checkbox" name="shape" value={s.key} checked={p.shape.includes(s.key)} />
               <span class="sp-shape"><i class={`sp-sh sp-sh-${s.key}`} aria-hidden="true"></i>{SHAPE_LABEL[s.key]}</span> <em>{s.n}</em></label>
           ))}
+        </fieldset>
+
+        <fieldset class="sp-fs">
+          <legend>Carving time <span class="sp-hint" title={`Estimated at ${REF_LONG_IN} in on the long side with a 1/4 in roughing and 1/8 in ball nose finishing pass, the same estimate as the Carving box on each design. Smaller carves are quicker. Only designs whose STL has been measured are included.`}>ⓘ</span></legend>
+          {f.time.map((b) => (
+            <label class={`sp-opt ${b.n === 0 && !p.time.includes(b.key) ? 'is-empty' : ''}`}><input type="checkbox" name="time" value={b.key} checked={p.time.includes(b.key)} /> <span>{b.label}</span> <em>{b.n}</em></label>
+          ))}
+          <p class="sp-note">At {REF_LONG_IN} in wide</p>
+        </fieldset>
+
+        <fieldset class="sp-fs">
+          <legend>Fits my board <span class="sp-hint" title={`The thinnest standard board the carve fits at ${REF_LONG_IN} in on the long side: relief depth plus a 1/4 in solid back. Deeper reliefs need thicker wood and longer bits. Only measured designs are included.`}>ⓘ</span></legend>
+          <label class="sp-opt"><input type="radio" name="board" value="" checked={!p.board} /> <span>Any thickness</span></label>
+          {f.board.map((b) => (
+            <label class={`sp-opt ${b.n === 0 && p.board !== b.key ? 'is-empty' : ''}`}><input type="radio" name="board" value={b.key} checked={p.board === b.key} /> <span>{b.label}</span> <em>{b.n}</em></label>
+          ))}
+          <p class="sp-note">At {REF_LONG_IN} in wide</p>
         </fieldset>
 
         <fieldset class="sp-fs">
@@ -152,7 +171,7 @@ const brandName = r.brand ? r.brand.charAt(0).toUpperCase() + r.brand.slice(1) :
             <>
               <p class="mt-2 text-sm text-ink-700/75">We add new designs every week and we build what makers ask for. Try one of these, or ask us for it:</p>
               <div class="sp-pop">
-                {POPULAR_SEARCHES.slice(0, 8).map((w) => <a href={href({ q: w, cats: [], price: [], shape: [], kind: '', best: false, fresh: false, sort: 'relevance' })} data-sp-link>{w}</a>)}
+                {POPULAR_SEARCHES.slice(0, 8).map((w) => <a href={href({ q: w, cats: [], price: [], shape: [], time: [], board: '', kind: '', best: false, fresh: false, sort: 'relevance' })} data-sp-link>{w}</a>)}
               </div>
               {p.q && <a href={`/requests?suggest=${encodeURIComponent(p.q)}`} class="sp-req">💡 Request “{p.q}” as a new design</a>}
             </>
@@ -193,6 +212,7 @@ const brandName = r.brand ? r.brand.charAt(0).toUpperCase() + r.brand.slice(1) :
   .sp-opt em { font-style: normal; font-size: .75rem; color: #8a7a68; font-variant-numeric: tabular-nums; }
   .sp-opt.is-empty { opacity: .45; }
   .sp-more summary { font-size: .8rem; color: #633806; cursor: pointer; padding: .3rem 0; }
+  .sp-note { font-size: .72rem; color: rgb(74 64 54 / .6); margin: .25rem 0 0; }
   .sp-shape { display: inline-flex; align-items: center; gap: .45rem; }
   .sp-sh { display: inline-block; border: 1.5px solid #854F0B; border-radius: 2px; flex-shrink: 0; }
   .sp-sh-square { width: 12px; height: 12px; } .sp-sh-portrait { width: 10px; height: 14px; } .sp-sh-landscape { width: 15px; height: 10px; }

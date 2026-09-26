@@ -6,6 +6,7 @@ import RecentlyViewed from '../../components/RecentlyViewed.astro';
 import TrustBadges from '../../components/TrustBadges.astro';
 import CarveCard from '../../components/CarveCard.astro';
 import LaserStudioCrossSell from '../../components/LaserStudioCrossSell.astro';
+import SetOffer from '../../components/SetOffer.astro';
 import { getProductBySlug, getRelatedProducts, getSettings, getSoldCount, getBoughtTogether } from '../../lib/queries';
 import FreePackInline from '../../components/FreePackInline.astro';
 import { pricing, money } from '../../lib/pricing';
@@ -398,6 +399,7 @@ const breadcrumbLd = {
         data-id={p.id} data-slug={p.slug} data-title={cleanTitle} data-price={price} data-img={gallery[0] || ''}>
         <span aria-hidden="true">⚡</span> Buy it now
       </button>
+      <SetOffer productId={p.id} isBundle={!!p.is_bundle} discount={settings.discount_percent} where="buybox" />
       <div class="mt-2 flex items-center justify-center gap-1.5 flex-wrap text-[11px] text-ink-700/60">
         <span>Express checkout with</span>
         {/* Full names, not " Pay" / "G Pay": Google's StoreBot crawls these
@@ -557,6 +559,8 @@ const breadcrumbLd = {
       </div>
     </div>
   </div>
+
+  <SetOffer productId={p.id} isBundle={!!p.is_bundle} discount={settings.discount_percent} where="contents" />
 
   <section class="mt-10">
     <TrustBadges />

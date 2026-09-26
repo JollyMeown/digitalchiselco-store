@@ -76,9 +76,6 @@ const ld = {
       </div>
       <p class="text-sm text-ink-700/80 mb-4 max-w-3xl">
         {s.text}
-        {L.theme === 'religious' && s.q === 'stations of the cross' && (
-          <> <a href="/requests" class="underline text-bronze-700">{ui.requestCta}</a></>
-        )}
       </p>
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {s.items.map((p, j) => <ProductCard product={p} discount={settings.discount_percent} eager={i === 0 && j < 4} />)}

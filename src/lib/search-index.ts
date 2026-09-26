@@ -19,6 +19,7 @@
 import { supabase } from './supabase';
 import { expand, tokens, didYouMean, normalise, canonical } from './search-smart';
 import type { ProductCard } from './queries';
+import { carveAt, REF_LONG_IN } from './carve-estimate';
 
 export type Shape = 'square' | 'portrait' | 'landscape';
 export type Kind = 'single' | 'bundle' | 'software';
@@ -30,6 +31,8 @@ export type Entry = ProductCard & {
   created: number;
   shape: Shape | null;
   kind: Kind;
+  carveH: number | null;     // hours to carve at 12 in on the long side (lib/carve-estimate)
+  board: number | null;      // thinnest standard board it fits at that size, inches
 };
 
 export const PRICE_BUCKETS = [
@@ -46,6 +49,19 @@ export const SORTS = [
   { key: 'price-asc', label: 'Price: low to high' },
   { key: 'price-desc', label: 'Price: high to low' },
 ] as const;
+// Carving filters (2026-09-26), measured at 12 in on the long side. Only
+// designs whose STL has been measured (model_specs) can match them.
+export const TIME_BUCKETS = [
+  { key: 'quick', label: 'Under 4½ hours', min: 0, max: 4.5 },
+  { key: 'mid', label: '4½ to 6½ hours', min: 4.5, max: 6.5 },
+  { key: 'long', label: 'Over 6½ hours', min: 6.5, max: Infinity },
+] as const;
+export const BOARDS = [
+  { key: '1', label: '1 in (25 mm)', max: 1 },
+  { key: '1.25', label: '1¼ in (32 mm)', max: 1.25 },
+  { key: '1.75', label: '1¾ in (45 mm)', max: 1.75 },
+] as const;
+export { REF_LONG_IN };
 export type SortKey = typeof SORTS[number]['key'];
 
 // Brands we do not sell (licensed logos, trademarks). Mapped to a subject we
@@ -61,7 +77,7 @@ type Cat = { id: string; slug: string; name: string };
 let cache: { at: number; entries: Entry[]; cats: Cat[] } | null = null;
 let loading: Promise<{ entries: Entry[]; cats: Cat[] }> | null = null;
 
-const SEL = 'id,title,slug,price_usd,image_url,is_bundle,link_status,rating_avg,rating_count,customer_photo_url,etsy_sales_365,created_at,seo_keywords,membership_plan_slug,model_specs->width,model_specs->height,product_categories(category_id)';
+const SEL = 'id,title,slug,price_usd,image_url,is_bundle,link_status,rating_avg,rating_count,customer_photo_url,etsy_sales_365,created_at,seo_keywords,membership_plan_slug,model_specs->width,model_specs->height,model_specs->depth,product_categories(category_id)';
 
 async function load(): Promise<{ entries: Entry[]; cats: Cat[] }> {
   const [{ data: catRows }, { count }] = await Promise.all([
@@ -82,6 +98,7 @@ async function load(): Promise<{ entries: Entry[]; cats: Cat[] }> {
       const catList = (p.product_categories || []).map((x: any) => byId.get(x.category_id)).filter(Boolean) as Cat[];
       const w = Number(p.width), h = Number(p.height);
       const a = w > 0 && h > 0 ? w / h : 0;
+      const est = carveAt(w, h, Number(p.depth));
       const kw = Array.isArray(p.seo_keywords) ? p.seo_keywords.join(' ') : String(p.seo_keywords || '');
       entries.push({
         id: p.id, title: p.title, slug: p.slug, price_usd: Number(p.price_usd), image_url: p.image_url,
@@ -94,6 +111,8 @@ async function load(): Promise<{ entries: Entry[]; cats: Cat[] }> {
         created: Date.parse(p.created_at) || 0,
         shape: !a ? null : a > 1.12 ? 'landscape' : a < 0.89 ? 'portrait' : 'square',
         kind: String(p.slug).startsWith('software-') ? 'software' : p.is_bundle ? 'bundle' : 'single',
+        carveH: est ? est.hours : null,
+        board: est ? est.board : null,
       });
     }
   }
@@ -132,6 +151,7 @@ const has = (hay: string, term: string) => hasAny(hay, forms(term));
 
 export type Params = {
   q: string; cats: string[]; price: string[]; shape: Shape[]; kind: Kind | ''; best: boolean; fresh: boolean;
+  time: string[]; board: string;
   sort: SortKey; page: number;
 };
 export function parseParams(u: URLSearchParams): Params {
@@ -143,6 +163,8 @@ export function parseParams(u: URLSearchParams): Params {
     cats: list('cat'),
     price: list('price').filter((k) => PRICE_BUCKETS.some((b) => b.key === k)),
     shape: list('shape').filter((s): s is Shape => ['square', 'portrait', 'landscape'].includes(s)),
+    time: list('time').filter((k) => TIME_BUCKETS.some((b) => b.key === k)),
+    board: BOARDS.some((b) => b.key === u.get('board')) ? String(u.get('board')) : '',
     kind: (['single', 'bundle', 'software'].includes(u.get('type') || '') ? u.get('type') : '') as Kind | '',
     best: u.get('best') === '1',
     fresh: u.get('new') === '1',
@@ -156,6 +178,8 @@ export function toQuery(p: Partial<Params>): string {
   for (const c of p.cats || []) u.append('cat', c);
   for (const c of p.price || []) u.append('price', c);
   for (const c of p.shape || []) u.append('shape', c);
+  for (const c of p.time || []) u.append('time', c);
+  if (p.board) u.set('board', p.board);
   if (p.kind) u.set('type', p.kind);
   if (p.best) u.set('best', '1');
   if (p.fresh) u.set('new', '1');
@@ -173,6 +197,8 @@ export type Result = {
     cats: { slug: string; name: string; n: number }[];
     price: { key: string; label: string; n: number }[];
     shape: { key: Shape; n: number }[];
+    time: { key: string; label: string; n: number }[];
+    board: { key: string; label: string; n: number }[];
     kind: { key: Kind; n: number }[];
     best: number; fresh: number;
   };
@@ -243,11 +269,15 @@ export async function search(params: Params): Promise<Result> {
 
   const now = Date.now();
   const inPrice = (e: Entry, keys: string[]) => !keys.length || keys.some((k) => { const b = PRICE_BUCKETS.find((x) => x.key === k)!; return e.price_usd >= b.min && e.price_usd < b.max; });
+  const inTime = (e: Entry, keys: string[]) => !keys.length || (e.carveH !== null && keys.some((k) => { const b = TIME_BUCKETS.find((x) => x.key === k)!; return e.carveH! >= b.min && e.carveH! < b.max; }));
+  const fitsBoard = (e: Entry, key: string) => { if (!key) return true; const b = BOARDS.find((x) => x.key === key)!; return e.board !== null && e.board <= b.max; };
   // each filter as a predicate, so facet counts can leave their own one out
   const F = {
     cats: (e: Entry) => !params.cats.length || e.cats.some((c) => params.cats.includes(c)),
     price: (e: Entry) => inPrice(e, params.price),
     shape: (e: Entry) => !params.shape.length || (!!e.shape && params.shape.includes(e.shape)),
+    time: (e: Entry) => inTime(e, params.time),
+    board: (e: Entry) => fitsBoard(e, params.board),
     kind: (e: Entry) => !params.kind || e.kind === params.kind,
     best: (e: Entry) => !params.best || e.sales > 0,
     fresh: (e: Entry) => !params.fresh || now - e.created < 30 * DAY,
@@ -273,6 +303,8 @@ export async function search(params: Params): Promise<Result> {
       .filter((c) => c.n > 0 || params.cats.includes(c.slug)).sort((a, b) => b.n - a.n),
     price: PRICE_BUCKETS.map((b) => ({ key: b.key, label: b.label, n: count('price', (e) => inPrice(e, [b.key])) })),
     shape: (['square', 'portrait', 'landscape'] as Shape[]).map((s) => ({ key: s, n: count('shape', (e) => e.shape === s) })),
+    time: TIME_BUCKETS.map((b) => ({ key: b.key, label: b.label, n: count('time', (e) => inTime(e, [b.key])) })),
+    board: BOARDS.map((b) => ({ key: b.key, label: b.label, n: count('board', (e) => fitsBoard(e, b.key)) })),
     kind: (['single', 'bundle', 'software'] as Kind[]).map((k) => ({ key: k, n: count('kind', (e) => e.kind === k) })),
     best: count('best', (e) => e.sales > 0),
     fresh: count('fresh', (e) => now - e.created < 30 * DAY),

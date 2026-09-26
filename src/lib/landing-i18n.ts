@@ -134,8 +134,8 @@ export const LANDINGS: Landing[] = [
     sections: [
       { h: 'Ostatnia Wieczerza', q: 'last supper', seeAll: 'ostatnia wieczerza',
         text: 'Jeden z najchętniej kupowanych motywów w naszym sklepie. Pięknie wygląda nad stołem w jadalni i jako prezent ślubny.' },
-      { h: 'Droga Krzyżowa', q: 'stations of the cross', seeAll: 'droga krzyżowa',
-        text: 'Sceny Męki Pańskiej jako osobne płaskorzeźby. Poniżej stacje dostępne już dziś. Brakuje stacji, której potrzebujesz?' },
+      { h: 'Droga Krzyżowa', q: 'stations of the cross', seeAll: 'droga krzyżowa', limit: 16,
+        text: 'Wszystkie 14 stacji Drogi Krzyżowej: każda jako osobna płaskorzeźba albo cały komplet w niższej cenie. Pasują do kościoła, kaplicy i domowego ołtarzyka.' },
       { h: 'Jezus Chrystus', q: 'jesus', seeAll: 'jezus',
         text: 'Oblicze Chrystusa, Ukrzyżowanie, Jezus uciszający burzę i inne sceny z Ewangelii.' },
       { h: 'Matka Boska i anioły', q: 'mary', seeAll: 'matka boska',
@@ -176,8 +176,8 @@ export const LANDINGS: Landing[] = [
     sections: [
       { h: 'Das Letzte Abendmahl', q: 'last supper', seeAll: 'abendmahl',
         text: 'Eines unserer meistverkauften Motive. Wirkt besonders schön über dem Esstisch und als Hochzeitsgeschenk.' },
-      { h: 'Kreuzweg', q: 'stations of the cross', seeAll: 'kreuzweg',
-        text: 'Szenen der Passion Christi als einzelne Reliefs. Hier die Stationen, die es bereits gibt. Fehlt Ihnen eine Station?' },
+      { h: 'Kreuzweg', q: 'stations of the cross', seeAll: 'kreuzweg', limit: 16,
+        text: 'Alle 14 Stationen des Kreuzwegs: jede als einzelnes Relief oder das komplette Set zum Vorteilspreis. Passend für Kirche, Kapelle und Hausaltar.' },
       { h: 'Jesus Christus', q: 'jesus', seeAll: 'jesus',
         text: 'Das Antlitz Christi, die Kreuzigung, die Stillung des Sturms und weitere Szenen aus den Evangelien.' },
       { h: 'Madonna und Engel', q: 'mary', seeAll: 'madonna',
