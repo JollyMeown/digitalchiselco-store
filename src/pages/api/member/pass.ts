@@ -1,14 +1,14 @@
-// All-Access pass, for the product page.
-//   GET  ?product=<uuid>  -> { offered, signedIn, active, used, limit, endDate, covered, owned }
-//   POST { product_id }   -> adds the design to the holder's account
+// Diamond Select credits, for the product page (lib/diamond-select.ts).
+//   GET  ?product=<uuid>  -> { offered, signedIn, active, left, earned, total, nextDate, lastDay, inGrace, covered, owned, discount }
+//   POST { product_id }   -> uses 1 credit: the design is added to the member's account
 // Identity is the signed account cookie (the same one /account sets), so only
-// the holder can use their pass. Product pages are cached at the edge, which
-// is why the page asks here from the browser instead of rendering it.
+// the member can use their credits. Product pages are cached at the edge,
+// which is why the page asks here from the browser instead of rendering it.
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { verifyAccountToken } from '../../../lib/account-token';
 import { rateLimit, clientIp, tooMany } from '../../../lib/rate-limit';
-import { passOffered, activePass, usedLast30, passCovers, PASS_FAIR_USE_PER_30D } from '../../../lib/all-access';
+import { diamondOffered, activeDiamond, creditsFor, passCovers, DIAMOND_SLUG, DIAMOND_EXTRA_DISCOUNT, DIAMOND_CREDITS_PER_MONTH } from '../../../lib/diamond-select';
 
 export const prerender = false;
 
@@ -20,11 +20,11 @@ const PRODUCT_SEL = 'id, slug, active, is_bundle, membership_plan_slug, is_custo
 
 export const GET: APIRoute = async ({ url, cookies }) => {
   const db = supabaseAdmin();
-  const offered = await passOffered(db).catch(() => false);
+  const offered = await diamondOffered(db).catch(() => false);
   const sess = verifyAccountToken(cookies.get('dcc_account')?.value);
   if (!sess?.email) return json({ offered, signedIn: false, active: false });
-  const pass = await activePass(db, sess.email);
-  if (!pass) return json({ offered, signedIn: true, active: false });
+  const term = await activeDiamond(db, sess.email);
+  if (!term) return json({ offered, signedIn: true, active: false });
   const pid = url.searchParams.get('product') || '';
   let covered = false, owned = false;
   if (UUID.test(pid)) {
@@ -35,7 +35,8 @@ export const GET: APIRoute = async ({ url, cookies }) => {
     covered = passCovers(p as any);
     owned = (count || 0) > 0;
   }
-  return json({ offered, signedIn: true, active: true, endDate: pass.end_date, used: await usedLast30(db, sess.email), limit: PASS_FAIR_USE_PER_30D, covered, owned });
+  const c = await creditsFor(db, term, sess.email);
+  return json({ offered, signedIn: true, active: true, ...c, inGrace: term.inGrace, covered, owned, discount: DIAMOND_EXTRA_DISCOUNT });
 };
 
 export const POST: APIRoute = async ({ request, cookies }) => {
@@ -47,19 +48,19 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (!UUID.test(pid)) return json({ error: 'Unknown design.' }, 400);
 
   const db = supabaseAdmin();
-  const pass = await activePass(db, sess.email);
-  if (!pass) return json({ error: 'Your account has no active All-Access pass.' }, 403);
+  const term = await activeDiamond(db, sess.email);
+  if (!term) return json({ error: 'Your account has no active Diamond Select membership.' }, 403);
   const { data: p } = await db.from('products').select(PRODUCT_SEL).eq('id', pid).maybeSingle();
-  if (!passCovers(p as any)) return json({ error: 'This item is not included in the pass.' }, 400);
+  if (!passCovers(p as any)) return json({ error: 'Credits are for single designs. Bundles, sets and made-to-order items are not included.' }, 400);
 
   const { count: have } = await db.from('entitlements').select('id', { count: 'exact', head: true }).ilike('email', sess.email).eq('product_id', pid);
-  if ((have || 0) > 0) return json({ ok: true, already: true, url: '/account#pass' });
+  if ((have || 0) > 0) return json({ ok: true, already: true, url: '/account#diamond' });
 
-  const used = await usedLast30(db, sess.email);
-  if (used >= PASS_FAIR_USE_PER_30D) {
-    return json({ error: `You have added ${used} designs in the last 30 days, the fair-use limit of the pass. More become available as older ones pass 30 days.` }, 429);
+  const c = await creditsFor(db, term, sess.email);
+  if (c.left < 1) {
+    return json({ error: c.nextDate ? `No credits left. Your next ${DIAMOND_CREDITS_PER_MONTH} arrive on ${c.nextDate}.` : 'You have used all the credits of this membership.' }, 429);
   }
-  const { error } = await db.from('entitlements').insert({ email: sess.email.toLowerCase(), product_id: pid, source: 'all-access', order_id: null });
-  if (error) { console.error('pass claim failed:', error); return json({ error: 'Could not add the design. Please try again.' }, 500); }
-  return json({ ok: true, used: used + 1, limit: PASS_FAIR_USE_PER_30D, url: '/account#pass' });
+  const { error } = await db.from('entitlements').insert({ email: sess.email.toLowerCase(), product_id: pid, source: DIAMOND_SLUG, order_id: null });
+  if (error) { console.error('diamond credit failed:', error); return json({ error: 'Could not add the design. Please try again.' }, 500); }
+  return json({ ok: true, left: c.left - 1, url: '/account#diamond' });
 };

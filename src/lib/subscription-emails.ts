@@ -278,3 +278,56 @@ export function winbackEmail(d: ExpiryEmailData & { newPackTitle?: string | null
   const text = `Your membership ended on ${d.endDateLabel}.${d.coupon ? ` Code ${d.coupon} at checkout.` : ''}\nRestart: ${d.renewUrl}\nYour packs: ${SITE}/account`;
   return { subject, html, text: text + (d.makerInvite ? MAKER_BLOCK_TEXT : '') };
 }
+
+// ── Diamond Select (2026-09-26) ───────────────────────────────────────
+// No curated pack: the member picks designs with credits. Every number comes
+// from the caller (the plan row and lib/membership-facts), never this file.
+export type DiamondEmailData = {
+  email: string; customerName?: string | null; planName: string;
+  creditsLeft: number;        // credits available right now
+  perMonth: number;           // credits added each month
+  totalCredits: number;       // over the whole term
+  nextDateLabel?: string | null;
+  endDateLabel: string;
+  graceDays: number;
+  extraDiscount: number;      // % off designs bought beyond the credits
+  logoUrl?: string | null; makerInvite?: boolean;
+  isGift?: boolean; giftFrom?: string | null; giftNote?: string | null;
+};
+const diamondHow = (d: DiamondEmailData) => `
+    <ol style="margin:14px 0 0;padding-left:20px;font-size:14px;line-height:1.7;color:#555;">
+      <li>Browse <a href="${SITE}/catalog" style="color:${BRONZE};">the catalogue</a> and open any single design you like.</li>
+      <li>While signed in to <a href="${SITE}/account" style="color:${BRONZE};">your account</a>, press <strong>Use 1 credit</strong> on the design page.</li>
+      <li>The design goes into your account for good. Download it there whenever you like.</li>
+    </ol>`;
+
+/** Welcome, sent the day a Diamond Select term starts. */
+export function diamondWelcomeEmail(d: DiamondEmailData): { subject: string; html: string; text: string } {
+  const subject = d.isGift
+    ? `🎁 ${d.giftFrom ? `${d.giftFrom} gave` : 'Someone gave'} you Diamond Select at DigitalChiselCo`
+    : `Welcome to Diamond Select: your first ${d.creditsLeft} designs are yours to choose`;
+  const gift = d.isGift ? `<div style="margin:0 0 16px;background:#FAEEDA;border-radius:10px;padding:14px 16px;text-align:center;"><p style="margin:0;font-size:15px;color:${INK};"><strong>${d.giftFrom ? esc(d.giftFrom) : 'Someone'}</strong> gave you this membership.</p>${d.giftNote ? `<p style="margin:8px 0 0;font-size:14px;font-style:italic;color:#6b5a45;">"${esc(d.giftNote)}"</p>` : ''}</div>` : '';
+  const body = `
+    ${gift}${greet(d.customerName)}
+    <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#555;">Welcome to <strong>${esc(d.planName)}</strong>. You have <strong>${d.creditsLeft} credits</strong> ready now. Each credit is one single design of your choice, and ${d.perMonth} more arrive every month: <strong>${d.totalCredits} designs</strong> over your membership.</p>
+    ${diamondHow(d)}
+    <p style="margin:14px 0 0;"><a href="${SITE}/catalog?sort=best" style="display:inline-block;background:${BRONZE};color:${CREAM};text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">Choose your first designs</a></p>
+    <p style="margin:16px 0 0;font-size:13px;color:#777;line-height:1.6;">Unused credits roll over to the next month. Your membership runs until ${esc(d.endDateLabel)}, and you have ${d.graceDays} more days after that to use any credits left. Anything you buy beyond your credits is ${d.extraDiscount}% off at checkout. Credits are for single designs; bundles and sets are not included.</p>`;
+  const html = shell({ subject, heading: 'Diamond Select is live', subheading: `${d.creditsLeft} credits ready`, bodyHtml: body, logoUrl: d.logoUrl, makerBlock: d.makerInvite, preheader: `${d.creditsLeft} designs of your choice, ready now` });
+  const text = `Welcome to ${d.planName}.\n\nYou have ${d.creditsLeft} credits ready now. Each credit is one single design of your choice, and ${d.perMonth} more arrive every month (${d.totalCredits} over your membership).\n\n1. Open any single design on ${SITE}/catalog\n2. Signed in to your account, press "Use 1 credit"\n3. Download it from ${SITE}/account whenever you like\n\nUnused credits roll over. Membership runs until ${d.endDateLabel}, plus ${d.graceDays} days to use leftovers. Extra designs are ${d.extraDiscount}% off.`;
+  return { subject, html, text: text + (d.makerInvite ? MAKER_BLOCK_TEXT : '') };
+}
+
+/** The monthly "new credits" note, on each month-day after the first. */
+export function diamondCreditsEmail(d: DiamondEmailData & { newCredits: number }): { subject: string; html: string; text: string } {
+  const subject = `${d.newCredits} new Diamond Select credits: you now have ${d.creditsLeft} to spend`;
+  const body = `
+    ${greet(d.customerName)}
+    <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#555;">Your ${d.newCredits} credits for this month have arrived. You now have <strong>${d.creditsLeft} credits</strong>, each one a single design of your choice.</p>
+    <p style="margin:14px 0 0;"><a href="${SITE}/catalog?sort=newest" style="display:inline-block;background:${BRONZE};color:${CREAM};text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">See the newest designs</a>
+      <a href="${SITE}/catalog?sort=best" style="display:inline-block;margin-left:8px;color:${BRONZE};">or the best sellers</a></p>
+    <p style="margin:16px 0 0;font-size:13px;color:#777;line-height:1.6;">${d.nextDateLabel ? `The next ${d.perMonth} arrive on ${esc(d.nextDateLabel)}. ` : ''}Unused credits roll over until ${d.graceDays} days after your membership ends on ${esc(d.endDateLabel)}.</p>`;
+  const html = shell({ subject, heading: 'New credits are in', subheading: `${d.creditsLeft} credits to spend`, bodyHtml: body, logoUrl: d.logoUrl, makerBlock: d.makerInvite, preheader: `${d.creditsLeft} designs of your choice are waiting` });
+  const text = `Your ${d.newCredits} credits for this month have arrived. You now have ${d.creditsLeft} credits.\n\nNewest designs: ${SITE}/catalog?sort=newest\nBest sellers: ${SITE}/catalog?sort=best\n\n${d.nextDateLabel ? `Next ${d.perMonth} arrive on ${d.nextDateLabel}. ` : ''}Membership ends ${d.endDateLabel}; credits can be used for ${d.graceDays} days after that.`;
+  return { subject, html, text: text + (d.makerInvite ? MAKER_BLOCK_TEXT : '') };
+}

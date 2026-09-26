@@ -3,7 +3,7 @@ import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { getMembershipPlans } from '../lib/queries';
 import { MEMBER_FAQ } from '../lib/membership-faq';
-import { planFacts, planFeatureLines } from '../lib/membership-facts';
+import { planFacts, planFeatureLines, isDiamond } from '../lib/membership-facts';
 const faqGroups = [...new Set(MEMBER_FAQ.map((x) => x.group))];
 // ?preview=1 shows plans whose launch date has not arrived (owner testing).
 const preview = Astro.url.searchParams.get('preview') === '1';
@@ -39,6 +39,7 @@ const F = featured ? planFacts(featured) : planFacts({ months: 3, files_per_mont
               <input type="radio" name="plan" value={p.slug} checked={p.highlight} class="mr-2 plan-radio" />
               <span class="font-medium text-lg text-ink-800">{p.name}</span>
               {p.highlight && <span class="ml-2 text-xs bg-bronze-600 text-cream px-2 py-0.5 rounded">★ MOST POPULAR</span>}
+              {isDiamond(p) && <span class="ml-2 text-xs bg-[#2B4A7A] text-white px-2 py-0.5 rounded">&#9670; YOU CHOOSE</span>}
             </div>
             <div class="text-right">
               <div class="font-serif text-3xl text-bronze-700">${Number(p.price_usd).toFixed(2)}</div>

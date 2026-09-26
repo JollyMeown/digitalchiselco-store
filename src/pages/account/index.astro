@@ -125,33 +125,35 @@ if (session?.email) {
   totalFiles = paidOrders.reduce((n, o) => n + (o.order_items || []).reduce((m, it) => m + (it.downloads || []).length, 0), 0);
 }
 
-// ── All-Access pass ───────────────────────────────────────────────────
-// Designs added with the pass have no order, so the order list above never
-// shows them; they get their own section, with the same download links.
-type PassItem = { product_id: string; title: string; slug: string; image_url: string | null; granted_at: string; downloads: DownloadRow[] };
+// ── Diamond Select ────────────────────────────────────────────────────
+// Designs picked with credits have no order, so the order list above never
+// shows them; they get their own section. Their Download buttons go through
+// /api/member/dl, which counts the download and then opens the same file.
+type PassItem = { entitlement_id: string; product_id: string; title: string; slug: string; image_url: string | null; granted_at: string; downloads: DownloadRow[] };
 let passItems: PassItem[] = [];
-let passInfo: { endLabel: string; used: number; limit: number } | null = null;
+let passInfo: { endLabel: string; left: number; earned: number; total: number; nextLabel: string | null; lastLabel: string; inGrace: boolean } | null = null;
 if (session?.email) {
   const db = supabaseAdmin();
-  const { activePass, usedLast30, PASS_FAIR_USE_PER_30D } = await import('../../lib/all-access');
-  const [{ data: ents }, pass] = await Promise.all([
-    db.from('entitlements').select('product_id, granted_at').ilike('email', session.email).eq('source', 'all-access').order('granted_at', { ascending: false }).limit(500),
-    activePass(db, session.email),
+  const { activeDiamond, creditsFor, DIAMOND_SLUG } = await import('../../lib/diamond-select');
+  const { ymdLabel: dl } = await import('../../lib/subscriptions');
+  const [{ data: ents }, term] = await Promise.all([
+    db.from('entitlements').select('id, product_id, granted_at').ilike('email', session.email).eq('source', DIAMOND_SLUG).order('granted_at', { ascending: false }).limit(500),
+    activeDiamond(db, session.email),
   ]);
-  if (pass) {
-    const [y, m, d] = String(pass.end_date).split('-').map(Number);
-    passInfo = { endLabel: `${d} ${['January','February','March','April','May','June','July','August','September','October','November','December'][m - 1]} ${y}`, used: await usedLast30(db, session.email), limit: PASS_FAIR_USE_PER_30D };
+  if (term) {
+    const c = await creditsFor(db, term, session.email);
+    passInfo = { endLabel: dl(term.end_date), left: c.left, earned: c.earned, total: c.total, nextLabel: c.nextDate ? dl(c.nextDate) : null, lastLabel: dl(c.lastDay), inGrace: term.inGrace };
   }
   const ids = [...new Set((ents || []).map((e: any) => e.product_id).filter(Boolean))];
   if (ids.length) {
     const [{ data: prods }, { data: dls }] = await Promise.all([
       db.from('products').select('id, title, slug, image_url').in('id', ids),
-      db.from('product_downloads').select('product_id, file_name, download_link').in('product_id', ids),
+      db.from('product_downloads').select('product_id, file_name, download_link').in('product_id', ids).order('file_name').order('download_link'),   // same order as /api/member/dl
     ]);
     const byId = new Map((prods || []).map((x: any) => [x.id, x]));
     passItems = (ents || []).map((e: any) => {
       const pr: any = byId.get(e.product_id) || {};
-      return { product_id: e.product_id, title: String(pr.title || 'Design').split('|')[0].trim(), slug: pr.slug || '', image_url: pr.image_url || null, granted_at: e.granted_at,
+      return { entitlement_id: e.id, product_id: e.product_id, title: String(pr.title || 'Design').split('|')[0].trim(), slug: pr.slug || '', image_url: pr.image_url || null, granted_at: e.granted_at,
         downloads: (dls || []).filter((x: any) => x.product_id === e.product_id).map((x: any) => ({ file_name: x.file_name, download_link: x.download_link })) };
     }).filter((x) => x.slug);
   }
@@ -178,6 +180,7 @@ if (session?.email) {
     .from('member_subscriptions')
     .select('id, order_id, plan_slug, months, tier, status, start_date, end_date, total_drops, drops_sent, renewed_to')
     .eq('email', session.email)
+    .neq('plan_slug', 'diamond-select')   // no packs: it has its own section above
     .order('start_date', { ascending: false });
   if (subs && subs.length) {
     const ids = subs.map((s: any) => s.id);
@@ -430,12 +433,20 @@ if (session?.email) {
         )}
 
         {(passInfo || passItems.length > 0) && (
-          <section id="pass" class="mb-10 scroll-mt-24">
-            <h2 class="font-serif text-2xl text-bronze-800 mb-1">Your All-Access pass</h2>
+          <section id="diamond" class="mb-10 scroll-mt-24">
+            <span id="pass" aria-hidden="true"></span>
+            <h2 class="font-serif text-2xl text-bronze-800 mb-1">&#9670; Your Diamond Select</h2>
             {passInfo ? (
-              <p class="text-sm text-ink-700/70 mb-4">Active until <strong>{passInfo.endLabel}</strong>. Add any design from its product page with "Add to my downloads". {passInfo.used} of {passInfo.limit} used in the last 30 days.</p>
+              <div class="mb-4 rounded-lg border border-[#3B5B8C]/25 bg-[#EAF0F8] px-4 py-3 text-sm text-[#213B63]">
+                <p><strong class="text-lg">{passInfo.left}</strong> credit{passInfo.left === 1 ? '' : 's'} to spend. Each one is a single design of your choice: open it and press <strong>Use 1 credit</strong>.</p>
+                <p class="mt-1 text-xs opacity-80">
+                  {passInfo.earned} of {passInfo.total} credits received so far{passInfo.nextLabel ? `, the next 10 on ${passInfo.nextLabel}` : ''}.
+                  {passInfo.inGrace ? ` Your membership ended on ${passInfo.endLabel}; use your credits by ${passInfo.lastLabel}.` : ` Membership runs until ${passInfo.endLabel}, credits can be used until ${passInfo.lastLabel}.`}
+                </p>
+                <p class="mt-2"><a href="/catalog?sort=best" class="underline">Choose from the best sellers</a> · <a href="/catalog?sort=newest" class="underline">the newest designs</a> · <a href="/search?focus=1" class="underline">search</a></p>
+              </div>
             ) : (
-              <p class="text-sm text-ink-700/70 mb-4">Your pass has ended. Designs you added stay here to download.</p>
+              <p class="text-sm text-ink-700/70 mb-4">Your Diamond Select membership has ended. Every design you picked stays here to download.</p>
             )}
             {passItems.length > 0 ? (
               <ul class="divide-y divide-black/10 border-y border-black/10">
@@ -444,15 +455,15 @@ if (session?.email) {
                     <a href={`/product/${it.slug}`} class="w-14 h-14 rounded overflow-hidden bg-cream shrink-0">{it.image_url && <img src={img(it.image_url, { w: 112, square: true, q: 70 })} alt="" width="56" height="56" loading="lazy" class="w-full h-full object-cover" />}</a>
                     <a href={`/product/${it.slug}`} class="flex-1 min-w-0 text-sm text-ink-800 line-clamp-2">{it.title}</a>
                     <div class="flex flex-col gap-1 shrink-0">
-                      {it.downloads.length ? it.downloads.map((d, i) => (
-                        <a href={d.download_link} target="_blank" rel="noopener" class="text-xs bg-bronze-600 text-cream px-3 py-1.5 rounded hover:bg-bronze-700 text-center">⬇ Download{it.downloads.length > 1 ? ` ${i + 1}` : ''}</a>
+                      {it.downloads.length ? it.downloads.map((_d, i) => (
+                        <a href={`/api/member/dl?e=${it.entitlement_id}&f=${i}`} target="_blank" rel="noopener" class="text-xs bg-bronze-600 text-cream px-3 py-1.5 rounded hover:bg-bronze-700 text-center">⬇ Download{it.downloads.length > 1 ? ` ${i + 1}` : ''}</a>
                       )) : <span class="text-xs text-ink-700/60">Link on its way</span>}
                     </div>
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p class="text-sm"><a href="/search" class="text-bronze-700 underline">Find a design to add</a></p>
+            ) : passInfo && (
+              <p class="text-sm text-ink-700/70">Nothing picked yet. Your first {passInfo.left} designs are waiting.</p>
             )}
           </section>
         )}

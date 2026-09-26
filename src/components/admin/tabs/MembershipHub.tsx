@@ -9,10 +9,12 @@ import MemberSubs from './MemberSubs';
 import MonthlyDrops from './MonthlyDrops';
 import Membership from './Membership';
 import MemberEmails from './MemberEmails';
+import DiamondAdmin from './DiamondAdmin';
 
 const SUBS = [
   { key: 'overview', label: 'Overview' },
   { key: 'members', label: 'Members' },
+  { key: 'diamond', label: 'Diamond Select' },
   { key: 'packs', label: 'Monthly packs' },
   { key: 'plans', label: 'Plans & purchases' },
   { key: 'emails', label: 'Emails' },
@@ -162,6 +164,7 @@ export default function MembershipHub() {
       </div>
       {sub === 'overview' && <Overview go={setSub} />}
       {sub === 'members' && <MemberSubs />}
+      {sub === 'diamond' && <DiamondAdmin />}
       {sub === 'packs' && <MonthlyDrops />}
       {sub === 'plans' && <Membership />}
       {sub === 'emails' && <MemberEmails />}

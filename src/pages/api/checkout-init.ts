@@ -17,6 +17,7 @@ import { supabaseAdmin } from '../../lib/supabase';
 import { paddleApi } from '../../lib/paddle';
 import { validateCoupon, getActiveShopSale } from '../../lib/discounts';
 import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
+import { DIAMOND_SLUG, DIAMOND_EXTRA_DISCOUNT } from '../../lib/membership-facts';
 
 export const prerender = false;
 
@@ -169,10 +170,13 @@ export const POST: APIRoute = async ({ request }) => {
       // above returns its own discount). Server-side only: the email is verified
       // by Paddle at payment, so nobody gains by typing a member email they
       // don't control (the receipt + downloads go to that inbox).
+      // Diamond Select members get 15% (DIAMOND_EXTRA_DISCOUNT) on what they
+      // buy beyond their credits; every other active member 10%.
       if (email) {
         const { data: mem } = await db.from('member_subscriptions')
-          .select('id').eq('email', email).eq('status', 'active').limit(1);
-        if (mem?.length && discountPercent < 10) discountPercent = 10;
+          .select('plan_slug').eq('email', email).eq('status', 'active').limit(10);
+        const memberPct = !mem?.length ? 0 : mem.some((m: any) => m.plan_slug === DIAMOND_SLUG) ? DIAMOND_EXTRA_DISCOUNT : 10;
+        if (memberPct && discountPercent < memberPct) discountPercent = memberPct;
       }
     }
 

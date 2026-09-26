@@ -354,36 +354,44 @@ const breadcrumbLd = {
         </script>
       )}
 
-      {/* All-Access pass: filled from the browser (this page is edge-cached, so
-          nothing personal can be rendered into it). Empty for everyone else. */}
-      <div id="pass-slot" data-pid={p.id} hidden class="mt-5 rounded-lg border border-[#2F7A57]/30 bg-[#E9F4EE] px-4 py-3 text-sm"></div>
+      {/* Diamond Select credits: filled from the browser (this page is
+          edge-cached, so nothing personal can be rendered into it). Empty for
+          everyone who is not a member. */}
+      <div id="pass-slot" data-pid={p.id} hidden class="mt-5 rounded-lg border border-[#3B5B8C]/30 bg-[#EAF0F8] px-4 py-3 text-sm"></div>
       <script is:inline>
         (function () {
           var slot = document.getElementById('pass-slot');
           if (!slot) return;
           var pid = slot.getAttribute('data-pid');
           function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+          function day(d) { try { return new Date(d + 'T00:00:00Z').toLocaleDateString(undefined, { day: 'numeric', month: 'long', timeZone: 'UTC' }); } catch (_) { return d; } }
+          var BTN = 'mt-2 w-full bg-[#2B4A7A] text-white py-2.5 rounded-md font-medium hover:bg-[#213B63] transition';
           fetch('/api/member/pass?product=' + encodeURIComponent(pid), { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
               if (d.active && d.owned) {
-                slot.innerHTML = '<strong>In your account.</strong> <a href="/account#pass" class="underline">Download it from your account</a>';
-              } else if (d.active && d.covered) {
-                slot.innerHTML = '<p class="font-medium text-[#1E5C40]">Included in your All-Access pass</p>'
-                  + '<button type="button" id="pass-add" class="mt-2 w-full bg-[#2F7A57] text-white py-2.5 rounded-md font-medium hover:bg-[#24613F] transition">Add to my downloads</button>'
-                  + '<p id="pass-msg" class="mt-1.5 text-xs text-[#1E5C40]/80">' + esc(d.used) + ' of ' + esc(d.limit) + ' designs used in the last 30 days</p>';
+                slot.innerHTML = '<strong>In your account.</strong> <a href="/account#diamond" class="underline">Download it from your account</a>';
+              } else if (d.active && d.covered && d.left > 0) {
+                slot.innerHTML = '<p class="font-medium text-[#213B63]">&#9670; Diamond Select: pick this design with a credit</p>'
+                  + '<button type="button" id="pass-add" class="' + BTN + '">Use 1 credit</button>'
+                  + '<p id="pass-msg" class="mt-1.5 text-xs text-[#213B63]/80">' + esc(d.left) + ' credit' + (d.left === 1 ? '' : 's') + ' left'
+                  + (d.nextDate ? ', ' + 10 + ' more on ' + esc(day(d.nextDate)) : '') + (d.inGrace ? ' (use them by ' + esc(day(d.lastDay)) + ')' : '') + '</p>';
                 document.getElementById('pass-add').addEventListener('click', function () {
                   var b = this; b.disabled = true; b.textContent = 'Adding…';
                   fetch('/api/member/pass', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ product_id: pid }) })
                     .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
                     .then(function (x) {
-                      if (x.ok && x.j.ok) slot.innerHTML = '<strong>Added to your account.</strong> <a href="/account#pass" class="underline">Download it now</a>';
-                      else { b.disabled = false; b.textContent = 'Add to my downloads'; document.getElementById('pass-msg').textContent = x.j.error || 'Could not add it. Please try again.'; }
+                      if (x.ok && x.j.ok) slot.innerHTML = '<strong>Added to your account.</strong> ' + (typeof x.j.left === 'number' ? esc(x.j.left) + ' credit' + (x.j.left === 1 ? '' : 's') + ' left. ' : '') + '<a href="/account#diamond" class="underline">Download it now</a>';
+                      else { b.disabled = false; b.textContent = 'Use 1 credit'; document.getElementById('pass-msg').textContent = x.j.error || 'Could not add it. Please try again.'; }
                     });
                 });
+              } else if (d.active && d.covered) {
+                slot.innerHTML = '<p class="text-[#213B63]">&#9670; You have used this month&#39;s credits.' + (d.nextDate ? ' Your next 10 arrive on ' + esc(day(d.nextDate)) + '.' : '') + ' Buying it now? You get ' + esc(d.discount) + '% off at checkout.</p>';
+              } else if (d.active) {
+                slot.innerHTML = '<p class="text-[#213B63]">&#9670; Credits are for single designs. As a Diamond Select member you get ' + esc(d.discount) + '% off this at checkout.</p>';
               } else if (d.offered && !d.signedIn) {
                 slot.className = 'mt-5 text-xs text-ink-700/70';
-                slot.innerHTML = 'All-Access pass holder? <a href="/account" class="underline text-bronze-700">Sign in</a> to add this design to your downloads.';
+                slot.innerHTML = 'Diamond Select member? <a href="/account" class="underline text-bronze-700">Sign in</a> to pick this design with a credit.';
               } else { return; }
               slot.hidden = false;
             })

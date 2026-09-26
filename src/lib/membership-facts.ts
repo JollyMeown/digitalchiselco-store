@@ -29,22 +29,36 @@ export function planFacts(p: PlanLike) {
   };
 }
 
-/** The All-Access Library pass: the single definition (lib/all-access.ts
- *  imports these). This file has no server imports, so it is safe anywhere. */
-export const ALL_ACCESS_SLUG = 'all-access-year';
-export const PASS_FAIR_USE_PER_30D = 100;
-export const isAllAccess = (p: PlanLike | null | undefined) => p?.slug === ALL_ACCESS_SLUG;
+/** Diamond Select (2026-09-26): the member chooses their own designs with
+ *  credits. The single definition (lib/diamond-select.ts imports these). This
+ *  file has no server imports, so it is safe anywhere, browser included. */
+export const DIAMOND_SLUG = 'diamond-select';
+export const DIAMOND_CREDITS_PER_MONTH = 10;
+/** Days after the term ends in which leftover credits can still be used. */
+export const DIAMOND_GRACE_DAYS = 30;
+/** Member price on designs bought beyond the credits (other plans get 10%). */
+export const DIAMOND_EXTRA_DISCOUNT = 15;
+/** Founding offer: shown until this date, then the plan goes to the regular price (owner changes it in Admin). */
+export const DIAMOND_FOUNDING_UNTIL = '2026-12-31';
+export const DIAMOND_REGULAR_PRICE = 149;
+export const isDiamond = (p: PlanLike | null | undefined) => p?.slug === DIAMOND_SLUG;
 
 /** Feature lines that carry numbers are generated, never stored, so they can never go stale. */
 export function autoFeatureLines(p: PlanLike): string[] {
   const f = planFacts(p);
-  if (isAllAccess(p)) return [
-    'Download any design in the library, whenever you like',
-    `Every new design added during your ${f.monthsLabel}`,
-    `Up to ${PASS_FAIR_USE_PER_30D} designs every 30 days (fair use)`,
-    `Plus the monthly member pack by email`,
-    `${f.priceLabel} once for ${f.monthsLabel}, no automatic renewal`,
-  ];
+  if (isDiamond(p)) {
+    const credits = f.months * DIAMOND_CREDITS_PER_MONTH;
+    const founding = new Date().toISOString().slice(0, 10) <= DIAMOND_FOUNDING_UNTIL && f.price < DIAMOND_REGULAR_PRICE;
+    return [
+      `You choose: ${DIAMOND_CREDITS_PER_MONTH} designs of your choice every month, ${credits} over ${f.monthsLabel}`,
+      `1 credit = 1 single design from the whole catalogue, new designs included`,
+      `Unused credits roll over, plus ${DIAMOND_GRACE_DAYS} days after your term to use leftovers`,
+      `Every design you pick stays in your account forever`,
+      `${DIAMOND_EXTRA_DISCOUNT}% off any design you buy beyond your credits`,
+      founding ? `${f.priceLabel} founding price until 31 December 2026 (then $${DIAMOND_REGULAR_PRICE}), one payment, no automatic renewal`
+        : `${f.priceLabel} once for ${f.monthsLabel}, no automatic renewal`,
+    ];
+  }
   return [
     `${f.files} fresh bas-relief STL designs every month`,
     `${f.totalFiles} designs over ${f.monthsLabel}, ${f.perFileLabel} each`,

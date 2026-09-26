@@ -27,8 +27,10 @@ import { supabaseAdmin } from './supabase';
 import { send as sendEmail } from './resend';
 import {
   firstPackEmail, monthlyDropEmail, preExpiryEmail, expiryEmail, winbackEmail,
+  diamondWelcomeEmail, diamondCreditsEmail,
   type DropEmailData, type ExpiryEmailData, type PackItem,
 } from './subscription-emails';
+import { DIAMOND_SLUG, DIAMOND_CREDITS_PER_MONTH, DIAMOND_GRACE_DAYS, DIAMOND_EXTRA_DISCOUNT } from './membership-facts';
 
 const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
 const RENEW_URL = process.env.MEMBERSHIP_RENEW_URL || `${SITE}/membership?renew=1`;
@@ -262,6 +264,10 @@ export async function createSubscriptionForPurchase(input: {
     } else { start = running.end_date; chainedFrom = running.id; }
   }
   const end = addMonths(start, months + creditMonths);
+  // Diamond Select sends no curated packs: the member picks designs with credits
+  // (lib/diamond-select.ts). Its term only drives the welcome, the monthly
+  // "new credits" note and the usual expiry emails.
+  const packs = input.plan.slug === DIAMOND_SLUG ? 0 : months + creditMonths;
 
   const row = {
     email, customer_name: input.customerName || null,
@@ -270,9 +276,9 @@ export async function createSubscriptionForPurchase(input: {
     // the cron sends drop 1 when start arrives (future start) or catches up now
     // an imported member may already have received some packs in the old
     // system: start counting from there so nothing is sent twice
-    drops_sent: Math.max(0, Math.min(months + creditMonths, Number(input.dropsAlreadySent) || 0)),
-    next_drop_date: (Number(input.dropsAlreadySent) || 0) >= months + creditMonths ? null : addMonths(start, Math.max(0, Number(input.dropsAlreadySent) || 0)),
-    total_drops: months + creditMonths, price_usd: input.plan.price_usd ?? null,
+    drops_sent: Math.max(0, Math.min(packs, Number(input.dropsAlreadySent) || 0)),
+    next_drop_date: (Number(input.dropsAlreadySent) || 0) >= packs ? null : addMonths(start, Math.max(0, Number(input.dropsAlreadySent) || 0)),
+    total_drops: packs, price_usd: input.plan.price_usd ?? null,
     is_renewal: isRenewal, order_id: input.orderId || null,
     paddle_transaction_id: input.paddleTransactionId || null,
     gift_from: input.gift ? (input.gift.from || null) : null,
@@ -331,6 +337,34 @@ export async function processSubscription(db: DB, s: any, ctx: Ctx): Promise<voi
   // the BRS pack builder end to end). Its months are due immediately, and a
   // pack month of 2090+ is NEVER sent to any other address, whatever happens.
   const isTestTerm = String(s.email).toLowerCase() === TEST_INBOX && String(s.start_date) >= '2090';
+
+  // 0) Diamond Select: no packs. A welcome once per term, then a short note on
+  //    each month-day when the new credits arrive (the current one only, never
+  //    a backlog). Credits are counted from the dates, as in lib/diamond-select.
+  if (s.plan_slug === DIAMOND_SLUG && s.status === 'active' && s.start_date <= today) {
+    try {
+      const months = Number(s.months) || 12;
+      let started = 0;
+      while (started < months && addMonths(s.start_date, started) <= today) started++;
+      const { count } = await db.from('entitlements').select('id', { count: 'exact', head: true })
+        .ilike('email', s.email).eq('source', DIAMOND_SLUG).gte('granted_at', s.start_date);
+      const left = Math.max(0, started * DIAMOND_CREDITS_PER_MONTH - (count || 0));
+      const next = started < months ? addMonths(s.start_date, started) : null;
+      const base = {
+        email: s.email, customerName: s.customer_name, planName: plan, creditsLeft: left,
+        perMonth: DIAMOND_CREDITS_PER_MONTH, totalCredits: months * DIAMOND_CREDITS_PER_MONTH,
+        nextDateLabel: next ? ymdLabel(next) : null, endDateLabel: ymdLabel(s.end_date), graceDays: DIAMOND_GRACE_DAYS,
+        extraDiscount: DIAMOND_EXTRA_DISCOUNT, logoUrl, makerInvite: settings.makerInvite,
+        isGift: !!s.gift_from || !!s.gift_buyer_email, giftFrom: s.gift_from, giftNote: s.gift_note,
+      };
+      await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: 'diamond_welcome', drop_month: toYM(s.start_date) }, () => diamondWelcomeEmail(base));
+      const monthDay = started >= 2 ? addMonths(s.start_date, started - 1) : null;
+      if (monthDay && monthDay >= addDays(today, -3)) {
+        await sendOnce(db, { subscription_id: s.id, email: s.email, email_type: 'diamond_credits', drop_month: toYM(monthDay) },
+          () => diamondCreditsEmail({ ...base, newCredits: DIAMOND_CREDITS_PER_MONTH }));
+      }
+    } catch (e: any) { stats.failures++; stats.notes.push(`diamond ${s.email}: ${e?.message || e}`); }
+  }
 
   // 1) drops: catch up every month that has arrived, oldest first, stopping
   //    at the first month whose pack is not uploaded yet
