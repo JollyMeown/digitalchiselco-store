@@ -1,0 +1,135 @@
+---
+// The explainer under the plan picker on /membership, for ONE plan. The page
+// renders one per plan and shows the one whose card is selected (owner,
+// 2026-09-26: "when I select any membership option this text must update").
+// Every number comes from the plan row through planFacts / the Diamond
+// constants, never typed here, so a price change in Admin > Membership shows.
+import { planFacts, isDiamond, DIAMOND_CREDITS_PER_MONTH, DIAMOND_GRACE_DAYS, DIAMOND_EXTRA_DISCOUNT, type PlanLike } from '../lib/membership-facts';
+interface Props { plan: PlanLike & { slug: string; features?: string[] | null } }
+const { plan: p } = Astro.props;
+const F = planFacts(p);
+const diamond = isDiamond(p);
+const starter = !diamond && (p.slug.startsWith('starter') || F.months === 1);
+const premium = !diamond && !starter && F.months >= 12;
+const credits = F.months * DIAMOND_CREDITS_PER_MONTH;
+const perPick = `$${(F.price / credits).toFixed(2)}`;
+// Premium's extra perks are stored as words on the plan row (no numbers to go stale)
+const premiumExtras = premium ? (p.features || []).filter((l) => /bonus|discount/i.test(l)) : [];
+const fit = diamond ? [
+  'Know exactly what you want to carve and would rather choose it yourself',
+  'Sell carvings in one niche (hunting, Christian, pets, western) and want designs from that niche only',
+  'Want first pick of new designs as they are released',
+  'Buy more than a handful of designs a year and want the lowest price per design you choose',
+] : starter ? [
+  'Want to try our designs before committing to a membership',
+  'Want a small ready-made project set for a weekend or two',
+  'Are buying a first gift for someone with a CNC',
+] : [
+  'Own a CNC router and want fresh designs every month',
+  'Want professional STL files without spending hours searching',
+  'Want to build a ready-to-carve project library',
+  premium ? 'Want the lowest price per design and the Premium extras' : F.months <= 3 ? 'Want to test a short membership before committing longer' : 'Want half a year of projects at a lower price per file',
+  'Love having a reason to fire up the router every month',
+];
+---
+{diamond ? (
+  <>
+    <section class="mb-14 grid md:grid-cols-2 gap-10">
+      <div>
+        <h2 class="font-serif text-2xl mb-3">&#9670; Why Diamond Select is different</h2>
+        <p class="text-ink-700 leading-relaxed">Our other plans send designs we choose. With Diamond Select <strong>you choose</strong>: {DIAMOND_CREDITS_PER_MONTH} designs of your own choice every month from the whole catalogue, new releases included, for {F.monthsLabel}.</p>
+      </div>
+      <div class="border border-[#3B5B8C]/25 rounded-lg p-5 bg-[#EAF0F8]">
+        <h3 class="font-medium text-[#213B63] mb-3">&#9670; The math</h3>
+        <ul class="text-sm text-ink-700 space-y-1.5">
+          <li>• {DIAMOND_CREDITS_PER_MONTH} credits every month, 1 credit = 1 design you choose</li>
+          <li>• {credits} designs of your choice over {F.monthsLabel}</li>
+          <li>• Your price: <strong>only {F.priceLabel}</strong>, about {perPick} per design you pick</li>
+          <li>• {DIAMOND_EXTRA_DISCOUNT}% off any design you buy beyond your credits</li>
+        </ul>
+      </div>
+    </section>
+    <section class="mb-14">
+      <h2 class="font-serif text-2xl mb-4">🚀 How it works</h2>
+      <ol class="text-ink-700 space-y-1.5 leading-relaxed list-decimal pl-5">
+        <li>Join today: your first {DIAMOND_CREDITS_PER_MONTH} credits are in your account straight away.</li>
+        <li>Open any single design you like and press <strong>Use 1 credit</strong>.</li>
+        <li>The design goes into your account for good. Download it whenever you like.</li>
+        <li>{DIAMOND_CREDITS_PER_MONTH} more credits arrive on the same day every month. We email you when they do.</li>
+      </ol>
+      <ul class="mt-4 text-sm text-ink-700 space-y-1.5">
+        <li>✓ Unused credits roll over, and you have {DIAMOND_GRACE_DAYS} days after your membership ends to use any left</li>
+        <li>✓ One {F.priceLabel} payment covers the full {F.monthsLabel}, no recurring charge</li>
+        <li>✓ Credits are for single designs; bundles and sets are not included</li>
+      </ul>
+    </section>
+    <section class="mb-14">
+      <h2 class="font-serif text-2xl mb-4">📦 What you get each month</h2>
+      <ul class="text-ink-700 space-y-2 leading-relaxed">
+        <li>• {DIAMOND_CREDITS_PER_MONTH} new credits to spend on any single design in the catalogue</li>
+        <li>• Every new design we release is yours to pick too</li>
+        <li>• CNC-ready STL files for VCarve, Aspire, Fusion 360 and compatible CAM software</li>
+        <li>• Scalable designs to fit your material, router size and project</li>
+      </ul>
+    </section>
+  </>
+) : (
+  <>
+    <section class="mb-14 grid md:grid-cols-2 gap-10">
+      <div>
+        <h2 class="font-serif text-2xl mb-3">✨ Why this {starter ? 'bundle' : 'membership'} is a smart buy</h2>
+        {starter
+          ? <p class="text-ink-700 leading-relaxed">You get {F.totalFiles} hand-picked, CNC-ready designs in one go for {F.priceLabel}: the easiest way to see how our reliefs carve on your own machine.</p>
+          : <p class="text-ink-700 leading-relaxed">You get new CNC-ready designs without searching, guessing, or buying files one by one. Your first pack starts right away, and a new themed set arrives each month for {F.monthsLabel}.</p>}
+      </div>
+      <div class="border border-bronze-600/20 rounded-lg p-5 bg-cream/40">
+        <h3 class="font-medium text-bronze-700 mb-3">⭐ The math</h3>
+        <ul class="text-sm text-ink-700 space-y-1.5">
+          {!starter && <li>• {F.files} files per month</li>}
+          <li>• {F.totalFiles} total STL files{starter ? '' : ` over ${F.monthsLabel}`}</li>
+          {!starter && <li>• Around {F.retailPerMonthLabel} value every month</li>}
+          <li>• Roughly {F.retailLabel} total retail value</li>
+          <li>• Your price: <strong>only {F.priceLabel}</strong>, {F.perFileLabel} per design</li>
+          <li>• About {F.pctOff}% off retail</li>
+        </ul>
+      </div>
+    </section>
+    <section class="mb-14">
+      <h2 class="font-serif text-2xl mb-4">🚀 How it works: instant start</h2>
+      <p class="text-ink-700 leading-relaxed">Order today and receive {starter ? 'your' : 'your first'} {F.files} bas-relief STL files within minutes through your download link and welcome email.</p>
+      <ul class="mt-4 text-sm text-ink-700 space-y-1.5">
+        <li>✓ No waiting for a billing cycle</li>
+        <li>✓ No recurring charge</li>
+        <li>✓ No surprise payment later</li>
+        <li>✓ One {F.priceLabel} order covers {starter ? 'the whole bundle' : `the full ${F.monthsLabel}`}</li>
+      </ul>
+    </section>
+    <section class="mb-14">
+      <h2 class="font-serif text-2xl mb-4">📦 What you get{starter ? '' : ' each month'}</h2>
+      <ul class="text-ink-700 space-y-2 leading-relaxed">
+        <li>• {F.files} professionally finished bas-relief STL files{starter ? ', chosen for first-timers' : ''}</li>
+        {!starter && <li>• Fresh monthly themes such as wildlife, florals, patriotic, seasonal, rustic decor, animals, wall art, and more</li>}
+        {premiumExtras.map((l) => <li>• {l}</li>)}
+        <li>• CNC-ready STL files for VCarve, Aspire, Fusion 360, and compatible CAM software</li>
+        <li>• Scalable designs to fit your material, router size, and project style</li>
+        <li>• Perfect files for wall art, signs, plaques, gifts, craft fairs, and woodworking products</li>
+      </ul>
+    </section>
+  </>
+)}
+
+<section class="mb-14 grid md:grid-cols-2 gap-10">
+  <div>
+    <h2 class="font-serif text-2xl mb-3">🛠 Perfect for you if you</h2>
+    <ul class="text-ink-700 space-y-1.5">{fit.map((l) => <li>• {l}</li>)}</ul>
+  </div>
+  <div>
+    <h2 class="font-serif text-2xl mb-3">📁 File format &amp; delivery</h2>
+    <p class="text-ink-700 leading-relaxed">Files are delivered in <strong>.STL</strong> format, the standard format for CNC bas-relief carving.</p>
+    <p class="mt-3 text-ink-700">
+      {diamond ? `Every design you pick goes straight into your account, ready to download, and stays there for good.`
+        : starter ? `Your ${F.files} designs are available right after checkout, by email and in your account.`
+        : `Your first pack is available after checkout. The next ${F.files}-file packs arrive monthly for ${F.monthsLabel} through your member access link.`}
+    </p>
+  </div>
+</section>
