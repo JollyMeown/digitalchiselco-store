@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Card } from '../ui';
 import LiveVisitorMap from '../LiveVisitorMap';
+import LiveActivity from '../LiveActivity';
 import ChannelStats from '../ChannelStats';
 import MerchantStats from '../MerchantStats';
 import SearchConsole from '../SearchConsole';
@@ -203,6 +204,8 @@ export default function Traffic() {
           <button className="text-xs px-2 py-1 rounded bg-cream text-bronze-700 underline" onClick={() => load()}>reload</button>
         </div>
       </div>
+
+      <LiveActivity />
 
       {loading ? <div className="text-sm text-ink-700/60">Loading traffic…</div> : (
         <>
