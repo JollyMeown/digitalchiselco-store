@@ -487,7 +487,8 @@ export function cncMatchEmail(d: { email: string; name?: string | null }): Out {
 
 /** Diamond Select launch (2026-09-27). Every number comes from the plan row and
  *  lib/membership-facts, never typed here (email invariant: no stale copy). */
-export function diamondLaunchEmail(d: { email: string; name?: string | null; price: number; months: number; creditsPerMonth: number; graceDays: number; extraDiscount: number; regularPrice: number; foundingUntilLabel: string; founding: boolean }): Out {
+export function diamondLaunchEmail(d: { email: string; name?: string | null; price: number; months: number; creditsPerMonth: number; graceDays: number; extraDiscount: number; regularPrice: number; foundingUntilLabel: string; founding: boolean;
+  compare?: { name: string; priceLabel: string; designs: number; chooser: string; discount: number }[] }): Out {
   const e = d.email;
   const url = `${SITE}/membership?plan=diamond-select&utm_source=email&utm_medium=broadcast&utm_campaign=diamond-launch-2026-09`;
   const credits = d.months * d.creditsPerMonth;
@@ -502,6 +503,15 @@ export function diamondLaunchEmail(d: { email: string; name?: string | null; pri
     <p style="margin:0 0 16px;padding:12px 14px;background:#EAF0F8;border-left:3px solid #2B4A7A;border-radius:4px">
       <strong>${d.founding ? 'Founding price' : 'Price'}: ${price} for the whole year</strong>, one payment, no automatic renewal. About ${perDesign} per design you choose.${d.founding ? ` After ${d.foundingUntilLabel} it will be $${d.regularPrice}.` : ''}
     </p>
+    ${d.compare && d.compare.length > 1 ? `
+    <p style="margin:0 0 8px"><strong>Which membership suits you?</strong></p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;border-collapse:collapse;font-size:14px">
+      ${d.compare.map((r) => `<tr>
+        <td style="padding:8px 10px;border-top:1px solid #E5DDD0;"><strong>${r.name.replace(/,? \d+ months?$/i, '').replace(/^12-Month /, '')}</strong><br/><span style="color:#6b5a48;font-size:13px">${r.chooser}</span></td>
+        <td style="padding:8px 10px;border-top:1px solid #E5DDD0;text-align:right;white-space:nowrap">${r.designs} designs<br/><span style="color:#6b5a48;font-size:13px">${r.priceLabel}, ${r.discount}% off extras</span></td>
+      </tr>`).join('')}
+    </table>
+    <p style="margin:0 0 14px">The same number of designs in the year. The difference is who chooses them.</p>` : ''}
     <p style="margin:0 0 8px"><strong>How it works:</strong></p>
     <p style="margin:0 0 14px;line-height:1.7">
       1. Join, and your first ${d.creditsPerMonth} credits are ready straight away<br/>
@@ -519,6 +529,7 @@ export function diamondLaunchEmail(d: { email: string; name?: string | null; pri
     `You get ${d.creditsPerMonth} credits every month for ${d.months} months. One credit is one design of your choice:`,
     `any single design in the catalogue, new releases included. ${credits} designs you choose in the year.`, '',
     `${d.founding ? 'Founding price' : 'Price'}: ${price} for the whole year, one payment, no automatic renewal. About ${perDesign} per design.${d.founding ? ` After ${d.foundingUntilLabel} it will be $${d.regularPrice}.` : ''}`, '',
+    ...(d.compare && d.compare.length > 1 ? ['Which membership suits you?', ...d.compare.map((r) => `- ${r.name}: ${r.designs} designs, ${r.priceLabel}, ${r.chooser.toLowerCase()}, ${r.discount}% off extras`), 'The same number of designs in the year. The difference is who chooses them.', ''] : []),
     'How it works:',
     `1. Join, and your first ${d.creditsPerMonth} credits are ready straight away`,
     '2. Open any design you like and press "Use 1 credit"',

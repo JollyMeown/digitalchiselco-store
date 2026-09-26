@@ -3,7 +3,7 @@ import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { getMembershipPlans } from '../lib/queries';
 import { MEMBER_FAQ } from '../lib/membership-faq';
-import { planFacts, planFeatureLines, isDiamond, DIAMOND_CREDITS_PER_MONTH } from '../lib/membership-facts';
+import { planFacts, planFeatureLines, isDiamond, DIAMOND_CREDITS_PER_MONTH, compareRow } from '../lib/membership-facts';
 import MembershipPlanDetails from '../components/MembershipPlanDetails.astro';
 const faqGroups = [...new Set(MEMBER_FAQ.map((x) => x.group))];
 // ?preview=1 shows plans whose launch date has not arrived (owner testing).
@@ -16,6 +16,8 @@ const F = featured ? planFacts(featured) : planFacts({ months: 3, files_per_mont
 // The parts below the picker follow the SELECTED plan: one version per plan,
 // only the selected one visible (the script swaps them on click).
 const sel = featured?.slug || '';
+// the comparison lists real memberships only (the one-month starter bundle is not one)
+const compare = plans.filter((p: any) => Number(p.months) > 1).map((p: any) => compareRow(p));
 const lines = (p: any) => {
   const f = planFacts(p);
   if (isDiamond(p)) return { form: `Tell us where to send your first ${DIAMOND_CREDITS_PER_MONTH} credits.`, note: `One ${f.priceLabel} order covers the full ${f.monthsLabel}. No recurring charge. No surprise payment later.`,
@@ -65,6 +67,43 @@ const lines = (p: any) => {
       ))}
     </div>
   </section>
+
+  <!-- COMPARE: every number from the plan rows (compareRow in lib/membership-facts) -->
+  {compare.length > 1 && (
+    <section class="mb-12" aria-labelledby="compare-h">
+      <h2 id="compare-h" class="font-serif text-2xl mb-1">Compare the memberships</h2>
+      <p class="text-sm text-ink-700/70 mb-4">Every plan is one payment with no automatic renewal, and commercial use is always included.</p>
+      <div class="overflow-x-auto border border-black/10 rounded-xl bg-white">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-cream/60 text-left text-[11px] uppercase tracking-wide text-ink-700/70">
+              <th class="px-4 py-2.5 font-semibold">Membership</th>
+              <th class="px-4 py-2.5 font-semibold">Who chooses</th>
+              <th class="px-4 py-2.5 font-semibold">Each month</th>
+              <th class="px-4 py-2.5 font-semibold text-right">Designs in total</th>
+              <th class="px-4 py-2.5 font-semibold text-right">Price</th>
+              <th class="px-4 py-2.5 font-semibold text-right">Per design</th>
+              <th class="px-4 py-2.5 font-semibold text-right">Off extra designs</th>
+            </tr>
+          </thead>
+          <tbody>
+            {compare.map((r) => (
+              <tr class={`border-t border-black/5 ${r.slug === 'diamond-select' ? 'bg-[#EAF0F8]/60' : ''}`}>
+                <td class="px-4 py-3 font-medium text-ink-900">{r.slug === 'diamond-select' && <span aria-hidden="true">&#9670; </span>}{r.name}</td>
+                <td class="px-4 py-3">{r.chooser}</td>
+                <td class="px-4 py-3">{r.perMonth}</td>
+                <td class="px-4 py-3 text-right tabular-nums">{r.designs}</td>
+                <td class="px-4 py-3 text-right tabular-nums font-medium">{r.priceLabel}</td>
+                <td class="px-4 py-3 text-right tabular-nums">{r.perDesignLabel}</td>
+                <td class="px-4 py-3 text-right tabular-nums">{r.discount}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-ink-700/60 mt-2">"We choose" plans send a themed pack of new designs each month. With Diamond Select you pick any single design from the whole catalogue with your monthly credits.</p>
+    </section>
+  )}
 
   <!-- SIGN-UP FORM -->
   <section class="mb-14 border border-black/10 rounded-xl p-6 md:p-8 bg-cream/30">

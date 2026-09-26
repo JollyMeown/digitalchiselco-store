@@ -10,7 +10,7 @@
 // without it). Current Diamond members are skipped. Dedupes on diamond-launch:.
 import { createClient } from '@supabase/supabase-js';
 import { diamondLaunchEmail, unsubHeaders } from '../src/lib/marketing-emails.ts';
-import { DIAMOND_SLUG, DIAMOND_CREDITS_PER_MONTH, DIAMOND_GRACE_DAYS, DIAMOND_EXTRA_DISCOUNT, DIAMOND_REGULAR_PRICE, DIAMOND_FOUNDING_UNTIL } from '../src/lib/membership-facts.ts';
+import { DIAMOND_SLUG, DIAMOND_CREDITS_PER_MONTH, DIAMOND_GRACE_DAYS, DIAMOND_EXTRA_DISCOUNT, DIAMOND_REGULAR_PRICE, DIAMOND_FOUNDING_UNTIL, compareRow } from '../src/lib/membership-facts.ts';
 import { sendBatch, send as sendOne } from '../src/lib/resend.ts';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > -1 ? process.argv[i + 1] : d; };
@@ -29,7 +29,10 @@ const launched = !!plan?.active && (!plan.available_from || String(plan.availabl
 const founding = today <= DIAMOND_FOUNDING_UNTIL && Number(plan.price_usd) < DIAMOND_REGULAR_PRICE;
 const facts = { price: Number(plan.price_usd), months: Number(plan.months), creditsPerMonth: DIAMOND_CREDITS_PER_MONTH, graceDays: DIAMOND_GRACE_DAYS,
   extraDiscount: DIAMOND_EXTRA_DISCOUNT, regularPrice: DIAMOND_REGULAR_PRICE, foundingUntilLabel: '31 December', founding };
-const makeEmail = (email, name) => diamondLaunchEmail({ email, name, ...facts });
+// Premium vs Diamond: the same 120 designs, the difference is who chooses
+const { data: cmpPlans } = await db.from('membership_plans').select('slug, name, months, files_per_month, price_usd, features').in('slug', ['12-month-premium', DIAMOND_SLUG]);
+const compare = ['12-month-premium', DIAMOND_SLUG].map((sl) => (cmpPlans || []).find((x) => x.slug === sl)).filter(Boolean).map((x) => compareRow(x));
+const makeEmail = (email, name) => diamondLaunchEmail({ email, name, ...facts, compare });
 
 const page = async (table, select, apply) => {
   const out = [];

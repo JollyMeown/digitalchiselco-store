@@ -88,3 +88,25 @@ export function fillPlanTokens(text: string, p: PlanLike | null | undefined): st
   };
   return text.replace(/\{([a-z_]+)\}/g, (m, k) => (k in map ? map[k] : m));
 }
+
+/** Bonus designs a month, read from the plan's own feature line ("2 extra
+ *  Premium bonus designs every month"); 0 when the plan has none. */
+export function bonusPerMonth(p: PlanLike): number {
+  const line = (p.features || []).find((l) => /bonus/i.test(l) && /\d/.test(l));
+  const m = line?.match(/(\d+)\s+extra/i);
+  return m ? Number(m[1]) : 0;
+}
+
+/** One row of the membership comparison (page table and launch email). */
+export function compareRow(p: PlanLike) {
+  const f = planFacts(p);
+  const diamond = isDiamond(p);
+  const designs = diamond ? f.months * DIAMOND_CREDITS_PER_MONTH : f.totalFiles + f.months * bonusPerMonth(p);
+  return {
+    name: p.name || '', slug: p.slug || '', months: f.months, price: f.price, priceLabel: f.priceLabel,
+    designs, perDesignLabel: `$${(f.price / designs).toFixed(2)}`,
+    chooser: diamond ? 'You choose every design' : 'We choose (a themed pack each month)',
+    perMonth: diamond ? `${DIAMOND_CREDITS_PER_MONTH} of your choice` : `${f.files}${bonusPerMonth(p) ? ` + ${bonusPerMonth(p)} bonus` : ''} chosen for you`,
+    discount: diamond ? DIAMOND_EXTRA_DISCOUNT : 10,
+  };
+}
