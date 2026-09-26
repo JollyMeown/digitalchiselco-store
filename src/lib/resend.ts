@@ -155,7 +155,7 @@ async function refreshBudget(): Promise<void> {
 // days. Drips and one-time welcomes are never held (they are the relationship),
 // but they count, so broadcasts make room for them. 0 = off.
 let maxPerWeek = 4;
-const BROADCAST_KINDS = new Set(['weekly', 'filmCampaign', 'guideCampaign', 'articleCampaign', 'makerRecruit', 'winback', 'browse', 'price-drop', 'priceDrop', 'wishlistReminder', 'wishlist-reminder', 'referral-nudge', 'referralNudge', 'refundWinback', 'refund-winback', 'product-blast', 'picks', 'cncMatch']);
+const BROADCAST_KINDS = new Set(['weekly', 'filmCampaign', 'guideCampaign', 'articleCampaign', 'makerRecruit', 'winback', 'browse', 'price-drop', 'priceDrop', 'wishlistReminder', 'wishlist-reminder', 'referral-nudge', 'referralNudge', 'refundWinback', 'refund-winback', 'product-blast', 'picks', 'cncMatch', 'diamondLaunch']);
 // ── Cold segment (owner 2026-09-22) ─────────────────────────────────────
 // The imported Etsy buyers are 2,119 of a 2,339 list and have bought 7 times
 // ever (0.33%), while the 134 free-pack subscribers have bought 22 times

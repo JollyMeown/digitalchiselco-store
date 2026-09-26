@@ -485,6 +485,53 @@ export function cncMatchEmail(d: { email: string; name?: string | null }): Out {
   return { subject, html: shell(subject, 'Carved it on the CNC? Finish it on the laser', body, e), text };
 }
 
+/** Diamond Select launch (2026-09-27). Every number comes from the plan row and
+ *  lib/membership-facts, never typed here (email invariant: no stale copy). */
+export function diamondLaunchEmail(d: { email: string; name?: string | null; price: number; months: number; creditsPerMonth: number; graceDays: number; extraDiscount: number; regularPrice: number; foundingUntilLabel: string; founding: boolean }): Out {
+  const e = d.email;
+  const url = `${SITE}/membership?plan=diamond-select&utm_source=email&utm_medium=broadcast&utm_campaign=diamond-launch-2026-09`;
+  const credits = d.months * d.creditsPerMonth;
+  const perDesign = `$${(d.price / credits).toFixed(2)}`;
+  const price = Number.isInteger(d.price) ? `$${d.price}` : `$${d.price.toFixed(2)}`;
+  const subject = `Choose your own ${credits} designs this year`;
+  const hi = d.name ? `Hi ${String(d.name).split(' ')[0]},` : 'Hi,';
+  const body = `
+    <p style="margin:0 0 14px">${hi}</p>
+    <p style="margin:0 0 14px">Our other memberships send designs we pick for you. <strong>Diamond Select</strong> is for carvers who would rather choose.</p>
+    <p style="margin:0 0 14px">You get <strong>${d.creditsPerMonth} credits every month</strong> for ${d.months} months. One credit is one design of your choice: any single design in the catalogue, new releases included. That is <strong>${credits} designs you choose</strong> in the year.</p>
+    <p style="margin:0 0 16px;padding:12px 14px;background:#EAF0F8;border-left:3px solid #2B4A7A;border-radius:4px">
+      <strong>${d.founding ? 'Founding price' : 'Price'}: ${price} for the whole year</strong>, one payment, no automatic renewal. About ${perDesign} per design you choose.${d.founding ? ` After ${d.foundingUntilLabel} it will be $${d.regularPrice}.` : ''}
+    </p>
+    <p style="margin:0 0 8px"><strong>How it works:</strong></p>
+    <p style="margin:0 0 14px;line-height:1.7">
+      1. Join, and your first ${d.creditsPerMonth} credits are ready straight away<br/>
+      2. Open any design you like and press <strong>Use 1 credit</strong><br/>
+      3. It is yours for good: download it from your account whenever you like
+    </p>
+    <p style="margin:0 0 14px">Unused credits roll over, and you have ${d.graceDays} extra days after the year ends to use any left. Anything you buy beyond your credits is ${d.extraDiscount}% off. Commercial use is included, so you can sell what you carve. Bundles and sets, such as the 14 Stations of the Cross, are not included and stay separate.</p>
+    ${btn(url, 'Choose Diamond Select')}
+    <p style="margin:18px 0 6px">Jolly</p>
+    <p style="margin:0;color:#6b5a48;font-size:13px">DigitalChiselCo</p>
+  `;
+  const text = [
+    hi, '',
+    'Our other memberships send designs we pick for you. Diamond Select is for carvers who would rather choose.', '',
+    `You get ${d.creditsPerMonth} credits every month for ${d.months} months. One credit is one design of your choice:`,
+    `any single design in the catalogue, new releases included. ${credits} designs you choose in the year.`, '',
+    `${d.founding ? 'Founding price' : 'Price'}: ${price} for the whole year, one payment, no automatic renewal. About ${perDesign} per design.${d.founding ? ` After ${d.foundingUntilLabel} it will be $${d.regularPrice}.` : ''}`, '',
+    'How it works:',
+    `1. Join, and your first ${d.creditsPerMonth} credits are ready straight away`,
+    '2. Open any design you like and press "Use 1 credit"',
+    '3. It is yours for good: download it from your account whenever you like', '',
+    `Unused credits roll over, plus ${d.graceDays} days after the year ends. Extra designs are ${d.extraDiscount}% off. Commercial use included.`,
+    'Bundles and sets are not included and stay separate.', '',
+    `Choose Diamond Select: ${url}`, '',
+    'Jolly, DigitalChiselCo',
+    `Unsubscribe: ${unsubUrl(e)}`,
+  ].join('\n');
+  return { subject, html: shell(subject, 'Diamond Select: you choose', body, e), text };
+}
+
 export function cartReminderEmail(d: { email: string; items: { title: string; price: number; image_url?: string | null; slug?: string | null; etsy_price?: number | null }[]; subtotal: number }): Out {
   const subject = 'Your cart is saved — your designs are waiting';
   // The reason a hesitant buyer was missing: the same file costs more on
