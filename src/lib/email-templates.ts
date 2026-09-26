@@ -545,6 +545,9 @@ export type MembershipPurchaseData = {
 
 export function membershipPurchaseNotification(d: MembershipPurchaseData): { subject: string; html: string; text: string } {
   const planSummary = d.plans.map((p) => `${p.qty}× ${p.name}`).join(', ');
+  // Diamond Select sends no pack: its welcome email hands out the first credits.
+  const diamondOnly = d.plans.length > 0 && d.plans.every((p) => p.slug === 'diamond-select');
+  const doneLine = diamondOnly ? 'Nothing to do: the Diamond Select welcome email with the first credits has been sent.' : 'Nothing to do: the first pack has been sent automatically.';
   const subject = `🟢 New membership: ${d.customerName || d.customerEmail}, ${planSummary}`;
   const dateStr = new Date(d.createdAt).toLocaleString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
@@ -562,7 +565,7 @@ export function membershipPurchaseNotification(d: MembershipPurchaseData): { sub
   <div style="max-width:560px;margin:0 auto;padding:24px;background:#fff;border:1px solid #eee;border-radius:10px;">
     <div style="background:${BRAND_BRONZE};color:${BRAND_CREAM};padding:14px 18px;border-radius:6px;margin-bottom:18px;">
       <strong style="font-size:16px;">New membership purchase</strong><br>
-      <span style="font-size:13px;opacity:.85;">Nothing to do: the first pack has been sent automatically.</span>
+      <span style="font-size:13px;opacity:.85;">${doneLine}</span>
     </div>
 
     <p style="margin:0 0 14px;font-size:15px;">A customer just paid for a membership. Their term was created and this month's pack emailed the moment the payment landed. Admin &gt; Subscriptions shows when it was delivered, opened and downloaded.</p>
@@ -584,7 +587,7 @@ export function membershipPurchaseNotification(d: MembershipPurchaseData): { sub
 </body></html>`;
 
   const text = `New membership purchase
-Nothing to do: the term was created and the first pack was sent automatically.
+${diamondOnly ? 'Nothing to do: the term was created and the Diamond Select welcome email with the first credits was sent.' : 'Nothing to do: the term was created and the first pack was sent automatically.'}
 
 Name : ${d.customerName || '(not provided)'}
 Email: ${d.customerEmail}

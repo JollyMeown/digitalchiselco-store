@@ -20,6 +20,7 @@ import { createSubscriptionForPurchase, packLink, toYM, STARTER_PLAN_SLUG, START
 import { giftCardEmail } from '../../../lib/marketing-emails';
 import { queuePaymentRecovery, closePaymentRecoveryForEmail } from '../../../lib/pay-recovery';
 import { telegramOwner } from '../../../lib/notify';
+import { DIAMOND_SLUG } from '../../../lib/membership-facts';
 
 const OPS_INBOX = 'jolly@digitalchiselco.com';
 
@@ -860,6 +861,13 @@ async function handleTransactionCompleted(db: any, txn: any) {
           const { data: terms } = await db.from('member_subscriptions')
             .select('id, plan_slug, start_date, total_drops').eq('order_id', order.id);
           for (const t of terms || []) {
+            // Diamond Select has no pack: the member picks designs with credits.
+            // Giving it this month's pack link handed out 8 curated designs on
+            // top of the credits (caught in the owner's pre-launch test, 2026-09-27).
+            if (t.plan_slug === DIAMOND_SLUG) {
+              membershipLinks[t.plan_slug] = [{ name: 'your credits are ready: choose your designs in your account', url: `${String(env('PUBLIC_SITE_URL') || 'https://digitalchiselco.com').replace(/\/$/, '')}/account#diamond` }];
+              continue;
+            }
             const ym = t.plan_slug === STARTER_PLAN_SLUG ? STARTER_PACK_MONTH : toYM(t.start_date);
             const { data: pk } = await db.from('monthly_files').select('standard_drive_link').eq('month', ym).maybeSingle();
             if (pk?.standard_drive_link) {
