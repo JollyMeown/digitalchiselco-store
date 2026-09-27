@@ -19,7 +19,10 @@ const activeSlug = path.startsWith('/collections/') ? path.split('/').filter(Boo
 const isCatalog = path === '/catalog';
 ---
 <aside class="hidden lg:block w-[220px] flex-shrink-0">
-  <div class="sticky top-[88px]">
+  {/* Sticky, and scrollable on its own once the list is taller than the
+      screen (owner, 2026-09-27: new categories pushed the last ones out of
+      reach). overscroll-contain keeps the page still while the list scrolls. */}
+  <div class="sticky top-[88px] max-h-[calc(100vh-104px)] overflow-y-auto overscroll-contain pr-1 side-cats-scroll">
     {/* a <p>, not an <h2>: this rail sits before the page content in the DOM,
         so as a heading it outranked the real first section on every page */}
     <p class="text-xs font-medium text-ink-800 mb-3 uppercase tracking-wide" id="side-cats-label">Categories</p>
@@ -29,15 +32,22 @@ const isCatalog = path === '/catalog';
         <span>All designs</span>
         {allCount > 0 && <span class="text-xs text-ink-700/45 tabular-nums">{allCount}</span>}
       </a>
-      {categories.map((c) => (
+      {/* a collection with no live designs is left out until it has some:
+          an empty page reads as a broken shop */}
+      {categories.filter((c) => !Object.keys(countBy).length || countBy[c.id] > 0 || activeSlug === c.slug).map((c) => (
         <a
           href={`/collections/${c.slug}`}
           class={`flex items-center justify-between gap-2 py-1.5 px-2 rounded transition ${activeSlug === c.slug ? 'bg-cream text-bronze-700 font-medium' : 'text-ink-700 hover:bg-cream'}`}
         >
-          <span class="truncate">{c.name}</span>
+          <span class="leading-snug">{c.name}</span>
           {countBy[c.id] > 0 && <span class="text-xs text-ink-700/45 tabular-nums flex-shrink-0">{countBy[c.id]}</span>}
         </a>
       ))}
     </nav>
   </div>
 </aside>
+<style>
+  .side-cats-scroll { scrollbar-width: thin; scrollbar-color: rgba(133,79,11,.35) transparent; }
+  .side-cats-scroll::-webkit-scrollbar { width: 6px; }
+  .side-cats-scroll::-webkit-scrollbar-thumb { background: rgba(133,79,11,.35); border-radius: 3px; }
+</style>
