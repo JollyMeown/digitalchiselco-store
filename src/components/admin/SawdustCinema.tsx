@@ -37,6 +37,21 @@ export default function SawdustCinemaAdmin() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // Homepage switch (site_settings.show_sawdust_cinema, default off). Films and
+  // film emails work either way; this only shows or hides the homepage section.
+  const [onHome, setOnHome] = useState<boolean | null>(null);
+  useEffect(() => {
+    supabase.from('site_settings').select('show_sawdust_cinema').eq('id', 1).maybeSingle()
+      .then(({ data }) => setOnHome(!!(data as any)?.show_sawdust_cinema));
+  }, []);
+  async function toggleHome() {
+    const next = !onHome;
+    const { error } = await supabase.from('site_settings').update({ show_sawdust_cinema: next }).eq('id', 1);
+    if (error) { setNote(`Could not switch: ${error.message}`); return; }
+    setOnHome(next);
+    setNote(next ? 'Sawdust Cinema is ON: it appears on the homepage within 5 minutes.' : 'Sawdust Cinema is OFF: it leaves the homepage within 5 minutes.');
+  }
+
   // Product search: the film has to link somewhere, and typing a slug by hand
   // is how the wrong product ends up attached.
   useEffect(() => {
@@ -151,6 +166,17 @@ export default function SawdustCinemaAdmin() {
         Short films shown low on the homepage. Each one links to the design it is about, so a viewer who likes the clip can buy it in
         one tap. Nothing downloads for a visitor until they press play.
       </p>
+
+      <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg border border-black/10 bg-white">
+        <button type="button" role="switch" aria-checked={!!onHome} disabled={onHome === null} onClick={toggleHome}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${onHome ? 'bg-green-600' : 'bg-black/25'}`}>
+          <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${onHome ? 'translate-x-5' : 'translate-x-0.5'}`} />
+        </button>
+        <div className="text-sm">
+          <b>Show on the homepage: {onHome === null ? '…' : onHome ? 'ON' : 'OFF'}</b>
+          <div className="text-[11px] text-ink-700/60">Off hides the whole section from the main page. Films, product-page links and film emails keep working.</div>
+        </div>
+      </div>
 
       <div className="rounded-lg border border-bronze-600/20 bg-cream/40 p-3 mb-4">
         <div className="text-[13px] font-bold text-ink-900 mb-2">Add a film</div>
