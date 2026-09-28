@@ -51,7 +51,7 @@ export type Analysis = {
   volume: number;            // mm^3, signed-tetrahedron, absolute
   openEdges: number;         // edges used by exactly one triangle: holes
   degenerate: number;        // zero-area triangles
-  detailLoss: { radius: number; max: number; mean: number; areaAffected: number; measurable: boolean }[];
+  detailLoss: { radius: number; max: number; mean: number; areaAffected: number; areaVisible?: number; measurable: boolean }[];
   orientation: Orientation;
 };
 
@@ -156,44 +156,67 @@ function raster(pos: Float32Array, target = 320) {
  * a square one and understates what it can reach into.
  */
 function closeWithTool(src: Float32Array, w: number, h: number, rCells: number,
-                       shape: 'ball' | 'flat', floor: number) {
-  const r = Math.max(1, Math.round(rCells));
-  const off: number[] = [];      // dx, dy, height offset
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
+                       shape: 'ball' | 'flat', floor: number, cellMm: number) {
+  // FIXED 2026-09-28. Two errors made every ball-nose figure wrong, and wrong by
+  // an amount that changed with the grid size:
+  //   1. the ball's profile was built in GRID CELLS and compared with heights in
+  //      MILLIMETRES, so on a 0.1 mm grid the ball was ten times too tall;
+  //   2. the tip was placed with v + s instead of v - s.
+  // Checked against exact geometry (a 90 degree V-groove, where a ball of
+  // radius r stops r(sqrt2 - 1) above the bottom): the old code said a 3 mm
+  // ball lost 2.70 mm there at 0.1 mm cells and 1.60 mm at 0.2 mm cells; the
+  // truth is 0.62 mm, which this version returns at both.
+  //
+  //   tip(x)     = max over the disc of  v(x + o) - s(o)   (lowest the tip can sit)
+  //   surface(x) = min over the disc of  tip(x - o) + s(o) (what the ball leaves)
+  // with s(o) = r - sqrt(r^2 - d^2) IN MILLIMETRES, 0 for a flat cutter.
+  const r = Math.max(1, rCells);
+  const R = Math.ceil(r);
+  const off: number[] = [];      // dx, dy, height of the tool surface above its tip, mm
+  for (let dy = -R; dy <= R; dy++) {
+    for (let dx = -R; dx <= R; dx++) {
       const d2 = dx * dx + dy * dy;
       if (d2 > r * r) continue;
-      off.push(dx, dy, shape === 'ball' ? r - Math.sqrt(r * r - d2) : 0);
+      off.push(dx, dy, shape === 'ball' ? (r - Math.sqrt(r * r - d2)) * cellMm : 0);
     }
   }
-  const pass = (input: Float32Array, dilate: boolean) => {
-    const out = new Float32Array(w * h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        let best = dilate ? -Infinity : Infinity;
-        let any = false;
-        for (let o = 0; o < off.length; o += 3) {
-          const nx = x + off[o], ny = y + off[o + 1];
-          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-          const v = input[ny * w + nx];
-          if (Number.isNaN(v)) continue;
-          // the tool's own profile, in the units of the height map
-          const g = off[o + 2] * (rCells > 0 ? 1 : 0);
-          const cand = dilate ? v + g : v - g;
-          best = dilate ? Math.max(best, cand) : Math.min(best, cand);
-          any = true;
-        }
-        out[y * w + x] = any ? best : floor;
+  const tip = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let best = -Infinity;
+      for (let o = 0; o < off.length; o += 3) {
+        const nx = x + off[o], ny = y + off[o + 1];
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const v = input(src, nx, ny, w);
+        if (Number.isNaN(v)) continue;
+        const cand = v - off[o + 2];
+        if (cand > best) best = cand;
       }
+      tip[y * w + x] = best === -Infinity ? NaN : best;
     }
-    return out;
-  };
-  return pass(pass(src, true), false);
+  }
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let best = Infinity;
+      for (let o = 0; o < off.length; o += 3) {
+        const nx = x - off[o], ny = y - off[o + 1];
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const t = tip[ny * w + nx];
+        if (Number.isNaN(t)) continue;
+        const cand = t + off[o + 2];
+        if (cand < best) best = cand;
+      }
+      out[y * w + x] = best === Infinity ? floor : best;
+    }
+  }
+  return out;
 }
+const input = (a: Float32Array, x: number, y: number, w: number) => a[y * w + x];
 
 /** Kept for the detail-loss figures, which read better with the true ball. */
-const closeWithBall = (src: Float32Array, w: number, h: number, rCells: number, floor: number) =>
-  closeWithTool(src, w, h, rCells, 'ball', floor);
+const closeWithBall = (src: Float32Array, w: number, h: number, rCells: number, floor: number, cellMm: number) =>
+  closeWithTool(src, w, h, rCells, 'ball', floor, cellMm);
 
 // ── machining simulation ────────────────────────────────────────────────
 export type SimSurface = { w: number; h: number; cell: number; z: Float32Array };
@@ -247,7 +270,7 @@ export function simulate(a: Analysis, opts: {
   if (!isFinite(base)) base = 0;
 
   // roughing: the flat cutter cannot reach in, and it leaves layers behind
-  const roughClosed = closeWithTool(src, w, h, (opts.roughDia / 2) / cell, 'flat', base);
+  const roughClosed = closeWithTool(src, w, h, (opts.roughDia / 2) / cell, 'flat', base, cell);
   const rough = new Float32Array(w * h);
   const sd = Math.max(0.2, opts.stepdown);
   // Emptiness must stay empty. closeWithTool fills unreachable cells with the
@@ -261,7 +284,7 @@ export function simulate(a: Analysis, opts: {
   }
 
   // finishing: the ball, plus the ridges it leaves between passes
-  const finishClosed = closeWithTool(src, w, h, ballR / cell, 'ball', base);
+  const finishClosed = closeWithTool(src, w, h, ballR / cell, 'ball', base, cell);
   const stepMm = opts.ballDia * (opts.stepoverPct / 100);
   const scallop = Math.max(0, ballR - Math.sqrt(Math.max(0, ballR * ballR - (stepMm / 2) * (stepMm / 2))));
   const finish = new Float32Array(w * h);
@@ -362,13 +385,15 @@ function orient(pos: Float32Array, size: { x: number; y: number; z: number },
   return { current, best: { axis: best.axis, sign: best.sign, score: best.score }, verdict, fix, rotatedSize };
 }
 
-export function analyse(pos: Float32Array, onProgress?: (p: number) => void): Analysis {
+export function analyse(pos: Float32Array, onProgress?: (p: number) => void, opts: { target?: number } = {}): Analysis {
   const triangles = Math.floor(pos.length / 9);
   onProgress?.(0.15);
   // Resolve the grid finely enough that the smallest cutter spans several
   // cells, but back off on very large meshes where the per-triangle cost, not
   // the grid, is what makes this slow.
-  const target = 640;
+  // (Offline studies pass a finer target so a 1.5 mm bit is measurable on a
+  // 300 mm panel; the browser tool keeps 640.)
+  const target = opts.target ?? 640;
   const r = raster(pos, target);
   onProgress?.(0.5);
 
@@ -450,7 +475,7 @@ export function analyse(pos: Float32Array, onProgress?: (p: number) => void): An
       }
     }
     const rd = rFull / k;
-    const closed = closeWithBall(small, dw, dh, rd, r.minZ);
+    const closed = closeWithBall(small, dw, dh, rd, r.minZ, r.cell * k);
 
     // Exclude everything within the cutter's reach of the outline. Closing
     // against empty space fills the vertical drop at the edge of the part,
@@ -471,13 +496,14 @@ export function analyse(pos: Float32Array, onProgress?: (p: number) => void): An
     }
 
     const losses: number[] = [];
-    let sum = 0, cnt = 0, affected = 0;
+    let sum = 0, cnt = 0, affected = 0, visible = 0;
     for (let i = 0; i < small.length; i++) {
       const a = small[i];
       if (Number.isNaN(a) || near[i]) continue;
       const d = Math.max(0, closed[i] - a);
       losses.push(d); sum += d; cnt++;
       if (d > 0.05) affected++;
+      if (d > VISIBLE_MM) visible++;   // what a finishing pass with a smaller bit is actually for
     }
     if (cnt < 50) return dead;
     losses.sort((a, b) => a - b);
@@ -488,6 +514,7 @@ export function analyse(pos: Float32Array, onProgress?: (p: number) => void): An
       max: Math.round(p99 * 100) / 100,
       mean: Math.round((sum / cnt) * 100) / 100,
       areaAffected: Math.round(1000 * affected / cnt) / 10,
+      areaVisible: Math.round(1000 * visible / cnt) / 10,
       measurable: true,
     };
   });
@@ -539,6 +566,10 @@ export type FasterOption = {
   /** true when the ridges are below what sanding removes */
   ridgesFree: boolean;
 };
+
+/** Detail loss a viewer notices on a finished carving: well past what sanding
+ *  removes (SANDING_MM). Used to size a rest-machining pass. */
+export const VISIBLE_MM = 0.25;
 
 /** Roughly what 220 grit removes. */
 export const SANDING_MM = 0.05;
@@ -621,3 +652,6 @@ export const fmtTime = (min: number) => {
   const h = Math.floor(min / 60), m = Math.round(min % 60);
   return m ? `${h} h ${m} min` : `${h} h`;
 };
+
+// For the geometry tests in scripts/blog/3mm-vs-1-5mm-ball-nose-relief-carving/test_engine.mjs
+export { closeWithTool as _closeWithTool };

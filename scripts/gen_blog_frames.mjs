@@ -61,6 +61,14 @@ async function heroFor(slug) {
   if (heroCache.has(slug)) return heroCache.get(slug);
   // An explicit URL is used as-is: a series that needs the RAW render for
   // the early stages and the finished photo for the late ones names each.
+  // A local file (e.g. a tool photo the owner supplied) is read from disk,
+  // relative to the article folder or absolute.
+  if (/\.(png|jpe?g|webp)$/i.test(slug) && !/^https?:\/\//.test(slug)) {
+    const p = path.isAbsolute(slug) ? slug : path.join(DIR, slug);
+    const buf = fs.readFileSync(p);
+    heroCache.set(slug, buf);
+    return buf;
+  }
   if (/^https?:\/\//.test(slug)) {
     const buf = Buffer.from(await (await fetch(slug)).arrayBuffer());
     heroCache.set(slug, buf);
