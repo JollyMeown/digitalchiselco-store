@@ -1,0 +1,223 @@
+<p><strong>The short answer:</strong> on a typical 300 mm (12 in) relief, a 3 mm ball nose finishes 97 to 99 percent of the surface to within a quarter of a millimetre of the model. A 1.5 mm ball nose only earns its keep on the last 1 to 3 percent: the gaps between feathers, the corner of an eye, the space under a claw. Running the 1.5 mm over the whole panel doubles your finishing time to get that last bit. Running it <em>only</em> where the 3 mm could not reach, which is what rest machining does, gets the same detail in about half the time: <strong>42 to 49 percent less finishing time</strong> on the five real designs we simulated.</p>
+
+<p>That is the whole article in one paragraph. The rest shows how we measured it, what the difference actually looks like on a carving, and how to set up rest machining in Aspire, VCarve Pro, Fusion, Carveco and Carbide Create.</p>
+
+<h2 id="contents">What this guide covers</h2>
+<ul>
+  <li><a href="#numbers">The numbers, in one table</a></li>
+  <li><a href="#method">How we measured it</a></li>
+  <li><a href="#see">What each bit leaves on a real carving</a></li>
+  <li><a href="#rest">Rest machining: the small bit only where it is needed</a></li>
+  <li><a href="#where">Where the 1.5 mm is actually needed</a></li>
+  <li><a href="#time">How much time it saves</a></li>
+  <li><a href="#software">Setting it up in your software</a></li>
+  <li><a href="#which">Which approach for which carving</a></li>
+  <li><a href="#mistakes">Common mistakes</a></li>
+  <li><a href="#faq">Questions</a></li>
+  <li><a href="#files">The five designs we tested</a></li>
+</ul>
+
+<h2 id="numbers">The numbers, in one table</h2>
+
+<p>Five real designs from the shop, each scaled so its long side is 300 mm and its relief about 18 mm deep. "Misses" is how deep the deepest detail sits that a given ball simply cannot get into (the 99th percentile, so one stray spot cannot set the number). "Visible" is the share of the panel where it misses by more than 0.25 mm, which is about five times what a pass of 220 grit takes off, so you would see it.</p>
+
+<table>
+  <thead>
+    <tr><th>Design (300 mm)</th><th>6 mm misses</th><th>3 mm misses</th><th>1.5 mm misses</th><th>3 mm: panel with visible loss</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Leaping largemouth bass</td><td>1.75 mm</td><td>0.24 mm</td><td>0.13 mm</td><td>1.0%</td></tr>
+    <tr><td>Feathered fishing lure</td><td>1.26 mm</td><td>0.40 mm</td><td>0.17 mm</td><td>2.0%</td></tr>
+    <tr><td>Coiled dragon medallion</td><td>4.31 mm</td><td>2.10 mm</td><td>0.20 mm</td><td>2.6%</td></tr>
+    <tr><td>Mallard duck arch</td><td>0.72 mm</td><td>0.23 mm</td><td>0.13 mm</td><td>0.8%</td></tr>
+    <tr><td>Rustic cross wreath</td><td>4.35 mm</td><td>0.89 mm</td><td>0.21 mm</td><td>3.2%</td></tr>
+  </tbody>
+</table>
+
+<p>Two things jump out. The 6 mm ball is a different league: on the dragon and the cross it leaves gaps over 4 mm deep, and it misses visible detail on 3 to 9 percent of every panel. And the step from 3 mm to 1.5 mm is small everywhere except in a few narrow places, which is exactly the situation rest machining was invented for.</p>
+
+<h2 id="method">How we measured it</h2>
+
+<p>These are simulations, not stopwatch times from a machine, and we want to be exact about what that means.</p>
+
+<ul>
+  <li>Each design is the real STL file you download, run through the same engine as our free <a href="/tools/will-it-cut">Will it cut? checker</a>, on a grid of 0.17 mm.</li>
+  <li>The cutter is modelled as a true hemisphere. For every point on the surface the engine works out the lowest the ball's tip can go without the ball hitting the carving anywhere, and what surface the ball leaves behind. The gap between that and the model is the detail it misses.</li>
+  <li>We checked the engine against a shape with a known answer: in a 90 degree V-groove a ball of radius r stops r(&radic;2 - 1) above the bottom. It matches to a few hundredths of a millimetre.</li>
+  <li>Finishing time is a raster pass at 10 percent stepover on a mid-size hobby machine (the Shapeoko, X-Carve and Onefinity class) at the feeds we publish on every product page. Roughing is the same whichever finishing plan you pick, about 1.2 to 1.6 hours here, so it is left out of the comparisons.</li>
+  <li>What it does not model: holder collisions, deflection, and the air moves a rest pass makes between islands. So treat the times as honest estimates, and expect a real rest pass to run a little longer than shown.</li>
+</ul>
+
+<h2 id="see">What each bit leaves on a real carving</h2>
+
+<p>Numbers are easier to believe when you can see them. This is the head of the dragon medallion, a 70 mm square of it, simulated four ways. Top left is the model. The other three are the surfaces a 6 mm, 3 mm and 1.5 mm ball nose can actually cut, before any sanding.</p>
+
+<figure>
+  <img src="{{IMG:reach}}" alt="Simulation of the dragon head as the model and as a 6 mm, 3 mm and 1.5 mm ball nose can cut it" loading="lazy" />
+  <figcaption>The 6 mm melts the eye and scales into soft shapes. The 3 mm keeps the eye, the jaw and the main forms, and softens the finest scale texture. The 1.5 mm is almost indistinguishable from the model.</figcaption>
+</figure>
+
+<p>That middle result is the important one. The 3 mm is not bad, it is good nearly everywhere, and the places it falls short are specific and small. On the whole dragon the 3 mm pass looks like this on the machine, and it is the pass that turns a stepped block into a carving:</p>
+
+<figure>
+  <img src="{{IMG:finish3}}" alt="A 3 mm ball nose running the finishing pass across a walnut dragon medallion" loading="lazy" />
+  <figcaption>The 3 mm finishing pass: smooth and fully modelled where the cutter has been, still rough from the roughing pass below it.</figcaption>
+</figure>
+
+<h2 id="rest">Rest machining: the small bit only where it is needed</h2>
+
+<p>Rest machining means running a second, smaller finishing tool only over the material the first tool could not reach, instead of over the whole part again. The software already knows where the 3 mm fell short, because it computed that toolpath. So the 1.5 mm pass becomes a short cleanup of the deep, narrow places rather than a second ten-hour raster.</p>
+
+<p>There are two ways to tell the software where those places are:</p>
+
+<ul>
+  <li><strong>Automatic:</strong> the software calculates the unreached areas itself and sends the small bit only there. Aspire, VCarve Pro and Fusion can do this.</li>
+  <li><strong>By vector:</strong> you draw a boundary around the areas you care about, and the small-bit finishing pass is limited to the inside of it. Every program here can do this, and it is the only option in Carveco's relief toolpath and in Carbide Create.</li>
+</ul>
+
+<figure>
+  <img src="{{IMG:rest15}}" alt="A 1.5 mm tapered ball nose rest-machining only the dragon head after the 3 mm finishing pass" loading="lazy" />
+  <figcaption>The rest pass: a 1.5 mm tapered ball nose working only around the head, after the 3 mm has finished everything.</figcaption>
+</figure>
+
+<h2 id="where">Where the 1.5 mm is actually needed</h2>
+
+<p>We mapped it. Red is every place on the dragon where the 3 mm leaves more than 0.25 mm behind, ignoring specks smaller than 1 square millimetre (the same idea as the "minimum detail" setting in Aspire and VCarve), grown by the small ball's own radius. That red is what automatic rest machining would cut: <strong>5.3 percent of the panel</strong>.</p>
+
+<figure>
+  <img src="{{IMG:restmap}}" alt="Map of the dragon medallion showing in red the only areas a 1.5 mm rest-machining pass needs to cut after a 3 mm finish" loading="lazy" />
+  <figcaption>Red: the only areas a 1.5 mm rest pass needs to touch. Dashed: one hand-drawn vector around the head.</figcaption>
+</figure>
+
+<p>The map also shows the honest limit of the vector method. One vector around the head covers 6.7 percent of the panel but catches only a quarter of the misses on this design, because most of them are thin gaps running along the wing edges and the medallion rim. On a busy, all-over design like this one, automatic rest machining is clearly the better tool. The vector method shines when the fine detail lives in one place: a face, a pair of eyes, claws, lettering.</p>
+
+<h2 id="time">How much time it saves</h2>
+
+<table>
+  <thead>
+    <tr><th>Design (300 mm)</th><th>3 mm only</th><th>1.5 mm everywhere</th><th>3 mm + 1.5 mm rest pass</th><th>Saved vs 1.5 mm everywhere</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Leaping largemouth bass</td><td>5.5 h</td><td>11.1 h</td><td>5.7 h</td><td>49%</td></tr>
+    <tr><td>Feathered fishing lure</td><td>5.5 h</td><td>11.1 h</td><td>6.3 h</td><td>44%</td></tr>
+    <tr><td>Coiled dragon medallion</td><td>5.0 h</td><td>10.0 h</td><td>5.5 h</td><td>45%</td></tr>
+    <tr><td>Mallard duck arch</td><td>4.2 h</td><td>8.4 h</td><td>4.4 h</td><td>48%</td></tr>
+    <tr><td>Rustic cross wreath</td><td>4.7 h</td><td>9.4 h</td><td>5.5 h</td><td>42%</td></tr>
+  </tbody>
+</table>
+
+<figure>
+  <img src="{{IMG:timechart}}" alt="Chart of finishing time for five relief designs: 1.5 mm everywhere against 3 mm plus a 1.5 mm rest pass, 46 percent less on average" loading="lazy" />
+  <figcaption>Finishing time for all five designs. The rest pass adds only 7 to 47 minutes on top of the 3 mm pass.</figcaption>
+</figure>
+
+<p>The rest pass itself is short: 7 to 47 minutes on these panels, because it only covers 1 to 8 percent of the area. At 450 mm (18 in) the picture is the same, 44 to 48 percent saved, because every feature grows with the panel and the 3 mm fits into more of them. Carve smaller, and the balance tips the other way: the same details shrink, the 3 mm misses more, and the 1.5 mm pass earns more of its time.</p>
+
+<h2 id="software">Setting it up in your software</h2>
+
+<p>The idea is the same everywhere: finish the whole model with the 3 mm first, then add a second finishing pass with the 1.5 mm that only runs where it is needed. Keep the same stock setup and the same XY origin for both, and after the tool change re-zero Z for the new bit (or let your tool setter do it).</p>
+
+<h3>Vectric Aspire and VCarve Pro</h3>
+<ul>
+  <li>In current versions, the <strong>3D Finish</strong> toolpath accepts more than one tool. Add the 3 mm ball nose, then the 1.5 mm below it. With more than one tool in the list, the toolpath rest-machines automatically: each tool only cuts what the one before it could not reach.</li>
+  <li>The <strong>Minimum detail</strong> slider decides how small an unreached area can be before the small tool ignores it. Raise it and the rest pass gets shorter; lower it and it chases every speck.</li>
+  <li>To limit the small bit to part of the model, set the <strong>Machining Limit Boundary</strong> to <strong>Selected Vector(s)</strong> and select vectors you have drawn around the detail areas.</li>
+  <li>If your version does not offer a second tool in the 3D Finish toolpath, use the vector method below: a normal 3D finish with the 1.5 mm, limited to selected vectors.</li>
+</ul>
+
+<h3>Fusion</h3>
+<ul>
+  <li>Finish with the 3 mm (Parallel or Scallop), then add a second finishing operation with the 1.5 mm and turn on <strong>Rest Machining</strong>, with the source set to your previous operations, so it only cuts what they left.</li>
+  <li>For the deep creases between forms, a <strong>Pencil</strong> toolpath with the small bit is made for exactly this cleanup.</li>
+  <li>Use a machining boundary if you also want to keep it to one area.</li>
+</ul>
+
+<h3>Carveco</h3>
+<ul>
+  <li>Carveco's automatic rest machining is documented for 2D area clearance; for reliefs, use vectors. Draw closed vectors around the detail areas, select them, and run a second <strong>Machine Relief</strong> finishing pass with the 1.5 mm limited to the selected vector.</li>
+</ul>
+
+<h3>Carbide Create Pro</h3>
+<ul>
+  <li>Carbide Create does not rest-machine 3D toolpaths automatically. Draw vectors around the areas that need the small bit, and select them for a second 3D finishing toolpath with the 1.5 mm.</li>
+</ul>
+
+<p>For the small bit itself, a <strong>tapered</strong> 1.5 mm ball nose is the better buy than a straight one: the cone makes it far stiffer, so it reaches down into narrow gaps without flexing or snapping. Starting speeds, feeds and stepovers are in our <a href="/blog/tapered-ball-nose-bits-relief-carving">tapered ball nose guide</a>.</p>
+
+<h2 id="which">Which approach for which carving</h2>
+
+<table>
+  <thead>
+    <tr><th>Your situation</th><th>What we would do</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Wall panel 300 mm or larger, you just want it done</td><td>3 mm only. It is within a quarter of a millimetre on 97 to 99 percent of the surface, and sanding and a dark glaze hide most of the rest.</td></tr>
+    <tr><td>You want the eyes, faces or feathers crisp</td><td>3 mm, then a 1.5 mm rest pass. Automatic if your software has it, vectors around the faces and eyes if not.</td></tr>
+    <tr><td>Busy all-over texture (scales, feathers, leaves everywhere)</td><td>Automatic rest machining. Hand-drawn vectors miss too much on these, as the dragon map shows.</td></tr>
+    <tr><td>Small carving, under about 200 mm</td><td>The detail shrinks with the panel, so the 1.5 mm matters more. Rest-machine at the least, and consider it for the whole finish on very small pieces.</td></tr>
+    <tr><td>You only own a 6 mm ball nose</td><td>Fine for a quick first carve, but expect soft detail: it missed visible detail on 3 to 9 percent of these panels. A 3 mm is the single best upgrade.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="mistakes">Common mistakes</h2>
+
+<ul>
+  <li><strong>Running the 1.5 mm over everything "to be safe".</strong> It doubles the finishing time to improve 1 to 3 percent of the surface.</li>
+  <li><strong>Lowering the stepover to get back missing detail.</strong> Stepover only changes the ridges left between passes. At 10 percent those ridges are under a hundredth of a millimetre for both bits, far below what sanding removes. Detail a ball cannot reach stays unreached at any stepover; only a smaller ball gets in.</li>
+  <li><strong>Using a straight 1.5 mm bit in deep gaps.</strong> A long, thin, straight shank flexes. A tapered ball nose has the same tip on a much stiffer body.</li>
+  <li><strong>Moving the XY origin between the two passes.</strong> The rest pass is only useful if it lines up with the first finish. Keep the origin; re-zero Z only.</li>
+  <li><strong>Judging the result before the finish goes on.</strong> A dark glaze settles into exactly the narrow places a 3 mm could not quite reach, which is why a 3 mm carving often looks sharper finished than raw. Our <a href="/blog/how-to-finish-cnc-relief-carvings">finishing guide</a> shows how.</li>
+</ul>
+
+<figure>
+  <img src="{{IMG:closeup}}" alt="The finished walnut dragon medallion on a stone mantel in candle and firelight" loading="lazy" />
+  <figcaption>What the detail is for: the finished dragon, oiled walnut, by the fire.</figcaption>
+</figure>
+
+<h2 id="faq">Questions</h2>
+
+<h3>Is a 1.5 mm ball nose worth buying?</h3>
+<p>Yes, as a second finishing bit rather than your only one. Used for a rest pass after a 3 mm, it adds 7 to 47 minutes on a 300 mm panel and brings back the narrow detail. Used over the whole panel, it doubles your finishing time for very little extra.</p>
+
+<h3>Does rest machining work in VCarve Pro, or only in Aspire?</h3>
+<p>In current versions, both: the 3D Finish toolpath rest-machines when you give it more than one tool, and both can limit a toolpath to selected vectors. Fusion does it too. In Carveco's relief toolpath and in Carbide Create you use the vector method.</p>
+
+<h3>What stepover should I use?</h3>
+<p>8 to 12 percent of the tool diameter is the usual range for 3D finishing, and we used 10 percent for every number here. At 10 percent the ridges left by either bit are too small to see after sanding, so there is little to gain from going lower.</p>
+
+<h3>How long does the rest pass itself take?</h3>
+<p>On these five 300 mm designs, 7 to 47 minutes, because the 1.5 mm only covers 1 to 8 percent of the panel.</p>
+
+<h3>Can I check my own file before I carve it?</h3>
+<p>Yes. Drop any STL into <a href="/tools/will-it-cut">Will it cut?</a> and it shows what each ball size misses on your file, at the size you plan to carve. It runs in your browser, so the file never leaves your computer.</p>
+
+<h2 id="files">The five designs we tested</h2>
+
+<p>Every number in this article comes from these five files, and each one carves well with a 3 mm finish alone. The dragon is the one to try a rest pass on: it has the most to gain.</p>
+
+<figure>
+  <a href="{{URL:dragon}}"><img src="{{MOCK:dragon}}" alt="{{TITLE:dragon}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:dragon}}">Download the coiled dragon medallion · {{PRICE:dragon}}</a></p>
+
+<figure>
+  <a href="{{URL:bass}}"><img src="{{MOCK:bass}}" alt="{{TITLE:bass}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:bass}}">Download the leaping largemouth bass · {{PRICE:bass}}</a></p>
+
+<figure>
+  <a href="{{URL:lure}}"><img src="{{MOCK:lure}}" alt="{{TITLE:lure}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:lure}}">Download the feathered fishing lure · {{PRICE:lure}}</a></p>
+
+<figure>
+  <a href="{{URL:mallard}}"><img src="{{MOCK:mallard}}" alt="{{TITLE:mallard}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:mallard}}">Download the mallard duck arch · {{PRICE:mallard}}</a></p>
+
+<figure>
+  <a href="{{URL:cross}}"><img src="{{MOCK:cross}}" alt="{{TITLE:cross}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:cross}}">Download the rustic cross wreath · {{PRICE:cross}}</a></p>
+
+<p>Commercial use is included with every design: carve them and sell what you make. The details are on our <a href="/license">licence page</a>.</p>

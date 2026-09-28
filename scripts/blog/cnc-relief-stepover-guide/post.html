@@ -1,0 +1,167 @@
+<p><strong>The short answer:</strong> for a 3 mm ball nose on a relief you will oil straight off the machine, use 8 to 10 percent stepover. If you will brush and lightly sand before finishing, 15 percent is plenty, and it cuts finishing time by a third. Up to 25 percent leaves ridges that a pass of 220 grit still removes, in under half the time of 10 percent. Past that, the ridges become real work. Stepover buys time with ridges, and nothing else: it never brings back detail the ball cannot reach.</p>
+
+<p>Every number below comes from the real STL of our leaping largemouth bass, carved at 300 mm (12 in), with the ridge heights worked out exactly and the times from the same model as our free <a href="/tools/will-it-cut">Will it cut? checker</a>.</p>
+
+<h2 id="contents">What this guide covers</h2>
+<ul>
+  <li><a href="#what">What stepover actually is</a></li>
+  <li><a href="#ridges">Why it leaves ridges, and how tall</a></li>
+  <li><a href="#table">The numbers for a 3 mm ball nose</a></li>
+  <li><a href="#see">What those ridges look like on a carving</a></li>
+  <li><a href="#finish">Pick the stepover by how you will finish</a></li>
+  <li><a href="#bits">Bigger ball, finer stepover</a></li>
+  <li><a href="#tips">Five things that matter more than people think</a></li>
+  <li><a href="#faq">Questions</a></li>
+  <li><a href="#files">The designs in this guide</a></li>
+</ul>
+
+<h2 id="what">What stepover actually is</h2>
+
+<p>A 3D finishing pass does not carve the whole surface at once. The ball nose runs back and forth in straight lines, and each line sits a little over from the last. That sideways step between neighbouring passes is the stepover. Software usually asks for it as a percentage of the tool diameter, so 10 percent on a 3 mm ball means the passes are 0.3 mm apart.</p>
+
+<figure>
+  <img src="{{IMG:passes}}" alt="A 3 mm ball nose laying down parallel finishing passes across the maple bass, the stepover visible as evenly spaced lines" loading="lazy" />
+  <figcaption>The 3 mm ball nose laying down its passes. The gap between those lines is the stepover.</figcaption>
+</figure>
+
+<h2 id="ridges">Why it leaves ridges, and how tall</h2>
+
+<p>Each pass of a round tip cuts a shallow groove. Where two grooves meet, a thin ridge of wood is left standing between them: machinists call it a scallop or cusp. Its height is plain geometry, <strong>h = r - &radic;(r&sup2; - (s/2)&sup2;)</strong>, for a ball of radius r at stepover s. The useful consequence: <strong>double the stepover and the ridge gets about four times taller</strong>, while the finishing time halves.</p>
+
+<figure>
+  <img src="{{IMG:scallop}}" alt="Diagram of how a 3 mm ball nose leaves ridges at 10 and 25 percent stepover, magnified against what 220 grit removes" loading="lazy" />
+  <figcaption>At 10 percent the ridges are a small fraction of what sanding removes. At 25 percent they reach almost exactly to it.</figcaption>
+</figure>
+
+<p>To judge whether a ridge matters, compare it with what a pass of 220 grit takes off, about 0.05 mm. A ridge well under that is gone the moment you sand. A ridge near it needs a proper sanding. A ridge well over it is texture you will be fighting.</p>
+
+<h2 id="table">The numbers for a 3 mm ball nose</h2>
+
+<p>The leaping bass at 300 mm, finished with a 3 mm ball nose on a mid-size hobby machine (the Shapeoko, X-Carve and Onefinity class) at the feeds on our product pages. Roughing takes about 1.5 hours whatever stepover you finish with, so it is left out.</p>
+
+<table>
+  <thead>
+    <tr><th>Stepover</th><th>Passes apart</th><th>Ridge height</th><th>Finishing time</th><th>What you get</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>8%</td><td>0.24 mm</td><td>0.005 mm</td><td>6.9 h</td><td>Smooth off the machine</td></tr>
+    <tr><td>10%</td><td>0.30 mm</td><td>0.008 mm</td><td>5.5 h</td><td>Smooth off the machine</td></tr>
+    <tr><td>12%</td><td>0.36 mm</td><td>0.011 mm</td><td>4.6 h</td><td>Faint lines in raking light</td></tr>
+    <tr><td>15%</td><td>0.45 mm</td><td>0.017 mm</td><td>3.7 h</td><td>Faint lines; a brush takes them off</td></tr>
+    <tr><td>20%</td><td>0.60 mm</td><td>0.030 mm</td><td>2.8 h</td><td>Visible lines; light sanding</td></tr>
+    <tr><td>25%</td><td>0.75 mm</td><td>0.048 mm</td><td>2.2 h</td><td>Clear lines; a full 220 sanding</td></tr>
+    <tr><td>30%</td><td>0.90 mm</td><td>0.069 mm</td><td>1.9 h</td><td>More than 220 grit removes</td></tr>
+    <tr><td>40%</td><td>1.20 mm</td><td>0.125 mm</td><td>1.4 h</td><td>Corrugated; real sanding work</td></tr>
+  </tbody>
+</table>
+
+<p>Going from 10 to 15 percent saves nearly two hours on this panel and leaves ridges a brass brush handles. On a 450 mm (18 in) panel every time in the table is about 2.25 times longer, so the same step saves over four hours; the ridge heights do not change with size.</p>
+
+<h2 id="see">What those ridges look like on a carving</h2>
+
+<p>Numbers under a tenth of a millimetre are hard to picture, so here is the eye and gill of the same bass, 46 mm across, straight off the machine at four stepovers. The ridges are simulated from the real file, not drawn in by hand; the wood's photographic look comes from a render of that same surface.</p>
+
+<figure>
+  <img src="{{IMG:surfaces}}" alt="The eye of the carved bass straight off the machine at 8, 15, 25 and 40 percent stepover" loading="lazy" />
+  <figcaption>8 percent: smooth. 15 percent: faint lines. 25 percent: clear lines that 220 grit still removes. 40 percent: a corrugated surface that needs real work.</figcaption>
+</figure>
+
+<p>Notice what does not change: the eye, the gill cover and the scale texture are exactly as sharp at 40 percent as at 8. Stepover only adds ridges on top. It is a finish decision, not a detail decision; detail is decided by the ball size, which is what our <a href="/blog/3mm-vs-1-5mm-ball-nose-relief-carving">3 mm vs 1.5 mm ball nose guide</a> measures.</p>
+
+<h2 id="finish">Pick the stepover by how you will finish</h2>
+
+<p>The right stepover is really a question about what happens after the machine stops.</p>
+
+<table>
+  <thead>
+    <tr><th>How you will finish</th><th>3 mm ball nose</th><th>Why</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Oil or wax straight off the machine, no sanding</td><td>8 to 10%</td><td>Oil darkens every ridge and raking light finds them. Keep them under a hundredth of a millimetre.</td></tr>
+    <tr><td>Brass brush, light sand, then glaze or stain</td><td>12 to 15%</td><td>The brush and a dark glaze take care of ridges this size, and you save about a third of the finishing time.</td></tr>
+    <tr><td>Flat or gently curved work you will sand properly, or paint</td><td>20 to 25%</td><td>Ridges stay under what 220 grit removes, in less than half the time of 10%.</td></tr>
+    <tr><td>Fine, deep detail you cannot get sandpaper into</td><td>8 to 10%</td><td>Sanding only reaches the open surfaces. Ridges in the recesses stay, so leave fewer of them.</td></tr>
+  </tbody>
+</table>
+
+<figure>
+  <img src="{{IMG:brush}}" alt="Hands brushing the tool ridges off the maple bass carving with a brass wire brush" loading="lazy" />
+  <figcaption>A brass wire brush takes small ridges off the open surfaces in minutes, and it gets into places sandpaper does not.</figcaption>
+</figure>
+
+<p>The brush step is covered in detail, with the products we use, in our <a href="/blog/how-to-finish-cnc-relief-carvings">finishing guide</a>.</p>
+
+<h2 id="bits">Bigger ball, finer stepover</h2>
+
+<p>The same percentage does not mean the same finish across bit sizes. At 10 percent, a 1.5 mm ball leaves 0.004 mm ridges, a 3 mm ball 0.008 mm and a 6 mm ball 0.015 mm, because the passes are further apart on the bigger ball. Turn it around, and a bigger ball can reach the same ridge height with fewer passes:</p>
+
+<figure>
+  <img src="{{IMG:timeridge}}" alt="Chart of finishing time against ridge height for 1.5, 3 and 6 mm ball nose bits" loading="lazy" />
+  <figcaption>Each dot is one stepover. Stars mark the fastest setting for each bit whose ridges 220 grit still removes.</figcaption>
+</figure>
+
+<table>
+  <thead>
+    <tr><th>Bit</th><th>Fastest stepover that still sands off</th><th>Finishing time</th><th>Ridge</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1.5 mm ball</td><td>30%</td><td>3.7 h</td><td>0.035 mm</td></tr>
+    <tr><td>3 mm ball</td><td>25%</td><td>2.2 h</td><td>0.048 mm</td></tr>
+    <tr><td>6 mm ball</td><td>15%</td><td>1.9 h</td><td>0.034 mm</td></tr>
+  </tbody>
+</table>
+
+<p>So the 6 mm ball is the fastest way to a sandable finish, and that is exactly the trap: it cannot get into fine detail at any stepover. On the designs we tested it missed visible detail on 3 to 9 percent of every panel. The 3 mm is the best all-round finishing bit for relief work, and a 1.5 mm rest pass handles the few places it cannot reach.</p>
+
+<h2 id="tips">Five things that matter more than people think</h2>
+
+<ul>
+  <li><strong>Run the passes along the grain.</strong> Most software has a raster angle. Lined up with the grain, the ridges hide in the wood's own lines; across it, they catch the light.</li>
+  <li><strong>Stepover never recovers detail.</strong> If the eye or a feather looks soft, a finer stepover will not fix it. A smaller ball will.</li>
+  <li><strong>Hang it where the light rakes.</strong> A carving by a window or under a picture light shows ridges that disappear under flat ceiling light. Finish for the wall it is going on.</li>
+  <li><strong>Oil makes ridges look taller.</strong> Oil soaks into the ridge sides and darkens them. If you oil without sanding, go finer, not coarser.</li>
+  <li><strong>Check the time before you commit.</strong> Our <a href="/tools/will-it-cut">Will it cut? tool</a> shows the finishing time and the fastest sand-free stepover for your own file at your own size, right in your browser.</li>
+</ul>
+
+<figure>
+  <img src="{{IMG:lakehouse}}" alt="The finished maple bass relief hanging on a cabin wall at golden hour, the lake glowing through the window" loading="lazy" />
+  <figcaption>The same bass, brushed, glazed and oiled. No ridges left, and a few hours saved on the machine.</figcaption>
+</figure>
+
+<h2 id="faq">Questions</h2>
+
+<h3>What stepover should I use for a 3 mm (1/8 in) ball nose?</h3>
+<p>8 to 10 percent if you will not sand, 12 to 15 percent if you will brush and glaze, and up to 25 percent on surfaces you will sand properly with 220 grit. A 1/8 inch ball is 3.175 mm, close enough that the same percentages apply.</p>
+
+<h3>Does a smaller stepover give more detail?</h3>
+<p>No. It gives smaller ridges between passes. The detail you get is set by how small the ball is, because a ball cannot reach into a gap narrower than itself at any stepover.</p>
+
+<h3>Should I set stepover as a percentage or in millimetres?</h3>
+<p>Either works as long as you remember it is the distance between passes that matters. A percentage is handy because the ridge height stays the same fraction of the ball's size, so 10 percent looks alike on any ball. In millimetres, the same stepover leaves smaller ridges on a bigger ball.</p>
+
+<h3>How much time does going from 10 to 15 percent save?</h3>
+<p>A third of the finishing time. On the bass at 300 mm that is 5.5 hours down to 3.7 hours; at 450 mm, 12.5 hours down to 8.3.</p>
+
+<h3>Why can I still see lines after finishing?</h3>
+<p>Usually because the ridges are bigger than the sanding took off, the light is raking across them, and oil has darkened their sides. Brush or sand once more across the lines, or finish the next one at a finer stepover.</p>
+
+<h2 id="files">The designs in this guide</h2>
+
+<p>The leaping bass is the carving in every photograph and every number above. Two more from the same study carve well at any of these settings.</p>
+
+<figure>
+  <a href="{{URL:bass}}"><img src="{{MOCK:bass}}" alt="{{TITLE:bass}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:bass}}">Download the leaping largemouth bass · {{PRICE:bass}}</a></p>
+
+<figure>
+  <a href="{{URL:lure}}"><img src="{{MOCK:lure}}" alt="{{TITLE:lure}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:lure}}">Download the feathered fishing lure · {{PRICE:lure}}</a></p>
+
+<figure>
+  <a href="{{URL:mallard}}"><img src="{{MOCK:mallard}}" alt="{{TITLE:mallard}} carved in wood" loading="lazy" /></a>
+</figure>
+<p><a class="dl-btn" href="{{URL:mallard}}">Download the mallard duck arch · {{PRICE:mallard}}</a></p>
+
+<p>Commercial use is included with every design: carve them and sell what you make. The details are on our <a href="/license">licence page</a>.</p>

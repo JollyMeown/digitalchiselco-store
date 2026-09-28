@@ -1,0 +1,13 @@
+{
+  "title": "CNC Relief Stepover: What It Buys You, and What It Costs",
+  "excerpt": "Stepover buys finishing time with ridges, and nothing else. Measured on a real bass relief at 300 mm: ridge heights and finishing times for 8 to 40 percent stepover, what the ridges look like, which stepover suits each way of finishing, and why a bigger ball at a finer stepover is faster.",
+  "seo_title": "CNC Relief Stepover Guide: Ridge Height vs Carving Time",
+  "seo_description": "What stepover to use for CNC relief carving: ridge height and finishing time for a 3 mm ball nose from 8 to 40 percent, measured on a real 300 mm relief, with the right setting for oiling, glazing or sanding.",
+  "cover": "hero",
+  "email": {
+    "subject": "Your stepover is costing you hours",
+    "intro": "Most of us run 10 percent stepover because that is what we were told. We measured what it actually buys on a real 12 inch relief.\n\nAt 15 percent the ridges are small enough for a brass brush and you finish in a third less time. Up to 25 percent they still sand off with 220 grit, in less than half the time. The new guide shows the ridges at four stepovers on the same carving, and which setting suits the way you finish.",
+    "image": "lakehouse",
+    "drip": true
+  }
+}

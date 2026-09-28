@@ -1,0 +1,8 @@
+{
+ "visibleLossPct": 1.6,
+ "autoRestZonePct": 5.31,
+ "headVectorPct": 6.71,
+ "headVectorCatchesPctOfMisses": 24.7,
+ "thresholdMm": 0.25,
+ "minSpeckMm2": 1
+}

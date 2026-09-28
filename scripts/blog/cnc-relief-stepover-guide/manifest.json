@@ -1,0 +1,37 @@
+[
+  {
+    "key": "hero",
+    "alt": "A freshly machined maple bass relief under low raking light, fine parallel tool ridges visible across the smooth water",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-stepover-guide/hero.jpg"
+  },
+  {
+    "key": "passes",
+    "alt": "A 3 mm ball nose laying down parallel finishing passes across the maple bass, the stepover visible as evenly spaced lines",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-stepover-guide/passes.jpg"
+  },
+  {
+    "key": "brush",
+    "alt": "Hands brushing the tool ridges off the maple bass carving with a brass brush, one half smooth and one half still ridged",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-stepover-guide/brush.jpg"
+  },
+  {
+    "key": "lakehouse",
+    "alt": "The finished maple bass relief hanging on a cabin wall at golden hour, the lake glowing through the window",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-stepover-guide/lakehouse.jpg"
+  },
+  {
+    "key": "scallop",
+    "alt": "Diagram of how a 3 mm ball nose leaves ridges at 10 and 25 percent stepover, magnified against what 220 grit removes",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-stepover-guide/scallop.jpg"
+  },
+  {
+    "key": "surfaces",
+    "alt": "The eye of the carved bass straight off the machine at 8, 15, 25 and 40 percent stepover",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-stepover-guide/surfaces.jpg"
+  },
+  {
+    "key": "timeridge",
+    "alt": "Chart of finishing time against ridge height for 1.5, 3 and 6 mm ball nose bits",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/cnc-relief-stepover-guide/timeridge.jpg"
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "title": "3 mm vs 1.5 mm Ball Nose for CNC Relief Carving: What Detail Survives, and How Rest Machining Halves the Time",
+  "excerpt": "We simulated five real relief designs to measure what a 6 mm, 3 mm and 1.5 mm ball nose each miss. The 3 mm gets 97 to 99 percent of the surface; a 1.5 mm rest pass gets the rest in about half the time of running it everywhere. With rest-machining setup for Aspire, VCarve Pro, Fusion, Carveco and Carbide Create.",
+  "seo_title": "3mm vs 1.5mm Ball Nose for CNC Relief: Detail, Time and Rest Machining",
+  "seo_description": "Simulated on five real relief STLs: what a 6, 3 and 1.5 mm ball nose miss, and how a 1.5 mm rest-machining pass after a 3 mm finish saves 42 to 49 percent of finishing time. Setup for Aspire, VCarve Pro, Fusion, Carveco, Carbide Create.",
+  "cover": "hero",
+  "email": {
+    "subject": "The 1.5 mm bit only needs 3% of your carving",
+    "intro": "Most of us own a 3 mm ball nose and wonder whether the 1.5 mm is worth ten hours. We measured it on five real designs.\n\nThe 3 mm gets within a quarter of a millimetre on 97 to 99 percent of a 12 inch panel. The 1.5 mm only matters in the last few narrow places, and rest machining sends it only there: the same detail in about half the finishing time. The new guide shows the pictures, the numbers, and how to set it up in Aspire, VCarve Pro, Fusion, Carveco and Carbide Create.",
+    "image": "closeup",
+    "drip": true
+  }
+}

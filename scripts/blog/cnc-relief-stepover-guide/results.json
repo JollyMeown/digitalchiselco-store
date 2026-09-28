@@ -1,0 +1,462 @@
+{
+ "design": "Leaping largemouth bass",
+ "machine": {
+  "name": "Mid hobby (Shapeoko, X-Carve, Onefinity)",
+  "rpm": 16000,
+  "feed": 1800,
+  "doc": 3
+ },
+ "sandingMm": 0.05,
+ "sizes": {
+  "300": {
+   "mm": {
+    "x": 300,
+    "y": 300,
+    "depth": 17.8
+   },
+   "rows": [
+    {
+     "dia": 1.5,
+     "so": 5,
+     "stepMm": 0.075,
+     "scallopMm": 0.0009,
+     "finishH": 22.2,
+     "roughH": 1.51
+    },
+    {
+     "dia": 1.5,
+     "so": 8,
+     "stepMm": 0.12,
+     "scallopMm": 0.0024,
+     "finishH": 13.88,
+     "roughH": 1.51
+    },
+    {
+     "dia": 1.5,
+     "so": 10,
+     "stepMm": 0.15,
+     "scallopMm": 0.0038,
+     "finishH": 11.1,
+     "roughH": 1.51
+    },
+    {
+     "dia": 1.5,
+     "so": 12,
+     "stepMm": 0.18,
+     "scallopMm": 0.0054,
+     "finishH": 9.25,
+     "roughH": 1.51
+    },
+    {
+     "dia": 1.5,
+     "so": 15,
+     "stepMm": 0.225,
+     "scallopMm": 0.0085,
+     "finishH": 7.4,
+     "roughH": 1.51
+    },
+    {
+     "dia": 1.5,
+     "so": 20,
+     "stepMm": 0.3,
+     "scallopMm": 0.0152,
+     "finishH": 5.55,
+     "roughH": 1.51
+    },
+    {
+     "dia": 1.5,
+     "so": 25,
+     "stepMm": 0.375,
+     "scallopMm": 0.0238,
+     "finishH": 4.44,
+     "roughH": 1.51
+    },
+    {
+     "dia": 1.5,
+     "so": 30,
+     "stepMm": 0.45,
+     "scallopMm": 0.0345,
+     "finishH": 3.7,
+     "roughH": 1.51
+    },
+    {
+     "dia": 1.5,
+     "so": 40,
+     "stepMm": 0.6,
+     "scallopMm": 0.0626,
+     "finishH": 2.78,
+     "roughH": 1.51
+    },
+    {
+     "dia": 3,
+     "so": 5,
+     "stepMm": 0.15,
+     "scallopMm": 0.0019,
+     "finishH": 11.1,
+     "roughH": 1.51
+    },
+    {
+     "dia": 3,
+     "so": 8,
+     "stepMm": 0.24,
+     "scallopMm": 0.0048,
+     "finishH": 6.94,
+     "roughH": 1.51
+    },
+    {
+     "dia": 3,
+     "so": 10,
+     "stepMm": 0.3,
+     "scallopMm": 0.0075,
+     "finishH": 5.55,
+     "roughH": 1.51
+    },
+    {
+     "dia": 3,
+     "so": 12,
+     "stepMm": 0.36,
+     "scallopMm": 0.0108,
+     "finishH": 4.63,
+     "roughH": 1.51
+    },
+    {
+     "dia": 3,
+     "so": 15,
+     "stepMm": 0.45,
+     "scallopMm": 0.017,
+     "finishH": 3.7,
+     "roughH": 1.51
+    },
+    {
+     "dia": 3,
+     "so": 20,
+     "stepMm": 0.6,
+     "scallopMm": 0.0303,
+     "finishH": 2.78,
+     "roughH": 1.51
+    },
+    {
+     "dia": 3,
+     "so": 25,
+     "stepMm": 0.75,
+     "scallopMm": 0.0476,
+     "finishH": 2.22,
+     "roughH": 1.51
+    },
+    {
+     "dia": 3,
+     "so": 30,
+     "stepMm": 0.9,
+     "scallopMm": 0.0691,
+     "finishH": 1.85,
+     "roughH": 1.51
+    },
+    {
+     "dia": 3,
+     "so": 40,
+     "stepMm": 1.2,
+     "scallopMm": 0.1252,
+     "finishH": 1.39,
+     "roughH": 1.51
+    },
+    {
+     "dia": 6,
+     "so": 5,
+     "stepMm": 0.3,
+     "scallopMm": 0.0038,
+     "finishH": 5.55,
+     "roughH": 1.51
+    },
+    {
+     "dia": 6,
+     "so": 8,
+     "stepMm": 0.48,
+     "scallopMm": 0.0096,
+     "finishH": 3.47,
+     "roughH": 1.51
+    },
+    {
+     "dia": 6,
+     "so": 10,
+     "stepMm": 0.6,
+     "scallopMm": 0.015,
+     "finishH": 2.78,
+     "roughH": 1.51
+    },
+    {
+     "dia": 6,
+     "so": 12,
+     "stepMm": 0.72,
+     "scallopMm": 0.0217,
+     "finishH": 2.32,
+     "roughH": 1.51
+    },
+    {
+     "dia": 6,
+     "so": 15,
+     "stepMm": 0.9,
+     "scallopMm": 0.0339,
+     "finishH": 1.85,
+     "roughH": 1.51
+    },
+    {
+     "dia": 6,
+     "so": 20,
+     "stepMm": 1.2,
+     "scallopMm": 0.0606,
+     "finishH": 1.39,
+     "roughH": 1.51
+    },
+    {
+     "dia": 6,
+     "so": 25,
+     "stepMm": 1.5,
+     "scallopMm": 0.0953,
+     "finishH": 1.11,
+     "roughH": 1.51
+    },
+    {
+     "dia": 6,
+     "so": 30,
+     "stepMm": 1.8,
+     "scallopMm": 0.1382,
+     "finishH": 0.93,
+     "roughH": 1.51
+    },
+    {
+     "dia": 6,
+     "so": 40,
+     "stepMm": 2.4,
+     "scallopMm": 0.2505,
+     "finishH": 0.69,
+     "roughH": 1.51
+    }
+   ]
+  },
+  "450": {
+   "mm": {
+    "x": 450,
+    "y": 450,
+    "depth": 26.6
+   },
+   "rows": [
+    {
+     "dia": 1.5,
+     "so": 5,
+     "stepMm": 0.075,
+     "scallopMm": 0.0009,
+     "finishH": 49.95,
+     "roughH": 5.11
+    },
+    {
+     "dia": 1.5,
+     "so": 8,
+     "stepMm": 0.12,
+     "scallopMm": 0.0024,
+     "finishH": 31.22,
+     "roughH": 5.11
+    },
+    {
+     "dia": 1.5,
+     "so": 10,
+     "stepMm": 0.15,
+     "scallopMm": 0.0038,
+     "finishH": 24.98,
+     "roughH": 5.11
+    },
+    {
+     "dia": 1.5,
+     "so": 12,
+     "stepMm": 0.18,
+     "scallopMm": 0.0054,
+     "finishH": 20.82,
+     "roughH": 5.11
+    },
+    {
+     "dia": 1.5,
+     "so": 15,
+     "stepMm": 0.225,
+     "scallopMm": 0.0085,
+     "finishH": 16.65,
+     "roughH": 5.11
+    },
+    {
+     "dia": 1.5,
+     "so": 20,
+     "stepMm": 0.3,
+     "scallopMm": 0.0152,
+     "finishH": 12.49,
+     "roughH": 5.11
+    },
+    {
+     "dia": 1.5,
+     "so": 25,
+     "stepMm": 0.375,
+     "scallopMm": 0.0238,
+     "finishH": 9.99,
+     "roughH": 5.11
+    },
+    {
+     "dia": 1.5,
+     "so": 30,
+     "stepMm": 0.45,
+     "scallopMm": 0.0345,
+     "finishH": 8.32,
+     "roughH": 5.11
+    },
+    {
+     "dia": 1.5,
+     "so": 40,
+     "stepMm": 0.6,
+     "scallopMm": 0.0626,
+     "finishH": 6.25,
+     "roughH": 5.11
+    },
+    {
+     "dia": 3,
+     "so": 5,
+     "stepMm": 0.15,
+     "scallopMm": 0.0019,
+     "finishH": 24.98,
+     "roughH": 5.11
+    },
+    {
+     "dia": 3,
+     "so": 8,
+     "stepMm": 0.24,
+     "scallopMm": 0.0048,
+     "finishH": 15.61,
+     "roughH": 5.11
+    },
+    {
+     "dia": 3,
+     "so": 10,
+     "stepMm": 0.3,
+     "scallopMm": 0.0075,
+     "finishH": 12.49,
+     "roughH": 5.11
+    },
+    {
+     "dia": 3,
+     "so": 12,
+     "stepMm": 0.36,
+     "scallopMm": 0.0108,
+     "finishH": 10.41,
+     "roughH": 5.11
+    },
+    {
+     "dia": 3,
+     "so": 15,
+     "stepMm": 0.45,
+     "scallopMm": 0.017,
+     "finishH": 8.32,
+     "roughH": 5.11
+    },
+    {
+     "dia": 3,
+     "so": 20,
+     "stepMm": 0.6,
+     "scallopMm": 0.0303,
+     "finishH": 6.25,
+     "roughH": 5.11
+    },
+    {
+     "dia": 3,
+     "so": 25,
+     "stepMm": 0.75,
+     "scallopMm": 0.0476,
+     "finishH": 5,
+     "roughH": 5.11
+    },
+    {
+     "dia": 3,
+     "so": 30,
+     "stepMm": 0.9,
+     "scallopMm": 0.0691,
+     "finishH": 4.17,
+     "roughH": 5.11
+    },
+    {
+     "dia": 3,
+     "so": 40,
+     "stepMm": 1.2,
+     "scallopMm": 0.1252,
+     "finishH": 3.13,
+     "roughH": 5.11
+    },
+    {
+     "dia": 6,
+     "so": 5,
+     "stepMm": 0.3,
+     "scallopMm": 0.0038,
+     "finishH": 12.49,
+     "roughH": 5.11
+    },
+    {
+     "dia": 6,
+     "so": 8,
+     "stepMm": 0.48,
+     "scallopMm": 0.0096,
+     "finishH": 7.81,
+     "roughH": 5.11
+    },
+    {
+     "dia": 6,
+     "so": 10,
+     "stepMm": 0.6,
+     "scallopMm": 0.015,
+     "finishH": 6.25,
+     "roughH": 5.11
+    },
+    {
+     "dia": 6,
+     "so": 12,
+     "stepMm": 0.72,
+     "scallopMm": 0.0217,
+     "finishH": 5.21,
+     "roughH": 5.11
+    },
+    {
+     "dia": 6,
+     "so": 15,
+     "stepMm": 0.9,
+     "scallopMm": 0.0339,
+     "finishH": 4.17,
+     "roughH": 5.11
+    },
+    {
+     "dia": 6,
+     "so": 20,
+     "stepMm": 1.2,
+     "scallopMm": 0.0606,
+     "finishH": 3.13,
+     "roughH": 5.11
+    },
+    {
+     "dia": 6,
+     "so": 25,
+     "stepMm": 1.5,
+     "scallopMm": 0.0953,
+     "finishH": 2.5,
+     "roughH": 5.11
+    },
+    {
+     "dia": 6,
+     "so": 30,
+     "stepMm": 1.8,
+     "scallopMm": 0.1382,
+     "finishH": 2.08,
+     "roughH": 5.11
+    },
+    {
+     "dia": 6,
+     "so": 40,
+     "stepMm": 2.4,
+     "scallopMm": 0.2505,
+     "finishH": 1.57,
+     "roughH": 5.11
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "key": "hero",
+    "alt": "A 3 mm ball nose and a 1.5 mm tapered ball nose lying on a finished walnut dragon medallion under low raking light",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3mm-vs-1-5mm-ball-nose-relief-carving/hero.jpg"
+  },
+  {
+    "key": "finish3",
+    "alt": "A 3 mm ball nose running the finishing pass across the walnut dragon medallion, smooth behind the cutter, stepped roughing ahead of it",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3mm-vs-1-5mm-ball-nose-relief-carving/finish3.jpg"
+  },
+  {
+    "key": "rest15",
+    "alt": "A 1.5 mm tapered ball nose rest-machining only the dragon head inside a boundary, the rest of the medallion already finished by the 3 mm",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3mm-vs-1-5mm-ball-nose-relief-carving/rest15.jpg"
+  },
+  {
+    "key": "closeup",
+    "alt": "Close-up of the finished walnut dragon medallion on a stone mantel in warm firelight, every scale and wing rib crisp",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3mm-vs-1-5mm-ball-nose-relief-carving/closeup.jpg"
+  },
+  {
+    "key": "reach",
+    "alt": "Simulation of the dragon head as the model and as a 6 mm, 3 mm and 1.5 mm ball nose can cut it",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3mm-vs-1-5mm-ball-nose-relief-carving/reach.jpg"
+  },
+  {
+    "key": "restmap",
+    "alt": "Map of the dragon medallion showing in red the only areas a 1.5 mm rest-machining pass needs to cut after a 3 mm finish",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3mm-vs-1-5mm-ball-nose-relief-carving/restmap.jpg"
+  },
+  {
+    "key": "timechart",
+    "alt": "Chart of finishing time for five relief designs: 1.5 mm everywhere against 3 mm plus a 1.5 mm rest pass, 46 percent less on average",
+    "url": "https://tutalnieozbngrsfywes.supabase.co/storage/v1/object/public/site-media/blog/3mm-vs-1-5mm-ball-nose-relief-carving/timechart.jpg"
+  }
+]

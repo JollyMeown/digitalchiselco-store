@@ -1011,4 +1011,8 @@ const ld = jsonLd({
   .faq p { margin: .5rem 0 0; font-size: .9rem; line-height: 1.6; color: #3a2a1a; }
   .foot { font-size: .85rem; color: #5c4a38; margin-top: 1.5rem; }
   .wic a { color: #854F0B; text-decoration: underline; }
+  /* Buttons are links too: without this, .wic a (more specific than .btn)
+     painted the button text bronze on a bronze button (owner, 2026-09-28). */
+  .wic a.btn { color: #fff; text-decoration: none; }
+  .wic a.btn.ghost { color: #854F0B; }
 </style>

@@ -1,0 +1,532 @@
+{
+ "machine": {
+  "name": "Mid hobby (Shapeoko, X-Carve, Onefinity)",
+  "rpm": 16000,
+  "feed": 1800,
+  "doc": 3
+ },
+ "stepoverPct": 10,
+ "generated": "2026-09-28T16:29:55.382Z",
+ "results": [
+  {
+   "name": "Leaping largemouth bass",
+   "file": "Leaping Largemouth Bass Fishing CNC Relief STL.stl",
+   "size": 300,
+   "mm": {
+    "x": 300,
+    "y": 300,
+    "depth": 18.3
+   },
+   "triangles": 2029174,
+   "detail": {
+    "3": {
+     "radius": 3,
+     "max": 0.24,
+     "mean": 0.04,
+     "areaAffected": 6.8,
+     "areaVisible": 1,
+     "measurable": true
+    },
+    "6": {
+     "radius": 6,
+     "max": 1.75,
+     "mean": 0.07,
+     "areaAffected": 11,
+     "areaVisible": 3.1,
+     "measurable": true
+    },
+    "1.5": {
+     "radius": 1.5,
+     "max": 0.13,
+     "mean": 0.03,
+     "areaAffected": 4.1,
+     "areaVisible": 0.5,
+     "measurable": true
+    }
+   },
+   "minutes": {
+    "rough": 95,
+    "finish_3_10": 333,
+    "finish_1_5_10": 666,
+    "finish_6_10": 167,
+    "total_3_10": 428,
+    "total_1_5_10": 761,
+    "total_6_10": 261
+   },
+   "rest": {
+    "visibleLoss3mmPct": 0.3,
+    "restAreaPct": 1.1,
+    "finish_rest": 340,
+    "savedVsFull15": 326
+   }
+  },
+  {
+   "name": "Leaping largemouth bass",
+   "file": "Leaping Largemouth Bass Fishing CNC Relief STL.stl",
+   "size": 450,
+   "mm": {
+    "x": 450,
+    "y": 450,
+    "depth": 27.5
+   },
+   "triangles": 2029174,
+   "detail": {
+    "3": {
+     "radius": 3,
+     "max": 0.24,
+     "mean": 0.05,
+     "areaAffected": 8.6,
+     "areaVisible": 0.9,
+     "measurable": true
+    },
+    "6": {
+     "radius": 6,
+     "max": 0.52,
+     "mean": 0.07,
+     "areaAffected": 12.9,
+     "areaVisible": 2.2,
+     "measurable": true
+    },
+    "1.5": {
+     "radius": 1.5,
+     "max": 0.13,
+     "mean": 0.03,
+     "areaAffected": 4,
+     "areaVisible": 0.4,
+     "measurable": true
+    }
+   },
+   "minutes": {
+    "rough": 320,
+    "finish_3_10": 750,
+    "finish_1_5_10": 1499,
+    "finish_6_10": 375,
+    "total_3_10": 1069,
+    "total_1_5_10": 1818,
+    "total_6_10": 695
+   },
+   "rest": {
+    "visibleLoss3mmPct": 0.4,
+    "restAreaPct": 1.8,
+    "finish_rest": 776,
+    "savedVsFull15": 722
+   }
+  },
+  {
+   "name": "Feathered fishing lure",
+   "file": "Ornate Feathered Fishing Lure CNC Relief STL.stl",
+   "size": 300,
+   "mm": {
+    "x": 300,
+    "y": 300,
+    "depth": 18.3
+   },
+   "triangles": 2029246,
+   "detail": {
+    "3": {
+     "radius": 3,
+     "max": 0.4,
+     "mean": 0.04,
+     "areaAffected": 11,
+     "areaVisible": 2,
+     "measurable": true
+    },
+    "6": {
+     "radius": 6,
+     "max": 1.26,
+     "mean": 0.07,
+     "areaAffected": 15.9,
+     "areaVisible": 6.4,
+     "measurable": true
+    },
+    "1.5": {
+     "radius": 1.5,
+     "max": 0.17,
+     "mean": 0.02,
+     "areaAffected": 5.5,
+     "areaVisible": 0.5,
+     "measurable": true
+    }
+   },
+   "minutes": {
+    "rough": 92,
+    "finish_3_10": 333,
+    "finish_1_5_10": 667,
+    "finish_6_10": 167,
+    "total_3_10": 425,
+    "total_1_5_10": 759,
+    "total_6_10": 259
+   },
+   "rest": {
+    "visibleLoss3mmPct": 2.1,
+    "restAreaPct": 6.4,
+    "finish_rest": 376,
+    "savedVsFull15": 291
+   }
+  },
+  {
+   "name": "Feathered fishing lure",
+   "file": "Ornate Feathered Fishing Lure CNC Relief STL.stl",
+   "size": 450,
+   "mm": {
+    "x": 450,
+    "y": 450,
+    "depth": 27.4
+   },
+   "triangles": 2029246,
+   "detail": {
+    "3": {
+     "radius": 3,
+     "max": 0.33,
+     "mean": 0.04,
+     "areaAffected": 10,
+     "areaVisible": 1.9,
+     "measurable": true
+    },
+    "6": {
+     "radius": 6,
+     "max": 0.88,
+     "mean": 0.07,
+     "areaAffected": 16,
+     "areaVisible": 6.1,
+     "measurable": true
+    },
+    "1.5": {
+     "radius": 1.5,
+     "max": 0.17,
+     "mean": 0.02,
+     "areaAffected": 4.4,
+     "areaVisible": 0.5,
+     "measurable": true
+    }
+   },
+   "minutes": {
+    "rough": 311,
+    "finish_3_10": 750,
+    "finish_1_5_10": 1500,
+    "finish_6_10": 375,
+    "total_3_10": 1061,
+    "total_1_5_10": 1811,
+    "total_6_10": 686
+   },
+   "rest": {
+    "visibleLoss3mmPct": 1.9,
+    "restAreaPct": 6.1,
+    "finish_rest": 841,
+    "savedVsFull15": 659
+   }
+  },
+  {
+   "name": "Coiled dragon medallion",
+   "file": "Coiled Medieval Dragon Medallion CNC Relief STL.stl",
+   "size": 300,
+   "mm": {
+    "x": 270,
+    "y": 300,
+    "depth": 18.4
+   },
+   "triangles": 2027814,
+   "detail": {
+    "3": {
+     "radius": 3,
+     "max": 2.1,
+     "mean": 0.09,
+     "areaAffected": 15.5,
+     "areaVisible": 2.6,
+     "measurable": true
+    },
+    "6": {
+     "radius": 6,
+     "max": 4.31,
+     "mean": 0.15,
+     "areaAffected": 25.1,
+     "areaVisible": 9.3,
+     "measurable": true
+    },
+    "1.5": {
+     "radius": 1.5,
+     "max": 0.2,
+     "mean": 0.04,
+     "areaAffected": 7.4,
+     "areaVisible": 0.7,
+     "measurable": true
+    }
+   },
+   "minutes": {
+    "rough": 73,
+    "finish_3_10": 300,
+    "finish_1_5_10": 599,
+    "finish_6_10": 150,
+    "total_3_10": 373,
+    "total_1_5_10": 672,
+    "total_6_10": 223
+   },
+   "rest": {
+    "visibleLoss3mmPct": 1.6,
+    "restAreaPct": 5.3,
+    "finish_rest": 332,
+    "savedVsFull15": 268
+   }
+  },
+  {
+   "name": "Coiled dragon medallion",
+   "file": "Coiled Medieval Dragon Medallion CNC Relief STL.stl",
+   "size": 450,
+   "mm": {
+    "x": 405,
+    "y": 450,
+    "depth": 27.5
+   },
+   "triangles": 2027814,
+   "detail": {
+    "3": {
+     "radius": 3,
+     "max": 0.44,
+     "mean": 0.08,
+     "areaAffected": 14.2,
+     "areaVisible": 2.5,
+     "measurable": true
+    },
+    "6": {
+     "radius": 6,
+     "max": 3.61,
+     "mean": 0.16,
+     "areaAffected": 24.7,
+     "areaVisible": 7.9,
+     "measurable": true
+    },
+    "1.5": {
+     "radius": 1.5,
+     "max": 0.21,
+     "mean": 0.04,
+     "areaAffected": 6.3,
+     "areaVisible": 0.8,
+     "measurable": true
+    }
+   },
+   "minutes": {
+    "rough": 246,
+    "finish_3_10": 674,
+    "finish_1_5_10": 1349,
+    "finish_6_10": 337,
+    "total_3_10": 921,
+    "total_1_5_10": 1595,
+    "total_6_10": 584
+   },
+   "rest": {
+    "visibleLoss3mmPct": 1.9,
+    "restAreaPct": 6.2,
+    "finish_rest": 758,
+    "savedVsFull15": 591
+   }
+  },
+  {
+   "name": "Mallard duck arch",
+   "file": "Mallard Duck Landing Arch Keystone CNC Relief STL.stl",
+   "size": 300,
+   "mm": {
+    "x": 228,
+    "y": 300,
+    "depth": 18.3
+   },
+   "triangles": 2025926,
+   "detail": {
+    "3": {
+     "radius": 3,
+     "max": 0.23,
+     "mean": 0.02,
+     "areaAffected": 9,
+     "areaVisible": 0.8,
+     "measurable": true
+    },
+    "6": {
+     "radius": 6,
+     "max": 0.72,
+     "mean": 0.06,
+     "areaAffected": 13.5,
+     "areaVisible": 4,
+     "measurable": true
+    },
+    "1.5": {
+     "radius": 1.5,
+     "max": 0.13,
+     "mean": 0.01,
+     "areaAffected": 5.8,
+     "areaVisible": 0.1,
+     "measurable": true
+    }
+   },
+   "minutes": {
+    "rough": 72,
+    "finish_3_10": 253,
+    "finish_1_5_10": 506,
+    "finish_6_10": 127,
+    "total_3_10": 325,
+    "total_1_5_10": 578,
+    "total_6_10": 198
+   },
+   "rest": {
+    "visibleLoss3mmPct": 0.6,
+    "restAreaPct": 1.9,
+    "finish_rest": 263,
+    "savedVsFull15": 243
+   }
+  },
+  {
+   "name": "Mallard duck arch",
+   "file": "Mallard Duck Landing Arch Keystone CNC Relief STL.stl",
+   "size": 450,
+   "mm": {
+    "x": 342,
+    "y": 450,
+    "depth": 27.5
+   },
+   "triangles": 2025926,
+   "detail": {
+    "3": {
+     "radius": 3,
+     "max": 0.24,
+     "mean": 0.02,
+     "areaAffected": 10.6,
+     "areaVisible": 0.9,
+     "measurable": true
+    },
+    "6": {
+     "radius": 6,
+     "max": 0.52,
+     "mean": 0.04,
+     "areaAffected": 15,
+     "areaVisible": 3.1,
+     "measurable": true
+    },
+    "1.5": {
+     "radius": 1.5,
+     "max": 0.15,
+     "mean": 0.01,
+     "areaAffected": 5.3,
+     "areaVisible": 0.1,
+     "measurable": true
+    }
+   },
+   "minutes": {
+    "rough": 242,
+    "finish_3_10": 569,
+    "finish_1_5_10": 1139,
+    "finish_6_10": 285,
+    "total_3_10": 811,
+    "total_1_5_10": 1381,
+    "total_6_10": 526
+   },
+   "rest": {
+    "visibleLoss3mmPct": 0.5,
+    "restAreaPct": 1.4,
+    "finish_rest": 586,
+    "savedVsFull15": 553
+   }
+  },
+  {
+   "name": "Rustic cross wreath",
+   "file": "Rustic Cross Wreath CNC Relief STL.stl",
+   "size": 300,
+   "mm": {
+    "x": 254,
+    "y": 300,
+    "depth": 18.3
+   },
+   "triangles": 2026934,
+   "detail": {
+    "3": {
+     "radius": 3,
+     "max": 0.89,
+     "mean": 0.09,
+     "areaAffected": 15.5,
+     "areaVisible": 3.2,
+     "measurable": true
+    },
+    "6": {
+     "radius": 6,
+     "max": 4.35,
+     "mean": 0.14,
+     "areaAffected": 23.4,
+     "areaVisible": 9.1,
+     "measurable": true
+    },
+    "1.5": {
+     "radius": 1.5,
+     "max": 0.21,
+     "mean": 0.05,
+     "areaAffected": 6.6,
+     "areaVisible": 0.9,
+     "measurable": true
+    }
+   },
+   "minutes": {
+    "rough": 77,
+    "finish_3_10": 282,
+    "finish_1_5_10": 564,
+    "finish_6_10": 141,
+    "total_3_10": 359,
+    "total_1_5_10": 641,
+    "total_6_10": 218
+   },
+   "rest": {
+    "visibleLoss3mmPct": 2.6,
+    "restAreaPct": 8.3,
+    "finish_rest": 329,
+    "savedVsFull15": 235
+   }
+  },
+  {
+   "name": "Rustic cross wreath",
+   "file": "Rustic Cross Wreath CNC Relief STL.stl",
+   "size": 450,
+   "mm": {
+    "x": 380,
+    "y": 450,
+    "depth": 27.5
+   },
+   "triangles": 2026934,
+   "detail": {
+    "3": {
+     "radius": 3,
+     "max": 0.48,
+     "mean": 0.09,
+     "areaAffected": 13.2,
+     "areaVisible": 2.5,
+     "measurable": true
+    },
+    "6": {
+     "radius": 6,
+     "max": 1.64,
+     "mean": 0.16,
+     "areaAffected": 23.2,
+     "areaVisible": 9.5,
+     "measurable": true
+    },
+    "1.5": {
+     "radius": 1.5,
+     "max": 0.18,
+     "mean": 0.05,
+     "areaAffected": 5.2,
+     "areaVisible": 0.7,
+     "measurable": true
+    }
+   },
+   "minutes": {
+    "rough": 260,
+    "finish_3_10": 634,
+    "finish_1_5_10": 1268,
+    "finish_6_10": 317,
+    "total_3_10": 894,
+    "total_1_5_10": 1528,
+    "total_6_10": 577
+   },
+   "rest": {
+    "visibleLoss3mmPct": 1.8,
+    "restAreaPct": 5.4,
+    "finish_rest": 702,
+    "savedVsFull15": 566
+   }
+  }
+ ]
+}
