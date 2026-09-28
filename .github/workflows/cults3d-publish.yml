@@ -6,9 +6,11 @@ name: Cults3D auto-publish
 # Settings -> Secrets and variables -> Actions.
 
 on:
-  schedule:
-    - cron: '0 */2 * * *'   # every 2 hours, on the hour (UTC); jitter randomizes the actual minute
-  workflow_dispatch:        # manual "Run workflow" button
+  # PAUSED 2026-09-28 (owner: Cults3D not reachable, stop uploading for now).
+  # To resume, put these two lines back:
+  # schedule:
+  #   - cron: '0 */2 * * *'   # every 2 hours, on the hour (UTC); jitter randomizes the actual minute
+  workflow_dispatch:       # manual "Run workflow" button
     inputs:
       limit:
         description: 'Listings to create this run'
