@@ -1,8 +1,9 @@
 ---
 import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
-import { getSettings, getMembershipPlans } from '../lib/queries';
+import { getSettings, designCountLabel, getMembershipPlans } from '../lib/queries';
 const s = await getSettings();
+const DESIGNS = await designCountLabel();
 const plans = await getMembershipPlans();
 const discount = s.discount_percent || 20;
 const cheapest = plans.length ? Math.min(...plans.map((p) => Number(p.price_usd) || Infinity)) : null;
@@ -32,7 +33,7 @@ const fromLabel = cheapest && Number.isFinite(cheapest) ? `membership plans from
           </div>
           <div>
             <div class="text-xs text-ink-700/60 uppercase tracking-wide mb-1">Catalog size</div>
-            <div class="font-serif text-2xl text-bronze-700">{s.products_count.toLocaleString()}+</div>
+            <div class="font-serif text-2xl text-bronze-700">{DESIGNS}</div>
             <div class="text-xs text-ink-700/60 mt-1">designs available</div>
           </div>
         </div>

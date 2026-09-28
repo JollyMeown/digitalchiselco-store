@@ -1,0 +1,105 @@
+---
+// Commercial-use licence in plain words (2026-09-28). "Can I sell what I
+// carve from a purchased STL?" is a question people put to search engines and
+// AI assistants, and one clear page with a yes/no table is what gets quoted.
+// Every row restates section 6 of /terms and the licence answers in /faq; if
+// the Terms change, change this page with them. It grants nothing new.
+import Shell from '../layouts/Shell.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { jsonLd } from '../lib/jsonld';
+
+const ROWS: { use: string; ok: boolean | 'none'; note: string }[] = [
+  { use: 'Carve the design in wood and sell the finished piece', ok: true, note: 'The main thing the licence is for.' },
+  { use: 'Sell finished pieces on Etsy, at craft fairs, markets or in your own shop', ok: true, note: 'Wherever you sell physical work.' },
+  { use: 'Carve, 3D print or laser engrave it as a commission for a customer', ok: true, note: 'You make the physical piece; the customer never receives the file.' },
+  { use: 'Make pieces as gifts or for your own home', ok: true, note: 'Personal use is included too.' },
+  { use: 'Resize it, change the depth or combine it with lettering for your own carving', ok: true, note: 'Edit it however you like to make your physical piece.' },
+  { use: 'Pay a royalty or a per-piece fee on what you sell', ok: 'none', note: 'There is none. Commercial use is included in the price.' },
+  { use: 'Send the STL file to a friend or another maker', ok: false, note: 'Download access is personal and cannot be passed on.' },
+  { use: 'Sell the STL file, or a modified version of it, as a digital download', ok: false, note: 'The file itself is never for resale, including edited versions.' },
+  { use: 'Put the file in a bundle, a membership or a file pack of your own', ok: false, note: 'That is redistribution of the file.' },
+  { use: 'Upload the file to a file-sharing or free-model site', ok: false, note: 'Not in any form.' },
+];
+
+const FAQ = [
+  { q: 'Can I sell carvings made from a DigitalChiselCo STL file?', a: 'Yes. Every design includes commercial use: carve, 3D print or laser engrave it and sell the finished physical pieces, with no extra licence and no royalty.' },
+  { q: 'Can I sell the STL file itself?', a: 'No. The licence covers the physical things you make, not the file. Reselling, sharing, sublicensing or redistributing the digital file in any form, including a modified version, is not allowed.' },
+  { q: 'Can I sell on Etsy?', a: 'Yes, you can sell the finished physical pieces on Etsy or anywhere else. You cannot list the STL file itself as a digital download.' },
+  { q: 'Is there a royalty or a per-item fee?', a: 'No. Commercial use of the physical pieces is included in the price of the design.' },
+  { q: 'Do memberships and custom designs carry the same licence?', a: 'Yes. Membership files and custom designs made from your photo carry the same licence as a design bought on its own.' },
+  { q: 'What happens to the licence after a refund?', a: 'A refund ends the licence, and you agree to delete any copies you downloaded.' },
+];
+
+const faqLd = {
+  '@context': 'https://schema.org', '@type': 'FAQPage',
+  mainEntity: FAQ.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+};
+---
+<Shell
+  title="Commercial-Use Licence for CNC STL Files: What You Can Sell | DigitalChiselCo"
+  description="Sell what you carve: every DigitalChiselCo STL includes commercial use for the physical pieces you make, with no royalty. What is allowed and what is not, in one table."
+>
+  <Breadcrumbs crumbs={[{ label: 'Commercial-use licence' }]} />
+  <script type="application/ld+json" set:html={jsonLd(faqLd)} />
+
+  <article class="max-w-3xl mx-auto pb-20 text-ink-700">
+    <p class="text-xs uppercase tracking-[0.18em] text-bronze-600 mb-2">Licence in plain words</p>
+    <h1 class="font-serif text-3xl sm:text-4xl text-bronze-800 leading-tight" style="text-wrap: balance">Commercial-use licence: sell what you carve</h1>
+
+    <p class="mt-4 text-[17px] leading-relaxed">
+      <strong>Every DigitalChiselCo design includes commercial use.</strong> You may carve, 3D print or laser engrave it and sell the
+      finished physical pieces, with no extra licence and no royalty. The one thing you may not do is pass on the digital STL file itself:
+      not shared, not resold, not re-uploaded, and not as an edited version.
+    </p>
+
+    <div class="mt-8 overflow-x-auto rounded-xl border border-bronze-600/20 bg-white">
+      <table class="w-full text-sm">
+        <thead class="bg-cream/70 text-left">
+          <tr><th class="px-4 py-2.5 font-medium text-ink-900">What you want to do</th><th class="px-4 py-2.5 font-medium text-ink-900 w-24">Allowed?</th><th class="px-4 py-2.5 font-medium text-ink-900 hidden sm:table-cell">Note</th></tr>
+        </thead>
+        <tbody>
+          {ROWS.map((r) => (
+            <tr class="border-t border-black/5 align-top">
+              <td class="px-4 py-2.5 text-ink-900">{r.use}<div class="sm:hidden text-xs text-ink-700/60 mt-0.5">{r.note}</div></td>
+              <td class="px-4 py-2.5">
+                {r.ok === 'none'
+                  ? <span class="inline-block rounded-full bg-cream text-bronze-800 text-xs font-semibold px-2.5 py-0.5 whitespace-nowrap">Not needed</span>
+                  : r.ok
+                  ? <span class="inline-block rounded-full bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5">Yes</span>
+                  : <span class="inline-block rounded-full bg-red-100 text-red-700 text-xs font-semibold px-2.5 py-0.5">No</span>}
+              </td>
+              <td class="px-4 py-2.5 text-ink-700/75 hidden sm:table-cell">{r.note}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="font-serif text-2xl text-bronze-800 mt-12 mb-3">Which files it covers</h2>
+    <p class="leading-relaxed">
+      The same licence applies to every design in the shop, to bundles, to membership files and to
+      <a href="/custom-design" class="text-bronze-700 underline">custom designs made from your photo</a>.
+      Your download access is personal and non-transferable.
+    </p>
+
+    <h2 class="font-serif text-2xl text-bronze-800 mt-10 mb-3">Common questions</h2>
+    <div class="space-y-4">
+      {FAQ.map((f) => (
+        <div>
+          <h3 class="font-medium text-ink-900">{f.q}</h3>
+          <p class="mt-1 leading-relaxed">{f.a}</p>
+        </div>
+      ))}
+    </div>
+
+    <p class="mt-10 text-sm text-ink-700/70">
+      This page explains section 6 of the <a href="/terms" class="text-bronze-700 underline">Terms of Service</a> in plain words.
+      If the two ever differ, the Terms of Service apply.
+    </p>
+
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a href="/catalog" class="inline-block bg-bronze-600 text-cream font-medium px-5 py-2.5 rounded-lg hover:bg-bronze-700">Browse the designs</a>
+      <a href="/free" class="inline-block border border-bronze-600/40 text-bronze-800 font-medium px-5 py-2.5 rounded-lg hover:bg-cream">Get 5 free STL files</a>
+    </div>
+  </article>
+</Shell>

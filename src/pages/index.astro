@@ -18,11 +18,13 @@ import {
   getPremiumBundles, MARQUEE_DEFAULTS, getCategoryBySlug, getProductsByCategory,
   getLiveSeasonalCollection, getSeasonalProducts,
   type ProductCard as ProductCardT,
+  designCountLabel,
 } from '../lib/queries';
 import { fillPlanTokens, planFeatureLines } from '../lib/membership-facts';
 import { jsonLd } from '../lib/jsonld';
 
 const s = await getSettings();
+const DESIGNS = await designCountLabel();   // live count, same figure as About and llms.txt
 // Cut Local marketplace promo (shown on the homepage only when live).
 let marketplaceOn = false;
 let makerCount = 0;
@@ -121,7 +123,7 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
         <div class="text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest text-ink-700/70 mt-0.5 sm:mt-1 leading-tight">Design Favorites</div>
       </div>
       <div>
-        <div class="font-serif text-[19px] sm:text-2xl md:text-3xl text-bronze-700 leading-tight">{Number(s.products_count).toLocaleString()}+</div>
+        <div class="font-serif text-[19px] sm:text-2xl md:text-3xl text-bronze-700 leading-tight">{DESIGNS}</div>
         <div class="text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest text-ink-700/70 mt-0.5 sm:mt-1 leading-tight">Unique Designs</div>
       </div>
       <div>

@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { Card } from '../ui';
 import LiveVisitorMap from '../LiveVisitorMap';
 import LiveActivity from '../LiveActivity';
+import AiVisitors from '../AiVisitors';
 import ChannelStats from '../ChannelStats';
 import MerchantStats from '../MerchantStats';
 import SearchConsole from '../SearchConsole';
@@ -218,6 +219,8 @@ export default function Traffic() {
 
           <ShopperActions events={eventsExt} names={prodNames} paid={paidCount} days={days} />
           <SavedCarts />
+
+          <AiVisitors rows={rows as any} days={days} />
 
           <LampStudio days={days} />
 

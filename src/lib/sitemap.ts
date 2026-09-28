@@ -65,6 +65,7 @@ export const STATIC_PATHS: Array<{ path: string; priority: number; changefreq: s
   { path: '/quiz',         priority: 0.5, changefreq: 'monthly' },
   { path: '/free',        priority: 0.6, changefreq: 'monthly' },
   { path: '/faq',         priority: 0.6, changefreq: 'monthly' },
+  { path: '/license',     priority: 0.5, changefreq: 'monthly' },
   { path: '/about',       priority: 0.5, changefreq: 'monthly' },
   { path: '/blog',        priority: 0.6, changefreq: 'weekly' },
   { path: '/tools',       priority: 0.7, changefreq: 'monthly' },

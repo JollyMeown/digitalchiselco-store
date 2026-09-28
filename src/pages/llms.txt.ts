@@ -65,6 +65,7 @@ export const GET: APIRoute = async () => {
   lines.push('## Help');
   lines.push(`- [FAQ](${SITE}/faq)`);
   lines.push(`- [Refund policy](${SITE}/refunds)`);
+  lines.push(`- [Commercial-use licence: what you can sell](${SITE}/license)`);
   lines.push(`- [Terms and licence](${SITE}/terms)`);
   lines.push(`- [Contact](${SITE}/contact)`);
   lines.push('');
