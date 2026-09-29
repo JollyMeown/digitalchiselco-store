@@ -152,6 +152,23 @@ const ld = jsonLd({
           <p class="note small">This simulates the surface your cutter can reach, which is the part that decides how the carving looks. It is not a full toolpath verification: it does not model your holder colliding with a tall wall, ramping, climb versus conventional, or deflection on a long thin bit.</p>
         </section>
 
+        <!-- ── rest machining preview ──────────────────────────────────── -->
+        <section class="panel" id="restPanel">
+          <h2>Rest machining: a 1.5 mm ball nose, only where it is needed
+            <button class="tip" type="button" data-tip="Rest machining means the small bit cuts only the places the bigger finishing bit could not get into, instead of going over the whole carving a second time. In Aspire and VCarve Pro a 3D finishing toolpath with more than one tool works those places out by itself. In other software you draw a boundary around the detailed areas and limit the small bit to it.">?</button>
+          </h2>
+          <div class="share-row" id="restAsk" hidden>
+            <button id="restGo" class="btn ghost" type="button">Work out the rest machining preview</button>
+            <span class="note">This file is large, so it takes a few seconds.</span>
+          </div>
+          <div class="sims" id="restSims" hidden>
+            <figure><canvas id="rest0" width="420" height="420"></canvas><figcaption><b>Where the 1.5 mm bit works</b><span id="rest0n"></span></figcaption></figure>
+            <figure><canvas id="rest1" width="420" height="420"></canvas><figcaption><b>Close-up after the finishing bit</b><span id="rest1n"></span></figcaption></figure>
+            <figure><canvas id="rest2" width="420" height="420"></canvas><figcaption><b>Same spot after rest machining</b><span id="rest2n"></span></figcaption></figure>
+          </div>
+          <p class="note" id="restNote"></p>
+        </section>
+
         <section class="panel">
           <h2>How much detail your bit will lose
             <button class="tip" type="button" data-tip="A round cutter cannot reach into a corner tighter than its own tip. This works out, for your actual file, how deep the detail is that each bit would smooth over. It is the same maths the cutter performs on the wood.">?</button>
@@ -177,6 +194,27 @@ const ld = jsonLd({
             <table class="ftable" id="fasterTable"></table>
           </div>
           <p class="note small">Two different errors, deliberately kept apart. Ridges between passes shrink when you lower the stepover, cost time, and sand out. Detail the bit cannot reach does not change with stepover and sanding never brings it back: that one is a decision about which cutter you own. Times are the same estimate as above, so compare them with each other rather than trusting the absolute number.</p>
+        </section>
+
+        <!-- ── outline for CAM (vector boundary) ───────────────────────── -->
+        <section class="panel" id="outlinePanel">
+          <h2>Outline for CAM: a vector boundary around the carving
+            <button class="tip" type="button" data-tip="A relief sits on a flat board, so ArtCAM, Aspire, VCarve, Carveco and Fusion see the whole rectangle as the model and machine the entire board. A closed vector around the carving tells them where to stop. You make that vector here, on a picture of your own file, and save it as DXF or SVG.">?</button>
+          </h2>
+          <p class="note">Two lines are useful: <strong style="color:#1470e0">blue</strong>, the edge of the carved area (everything the machine must touch), and <strong style="color:#d81f1f">red</strong>, around the subject (the raised carving only). Make either one, or both, in the way that suits you:</p>
+          <ol class="note outline-methods">
+            <li><strong>Inside and outside line.</strong> You mark a line just inside the edge and a line just outside it. The software finds the exact edge between the two.</li>
+            <li><strong>Draw it yourself.</strong> You click around the shape, point by point. Every point stays where you put it.</li>
+            <li><strong>Magnetic pen.</strong> You click along the edge and the line sticks to the edge between your clicks.</li>
+            <li><strong>Brush.</strong> You paint a wide stroke over the edge, all the way around. The software finds the edge under the paint.</li>
+          </ol>
+          <p class="note">Each method shows its own numbered steps. The file is saved at the model's own size and position, so it drops straight onto the model in ArtCAM, Aspire, VCarve, Carveco or Fusion.</p>
+          <div class="share-row">
+            <button id="outlineGo" class="btn" type="button">Open the outline tool</button>
+            <span class="note" id="outlineNote"></span>
+          </div>
+          <div id="outlineEditor" hidden></div>
+          <p class="note small" id="outlineFoot" hidden>Coordinates match the STL as supplied (100% scale). If you scale the model in your CAM software, scale the vector by the same amount. The outline never leaves your computer either.</p>
         </section>
 
         <section class="panel share">
@@ -230,10 +268,11 @@ const ld = jsonLd({
 </Shell>
 
 <script>
-  import { parseSTL, analyse, cutTime, fmtTime, simulate, fasterOptions, fastestFreeFor, bigBitOption, MACHINES, CLASSES, type Analysis } from '../../lib/stl-analyse';
+  import { parseSTL, analyse, cutTime, fmtTime, simulate, fasterOptions, fastestFreeFor, bigBitOption, heightGrid, reach, simulateRest, restTime, MACHINES, CLASSES, type Analysis, type HeightGrid } from '../../lib/stl-analyse';
 
   const $ = (id: string) => document.getElementById(id)!;
   let A: Analysis | null = null;
+  let POS: Float32Array | null = null;       // the parsed triangles, kept for the outline tool
   let fileName = '';
 
   // ── tooltips ──────────────────────────────────────────────────────────
@@ -286,6 +325,7 @@ const ld = jsonLd({
       await new Promise((r) => setTimeout(r, 16));        // let the bar paint
       const pos = parseSTL(buf);
       if (pos.length < 9) throw new Error('No triangles found in this file.');
+      POS = pos; resetOutline(); resetRest();
       setProgress(0.2, 'Measuring…');
       await new Promise((r) => setTimeout(r, 16));
       A = analyse(pos, (p) => setProgress(0.2 + p * 0.78));
@@ -296,6 +336,7 @@ const ld = jsonLd({
       render();
       drawSims();
       drawFaster();
+      drawRestSoon();
       $('out').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e: any) {
       $('progress').hidden = true;
@@ -306,8 +347,19 @@ const ld = jsonLd({
 
   // ── shading: one routine, so the model and both simulated surfaces are
   // lit identically and any difference you see is the cutter, not the render ─
+  // The engine's grid stores row 0 at the model's LOWEST y, which is the bottom of
+  // the picture. Drawn as stored, every preview was a mirror image of the model
+  // (found 2026-09-29 when the outline tool showed fish hanging tail-up). The
+  // numbers never depended on row order; the pictures do, so they are flipped here.
+  function flipRows(H: Float32Array, w: number, h: number) {
+    const out = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) out.set(H.subarray((h - 1 - y) * w, (h - y) * w), y * w);
+    return out;
+  }
+
   function shade(cv: HTMLCanvasElement, H: Float32Array, w: number, h: number, cell: number,
                  lo?: number, hi?: number) {
+    H = flipRows(H, w, h);
     const ctx = cv.getContext('2d')!;
     if (lo === undefined || hi === undefined) {
       lo = Infinity; hi = -Infinity;
@@ -372,11 +424,92 @@ const ld = jsonLd({
   }
   const drawSimsSoon = () => { clearTimeout(simTimer); simTimer = setTimeout(drawSims, 90); };
 
+  // ── rest machining preview (owner, 2026-09-29) ────────────────────────
+  // Its own finer grid, because the checker's 640 cells cannot see a 1.5 mm
+  // cutter on a normal panel. Built once per file and scale; the two reach
+  // surfaces are kept per bit, so moving the stepover only redraws.
+  const REST_DIA = 1.5;
+  let restG: HeightGrid | null = null, restKey = '', restReach: Record<string, Float32Array> = {}, restTimer: any;
+  function resetRest() {
+    restG = null; restKey = ''; restReach = {};
+    $('restSims').hidden = true; $('restAsk').hidden = true; $('restNote').textContent = '';
+  }
+  function drawRest(force = false) {
+    if (!A || !POS) return;
+    const ball = +($('ball') as HTMLSelectElement).value, so = +($('so') as HTMLInputElement).value;
+    const cls = CLASSES[+($('cls') as HTMLSelectElement).value], s = scale(), note = $('restNote');
+    if (ball <= REST_DIA) {
+      $('restSims').hidden = true; $('restAsk').hidden = true;
+      note.innerHTML = 'You are finishing with the 1.5 mm bit itself, so nothing is left over for a rest pass. Pick the 3 mm or the 6 mm finishing bit above to see what a 1.5 mm rest pass adds, and how much time it saves against finishing the whole carving with the small bit.';
+      return;
+    }
+    if (!restG && A.triangles > 600_000 && !force) { $('restAsk').hidden = false; $('restSims').hidden = true; note.textContent = ''; return; }
+    $('restAsk').hidden = true;
+    if (!restG || restKey !== String(s)) {
+      const long = Math.max(A.size.x, A.size.y) * s;
+      restG = heightGrid(POS, Math.round(Math.min(1400, Math.max(640, long / 0.3))), s); restKey = String(s); restReach = {};
+    }
+    const g = restG;
+    if (REST_DIA / 2 / g.cell < 2) {
+      $('restSims').hidden = true;
+      note.textContent = `At ${Math.round(Math.max(A.size.x, A.size.y) * s)} mm across, this model is too large for the preview to see a 1.5 mm cutter reliably, so it is not drawn rather than guessed at.`;
+      return;
+    }
+    const big = (restReach[ball] ||= reach(g, ball)), small = (restReach[REST_DIA] ||= reach(g, REST_DIA));
+    const focusMm = Math.min(45, Math.max(20, Math.min(A.size.x, A.size.y) * s * 0.25));
+    const R = simulateRest(g, big, small, { ballDia: ball, restDia: REST_DIA, stepoverPct: so, restStepoverPct: so, focusMm });
+    $('restSims').hidden = false;
+
+    // 1. the whole carving after the finishing bit, the rest zones tinted, the close-up framed
+    const cv = $('rest0') as HTMLCanvasElement, ctx = cv.getContext('2d')!;
+    shade(cv, R.finish, R.w, R.h, R.cell);
+    const tint = document.createElement('canvas'); tint.width = R.w; tint.height = R.h;
+    const tctx = tint.getContext('2d')!, img = tctx.createImageData(R.w, R.h);
+    for (let y = 0; y < R.h; y++) for (let x = 0; x < R.w; x++) {
+      if (!R.zone[(R.h - 1 - y) * R.w + x]) continue;                 // picture rows run top-down, grid rows bottom-up
+      const o = (y * R.w + x) * 4; img.data[o] = 10; img.data[o + 1] = 139; img.data[o + 2] = 176; img.data[o + 3] = 135;
+    }
+    tctx.putImageData(img, 0, 0);
+    const sc = Math.min(cv.width / R.w, cv.height / R.h), ox = (cv.width - R.w * sc) / 2, oy = (cv.height - R.h * sc) / 2;
+    ctx.drawImage(tint, ox, oy, R.w * sc, R.h * sc);
+    const f = R.focus;
+    ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.strokeRect(ox + f.x * sc, oy + (R.h - f.y - f.h) * sc, f.w * sc, f.h * sc);
+    ctx.lineWidth = 1.5; ctx.strokeStyle = '#2e1d10'; ctx.strokeRect(ox + f.x * sc, oy + (R.h - f.y - f.h) * sc, f.w * sc, f.h * sc);
+
+    // 2. the framed spot, before and after, on one height range so only the cutter differs
+    const crop = (a: Float32Array) => { const o = new Float32Array(f.w * f.h); for (let y = 0; y < f.h; y++) o.set(a.subarray((f.y + y) * R.w + f.x, (f.y + y) * R.w + f.x + f.w), y * f.w); return o; };
+    const c1 = crop(R.finish), c2 = crop(R.rest);
+    let lo = Infinity, hi = -Infinity;
+    for (const a of [c1, c2]) for (let i = 0; i < a.length; i++) { const v = a[i]; if (Number.isNaN(v)) continue; if (v < lo) lo = v; if (v > hi) hi = v; }
+    shade($('rest1') as HTMLCanvasElement, c1, f.w, f.h, R.cell, lo, hi);
+    shade($('rest2') as HTMLCanvasElement, c2, f.w, f.h, R.cell, lo, hi);
+
+    const side = (f.w * R.cell).toFixed(0);
+    $('rest0n').textContent = `tinted: ${R.areaPct}% of the carving`;
+    $('rest1n').textContent = `${ball} mm ball nose, the framed ${side} mm square`;
+    $('rest2n').textContent = `1.5 mm ball nose at ${so}% stepover, tinted areas only`;
+
+    const tBig = cutTime(A, cls, ball, so, s).finishMin, tAll = cutTime(A, cls, REST_DIA, so, s).finishMin, tRest = restTime(R.areaMm2, cls, REST_DIA, so);
+    if (R.areaPct < 0.3) {
+      note.innerHTML = `The ${ball} mm bit already reaches nearly everything in this file: under 0.3% of the carving would gain from a smaller cutter. A rest pass would add time and very little detail.`;
+    } else {
+      const saved = tAll - (tBig + tRest);
+      note.innerHTML = `In the tight places the ${ball} mm bit leaves up to <strong>${R.gain.toFixed(2)} mm</strong> of material that a 1.5 mm ball nose removes. Those places are <strong>${R.areaPct}%</strong> of the carving (tinted). Sending the small bit only there takes about <strong>${fmtTime(tRest)}</strong>, so finishing with the ${ball} mm bit and then rest machining comes to <strong>${fmtTime(tBig + tRest)}</strong>. Finishing the whole carving with the 1.5 mm bit would take ${fmtTime(tAll)}`
+        + (saved > 1 ? `, so rest machining saves about <strong>${fmtTime(saved)}</strong> and reaches the same detail.` : '.');
+    }
+  }
+  const drawRestSoon = (force = false) => {
+    clearTimeout(restTimer);
+    if (A && ($('restSims').hidden || !restG)) $('restNote').textContent = +($('ball') as HTMLSelectElement).value > REST_DIA && (A.triangles <= 600_000 || force || restG) ? 'Working out the rest machining preview…' : $('restNote').textContent;
+    restTimer = setTimeout(() => { try { drawRest(force); } catch (e: any) { $('restSims').hidden = true; $('restNote').textContent = 'The rest machining preview could not be drawn for this file.'; } }, 350);
+  };
+  $('restGo').addEventListener('click', () => { $('restAsk').hidden = true; drawRestSoon(true); });
+
   // ── preview: shade the height grid so it looks like the real thing ────
   function drawPreview() {
     if (!A) return;
     const cv = $('pv') as HTMLCanvasElement, ctx = cv.getContext('2d')!;
-    const { w, h } = A.grid, H = A.height;
+    const { w, h } = A.grid, H = flipRows(A.height, A.grid.w, A.grid.h);
     let lo = Infinity, hi = -Infinity;
     for (let i = 0; i < H.length; i++) { const v = H[i]; if (Number.isNaN(v)) continue; if (v < lo) lo = v; if (v > hi) hi = v; }
     const span = hi - lo || 1;
@@ -410,6 +543,62 @@ const ld = jsonLd({
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(tmp, (cv.width - w * s) / 2, (cv.height - h * s) / 2, w * s, h * s);
   }
+
+  // ── outline for CAM: level the board, trace the carving, hand it to the editor ──
+  // Both scripts are plain JS shared with BRS (public/tools/), loaded on demand so
+  // the checker itself stays as light as it was.
+  let outlineEd: any = null;
+  function resetOutline() {
+    outlineEd = null;
+    const box = $('outlineEditor'); box.hidden = true; box.innerHTML = '';
+    $('outlineFoot').hidden = true; $('outlineNote').textContent = '';
+  }
+  function loadScript(src: string) {
+    return new Promise<void>((res, rej) => {
+      const W = window as any; W.__loaded ||= {};
+      if (W.__loaded[src]) return res();
+      const s = document.createElement('script'); s.src = src;
+      s.onload = () => { W.__loaded[src] = 1; res(); }; s.onerror = () => rej(new Error('Could not load ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  $('outlineGo').addEventListener('click', async () => {
+    if (!POS || !A) return;
+    const W = window as any, note = $('outlineNote'), btn = $('outlineGo') as HTMLButtonElement;
+    btn.disabled = true;
+    try {
+      note.textContent = 'Loading the editor…';
+      await Promise.all([loadScript('/tools/vector-editor.js'), loadScript('/tools/relief-outline.js')]);
+      note.textContent = 'Measuring the file at full resolution…';
+      await new Promise((r) => setTimeout(r, 30));
+      const fine = analyse(POS, undefined, { target: 1500 });
+      const { w, h, cell } = fine.grid;
+      // the outline code wants row 0 at the TOP of the model and 0 where nothing is
+      const z = new Float32Array(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const v = fine.height[(h - 1 - y) * w + x]; z[y * w + x] = Number.isNaN(v) ? 0 : v - fine.min.z; }
+      note.textContent = 'Levelling the board…';
+      await new Promise((r) => setTimeout(r, 30));
+      // levelled heights make "one height (Z)" mean the same thing everywhere; a model
+      // without a flat rim cannot be levelled and is used as it is
+      let R: any = null, lv = z;
+      try { R = W.ReliefOutline.run({ w, h, cell, z }); lv = R.lv; } catch { R = null; }
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      shade(cv, fine.height, w, h, cell);
+      // the vectors carry the STL's own coordinates, so they land on the model in CAM
+      const ox = fine.min.x, oy = fine.min.y;
+      const box = $('outlineEditor'); box.hidden = false; box.innerHTML = '';
+      outlineEd = new W.VectorEditor(box, { image: cv, mmPerPx: cell, originMm: [ox, oy + h * cell], heightMap: { w, h, cell, z: lv }, name: (fileName.replace(/\.stl$/i, '') || 'model') + '_outline' });
+      $('outlineFoot').hidden = false;
+      note.textContent = 'Ready. Choose which line you are making and a method, then follow its steps.';
+      W.__outline = { R, ed: outlineEd, fine };
+      box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e: any) {
+      note.textContent = 'Could not open the outline tool: ' + (e?.message || e);
+    }
+    btn.disabled = false;
+  });
+  // test hook: feed an STL from script (the file input cannot be driven by automation)
+  (window as any).__wicLoad = (buf: ArrayBuffer, name = 'test.stl') => load(new File([buf], name));
 
   // ── render ────────────────────────────────────────────────────────────
   const mm = (v: number) => `${v.toFixed(1)} mm`;
@@ -595,6 +784,7 @@ const ld = jsonLd({
       $('customWrap').hidden = ($('machine') as HTMLSelectElement).value !== 'custom';
       render();
       if (id === 'ball' || id === 'so' || id === 'cls') drawSimsSoon();
+      if (id === 'ball' || id === 'so' || id === 'cls' || id === 'sc') drawRestSoon();
       drawFaster();
     });
   }
@@ -975,6 +1165,7 @@ const ld = jsonLd({
   .sims figcaption { font-size: .78rem; color: #5c4a38; margin-top: .4rem; line-height: 1.35; }
   .sims figcaption b { display: block; color: #2b1d10; font-size: .84rem; }
   .note.small { font-size: .78rem; color: #5c4a38; }
+  .outline-methods { margin: .2rem 0 .6rem; padding-left: 1.3rem; display: grid; gap: .25rem; }
   .times { display: grid; gap: .75rem; }
   @media (min-width: 620px) { .times { grid-template-columns: 1fr 1fr 1.2fr; } }
   .t { border-top: 1px solid rgba(43,29,16,.1); padding-top: .6rem; }

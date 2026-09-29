@@ -82,3 +82,6 @@ _specs_run.log
 _sess.mjs
 _pair.json
 _devsess.json
+
+# local test data for the outline tool, never committed
+public/_test/

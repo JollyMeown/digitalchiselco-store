@@ -28,6 +28,9 @@ function ago(iso: string): string {
 export default function SavedCarts() {
   const [rows, setRows] = useState<Snap[] | null>(null);
   const [show, setShow] = useState<'open' | 'bought'>('open');
+  // Owner, 2026-09-29: the list of carts opens downward from an arrow and starts
+  // closed, so Traffic is not pushed down by it. The four numbers stay in view.
+  const [expanded, setExpanded] = useState(false);
   const loadRef = useRef<null | (() => Promise<void>)>(null);
   useEffect(() => {
     let alive = true;
@@ -63,11 +66,15 @@ export default function SavedCarts() {
   return (
     <div className="bg-white border border-black/10 rounded-xl p-4">
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <div className="text-sm font-bold text-ink-800">🛒 Saved carts</div>
+        <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} aria-controls="saved-carts-list"
+          className="flex items-center gap-1.5 text-sm font-bold text-ink-800 hover:text-[#854F0B]">
+          <span aria-hidden="true" className={`inline-block text-[#854F0B] transition-transform ${expanded ? 'rotate-90' : ''}`}>▶</span>
+          🛒 Saved carts
+        </button>
         <span className="text-[11px] text-ink-700/60">last 30 days, refreshes every 20 s</span>
         <div className="ml-auto flex gap-1.5">
           {(['open', 'bought'] as const).map((k) => (
-            <button key={k} onClick={() => setShow(k)}
+            <button key={k} onClick={() => { setShow(k); setExpanded(true); }}
               className={`text-xs px-2.5 py-1 rounded-full border ${show === k ? 'bg-[#633806] text-[#FAEEDA] border-[#633806]' : 'bg-white border-black/15'}`}>
               {k === 'open' ? `Waiting (${view.open.length})` : `Bought (${view.bought.length})`}
             </button>
@@ -75,20 +82,20 @@ export default function SavedCarts() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+      <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 ${expanded ? 'mb-3' : ''}`}>
         <Stat n={view.live.length} label="with a cart, on the site now" hot={view.live.length > 0} />
         <Stat n={view.returning.length} label="came back to a saved cart" />
         <Stat n={`$${view.openValue.toFixed(0)}`} label="sitting in open carts" />
         <Stat n={view.withEmail} label="open carts with an email" />
       </div>
 
-      {list.length === 0 && (
+      {expanded && list.length === 0 && (
         <p className="text-xs text-ink-700/60 py-4 text-center">
           {show === 'open' ? 'No open carts yet. They appear as shoppers add designs (recording started 17 Sep 2026).' : 'No bought carts recorded yet.'}
         </p>
       )}
 
-      <div className="divide-y divide-black/5">
+      <div id="saved-carts-list" hidden={!expanded} className="divide-y divide-black/5">
         {list.slice(0, 40).map((r) => {
           const live = r.status === 'open' && Date.now() - new Date(r.last_seen_at).getTime() < LIVE_MS;
           const returning = new Date(r.last_seen_at).getTime() - new Date(r.first_saved_at).getTime() > 12 * 3600e3;

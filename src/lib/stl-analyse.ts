@@ -306,6 +306,150 @@ export function simulate(a: Analysis, opts: {
   };
 }
 
+// ── rest machining preview ──────────────────────────────────────────────
+// Owner, 2026-09-29: the page showed what the finishing bit leaves; it should
+// also show what a 1.5 mm rest pass adds. Rest machining = the small bit cuts
+// only where the bigger one could not reach, so three things are worth showing:
+// WHERE that is, what that spot looks like before and after, and what it costs.
+//
+// The checker's own grid (640 cells) cannot see a 1.5 mm cutter on a normal
+// panel, so this works on its own finer grid (about 0.3 mm cells).
+export type HeightGrid = { w: number; h: number; cell: number; z: Float32Array };
+export type RestSim = {
+  w: number; h: number; cell: number;
+  /** after the finishing bit, ridges included */
+  finish: Float32Array;
+  /** after the rest pass */
+  rest: Float32Array;
+  /** 1 where the small bit works (its reach gain is visible, plus a margin) */
+  zone: Uint8Array;
+  /** share of the carving the small bit works on, percent */
+  areaPct: number;
+  areaMm2: number;
+  /** how much deeper the small bit gets, 99th percentile inside the zone, mm */
+  gain: number;
+  /** the busiest window, in cells, for the close-up */
+  focus: { x: number; y: number; w: number; h: number };
+  scallopRest: number;
+};
+
+export function heightGrid(pos: Float32Array, target: number, scale = 1): HeightGrid {
+  const r = raster(pos, target);
+  const z = new Float32Array(r.top.length);
+  for (let i = 0; i < z.length; i++) z[i] = r.top[i] * scale;     // NaN stays NaN
+  return { w: r.w, h: r.h, cell: r.cell * scale, z };
+}
+
+/** What a ball nose of this diameter can reach of the grid, no ridges. */
+export function reach(g: HeightGrid, dia: number): Float32Array {
+  const rCells = (dia / 2) / g.cell;
+  let base = Infinity;
+  for (let i = 0; i < g.z.length; i++) { const v = g.z[i]; if (!Number.isNaN(v) && v < base) base = v; }
+  if (!isFinite(base)) base = 0;
+  const k = Math.max(1, Math.floor(rCells / 5));
+  const out = new Float32Array(g.w * g.h);
+  if (k === 1) {
+    const c = closeWithTool(g.z, g.w, g.h, rCells, 'ball', base, g.cell);
+    for (let i = 0; i < out.length; i++) out[i] = Number.isNaN(g.z[i]) ? NaN : Math.max(c[i], g.z[i]);
+    return out;
+  }
+  // A big ball is closed on a coarser copy, or the cost explodes. The copy keeps
+  // the HIGHEST point of each block, because a ball rests on peaks: averaging
+  // would let it sink into detail it cannot enter.
+  const sw = Math.ceil(g.w / k), sh = Math.ceil(g.h / k), small = new Float32Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      let m = -Infinity;
+      for (let yy = y * k; yy < Math.min(g.h, (y + 1) * k); yy++) {
+        for (let xx = x * k; xx < Math.min(g.w, (x + 1) * k); xx++) { const v = g.z[yy * g.w + xx]; if (!Number.isNaN(v) && v > m) m = v; }
+      }
+      small[y * sw + x] = m === -Infinity ? NaN : m;
+    }
+  }
+  const c = closeWithTool(small, sw, sh, rCells / k, 'ball', base, g.cell * k);
+  for (let y = 0; y < g.h; y++) {
+    const fy = Math.min(sh - 1, Math.max(0, (y + 0.5) / k - 0.5)), y0 = Math.floor(fy), y1 = Math.min(sh - 1, y0 + 1), ty = fy - y0;
+    for (let x = 0; x < g.w; x++) {
+      const i = y * g.w + x;
+      if (Number.isNaN(g.z[i])) { out[i] = NaN; continue; }
+      const fx = Math.min(sw - 1, Math.max(0, (x + 0.5) / k - 0.5)), x0 = Math.floor(fx), x1 = Math.min(sw - 1, x0 + 1), tx = fx - x0;
+      const v = (c[y0 * sw + x0] * (1 - tx) + c[y0 * sw + x1] * tx) * (1 - ty) + (c[y1 * sw + x0] * (1 - tx) + c[y1 * sw + x1] * tx) * ty;
+      out[i] = Math.max(v, g.z[i]);
+    }
+  }
+  return out;
+}
+
+export function simulateRest(g: HeightGrid, big: Float32Array, small: Float32Array, opts: {
+  ballDia: number; restDia: number; stepoverPct: number; restStepoverPct: number; focusMm?: number;
+}): RestSim {
+  const { w, h, cell } = g, n = w * h;
+  // 1. where the small bit gets visibly deeper than the finishing bit did
+  const raw = new Uint8Array(n);
+  for (let i = 0; i < n; i++) raw[i] = !Number.isNaN(g.z[i]) && big[i] - small[i] > VISIBLE_MM ? 1 : 0;
+  // single cells are noise, not a place to send a cutter
+  const kept = new Uint8Array(n);
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x; if (!raw[i]) continue;
+    let c = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) c += raw[i + dy * w + dx];
+    if (c >= 4) kept[i] = 1;
+  }
+  // 2. the cutter needs room around the spot: grow by its radius plus half a millimetre (two passes, rows then columns)
+  const m = Math.max(1, Math.round((opts.restDia / 2 + 0.5) / cell));
+  const rowGrown = new Uint8Array(n), zone = new Uint8Array(n);
+  for (let y = 0; y < h; y++) { let last = -1e9; for (let x = 0; x < w; x++) { if (kept[y * w + x]) last = x; if (x - last <= m) rowGrown[y * w + x] = 1; } last = 1e9; for (let x = w - 1; x >= 0; x--) { if (kept[y * w + x]) last = x; if (last - x <= m) rowGrown[y * w + x] = 1; } }
+  for (let x = 0; x < w; x++) { let last = -1e9; for (let y = 0; y < h; y++) { if (rowGrown[y * w + x]) last = y; if (y - last <= m) zone[y * w + x] = 1; } last = 1e9; for (let y = h - 1; y >= 0; y--) { if (rowGrown[y * w + x]) last = y; if (last - y <= m) zone[y * w + x] = 1; } }
+
+  // 3. the two surfaces, each with the ridges of the bit that cut it
+  const ridge = (dia: number, pct: number) => {
+    const r = dia / 2, step = dia * (pct / 100);
+    return { s: Math.max(0, r - Math.sqrt(Math.max(0, r * r - (step / 2) * (step / 2)))), period: Math.max(1e-6, step / cell) };
+  };
+  const rb = ridge(opts.ballDia, opts.stepoverPct), rs = ridge(opts.restDia, opts.restStepoverPct);
+  const finish = new Float32Array(n), rest = new Float32Array(n);
+  let covered = 0, inZone = 0; const gains: number[] = [];
+  for (let y = 0; y < h; y++) {
+    const kb = rb.s * 0.5 * (1 - Math.cos(2 * Math.PI * (y / rb.period)));
+    const ks = rs.s * 0.5 * (1 - Math.cos(2 * Math.PI * (y / rs.period)));
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (Number.isNaN(g.z[i])) { finish[i] = NaN; rest[i] = NaN; zone[i] = 0; continue; }
+      covered++;
+      finish[i] = big[i] + kb;
+      if (zone[i]) { inZone++; rest[i] = Math.min(finish[i], small[i] + ks); if (kept[i]) gains.push(big[i] - small[i]); }
+      else rest[i] = finish[i];
+    }
+  }
+  gains.sort((a, b) => a - b);
+
+  // 4. the busiest window, for the close-up: most depth gained per window
+  const fw = Math.min(w, Math.max(8, Math.round((opts.focusMm ?? 40) / cell))), fh = Math.min(h, fw);
+  const I = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y++) { let row = 0; for (let x = 0; x < w; x++) { const i = y * w + x; row += kept[i] ? big[i] - small[i] : 0; I[(y + 1) * (w + 1) + x + 1] = I[y * (w + 1) + x + 1] + row; } }
+  const step = Math.max(1, Math.round(fw / 6));
+  let best = -1, bx = 0, by = 0;
+  for (let y = 0; y + fh <= h; y += step) for (let x = 0; x + fw <= w; x += step) {
+    const s = I[(y + fh) * (w + 1) + x + fw] - I[y * (w + 1) + x + fw] - I[(y + fh) * (w + 1) + x] + I[y * (w + 1) + x];
+    if (s > best) { best = s; bx = x; by = y; }
+  }
+
+  return {
+    w, h, cell, finish, rest, zone,
+    areaPct: covered ? Math.round(1000 * inZone / covered) / 10 : 0,
+    areaMm2: inZone * cell * cell,
+    gain: gains.length ? Math.round(gains[Math.min(gains.length - 1, Math.floor(gains.length * 0.99))] * 100) / 100 : 0,
+    focus: { x: bx, y: by, w: fw, h: fh },
+    scallopRest: rs.s,
+  };
+}
+
+/** Time for the rest pass: the zone rastered at the small bit's stepover, plus a
+ *  quarter for the moves between islands. Same feed model as cutTime. */
+export function restTime(areaMm2: number, cls: MachineClass, restDia: number, restStepoverPct: number) {
+  const stepover = restDia * (restStepoverPct / 100);
+  return (areaMm2 / stepover) / (cls.feed * 0.5) * 1.25;
+}
+
 /**
  * Which way up is this thing?
  *

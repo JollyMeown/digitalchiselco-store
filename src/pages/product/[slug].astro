@@ -829,13 +829,59 @@ const breadcrumbLd = {
       });
     })();
 
-    document.querySelectorAll('.thumb').forEach((t) => {
-      t.addEventListener('click', () => {
-        const main = document.getElementById('main-img');
-        if (main) main.src = t.dataset.src;
-        document.querySelectorAll('.thumb').forEach((x) => x.classList.remove('border-bronze-600'));
+    // ── Gallery thumbnails ──────────────────────────────────────────
+    // Owner, 2026-09-29: a clicked thumbnail took a second or two to reach the
+    // big frame, because the large picture was only requested at the click.
+    // Now (1) the large pictures are fetched quietly once the page has loaded,
+    // one at a time so they never compete with the first paint, and (2) a click
+    // answers at once with the small picture already on screen, which sharpens
+    // the moment the large one is in.
+    (function () {
+      var main = document.getElementById('main-img');
+      var thumbs = [].slice.call(document.querySelectorAll('.thumb'));
+      if (!main || !thumbs.length) return;
+      var ready = {}, asked = {}, want = null;
+      ready[main.getAttribute('src')] = 1;
+      main.style.transition = 'filter .18s ease';
+
+      function warm(src, done) {
+        if (!src || ready[src]) { if (done) done(); return; }
+        var im = asked[src];
+        if (!im) { im = asked[src] = new Image(); im.decoding = 'async'; im.src = src; }
+        if (im.complete && im.naturalWidth) { ready[src] = 1; if (done) done(); return; }
+        im.addEventListener('load', function () { ready[src] = 1; if (done) done(); }, { once: true });
+        im.addEventListener('error', function () { delete asked[src]; if (done) done(); }, { once: true });
+      }
+      function show(t) {
+        var src = t.dataset.src; want = src;
+        thumbs.forEach(function (x) { x.classList.remove('border-bronze-600'); });
         t.classList.add('border-bronze-600');
+        if (ready[src]) { main.style.filter = ''; main.src = src; return; }
+        var small = t.querySelector('img');
+        if (small && small.complete && small.naturalWidth) { main.src = small.currentSrc || small.src; main.style.filter = 'blur(3px)'; }
+        warm(src, function () { if (want === src) { main.src = src; main.style.filter = ''; } });
+      }
+      thumbs.forEach(function (t, i) {
+        t.addEventListener('click', function () {
+          show(t);
+          [thumbs[i + 1], thumbs[i + 2], thumbs[i - 1]].forEach(function (n) { if (n) warm(n.dataset.src); });
+        });
+        ['pointerenter', 'touchstart', 'focus'].forEach(function (ev) {
+          t.addEventListener(ev, function () { warm(t.dataset.src); }, { passive: true });
+        });
       });
-    });
+
+      // quiet warm-up: everything on a desktop, the first six on a phone, nothing on a
+      // slow or data-saving connection (there the picture is fetched when it is asked for)
+      var conn = navigator.connection || {};
+      if (conn.saveData || /(^|-)2g|3g/.test(conn.effectiveType || '')) return;
+      var desktop = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      var list = (desktop ? thumbs : thumbs.slice(0, 6)).map(function (t) { return t.dataset.src; });
+      // three at a time: a picture nobody has asked for before takes the image service
+      // about 3 s to make, and one slow one must not hold up the rest
+      function run() { var i = 0; function next() { if (i < list.length) warm(list[i++], next); } next(); next(); next(); }
+      function idle() { (window.requestIdleCallback || function (f) { setTimeout(f, 600); })(run); }
+      if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle, { once: true });
+    })();
   </script>
 </Shell>
