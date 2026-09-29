@@ -26,7 +26,12 @@ export const isSupabaseConfigured = Boolean(env('PUBLIC_SUPABASE_URL'));
 // 2026-09-26: failures are counted per request in lib/request-health.ts
 // (server-only); this file is also bundled for the browser, so it only calls
 // the hook that module registers on globalThis.
-const QUERY_DEADLINE_MS = 6000;
+//
+// 2026-09-29: the 6 s deadline is for SERVER rendering only. In the browser it
+// cut off admin saves on a slow connection ("AbortError: signal is aborted
+// without reason" on Save changes), and a browser query never ties up a
+// Netlify function anyway. So the browser gets a generous deadline instead.
+const QUERY_DEADLINE_MS = typeof window === 'undefined' ? 6000 : 45000;
 
 const timedFetch: typeof fetch = async (input, init) => {
   const ctrl = new AbortController();
