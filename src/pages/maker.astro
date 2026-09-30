@@ -7,6 +7,7 @@ import { supabaseAdmin } from '../lib/supabase';
 import { placeLabel } from '../lib/place';
 import { verifyMakerToken, signMakerToken } from '../lib/marketplace-token';
 import { CREDIT_PACKS } from '../lib/marketplace';
+import { reach, SHIP_COUNTRY_CHOICES } from '../lib/maker-reach';
 const paddleEnv = ((process.env.PADDLE_ENV ?? import.meta.env.PADDLE_ENV) === 'production' ? 'production' : 'sandbox');
 const paddleToken = import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN || '';
 const packs = Object.entries(CREDIT_PACKS).map(([id, p]) => ({ id, ...p }));
@@ -24,8 +25,10 @@ if (auth) {
     const { data: inv } = await db.from('maker_fee_invoices').select('*').eq('maker_id', maker.id).eq('status', 'pending').order('created_at').limit(1);
     feeInvoice = inv?.[0] || null;
     const { data: open } = await db.from('maker_requests').select('*').eq('status', 'open').order('created_at', { ascending: false }).limit(60);
-    const mc = (maker.country || '').toLowerCase();
-    openJobs = (open || []).filter((r: any) => r.preferred_maker_id === maker.id || !mc || (r.country || '').toLowerCase() === mc || maker.deliver_intl).slice(0, 20);
+    // same rules as the job emails (maker-reach.ts): a US maker near the border
+    // sees a job from Quebec, marked as such; a maker who does not ship no longer
+    // sees jobs a continent away
+    openJobs = (open || []).map((r: any) => ({ ...r, _reach: reach(maker, r) })).filter((r: any) => r._reach.show).slice(0, 20);
     const { data: mine } = await db.from('maker_quotes').select('request_id').eq('maker_id', maker.id);
     myQuoted = new Set((mine || []).map((x: any) => x.request_id));
     const { data: active } = await db.from('maker_requests').select('*').eq('awarded_maker_id', maker.id).in('status', ['awarded', 'completed']).order('awarded_at', { ascending: false }).limit(20);
@@ -103,8 +106,17 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
               <input name="etsy_url" value={maker.etsy_url || ''} class="mt-1 w-full border border-black/15 rounded-lg px-3 py-2" /></label>
             <div class="flex flex-wrap gap-4 sm:col-span-2 text-sm">
               <label class="inline-flex items-center gap-2"><input type="checkbox" name="deliver_domestic_ship" checked={!!maker.deliver_domestic_ship} /> I ship within my country</label>
-              <label class="inline-flex items-center gap-2"><input type="checkbox" name="deliver_intl" checked={!!maker.deliver_intl} /> I ship internationally</label>
+              <label class="inline-flex items-center gap-2"><input type="checkbox" name="deliver_intl" checked={!!maker.deliver_intl} /> I ship anywhere in the world</label>
             </div>
+            <fieldset class="sm:col-span-2 text-sm">
+              <legend class="text-[11px] uppercase tracking-wide text-ink-700/50">Would you also ship to these countries? Tick any</legend>
+              <div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+                {SHIP_COUNTRY_CHOICES.map((c) => (
+                  <label class="inline-flex items-center gap-2"><input type="checkbox" name="ship_countries" value={c.code} checked={Array.isArray(maker.ship_countries) && maker.ship_countries.includes(c.code)} /> {c.name}</label>
+                ))}
+              </div>
+              <p class="text-xs text-ink-700/50 mt-1">Buyers from a ticked country reach you like local buyers do. Near a border and nothing ticked? We may still ask you about a job from across it.</p>
+            </fieldset>
             <div class="sm:col-span-2 flex items-center gap-3">
               <button class="bg-bronze-600 text-cream font-bold px-5 py-2.5 rounded-lg hover:bg-bronze-700 transition">Save listing</button>
               <span id="listing-msg" class="text-xs text-ink-700/60"></span>
@@ -212,6 +224,11 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
                     </div>
                     <div class="text-xs text-ink-700/60 mt-0.5">{[r.material, r.size, r.finish].filter(Boolean).join(' · ') || 'any material'} · qty {r.quantity}</div>
                     <div class="text-xs text-ink-700/55 mt-0.5">{placeLabel(r, { withCountry: true })} · by {r.deadline || 'flexible'} · budget {r.budget || 'open'} · {r.delivery}</div>
+                    {r._reach?.kind === 'border' && (
+                      <p class="text-xs mt-1.5 px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-900">
+                        Across the border{r._reach.km != null ? `, about ${Math.round(r._reach.km / 10) * 10} km from you` : ''}. Quote only if you can ship there; shipping and any customs are agreed with the buyer.
+                      </p>
+                    )}
                     {r.notes && <p class="text-sm text-ink-700/75 mt-1.5">{r.notes}</p>}
                   </div>
                 </div>
@@ -290,6 +307,7 @@ const jtitle = (r: any) => (r.product_title || 'a design').split('|')[0].trim();
           fd.forEach(function(v,k){ body[k]=v; });
           body.deliver_domestic_ship=lf.querySelector('[name=deliver_domestic_ship]').checked;
           body.deliver_intl=lf.querySelector('[name=deliver_intl]').checked;
+          body.ship_countries=[].slice.call(lf.querySelectorAll('[name=ship_countries]:checked')).map(function(x){ return x.value; });
           try{
             var r=await fetch('/api/mp/profile',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
             var j=await r.json();

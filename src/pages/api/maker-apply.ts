@@ -5,6 +5,7 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { rateLimit, clientIp, tooMany } from '../../lib/rate-limit';
+import { cleanShipCountries } from '../../lib/maker-reach';
 
 export const prerender = false;
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json' } });
@@ -50,6 +51,7 @@ export const POST: APIRoute = async ({ request }) => {
     deliver_domestic_ship: !!b.deliver_domestic_ship,
     deliver_intl: !!b.deliver_intl,
     deliver_intl_notes: str(b.deliver_intl_notes, 300) || null,
+    ship_countries: cleanShipCountries(b.ship_countries),   // migration 150
     machine_types,
     machine_count: intOrNull(b.machine_count),
     machine_models: str(b.machine_models, 500) || null,

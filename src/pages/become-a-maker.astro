@@ -3,6 +3,7 @@
 // nav/sitemap. Reachable only by the recruit email's link until launch.
 import Shell from '../layouts/Shell.astro';
 import { signUploadToken } from '../lib/marketplace-token';
+import { SHIP_COUNTRY_CHOICES } from '../lib/maker-reach';
 // Real prices, straight from the billing table: the first maker had to email
 // and ask what a credit costs, so no page may say "low-cost" without a number.
 import { SUCCESS_FEE_PCT as FEE_SUCCESS, FOUNDING_CREDITS as FOUNDING_DEFAULT, creditPacks, quotePriceRange } from '../lib/marketplace-pricing';
@@ -105,8 +106,16 @@ const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
           <label class="block"><span class="lbl">Local pickup / delivery radius (km) within your country</span><input name="deliver_radius_km" type="number" min="0" class="fld" placeholder="e.g. 40" /></label>
           <div class="flex flex-col justify-end gap-2 text-sm">
             <label class="flex items-center gap-2"><input type="checkbox" name="deliver_domestic_ship" /> I ship anywhere in my country</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="deliver_intl" id="intl" /> I ship internationally</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="deliver_intl" id="intl" /> I ship anywhere in the world</label>
           </div>
+          <fieldset class="sm:col-span-2 text-sm">
+            <legend class="lbl">Would you also ship to these countries? Tick any</legend>
+            <div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+              {SHIP_COUNTRY_CHOICES.map((c) => (
+                <label class="inline-flex items-center gap-2"><input type="checkbox" name="ship_countries" value={c.code} /> {c.name}</label>
+              ))}
+            </div>
+          </fieldset>
           <label class="block sm:col-span-2 hidden" id="intl-notes-wrap"><span class="lbl">Where do you ship internationally, and how?</span><input name="deliver_intl_notes" class="fld" placeholder="e.g. US, Canada, UK — via FedEx, buyer pays shipping" /></label>
         </div>
       </fieldset>
@@ -323,6 +332,7 @@ const uploadToken = signUploadToken();   // gates /api/maker-upload for 3h
         var fd=new FormData(form), body={};
         fd.forEach(function(v,k){ body[k]=v; });
         ['deliver_domestic_ship','deliver_intl','agreed_owns_machines','agreed_fees','agreed_terms'].forEach(function(k){ body[k]=!!form.querySelector('[name="'+k+'"]').checked; });
+        body.ship_countries=[].slice.call(form.querySelectorAll('[name="ship_countries"]:checked')).map(function(x){ return x.value; });
         Object.keys(chosen).forEach(function(k){ body[k]=chosen[k]; });
         body.portfolio_urls=urls;
         // The photos are marked required, but nothing used to enforce it: if

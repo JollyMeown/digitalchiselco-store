@@ -3,6 +3,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { send as sendEmail } from './resend';
 import { signMakerToken } from './marketplace-token';
+import { reach, REACH_ORDER, type Reach } from './maker-reach';
+import { placeLabel } from './place';
 
 const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
 // Prices/fees live in marketplace-pricing.ts (no imports of its own) so email
@@ -10,54 +12,78 @@ const SITE = (process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').repl
 export { SUCCESS_FEE_PCT, CREDIT_PACKS, FOUNDING_CREDITS } from './marketplace-pricing';
 import { SUCCESS_FEE_PCT } from './marketplace-pricing';
 
-// Find approved makers who can plausibly do this job. Lenient by design — it's
-// better to notify a few extra than to miss a maker. Ranked: same city, then
-// same region, then anyone who ships. Capability filter is soft (only excludes
-// a maker who lists materials and none match the requested one).
+// Find approved makers who can take this job, best first. Whether a maker can
+// reach the buyer is decided in maker-reach.ts (shared with the dashboard and
+// the daily reminder). Each returned maker carries `_reach`, so the job email
+// can say plainly when the buyer is across a border. Capability filter is soft
+// (only excludes a maker who lists materials and none match the requested one).
 export async function matchMakers(db: SupabaseClient, req: any): Promise<any[]> {
   const { data } = await db.from('makers').select('*').eq('status', 'approved').limit(2000);
-  const country = (req.country || '').toLowerCase();
-  const region = (req.region || '').toLowerCase();
-  const city = (req.city || '').toLowerCase();
   const material = (req.material || '').toLowerCase();
-  const wantsShip = req.delivery === 'ship' || req.delivery === 'either';
   const scored = (data || []).map((m: any) => {
-    const mc = (m.country || '').toLowerCase();
-    if (country && mc && country !== mc) {
-      // different country: only match if maker ships internationally and buyer accepts shipping
-      if (!(m.deliver_intl && wantsShip)) return null;
-    }
-    // soft capability filter
-    if (material && Array.isArray(m.materials) && m.materials.length && !m.materials.map((x: string) => x.toLowerCase()).includes(material)) return null;
-    let score = 0;
-    if (city && (m.city || '').toLowerCase() === city) score += 3;
-    if (region && (m.region || '').toLowerCase() === region) score += 2;
-    if (m.deliver_domestic_ship) score += 1;
-    score += Math.min(2, Number(m.rating_avg) || 0) * 0.3; // nudge higher-rated makers up
-    return { m, score };
-  }).filter(Boolean) as { m: any; score: number }[];
-  scored.sort((a, b) => b.score - a.score);
+    const r = reach(m, req);
+    if (!r.show) return null;
+    if (material && r.kind !== 'picked' && Array.isArray(m.materials) && m.materials.length && !m.materials.map((x: string) => x.toLowerCase()).includes(material)) return null;
+    return { m: { ...m, _reach: r }, r };
+  }).filter(Boolean) as { m: any; r: Reach }[];
+  scored.sort((a, b) =>
+    REACH_ORDER[a.r.kind] - REACH_ORDER[b.r.kind]
+    || (a.r.km ?? 1e9) - (b.r.km ?? 1e9)
+    || (Number(b.m.rating_avg) || 0) - (Number(a.m.rating_avg) || 0));
   return scored.map((s) => s.m);
 }
 
+/** "3 can deliver, 2 asked about shipping across the border" for the owner's alert. */
+export function reachSummary(makers: any[]): { sure: number; border: number; unsure: number } {
+  const k = makers.map((m) => (m._reach as Reach | undefined)?.kind);
+  return {
+    sure: makers.filter((m) => m._reach?.sure).length,
+    border: k.filter((x) => x === 'border').length,
+    unsure: k.filter((x) => x === 'unknown').length,
+  };
+}
+
 export async function notifyMakersOfJob(makers: any[], req: any) {
+  for (const m of makers.slice(0, 40)) await sendEmail(jobEmail(m, req));
+}
+
+/** The "new job" email for one maker, built but not sent (scripts preview it). */
+export function jobEmail(m: any, req: any) {
   const title = (req.product_title || 'a design').split('|')[0].trim();
-  for (const m of makers.slice(0, 40)) {
+  const where = placeLabel(req, { withCountry: true }) || req.country || 'your area';
+  {
     const link = `${SITE}/maker?t=${encodeURIComponent(signMakerToken(m.email))}`;
-    await sendEmail({
+    const r: Reach | undefined = m._reach;
+    const border = r?.kind === 'border';
+    const away = r?.km != null ? `about ${Math.round(r.km / 10) * 10} km from you` : 'in another country';
+    // Across a border the maker is ASKED, not assumed: say where the buyer is,
+    // that shipping and customs are between them, and that skipping costs nothing.
+    const borderHtml = border
+      ? `<p style="background:#fbf1de;border:1px solid #e7cf9c;border-radius:8px;padding:10px 12px;">This buyer is in <b>${esc(where)}</b>, ${away}, across the border. We are asking because you ship within your own country and you are one of the closest makers. Quote only if you can ship there: shipping and any customs are agreed between you and the buyer. If not, just skip it; only sending a quote uses a credit.</p>
+<p style="font-size:13px;color:#6b5d4a;">You can tick the countries you ship to under "Your listing" on your dashboard, so we only ask when it fits.</p>`
+      : '';
+    return {
       to: m.email,
-      subject: `New Cut Local job near you: ${title}`,
+      subject: border ? `Cut Local job across the border in ${countryName(req.country)}: ${title}` : `New Cut Local job near you: ${title}`,
       html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#2a241d;">
 <p style="font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#854F0B;">Cut Local · new job</p>
-<p>A buyer near <b>${esc(req.city || req.region || req.country || 'you')}</b> wants <b>${esc(title)}</b> made${req.material ? ' in ' + esc(req.material) : ''}${req.size ? ', ' + esc(req.size) : ''}.</p>
-<p>Budget: ${esc(req.budget || 'open')} · needed: ${esc(req.deadline || 'flexible')}.</p>
+<p>A buyer ${border ? 'in' : 'near'} <b>${esc(border ? where : (req.city || req.region || req.country || 'you'))}</b> wants <b>${esc(title)}</b> made${req.material ? ' in ' + esc(req.material) : ''}${req.size ? ', ' + esc(req.size) : ''}.</p>
+<p>Budget: ${esc(req.budget || 'open')} · needed: ${esc(req.deadline || 'flexible')}${req.delivery ? ' · ' + esc(req.delivery === 'ship' ? 'buyer wants it shipped' : req.delivery === 'pickup' ? 'pickup' : 'pickup or shipping') : ''}.</p>
+${borderHtml}
 <p style="margin:20px 0;"><a href="${link}" style="background:#854F0B;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:bold;">View job &amp; send a quote →</a></p>
 <p style="font-size:12px;color:#9a8b76;">You're an approved Cut Local maker. Quoting uses one credit.</p></div>`,
-      text: `New Cut Local job near ${req.city || req.country}: ${title}${req.material ? ' in ' + req.material : ''}. View & quote: ${link}`,
+      text: border
+        ? `Cut Local job across the border: a buyer in ${where} (${away}) wants ${title}${req.material ? ' in ' + req.material : ''}. Quote only if you can ship there; shipping and customs are agreed with the buyer. View & quote: ${link}`
+        : `New Cut Local job near ${req.city || req.country}: ${title}${req.material ? ' in ' + req.material : ''}. View & quote: ${link}`,
       idempotencyKey: `mp-job:${req.id}:${m.id}`,
       tags: [{ name: 'kind', value: 'marketplace' }],
-    });
+    };
   }
+}
+
+function countryName(c: unknown): string {
+  const s = String(c || '').trim();
+  return /^(ca|can|canada)$/i.test(s) ? 'Canada' : /^(us|usa|u\.?s\.?a?\.?|united states.*)$/i.test(s) ? 'the USA' : s || 'another country';
 }
 
 export async function notifyBuyerNewQuote(req: any, maker: any, quote: any, buyerLink: string) {

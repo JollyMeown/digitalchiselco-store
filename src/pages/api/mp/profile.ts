@@ -9,6 +9,7 @@ import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { verifyMakerToken } from '../../../lib/marketplace-token';
 import { rateLimit, clientIp, tooMany } from '../../../lib/rate-limit';
+import { cleanShipCountries } from '../../../lib/maker-reach';
 
 export const prerender = false;
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json' } });
@@ -45,6 +46,7 @@ export const POST: APIRoute = async ({ request }) => {
     etsy_url: str(b.etsy_url, 200) || null,
     deliver_domestic_ship: !!b.deliver_domestic_ship,
     deliver_intl: !!b.deliver_intl,
+    ship_countries: cleanShipCountries(b.ship_countries),   // migration 150
   };
   const { error } = await db.from('makers').update(patch).eq('id', maker.id);
   if (error) return json({ error: error.message }, 500);

@@ -1638,7 +1638,7 @@ ${ideasHtml}
   stats.makerLowCredits = 'off';
   stats.makerFeeSettlement = 'off';
   if (g.maker_automations_enabled) {
-    const { matchMakers } = await import('./marketplace');
+    const { reach } = await import('./maker-reach');
     await step(stats, 'makerJobsNudge', async () => {
       const s: any = { sent: 0, failed: 0 };
       const { data: openReqs } = await db.from('maker_requests').select('*').eq('status', 'open').gte('created_at', daysAgo(30)).limit(500);
@@ -1648,10 +1648,8 @@ ${ideasHtml}
       for (const m of makers || []) {
         if (outOfTime()) break;
         // count open jobs this maker matches but hasn't quoted
-        const matched = openReqs.filter((r: any) => {
-          const mc = (m.country || '').toLowerCase(), rc = (r.country || '').toLowerCase();
-          return (!rc || rc === mc || m.deliver_intl);
-        });
+        // same rules as the job emails and the dashboard (maker-reach.ts)
+        const matched = openReqs.filter((r: any) => reach(m, r).show);
         if (!matched.length) continue;
         const { data: quoted } = await db.from('maker_quotes').select('request_id').eq('maker_id', m.id).in('request_id', matched.map((r: any) => r.id));
         const already = new Set((quoted || []).map((q: any) => q.request_id));

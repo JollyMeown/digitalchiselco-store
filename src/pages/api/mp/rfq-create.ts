@@ -4,7 +4,7 @@ import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { rateLimit, clientIp, tooMany } from '../../../lib/rate-limit';
 import { signRequestToken } from '../../../lib/marketplace-token';
-import { matchMakers, notifyMakersOfJob } from '../../../lib/marketplace';
+import { matchMakers, notifyMakersOfJob, reachSummary } from '../../../lib/marketplace';
 
 export const prerender = false;
 const SITE = (import.meta.env.PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').replace(/\/$/, '');
@@ -56,9 +56,18 @@ export const POST: APIRoute = async ({ request }) => {
     });
   } catch (e) { console.error('[rfq-buyer-email]', (e as any)?.message); }
   // match + notify makers (best-effort, never blocks the buyer)
-  let matched = 0;
+  let matched = 0, reachLine = '';
   try {
     let makers = await matchMakers(db, data);
+    {
+      // Tell the owner whether anyone can actually deliver. The first real
+      // request (2026-09-29) "notified 1 maker" who could not reach the buyer,
+      // and nothing in the alert said so.
+      const s = reachSummary(makers), sure = s.sure + (prefMaker && !makers.some((mk: any) => mk.id === prefMaker.id) ? 1 : 0);
+      reachLine = sure > 0
+        ? `\n${sure} can deliver${s.border ? `, ${s.border} across the border asked if they ship there` : ''}${s.unsure ? `, ${s.unsure} unclear (missing location)` : ''}`
+        : `\n⚠️ <b>No maker can surely deliver this.</b>${s.border ? ` ${s.border} across the border asked if they ship there.` : ''}${s.unsure ? ` ${s.unsure} with unclear location.` : ''} Consider finding a maker by hand.`;
+    }
     // personally-requested maker: always included (even outside the geo match),
     // and gets a special "the buyer picked YOU" email instead of the broadcast
     if (prefMaker) {
@@ -81,7 +90,7 @@ export const POST: APIRoute = async ({ request }) => {
     matched += makers.length;
     await notifyMakersOfJob(makers, data);
   } catch (e) { console.error('[rfq-match]', (e as any)?.message); }
-  try { const { telegramOwner } = await import('../../../lib/notify'); await telegramOwner(`🔨 <b>New Cut Local request</b>\n${row.product_title}\n${[row.city, row.country].filter(Boolean).join(', ')} · notified ${matched} maker(s)`); } catch {}
+  try { const { telegramOwner } = await import('../../../lib/notify'); await telegramOwner(`🔨 <b>New Cut Local request</b>\n${row.product_title}\n${[row.city, row.country].filter(Boolean).join(', ')} · notified ${matched} maker(s)${reachLine}`); } catch {}
 
   return json({ ok: true, id: data.id, matched, link: `${SITE}/requests/${data.id}?t=${encodeURIComponent(token)}` });
 };
