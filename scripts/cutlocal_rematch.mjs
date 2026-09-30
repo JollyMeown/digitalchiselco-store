@@ -1,17 +1,19 @@
 // Re-run Cut Local matching for one open request and email the makers who were
 // not told before (new matching rules of 2026-09-30, src/lib/maker-reach.ts).
 //
-//   npx tsx scripts/cutlocal_rematch.mjs <request id>          dry run: who would be emailed, and the email text
-//   npx tsx scripts/cutlocal_rematch.mjs <request id> --send   send them (owner's go-ahead only)
+//   npx tsx scripts/cutlocal_rematch.mjs <request id>    preview: who would be emailed, and the email text
 //
-// Safe to repeat: each job email carries the key mp-job:<request>:<maker>, and
-// makers who already got one (email_send_log) are skipped before sending.
+// PREVIEW ONLY. Sending lives in Admin > Makers > Live marketplace > (open the
+// request) > "Email the job to N makers", which runs on the live site. The
+// email carries a maker sign-in link, and the live site rejects links signed
+// on this machine (different secret): found 2026-09-30 before anything went out.
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 import { matchMakers, notifyMakersOfJob, jobEmail } from '../src/lib/marketplace.ts';
 
-const id = process.argv[2], SEND = process.argv.includes('--send');
-if (!/^[0-9a-f-]{36}$/i.test(id || '')) { console.error('usage: npx tsx scripts/cutlocal_rematch.mjs <request id> [--send]'); process.exit(1); }
+const id = process.argv[2], SEND = false;
+if (process.argv.includes('--send')) { console.error('Sending is done from Admin > Makers (links must be signed by the live site). This script only previews.'); process.exit(1); }
+if (!/^[0-9a-f-]{36}$/i.test(id || '')) { console.error('usage: npx tsx scripts/cutlocal_rematch.mjs <request id>'); process.exit(1); }
 const db = createClient(process.env.PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
 const { data: req, error } = await db.from('maker_requests').select('*').eq('id', id).maybeSingle();
@@ -33,7 +35,7 @@ if (!SEND) {
     const plain = e.html.replace(/<p[^>]*>/g, '\n').replace(/<br\s*\/?>/g, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\n{2,}/g, '\n').trim();
     console.log(`\n--- email preview for ${fresh[0].maker_name} ---\nSubject: ${e.subject}\n\n${plain.replace(/\?t=[^"\s]+/g, '?t=...')}\n---`);
   }
-  console.log('\n(dry run: nothing sent. Add --send to email the makers marked WILL EMAIL.)');
+  console.log('\n(preview: nothing sent. To send, open the request in Admin > Makers > Live marketplace.)');
   process.exit(0);
 }
 await notifyMakersOfJob(fresh, req);

@@ -323,6 +323,7 @@ function Field({ k, v }: { k: string; v?: string | null }) {
 // ── Live marketplace monitor — requests, quotes, jobs, fees, disputes ──
 function MarketplaceMonitor() {
   const [d, setD] = useState<any>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const load = async () => {
     const [{ data: reqs }, { count: open }, { count: completed }, { data: fees }, { data: flagged }] = await Promise.all([
       supabase.from('maker_requests').select('id, product_title, status, city, region, created_at, agreed_price, flagged').order('created_at', { ascending: false }).limit(12),
@@ -361,19 +362,110 @@ function MarketplaceMonitor() {
       )}
       {d.reqs.length === 0 ? <p className="text-xs text-ink-700/50">No requests yet. Recruit + approve makers, then buyers can post jobs.</p> : (
         <div className="text-sm">
+          <div className="text-[11px] text-ink-700/50 mb-1">Click a request to see it in full and which makers were told.</div>
           {d.reqs.map((r: any) => (
-            <div key={r.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-black/5 last:border-0">
-              <span className="truncate text-ink-800">{(r.product_title || '').split('|')[0].trim()} <span className="text-ink-700/45 text-xs">{[r.city, r.region].filter(Boolean).join(', ')}</span></span>
-              <span className="flex items-center gap-2 shrink-0 text-xs">
-                {d.quoteCounts[r.id] > 0 && <span className="text-ink-700/60">{d.quoteCounts[r.id]} quote{d.quoteCounts[r.id] > 1 ? 's' : ''}</span>}
-                {r.agreed_price && <span className="text-bronze-700 font-medium">${Number(r.agreed_price).toFixed(0)}</span>}
-                <span className={`px-2 py-0.5 rounded-full font-medium ${r.status === 'completed' ? 'bg-green-100 text-green-800' : r.status === 'awarded' ? 'bg-bronze-100 text-bronze-700' : 'bg-cream text-ink-700'}`}>{r.status}</span>
-              </span>
+            <div key={r.id} className="border-b border-black/5 last:border-0">
+              <button type="button" onClick={() => setOpenId(openId === r.id ? null : r.id)} aria-expanded={openId === r.id}
+                className="w-full flex items-center justify-between gap-2 py-1.5 text-left hover:bg-cream/40 rounded">
+                <span className="truncate text-ink-800">
+                  <span aria-hidden="true" className={`inline-block text-[#854F0B] mr-1.5 transition-transform ${openId === r.id ? 'rotate-90' : ''}`}>▶</span>
+                  {(r.product_title || '').split('|')[0].trim()} <span className="text-ink-700/45 text-xs">{[r.city, r.region].filter(Boolean).join(', ')} · {new Date(r.created_at).toLocaleDateString()}</span>
+                </span>
+                <span className="flex items-center gap-2 shrink-0 text-xs">
+                  <span className="text-ink-700/60">{d.quoteCounts[r.id] || 0} quote{d.quoteCounts[r.id] === 1 ? '' : 's'}</span>
+                  {r.agreed_price && <span className="text-bronze-700 font-medium">${Number(r.agreed_price).toFixed(0)}</span>}
+                  <span className={`px-2 py-0.5 rounded-full font-medium ${r.status === 'completed' ? 'bg-green-100 text-green-800' : r.status === 'awarded' ? 'bg-bronze-100 text-bronze-700' : 'bg-amber-100 text-amber-800'}`}>{r.status}</span>
+                </span>
+              </button>
+              {openId === r.id && <RequestDetail id={r.id} />}
             </div>
           ))}
         </div>
       )}
     </Card>
+  );
+}
+
+// ── One request in full (owner, 2026-09-30: "why can't I see the cut local
+// request?" The rows could not be opened). Shows what the buyer asked for,
+// every maker who can take it and whether they were told, the quotes, and a
+// button that has the LIVE site email the makers not told yet (the maker
+// sign-in links must be signed by the server). ──
+const REACH_LABEL: Record<string, string> = {
+  picked: 'buyer picked them', local: 'local', ships: 'ships to the buyer', intl: 'ships to that country',
+  unknown: 'location unclear', border: 'across the border, asked', 'out of reach now': 'told earlier, out of reach',
+};
+function RequestDetail({ id }: { id: string }) {
+  const [d, setD] = useState<any>(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  async function call(notify = false) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin/cutlocal-request', {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ id, notify }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || j.error) throw new Error(j.error || `HTTP ${res.status}`);
+    return j;
+  }
+  const load = () => call().then(setD).catch((e) => setErr(e.message));
+  useEffect(() => { load(); }, [id]);
+  if (err) return <p className="text-xs text-red-700 py-2">Could not load the request: {err}</p>;
+  if (!d) return <p className="text-xs text-ink-700/50 py-2">Loading…</p>;
+  const r = d.request, fresh = d.makers.filter((m: any) => !m.told && m.kind !== 'out of reach now');
+  const sure = d.makers.filter((m: any) => m.sure).length;
+  async function notify() {
+    if (!confirm(`Email this job to ${fresh.length} maker(s): ${fresh.map((m: any) => m.name).join(', ')}?`)) return;
+    setBusy(true); setMsg('');
+    try { const j = await call(true); setMsg(`✓ Sent to ${j.sent} maker(s).`); await load(); }
+    catch (e: any) { setMsg('Could not send: ' + e.message); }
+    finally { setBusy(false); }
+  }
+  const age = Math.max(0, Math.round((Date.now() - new Date(r.created_at).getTime()) / 3600e3));
+  return (
+    <div className="mb-2 rounded-lg border border-black/10 bg-[#FBF5EA] p-3 text-xs space-y-3">
+      <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
+        <div><b>Buyer:</b> {r.buyer_name || '—'} · <a className="underline text-[#854F0B]" href={`mailto:${r.buyer_email}`}>{r.buyer_email}</a></div>
+        <div><b>Where:</b> {r.place || '—'}{r.postal ? ` (${r.postal})` : ''}</div>
+        <div><b>Wants:</b> {[r.material, r.size, r.finish].filter(Boolean).join(' · ') || 'not said'} · qty {r.quantity}</div>
+        <div><b>By:</b> {r.deadline || 'flexible'} · <b>budget</b> {r.budget || 'open'} · {r.delivery === 'ship' ? 'ship it' : r.delivery}</div>
+        <div><b>Posted:</b> {new Date(r.created_at).toLocaleString()} ({age < 48 ? `${age} h ago` : `${Math.round(age / 24)} days ago`})</div>
+        {r.product_slug && <div><b>Design:</b> <a className="underline text-[#854F0B]" href={`/product/${r.product_slug}`} target="_blank" rel="noreferrer">open the product page</a></div>}
+        {r.notes && <div className="sm:col-span-2"><b>Notes:</b> {r.notes}</div>}
+      </div>
+
+      <div>
+        <div className="font-semibold text-ink-800 mb-1">Makers ({d.makers.length}) · {sure > 0 ? `${sure} can surely deliver` : <span className="text-red-700">none can surely deliver</span>}</div>
+        {d.makers.length === 0 ? <p className="text-ink-700/60">No maker can reach this buyer. Consider finding one by hand.</p> : (
+          <ul className="space-y-0.5">
+            {d.makers.map((m: any) => (
+              <li key={m.id} className="flex flex-wrap items-center gap-x-2">
+                <span className="text-ink-800">{m.name}</span>
+                <span className="text-ink-700/55">{m.place}{m.km != null ? ` · ~${Math.round(m.km / 10) * 10} km` : ''}</span>
+                <span className={`px-1.5 rounded ${m.sure ? 'bg-green-100 text-green-800' : m.kind === 'border' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700'}`}>{REACH_LABEL[m.kind] || m.kind}</span>
+                <span className={m.told ? 'text-green-700' : 'text-ink-700/50'}>{m.told ? '✓ emailed' : 'not emailed yet'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {r.status === 'open' && fresh.length > 0 && (
+          <div className="mt-2 flex items-center gap-3">
+            <button className={btnPrimary} disabled={busy} onClick={notify}>{busy ? 'Sending…' : `Email the job to ${fresh.length} maker${fresh.length === 1 ? '' : 's'} not told yet`}</button>
+            <span className="text-ink-700/60">{msg}</span>
+          </div>
+        )}
+        {msg && !(r.status === 'open' && fresh.length > 0) && <p className="mt-1 text-green-700">{msg}</p>}
+      </div>
+
+      <div>
+        <div className="font-semibold text-ink-800 mb-1">Quotes ({d.quotes.length})</div>
+        {d.quotes.length === 0 ? <p className="text-ink-700/60">No quotes yet.</p> : d.quotes.map((q: any, i: number) => (
+          <div key={i}>{q.makers?.maker_name || 'maker'}: <b>${Number(q.price).toFixed(2)}</b>{q.lead_days ? ` · ${q.lead_days} days` : ''} · {q.status}{q.message ? ` · "${q.message}"` : ''}</div>
+        ))}
+      </div>
+    </div>
   );
 }
 
