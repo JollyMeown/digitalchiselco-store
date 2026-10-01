@@ -26,9 +26,41 @@ const img = (c.gallery && c.gallery[0]) ? sized(c.gallery[0], { w: 660, q: 78 })
     )}
   </div>
   <!-- Image — full, never cropped — right on desktop, top on mobile -->
-  <div class="sm:w-[56%] bg-cream flex items-center justify-center p-2.5 order-1 sm:order-2 min-h-[180px]">
+  <div class="sm:w-[56%] bg-cream flex items-center justify-center p-2.5 order-1 sm:order-2 min-h-[180px] relative">
     {img
-      ? <img src={img} alt={`Bas-relief carving by ${c.name}`} loading="lazy" class="w-full max-h-[320px] object-contain rounded-lg" />
+      ? <img src={img} alt={`Bas-relief carving by ${c.name}`} loading="lazy" class="cbv-photo w-full max-h-[320px] object-contain rounded-lg" />
       : <div class="text-bronze-600/40 font-serif text-sm">{c.name}</div>}
+    {c.video_url && (
+      // The maker's own clip of the carve (migration 151). Nothing loads until
+      // the button is pressed; the photo stays the face of the card.
+      <button type="button" class="cbv-play absolute bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full bg-[#2e1d10]/85 text-[#FAEEDA] text-xs font-semibold px-3 py-1.5 hover:bg-[#2e1d10] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FAEEDA]"
+        data-video={c.video_url} aria-label={`Watch ${c.name}'s carving being cut`}>
+        <span aria-hidden="true">▶</span> Watch it carve
+      </button>
+    )}
   </div>
 </article>
+
+<script is:inline>
+  // One listener for every card (the marquee duplicates cards for its loop).
+  // A pressed button swaps the photo for the video; while it plays, the
+  // scrolling strip holds still so the clip does not slide away on a phone.
+  (function () {
+    if (window.__cbvVideo) return; window.__cbvVideo = 1;
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('.cbv-play'); if (!b) return;
+      var box = b.parentElement, photo = box.querySelector('.cbv-photo');
+      var v = document.createElement('video');
+      v.src = b.dataset.video; v.controls = true; v.autoplay = true; v.muted = true; v.playsInline = true; v.preload = 'auto';
+      if (photo) v.poster = photo.currentSrc || photo.src;
+      v.className = 'w-full max-h-[320px] object-contain rounded-lg bg-black';
+      var track = box.closest('.dcc-marquee-track');
+      var hold = function (on) { if (track) track.style.animationPlayState = on ? 'paused' : ''; };
+      v.addEventListener('play', function () { hold(true); });
+      v.addEventListener('pause', function () { hold(false); });
+      v.addEventListener('ended', function () { hold(false); });
+      if (photo) photo.replaceWith(v); else box.prepend(v);
+      b.remove();
+    });
+  })();
+</script>

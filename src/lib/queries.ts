@@ -40,7 +40,7 @@ const SETTINGS_FALLBACK: SiteSettings = {
   sales_count: 4543, products_count: 1235, admirers_count: 505, experience_years: 20,
   discount_percent: 20, hero_image_url: null,
   hero_headline: 'Art that carves with purpose',
-  hero_subhead: 'Hundreds of museum-grade bas-relief designs, instantly downloadable. CNC-ready, commercial-use included.',
+  hero_subhead: 'Museum-grade bas-relief designs, instantly downloadable. CNC-ready, commercial-use included.',
   featured_product_id: null, admin_email: 'jolly@digitalchiselco.com',
   banner_image_url: null,
   logo_image_url: null, favicon_image_url: null,
@@ -490,6 +490,7 @@ export async function getRelatedToProducts(productIds: string[], limit = 8): Pro
 export type CustomerCreation = {
   id: string; name: string; description: string | null; gallery: string[];
   product_id: string | null; product_url: string | null; is_featured: boolean;
+  video_url?: string | null;   // migration 151
   products?: { title: string; slug: string } | null;
 };
 // Fetch active bundle products grouped under the "PREMIUM BUNDLE OFFER" category
@@ -521,7 +522,7 @@ export async function getCustomerCreations(limit = 9): Promise<CustomerCreation[
   try {
     const { data, error } = await supabase
       .from('customer_creations')
-      .select('id,name,description,gallery,product_id,product_url,is_featured,products(title,slug)')
+      .select('id,name,description,gallery,product_id,product_url,is_featured,video_url,products(title,slug)')
       .eq('active', true)
       .order('is_featured', { ascending: false })
       .order('sort_order')

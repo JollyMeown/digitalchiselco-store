@@ -11,7 +11,7 @@ import ProductSearchPicker from '../ProductSearchPicker';
 type Creation = {
   id: string; name: string; description: string | null; gallery: string[];
   product_id: string | null; product_url: string | null; active: boolean;
-  is_featured: boolean; sort_order: number; created_at: string;
+  is_featured: boolean; sort_order: number; created_at: string; video_url?: string | null;
   products?: { title: string; slug: string } | null;
 };
 type ProductPick = { id: string; title: string; slug: string; image_url: string | null };
@@ -81,6 +81,7 @@ export default function Creations() {
                   </div>
                   <div className="flex flex-col items-end gap-0.5">
                     {c.is_featured && <span className="text-[10px] bg-bronze-100 text-bronze-700 px-1.5 py-0.5 rounded">★ featured</span>}
+                    {c.video_url && <span className="text-[10px] bg-cream text-ink-700 px-1.5 py-0.5 rounded">▶ video</span>}
                     {!c.active && <span className="text-[10px] bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">hidden</span>}
                   </div>
                 </div>
@@ -113,6 +114,24 @@ function CreationForm({ c, products, onDone }: { c: Creation | null; products: P
   const [active, setActive] = useState(c?.active ?? true);
   const [isFeatured, setIsFeatured] = useState(c?.is_featured ?? false);
   const [sortOrder, setSortOrder] = useState<number | string>(c?.sort_order ?? 0);
+  const [videoUrl, setVideoUrl] = useState(c?.video_url || '');
+  const [videoBusy, setVideoBusy] = useState(false);
+
+  // A short clip of the carve (migration 151). Uploaded as-is: MP4 plays in
+  // every browser; an iPhone .mov often will not play in Chrome on Windows.
+  async function uploadVideo(f: File) {
+    if (f.size > 10 * 1024 * 1024) { setMsg({ kind: 'error', text: 'That video is over 10 MB. Trim or compress it first.' }); return; }
+    setVideoBusy(true); setMsg({ kind: 'info', text: 'Uploading the video…' });
+    try {
+      const ext = (f.name.split('.').pop() || 'mp4').toLowerCase();
+      const path = `creations/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error } = await supabase.storage.from('site-media').upload(path, f, { upsert: false, contentType: f.type || 'video/mp4' });
+      if (error) throw error;
+      setVideoUrl(supabase.storage.from('site-media').getPublicUrl(path).data.publicUrl);
+      setMsg({ kind: ext === 'mp4' ? 'success' : 'info', text: ext === 'mp4' ? '✓ Video uploaded. Save to keep it.' : '✓ Uploaded. Note: a .mov may not play in every browser; MP4 is safest.' });
+    } catch (e: any) { setMsg({ kind: 'error', text: 'Video upload failed: ' + (e?.message || e) }); }
+    finally { setVideoBusy(false); }
+  }
   const [msg, setMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string }>({ kind: 'info', text: '' });
   const [busy, setBusy] = useState(false);
   const [storyBusy, setStoryBusy] = useState(false);
@@ -168,6 +187,7 @@ function CreationForm({ c, products, onDone }: { c: Creation | null; products: P
       name, description: description || null, gallery,
       product_id: productId || null, product_url: productUrl || null,
       active, is_featured: isFeatured, sort_order: Number(sortOrder) || 0,
+      video_url: videoUrl.trim() || null,
     };
     const { error } = c
       ? await supabase.from('customer_creations').update(payload).eq('id', c.id)
@@ -226,6 +246,19 @@ function CreationForm({ c, products, onDone }: { c: Creation | null; products: P
           <label className={labelCls}>Photos ({gallery.length})</label>
           <p className="text-xs text-ink-700/60 mb-2">First photo is the main image shown on the homepage. Drag the arrows to reorder.</p>
           <ImageUpload value="" onChange={addImage} folder="creations" />
+          <div className="mt-4">
+            <label className={labelCls}>Video <span className="text-ink-700/40">(optional, a short clip of the carve, MP4 up to 10 MB)</span></label>
+            <div className="flex items-center gap-2">
+              <label className={btnGhost + ' cursor-pointer'}>
+                {videoBusy ? 'Uploading…' : (videoUrl ? 'Replace video' : 'Upload video')}
+                <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" disabled={videoBusy}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo(f); e.target.value = ''; }} />
+              </label>
+              {videoUrl && <button type="button" className={btnDanger} onClick={() => setVideoUrl('')}>Remove</button>}
+            </div>
+            {videoUrl && <video src={videoUrl} controls muted playsInline preload="metadata" className="mt-2 w-full max-h-56 rounded border border-black/10 bg-black" />}
+            <p className="text-xs text-ink-700/60 mt-1">On the homepage the first photo stays the face of the card, with a "Watch it carve" button.</p>
+          </div>
           {gallery.length > 0 && (
             <div className="mt-3 grid grid-cols-3 gap-2">
               {gallery.map((g, i) => (
