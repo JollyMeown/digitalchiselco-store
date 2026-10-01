@@ -194,6 +194,24 @@ export default function Products() {
     setBulkBusy(false);
     if (failed) alert(`Approved ${done}, ${failed} failed.`);
   }
+  // Bulk delete for the same ticked rows (owner, 2026-10-01): uploads that should
+  // never go live are thrown out in one go instead of one Delete at a time. Same
+  // permanent delete as the row button, so it asks first and names the count.
+  async function deleteMany(ids: string[]) {
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} product${ids.length === 1 ? '' : 's'} permanently? This also removes their download links and category links, and cannot be undone.`)) return;
+    setBulkBusy(true);
+    const gone: string[] = []; let failed = 0;
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const { error } = await supabase.from('products').delete().in('id', chunk);
+      if (error) failed += chunk.length; else gone.push(...chunk);
+    }
+    setRows((r) => r.filter((x) => !gone.includes(x.id)));
+    setSelected(new Set());
+    setBulkBusy(false);
+    if (failed) alert(`Deleted ${gone.length}, ${failed} failed.`);
+  }
 
   // Inline flag toggles for the Best seller / Latest pick homepage rows.
   // Optimistic: flip local state immediately, revert if the write fails.
@@ -288,6 +306,9 @@ export default function Products() {
               <button className={btnGhost} disabled={bulkBusy} onClick={() => setSelected(new Set(visibleRows.filter((r) => (r as any).pending_review).map((r) => r.id)))} title="Tick every pending item currently shown">☑ Select all pending</button>
               <button className="text-xs rounded bg-green-600 text-white px-3 py-1.5 hover:bg-green-700 disabled:opacity-40" disabled={bulkBusy || selected.size === 0} onClick={() => approveMany([...selected])}>
                 ✅ Approve selected{selected.size ? ` (${selected.size})` : ''}
+              </button>
+              <button className="text-xs rounded border border-red-500 text-red-600 px-3 py-1.5 hover:bg-red-50 disabled:opacity-40" disabled={bulkBusy || selected.size === 0} onClick={() => deleteMany([...selected])} title="Permanently deletes every ticked item">
+                🗑 Delete selected{selected.size ? ` (${selected.size})` : ''}
               </button>
               <button className="text-xs rounded border border-green-600 text-green-700 px-3 py-1.5 hover:bg-green-50 disabled:opacity-40" disabled={bulkBusy} onClick={() => approveMany(visibleRows.filter((r) => (r as any).pending_review).map((r) => r.id))} title="Publishes every pending item the current filters show">
                 {bulkBusy ? 'Approving…' : `Approve all shown (${visibleRows.filter((r) => (r as any).pending_review).length})`}
