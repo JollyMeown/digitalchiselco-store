@@ -63,7 +63,9 @@ const sizes = ok ? [
   at(8, '8 in'), at(12, '12 in'), at(18, '18 in'), at(24, '24 in'),
   ...(Math.abs(nativeLongIn - 24) > 1.5 && Math.abs(nativeLongIn - 18) > 1.5 && Math.abs(nativeLongIn - 12) > 1 ? [at(nativeLongIn, 'As supplied')] : []),
 ] : [];
-const DEFAULT = 1;   // 12 in: the most common panel
+// Owner, 2026-10-01: the card always opens on 8 in (was 12 in). It is the first
+// chip, so it stays the default whatever other sizes follow it.
+const DEFAULT = 0;   // 8 in
 const name = `cc-${id}`;
 ---
 {ok && (
