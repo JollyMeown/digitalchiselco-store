@@ -20,9 +20,11 @@ const { duration = 40, direction = 'left', pauseOnHover = true, gapClass = 'gap-
     <div class={`dcc-marquee-group flex ${gapClass} flex-shrink-0`}>
       <slot />
     </div>
-    <div class={`dcc-marquee-group dcc-marquee-dup flex ${gapClass} flex-shrink-0`} aria-hidden="true">
-      <slot />
-    </div>
+    {/* The loop copy is made in the browser, not sent in the HTML (2026-10-01):
+        sending it put every card in the page twice (homepage: 156 product links
+        for 54 products), which crawlers and AI readers saw as duplicate content.
+        It is filled only where the strip animates, and it is inert. */}
+    <div class={`dcc-marquee-group dcc-marquee-dup flex ${gapClass} flex-shrink-0`} aria-hidden="true" inert></div>
   </div>
   <div class="dcc-marquee-fade dcc-marquee-fade-l" aria-hidden="true"></div>
   <div class="dcc-marquee-fade dcc-marquee-fade-r" aria-hidden="true"></div>
@@ -30,6 +32,8 @@ const { duration = 40, direction = 'left', pauseOnHover = true, gapClass = 'gap-
 <style is:global>
   .dcc-marquee { overflow: hidden; position: relative; }
   .dcc-marquee-track { display: flex; width: max-content; animation: dcc-scroll var(--dcc-duration) linear infinite; animation-direction: var(--dcc-direction); will-change: transform; }
+  /* no scrolling until the loop copy exists, or the strip would jump at the halfway point */
+  .dcc-marquee:not(.is-looped) .dcc-marquee-track { animation: none; }
   .dcc-marquee-pausable:hover .dcc-marquee-track,
   .dcc-marquee.is-off .dcc-marquee-track { animation-play-state: paused; }
   .dcc-marquee-fade { position: absolute; top: 0; bottom: 0; width: 6%; pointer-events: none; }
@@ -55,8 +59,23 @@ const { duration = 40, direction = 'left', pauseOnHover = true, gapClass = 'gap-
   }
 </style>
 <script is:inline>
-  // Pause every marquee that is not on screen. One observer for the page.
+  // Make each strip's loop copy (only where it animates: wide screens without
+  // reduced motion), then pause every strip that is not on screen.
   (function () {
+    var loops = function () {
+      var animate = window.matchMedia && window.matchMedia('(min-width: 768px)').matches
+        && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!animate) return;
+      document.querySelectorAll('.dcc-marquee:not(.is-looped)').forEach(function (m) {
+        var src = m.querySelector('.dcc-marquee-group:not(.dcc-marquee-dup)'), dup = m.querySelector('.dcc-marquee-dup');
+        if (!src || !dup) return;
+        dup.innerHTML = src.innerHTML;
+        dup.querySelectorAll('[id]').forEach(function (e) { e.removeAttribute('id'); });
+        m.classList.add('is-looped');
+      });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loops); else loops();
+    document.addEventListener('astro:page-load', loops);
     if (window.__dccMarqueeIO) return;
     if (!('IntersectionObserver' in window)) return;
     var io = new IntersectionObserver(function (entries) {

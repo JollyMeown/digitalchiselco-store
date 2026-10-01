@@ -69,6 +69,7 @@ export const GET: APIRoute = async () => {
   lines.push(`- [Commercial-use licence: what you can sell](${SITE}/license)`);
   lines.push(`- [Opening our STL files in Aspire, VCarve, Carveco, Fusion 360 or ArtCAM](${SITE}/cam-software)`);
   lines.push(`- [Carved by you](${SITE}/carved-by-you): real carvings makers made from our files, with their photos, clips and notes`);
+  lines.push(`- [CNC relief glossary](${SITE}/glossary): plain definitions of stepover, scallop, relief depth, Z scaling, rest machining and more`);
   lines.push(`- [Terms and licence](${SITE}/terms)`);
   lines.push(`- [Contact](${SITE}/contact)`);
   lines.push('');

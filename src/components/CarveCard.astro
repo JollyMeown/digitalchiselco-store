@@ -89,6 +89,12 @@ const name = `cc-${id}`;
       ))}
     </div>
     <p class="cc-note">Estimates for a mid-size hobby machine (Shapeoko, X-Carve, Onefinity class). Scaling all three axes together keeps the depth in proportion; for thinner stock scale Z on its own. Hardwoods with fine grain (cherry, hard maple, walnut, basswood) hold this detail best. <a href="/tools/will-it-cut">Check your exact setup in Will it cut</a>, free, nothing uploaded.</p>
+    {/* The method behind the numbers, from the constants above (2026-10-01 audit:
+        "carve time needs a stated methodology"). Keep in step with FEED, DOC and bitsFor(). */}
+    <details class="cc-how">
+      <summary>How we estimate carve time</summary>
+      <p>Finishing is one raster pass over the whole carving with the ball nose shown, at 10% stepover and half of a {FEED.toLocaleString('en-US')} mm/min ({Math.round(FEED / IN)} in/min) feed. Roughing assumes about 45% of the block above the base is waste, cleared with the end mill shown at 40% stepover and {DOC} mm per pass ({1.5} mm for the 1/8 in end mill) at the full feed. The model leaves out acceleration, tool changes and moves between passes, so a real job usually takes somewhat longer. Times are rounded to 5 minutes.</p>
+    </details>
   </div>
 )}
 
@@ -108,6 +114,9 @@ const name = `cc-${id}`;
   .cc-warn { margin: .5rem 0 0; font-size: .78rem; color: #8a5a10; background: #FBF1DF; border-radius: .4rem; padding: .45rem .6rem; }
   .cc-note { margin: .7rem 0 0; font-size: .74rem; line-height: 1.5; color: rgba(43,33,24,.6); }
   .cc-note a { color: #854F0B; text-decoration: underline; text-underline-offset: 2px; }
+  .cc-how { margin-top: .45rem; font-size: .74rem; color: rgba(43,33,24,.65); }
+  .cc-how summary { cursor: pointer; color: #854F0B; text-decoration: underline; text-underline-offset: 2px; width: fit-content; }
+  .cc-how p { margin: .35rem 0 0; line-height: 1.5; }
   /* the checked size shows its panel and highlights its chip */
   .cc-r0:checked ~ .cc-panels .cc-p0, .cc-r1:checked ~ .cc-panels .cc-p1, .cc-r2:checked ~ .cc-panels .cc-p2,
   .cc-r3:checked ~ .cc-panels .cc-p3, .cc-r4:checked ~ .cc-panels .cc-p4 { display: block; }

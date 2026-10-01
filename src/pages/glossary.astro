@@ -1,0 +1,71 @@
+---
+// CNC relief glossary (2026-10-01 audit: "short definitions are excellent for
+// AI extraction"). One plain sentence or two per term, each linking to the page
+// that goes deeper. Figures match /tools/stepover-calculator and /cam-software.
+// Keep definitions general and true for any software; no brand claims here.
+import Shell from '../layouts/Shell.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { jsonLd } from '../lib/jsonld';
+
+type T = { term: string; def: string; more?: { href: string; label: string } };
+const TERMS: T[] = [
+  { term: 'Bas-relief', def: 'A carving whose design rises only a little from a flat background, so it reads from the front like a picture with depth. Most wall panels, plaques and signs carved on a CNC router are bas-relief.' },
+  { term: 'High relief', def: 'A carving whose subject stands far out from the background, with parts close to free-standing. It needs deeper stock and longer bits than bas-relief.' },
+  { term: 'STL file', def: 'A 3D model saved as a mesh of triangles. CAM software, slicers and modelling programs all read it. It carries no units, so you tell the software whether it is in millimetres or inches.', more: { href: '/cam-software', label: 'Opening an STL in your software' } },
+  { term: 'Bas-relief STL', def: 'A bas-relief saved as an STL: a triangle surface that rises from a flat back. On a CNC router it is roughed with an end mill and finished with a ball nose.' },
+  { term: 'Mesh', def: 'The surface of a 3D model made of many small triangles. More triangles hold finer detail and make a larger file.' },
+  { term: 'Triangle count', def: 'How many triangles a mesh has. A detailed relief often has one to two million; CAM software that slows down on large meshes can reduce the count first.' },
+  { term: 'Watertight', def: 'A mesh with no holes or gaps, so its surface fully encloses a volume. CAM software and slicers handle watertight meshes predictably.' },
+  { term: 'Flat base (zero plane)', def: 'The flat back of a relief, sitting at height zero. It lies on the board so the carving starts from a known level.' },
+  { term: 'Relief depth', def: 'The height from the flat base to the highest point of the carving. It decides the board thickness you need and much of the carve time.' },
+  { term: 'Z scaling', def: 'Changing the depth of a relief on its own. Scaling all three axes keeps the proportions; scaling only Z makes the carving shallower or deeper for your stock.', more: { href: '/blog/how-to-scale-stl-files-for-cnc-routers', label: 'Scaling without losing detail' } },
+  { term: 'CAM software', def: 'Software that turns a 3D model into toolpaths and G-code for the machine. Aspire, VCarve, Carveco, ArtCAM and Fusion 360 are common for reliefs.', more: { href: '/blog/aspire-vcarve-carveco-fusion-360-comparison', label: 'Comparing the main programs' } },
+  { term: 'Toolpath', def: 'The route a cutter follows over the material, with its speeds and depths. A relief usually takes a roughing toolpath and a finishing toolpath.' },
+  { term: 'Roughing', def: 'The first pass, which clears most of the waste quickly with a flat end mill, leaving a little material above the final surface.' },
+  { term: 'Finishing', def: 'The pass that cuts the final surface with a ball nose, line by line across the carving.' },
+  { term: 'End mill', def: 'A cutter with a flat bottom. It clears material fast and is used for roughing and for cutting the outline.' },
+  { term: 'Ball nose', def: 'A cutter with a rounded tip. It follows a curved surface, so it is the bit that carves relief detail. Its radius sets the finest detail it can reach.', more: { href: '/blog/3mm-vs-1-5mm-ball-nose-relief-carving', label: '3 mm vs 1.5 mm, measured' } },
+  { term: 'Tapered ball nose', def: 'A ball nose whose body widens above a small rounded tip. The thin tip reaches fine detail while the thicker body keeps it from snapping.', more: { href: '/blog/tapered-ball-nose-bits-relief-carving', label: 'Choosing a tapered ball nose' } },
+  { term: 'Raster', def: 'A finishing pattern of parallel straight passes across the carving, like lines of text. It is the most common finishing strategy for reliefs.' },
+  { term: 'Stepover', def: 'How far the cutter moves sideways between passes, often given as a percentage of its diameter. Smaller stepover means smaller ridges and a longer job.', more: { href: '/tools/stepover-calculator', label: 'Stepover calculator' } },
+  { term: 'Scallop', def: 'The small ridge a ball nose leaves between two passes. Its height is r − √(r² − (s/2)²), where r is the ball radius and s the stepover; with a 1/8 inch ball at 10 percent it is under 0.01 mm.' },
+  { term: 'Stepdown (depth of cut)', def: 'How deep the cutter goes in one roughing pass. Deep reliefs are roughed in several stepdowns, which is what leaves the terraces a finishing pass removes.' },
+  { term: 'Rest machining', def: 'A pass with a smaller bit that cuts only where a bigger bit could not reach, instead of going over the whole carving again. It brings out fine detail in a fraction of the time.', more: { href: '/blog/3mm-vs-1-5mm-ball-nose-relief-carving', label: 'How much time rest machining saves' } },
+  { term: 'Machining boundary', def: 'A closed vector that limits a toolpath to the area inside it, so the machine cuts the carving and leaves the rest of the board alone.', more: { href: '/tools/will-it-cut#outlinePanel', label: 'Make a boundary from an STL' } },
+  { term: 'Greyscale depth map', def: 'An image in which darker means deeper. Laser engravers work from such images rather than from an STL, so a relief is converted to one before burning.', more: { href: '/blog/stl-files-for-laser-engraving-guide', label: 'STL files for laser engraving' } },
+];
+
+const ld = {
+  '@context': 'https://schema.org', '@type': 'DefinedTermSet', name: 'CNC relief carving glossary', url: 'https://digitalchiselco.com/glossary',
+  hasDefinedTerm: TERMS.map((t) => ({ '@type': 'DefinedTerm', name: t.term, description: t.def, url: `https://digitalchiselco.com/glossary#${slug(t.term)}` })),
+};
+function slug(s: string) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+---
+<Shell
+  title="CNC Relief Carving Glossary: Stepover, Scallop, Relief Depth and More | DigitalChiselCo"
+  description="Plain definitions of the terms in CNC relief carving: bas-relief STL, mesh, watertight, relief depth, Z scaling, roughing, finishing, ball nose, stepover, scallop, rest machining and more."
+>
+  <Breadcrumbs crumbs={[{ label: 'Glossary' }]} />
+  <script type="application/ld+json" set:html={jsonLd(ld)} />
+
+  <article class="max-w-3xl mx-auto pb-20 text-ink-700">
+    <p class="text-xs uppercase tracking-[0.18em] text-bronze-600 mb-2">Reference</p>
+    <h1 class="font-serif text-3xl sm:text-4xl text-bronze-800 leading-tight" style="text-wrap: balance">CNC relief carving glossary</h1>
+    <p class="mt-4 text-[17px] leading-relaxed">The words you meet when you carve a bas-relief STL on a CNC router, each in a sentence or two.</p>
+
+    <nav class="mt-6 flex flex-wrap gap-x-3 gap-y-1.5 text-sm" aria-label="Terms">
+      {TERMS.map((t) => <a href={`#${slug(t.term)}`} class="text-bronze-700 hover:underline">{t.term}</a>)}
+    </nav>
+
+    <dl class="mt-10 space-y-6">
+      {TERMS.map((t) => (
+        <div id={slug(t.term)} class="scroll-mt-24 border-t border-black/10 pt-5">
+          <dt class="font-serif text-xl text-bronze-800">{t.term}</dt>
+          <dd class="mt-1.5 leading-relaxed">{t.def}{t.more && <> <a href={t.more.href} class="text-bronze-700 underline whitespace-nowrap">{t.more.label} →</a></>}</dd>
+        </div>
+      ))}
+    </dl>
+
+    <p class="mt-12 text-sm text-ink-700/75">More questions answered in the <a href="/faq" class="text-bronze-700 underline">FAQ</a>, or browse the <a href="/blog" class="text-bronze-700 underline">carving guides</a>.</p>
+  </article>
+</Shell>

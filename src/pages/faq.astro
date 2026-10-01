@@ -32,7 +32,7 @@ try {
   if (data?.founding_credits != null) FOUNDING_CREDITS = Number(data.founding_credits);
 } catch {}
 
-type QA = { q: string; a: string; group: string };
+type QA = { q: string; a: string; group: string; link?: { href: string; label: string } };
 
 // ── BUYERS ────────────────────────────────────────────────────────────
 // Answers follow the published Terms and Refund Policy exactly. If either
@@ -41,13 +41,44 @@ const BUYER: QA[] = [
   { group: 'What you are buying', q: 'What do I actually receive?',
     a: 'A digital STL file that you download. Nothing is posted to you. The design is finished and ready to machine, so there is no modelling work left for you to do.' },
   { group: 'What you are buying', q: 'Which machines can use these files?',
-    a: 'CNC routers, laser engravers and 3D printers. The reliefs are sculpted for clean carving, and they open in Vectric Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360 and any other package that imports STL.' },
+    a: 'CNC routers and 3D printers use the STL directly: it opens in Vectric Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360, any other package that imports STL, and any slicer. A laser engraver needs the relief turned into a greyscale depth image first, which our Laser Studio app does from the same STL.' },
   { group: 'What you are buying', q: 'Can I resize a design for my project?',
     a: 'Yes. Scale it in your CAM software to the size and depth your material and machine allow. Most buyers scale a relief to fit the blank they already have.' },
   { group: 'What you are buying', q: 'Will it carve on my machine?',
     a: 'If your machine cuts 3D toolpaths from an STL, yes. Detail depends on your bit and your material rather than on the file, so a smaller ball nose on a finish pass gives the crispest result.' },
   { group: 'What you are buying', q: 'I love a design but I have no machine. What then?',
     a: 'Use Cut Local. Tell us what you want made and makers near you send quotes with their price and lead time. You choose one and pay them directly, and the finished piece is real wood, not a file.' },
+
+  // ── CNC & STL questions (2026-10-01 audit: the FAQ had almost no technical
+  // answers). Short, factual, each pointing to the page that goes deeper.
+  // Figures match /tools/stepover-calculator and /cam-software.
+  { group: 'CNC & STL questions', q: 'What is a bas-relief STL file?',
+    a: 'A 3D surface model in which the design rises from a flat background plane, saved as a triangle mesh in the STL format. On a CNC router it is roughed out with an end mill and finished with a ball nose, which reproduces the surface detail.',
+    link: { href: '/glossary', label: 'CNC relief glossary' } },
+  { group: 'CNC & STL questions', q: 'Can VCarve and Aspire open STL files?',
+    a: 'Yes. VCarve Pro and VCarve Desktop import an STL and cut it with 3D roughing and finishing toolpaths; they cut it but cannot edit it, and one STL fits in a job. Aspire imports any number of STL files and can also edit and combine them. Carveco, ArtCAM and Fusion 360 open them too.',
+    link: { href: '/cam-software', label: 'Step by step for each program' } },
+  { group: 'CNC & STL questions', q: 'Can a laser engraver use an STL file?',
+    a: 'Not directly on most lasers. Laser software works from images or vectors, so the relief is first turned into a greyscale depth image, where darker means deeper. Our Laser Studio app does that from the STL.',
+    link: { href: '/blog/stl-files-for-laser-engraving-guide', label: 'STL files for laser engraving' } },
+  { group: 'CNC & STL questions', q: 'Which bits should I use for a relief?',
+    a: 'A common starting point is a 1/4 inch (6 mm) end mill for roughing and a 1/8 inch (3 mm) ball nose for finishing; for small carvings or the finest detail, a 1/16 inch tapered ball nose or a 1.5 mm rest-machining pass. Each product page suggests bits for 8, 12, 18 and 24 inch sizes.',
+    link: { href: '/blog/3mm-vs-1-5mm-ball-nose-relief-carving', label: '3 mm vs 1.5 mm ball nose, measured' } },
+  { group: 'CNC & STL questions', q: 'What stepover should I use?',
+    a: 'About 10 percent of the ball diameter is a common starting point. With a 1/8 inch ball nose that leaves ridges under 0.01 mm; ridges stay below 0.05 mm, which light sanding removes, up to about 24 percent. Finer than that mostly adds hours.',
+    link: { href: '/tools/stepover-calculator', label: 'Stepover calculator' } },
+  { group: 'CNC & STL questions', q: 'Can I resize the relief, and what happens to the depth?',
+    a: 'Yes. Scaling all three axes together keeps the depth in proportion, so a smaller carving is also shallower. To fit thinner stock, scale the depth (Z) on its own. Very small sizes lose fine detail unless you use a smaller ball nose.',
+    link: { href: '/blog/how-to-scale-stl-files-for-cnc-routers', label: 'Scaling STL files without losing detail' } },
+  { group: 'CNC & STL questions', q: 'Which wood carves relief detail best?',
+    a: 'Close-grained hardwoods such as cherry, hard maple, walnut and basswood hold fine detail best. Open-grained woods such as red oak carve well but show their grain through the detail.',
+    link: { href: '/blog/best-wood-for-cnc-relief-carving', label: 'One design carved in eight woods' } },
+  { group: 'CNC & STL questions', q: 'Why does my CAM software cut the whole board?',
+    a: 'Every relief sits on a flat backplate, so the software sees the full rectangle as the model. Give it a boundary around the carving and machine inside it. Our free outline tool makes that boundary as a DXF from the STL.',
+    link: { href: '/tools/will-it-cut#outlinePanel', label: 'Free outline tool' } },
+  { group: 'CNC & STL questions', q: 'Why does my carving look flat?',
+    a: 'Usually because of lighting or finish rather than the file: a relief needs light from the side and a darker glaze in the recesses to show its depth. Too large a finishing bit or too shallow a scale also flattens detail.',
+    link: { href: '/blog/cnc-relief-carving-looks-flat', label: 'The seven fixes, in order' } },
 
   { group: 'Paying', q: 'Who charges my card?',
     a: 'Paddle, at paddle.com. They are our authorised reseller and merchant of record, which means they are the seller for tax and consumer-protection purposes, they issue your receipt, and they handle billing and card security. We never see or store card numbers.' },
@@ -180,6 +211,7 @@ const faqLd = {
                   <span class="text-bronze-600 shrink-0 mt-0.5 transition-transform group-open:rotate-45 text-xl leading-none">+</span>
                 </summary>
                 <p class="mt-2.5 text-sm text-ink-700/85 leading-relaxed">{x.a}</p>
+                {x.link && <p class="mt-1.5 text-sm"><a href={x.link.href} class="text-bronze-700 underline">{x.link.label} →</a></p>}
               </details>
             ))}
           </div>

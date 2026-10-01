@@ -68,6 +68,7 @@ export const STATIC_PATHS: Array<{ path: string; priority: number; changefreq: s
   { path: '/license',     priority: 0.5, changefreq: 'monthly' },
   { path: '/cam-software', priority: 0.6, changefreq: 'monthly' },
   { path: '/carved-by-you', priority: 0.6, changefreq: 'weekly' },
+  { path: '/glossary',     priority: 0.5, changefreq: 'monthly' },
   { path: '/about',       priority: 0.5, changefreq: 'monthly' },
   { path: '/blog',        priority: 0.6, changefreq: 'weekly' },
   { path: '/tools',       priority: 0.7, changefreq: 'monthly' },

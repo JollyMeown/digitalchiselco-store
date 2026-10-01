@@ -40,7 +40,12 @@ const adsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID || 'AW-18375026540';
 // shopping campaigns). Dormant until PUBLIC_PINTEREST_TAG_ID is set in
 // Netlify: get the id from Pinterest Ads -> Conversions -> Tag manager.
 const pinTagId = import.meta.env.PUBLIC_PINTEREST_TAG_ID || '';
-const canonical = new URL(Astro.url.pathname, site).href;
+// Paged lists (?page=2, 3...) are canonical to themselves, so Google treats each
+// page of the catalog as its own page and follows its designs (2026-10-01; they
+// all pointed to page 1). Every other parameter (sort, filters, tracking) still
+// drops out, which keeps sorted and filtered copies from being indexed.
+const pageNo = Number(Astro.url.searchParams.get('page') || '1');
+const canonical = new URL(Astro.url.pathname + (Number.isInteger(pageNo) && pageNo > 1 ? `?page=${pageNo}` : ''), site).href;
 // Language suggestion bar data: the Polish and German landing pages.
 const localPages = LANDINGS.map((l) => ({ lang: l.lang, theme: l.theme, href: landingPath(l) }));
 const ogImage = image.startsWith('http') ? image : new URL(image, site).href;

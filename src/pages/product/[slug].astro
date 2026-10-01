@@ -563,8 +563,12 @@ const breadcrumbLd = {
               the supplied size) became the CarveCard above: size, depth, board,
               bits and time for the size the buyer will actually carve. */}
           <p class="px-4 py-2 text-xs text-ink-700/60 bg-cream/30 border-t border-black/10">
-            Opens directly in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360, and on any CNC router, 3D printer or laser
-            that reads STL. No OBJ or DXF: a DXF holds flat 2D outlines and cannot carry a three-dimensional relief at all.
+            {/* Wording made precise after the 2026-10-01 audit: few lasers read an STL
+                directly, and a DXF can hold 3D data; the typical CNC DXF does not. */}
+            Opens directly in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360, and in any slicer for 3D printing.
+            For a laser, the relief is first turned into a greyscale depth image, which our
+            <a href="/laser-studio" class="text-bronze-700 underline">Laser Studio</a> app does from this STL.
+            STL only, no OBJ or DXF: the DXF files used in CNC work hold 2D outlines, not the 3D relief surface.
             Scale it to whatever panel you are cutting. Scaling all three axes together keeps the depth in proportion;
             scale Z on its own for a shallower carve.
             <a href="/cam-software" class="text-bronze-700 underline">How to open it in your software</a>.
