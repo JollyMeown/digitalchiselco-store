@@ -8,7 +8,7 @@
 // brand, condition, product_type, google_product_category.
 
 import { supabase } from '../lib/supabase';
-import { pricing } from '../lib/pricing';
+import { pricing, saleDiscountFor } from '../lib/pricing';
 import { img } from '../lib/img';
 
 export const prerender = false;
@@ -34,13 +34,13 @@ export async function GET() {
   } catch {}
 
   const FALLBACK = (t: string) =>
-    `${t} is a high-detail 3D bas-relief STL for CNC routers, laser engravers and 3D printers. Instant download, commercial use included. Tested in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360.`;
+    `${t} is a high-detail 3D bas-relief STL for CNC routers and 3D printers, and laser engraving via a depth map. Instant download, commercial use included. Tested in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360.`;
 
   try {
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase
         .from('products')
-        .select('id, title, slug, price_usd, image_url, seo_description, description, product_categories(categories(name))')
+        .select('id, title, slug, price_usd, image_url, seo_description, description, membership_plan_slug, product_categories(categories(name))')
         .eq('active', true)
         .not('image_url', 'is', null)
         .order('slug')
@@ -50,7 +50,7 @@ export async function GET() {
       for (const p of batch as any[]) {
         const title = String(p.title || '').split('|')[0].trim().slice(0, 100);
         const desc = (p.seo_description || (p.description || '').slice(0, 480) || FALLBACK(title)).slice(0, 500);
-        const { price, original, percent } = pricing(p.price_usd, discount);
+        const { price, original, percent } = pricing(p.price_usd, saleDiscountFor(p, discount));
         const cats = (p.product_categories || []).map((pc: any) => pc.categories?.name).filter(Boolean).join(' > ');
         rows.push([
           cell(p.id),

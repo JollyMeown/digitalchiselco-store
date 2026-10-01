@@ -1198,7 +1198,7 @@ export function midweekPicksEmail(d: { email: string; products: MiniProduct[]; t
     <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 16px;">Midweek pick of the designs other carvers chose most in the last seven days. No sale, no countdown, just what is busy on the machines right now:</p>
     ${productGrid(d.products.slice(0, 3))}
     ${btn(SITE + '/catalog?sort=popular', 'See what else is popular')}
-    <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">Instant download &middot; commercial use included &middot; carve it on a router, laser or 3D printer</p>`;
+    <p style="text-align:center;font-size:12px;color:#999;margin:14px 0 0;">Instant download &middot; commercial use included &middot; carve it on a router or print it in 3D</p>`;
   const text = `What carvers picked this week:\n` +
     d.products.slice(0, 3).map((p) => `${(p.title || '').split('|')[0].trim()}: ${SITE}/product/${p.slug}`).join('\n') +
     `\n\n${SITE}/catalog\nUnsubscribe: ${unsubUrl(d.email)}`;

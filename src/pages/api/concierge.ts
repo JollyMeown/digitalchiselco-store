@@ -14,7 +14,7 @@ const env = (n: string) => process.env[n] ?? (import.meta as any).env?.[n];
 const SITE = 'https://digitalchiselco.com';
 const CLAUDE_MODEL = env('CONCIERGE_MODEL') || 'claude-haiku-4-5';
 const GEMINI_MODEL = env('GEMINI_MODEL') || 'gemini-2.5-flash';
-const SYSTEM = `You are the friendly design concierge for DigitalChiselCo, a shop that sells premium bas-relief STL design files for CNC routers, laser engravers and 3D printers.
+const SYSTEM = `You are the friendly design concierge for DigitalChiselCo, a shop that sells premium bas-relief STL design files for CNC routers and 3D printers, and laser engraving via a depth map.
 
 Facts you can rely on:
 - Products are INSTANT digital downloads (STL files) emailed right after purchase. No physical shipping.

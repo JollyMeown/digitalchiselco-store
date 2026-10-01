@@ -1,10 +1,10 @@
 ---
 import type { ProductCard } from '../lib/queries';
-import { pricing, money, DEFAULT_DISCOUNT } from '../lib/pricing';
+import { pricing, money, DEFAULT_DISCOUNT, saleDiscountFor } from '../lib/pricing';
 import { img } from '../lib/img';
 interface Props { product: ProductCard; discount?: number; eager?: boolean; }
 const { product, discount = DEFAULT_DISCOUNT, eager = false } = Astro.props;
-const { price, original, percent } = pricing(product.price_usd, discount);
+const { price, original, percent } = pricing(product.price_usd, saleDiscountFor(product, discount));
 const title = product.title.split('|')[0].trim();
 // Right-sized card images. The catalog was serving the raw upload into a
 // 400px tile: two 3 MB PNGs on one page, 12.7 MB in total, Lighthouse 66.

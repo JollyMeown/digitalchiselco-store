@@ -41,7 +41,7 @@ function killDashes(s: string) {
   return String(s || '').replace(/\s*[—–]\s*/g, ', ').replace(/, ,/g, ',').replace(/ {2,}/g, ' ');
 }
 
-const SYSTEM = `You write short "customer creation" stories for DigitalChiselCo, a shop selling downloadable STL files for CNC routers, laser engravers and 3D printers (bas-relief wood-carving designs). A real customer has shared a photo of the piece they carved or printed from one of our files.
+const SYSTEM = `You write short "customer creation" stories for DigitalChiselCo, a shop selling downloadable STL files for CNC routers and 3D printers, and laser engraving via a depth map (bas-relief wood-carving designs). A real customer has shared a photo of the piece they carved or printed from one of our files.
 
 Study the IMAGE first if one is given: it is the source of truth for what they made and the material. Write a warm, genuine 2 to 4 sentence story that celebrates THEIR craftsmanship, mentions what they made and (from the image) the material or finish, and feels human and specific, not like an ad.
 

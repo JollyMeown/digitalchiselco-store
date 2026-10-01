@@ -31,7 +31,7 @@ const site = (import.meta.env.PUBLIC_SITE_URL || 'https://digitalchiselco.com').
 const baseName = String(category.name).replace(/\s+STL$/i, '');
 const pageTitle = (category.seo_title || `${baseName} Relief STL Files for CNC Carving | DigitalChiselCo`) + (page > 1 ? ` (page ${page})` : '');
 const meta = (category.seo_description || category.description || '').slice(0, 160)
-  || `Browse ${total} ${baseName} bas-relief STL files for CNC routers, 3D printers and laser engravers. Instant download, commercial use included.`;
+  || `Browse ${total} ${baseName} bas-relief STL files for CNC routers and 3D printers, and laser engraving via a depth map. Instant download, commercial use included.`;
 const intro = page === 1 && category.intro_html ? xss(String(category.intro_html), {
   whiteList: { p: [], a: ['href', 'title'], strong: [], em: [], br: [] },
 }) : '';

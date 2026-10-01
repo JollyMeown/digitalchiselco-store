@@ -126,10 +126,12 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
         <div class="font-serif text-[19px] sm:text-2xl md:text-3xl text-bronze-700 leading-tight">{DESIGNS}</div>
         <div class="text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest text-ink-700/70 mt-0.5 sm:mt-1 leading-tight">Unique Designs</div>
       </div>
-      <div>
+      {/* The founder's own experience, not an Etsy figure (owner, 2026-10-01), so it
+          links to /about, which states it, rather than sitting under the Etsy line. */}
+      <a href="/about#jolly" class="block hover:opacity-80">
         <div class="font-serif text-[19px] sm:text-2xl md:text-3xl text-bronze-700 leading-tight">{Number(s.experience_years)}+</div>
         <div class="text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest text-ink-700/70 mt-0.5 sm:mt-1 leading-tight">Years of Craftsmanship</div>
-      </div>
+      </a>
     </div>
     {(s as any).etsy_link_enabled && (s as any).etsy_store_url && (
       <!-- Etsy provenance link — these stats come from our Etsy shop; toggled in Admin → Settings -->
@@ -138,7 +140,7 @@ const mq = (k: keyof typeof MARQUEE_DEFAULTS) => {
           class="group inline-flex items-center gap-2 rounded-full border border-[#F1641E]/30 bg-[#FFF3EC] pl-1.5 pr-3.5 py-1 text-xs text-ink-700 hover:border-[#F1641E] hover:bg-[#FFE9DC] transition shadow-sm"
           aria-label="Visit our Etsy store">
           <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#F1641E] text-white font-serif font-bold text-[13px] leading-none select-none" aria-hidden="true">E</span>
-          <span>Stats verified on our <strong class="text-[#F1641E]">Etsy</strong> store</span>
+          <span>Sales, rating, reviews and favorites verified on our <strong class="text-[#F1641E]">Etsy</strong> store</span>
           <span class="text-[#F1641E] group-hover:translate-x-0.5 transition" aria-hidden="true">→</span>
         </a>
       </div>

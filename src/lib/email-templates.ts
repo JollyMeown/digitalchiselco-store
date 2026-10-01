@@ -619,7 +619,7 @@ export function freePackLink(d: { name?: string | null; filesUrl: string; packUr
   const greeting = d.name ? `Hi ${esc(d.name)},` : 'Hi there,';
   const lead = d.missed
     ? 'You asked for our free STL pack and it never reached you. That was our fault, not yours: the files only went out after a confirmation click, and if that step did not happen the pack simply never sent. We have fixed that. Here they are.'
-    : 'Here are your 5 free bas-relief STL files, ready for CNC routers, 3D printers and laser engravers.';
+    : 'Here are your 5 free bas-relief STL files, ready for CNC routers and 3D printers, and laser engraving via a depth map.';
 
   const html = `<!doctype html>
 <html><body style="margin:0;padding:0;background:#f7f4ee;font-family:Helvetica,Arial,sans-serif;color:${BRAND_INK};">

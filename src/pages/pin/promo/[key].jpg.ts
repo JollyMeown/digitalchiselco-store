@@ -48,7 +48,7 @@ const PROMOS: Record<string, Promo> = {
   'free-files': {
     eyebrow: 'Free STL pack',
     title: ['Five relief', 'STL files,', 'free.'],
-    sub: 'Test how our reliefs carve on your own machine before you spend anything. Ready for CNC routers, lasers and 3D printers.',
+    sub: 'Test how our reliefs carve on your own machine before you spend anything. Ready for CNC routers and 3D printers.',
     cta: 'Download the free pack',
     scene: 'workshop',
     link: '/free',

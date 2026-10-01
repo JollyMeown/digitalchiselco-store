@@ -5,9 +5,10 @@ export type ProductCard = {
   image_url: string | null; is_bundle: boolean; link_status: string;
   rating_avg?: number | null; rating_count?: number | null;
   customer_photo_url?: string | null;   // a real buyer's carve, from an approved photo review
+  membership_plan_slug?: string | null; // memberships never show a sale price
 };
 
-const CARD = 'id,title,slug,price_usd,image_url,is_bundle,link_status,rating_avg,rating_count,customer_photo_url';
+const CARD = 'id,title,slug,price_usd,image_url,is_bundle,link_status,rating_avg,rating_count,customer_photo_url,membership_plan_slug';
 
 export type SiteSettings = {
   donation_total: number; rating: number; reviews_count: number;

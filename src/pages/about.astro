@@ -22,7 +22,7 @@ const aboutLd = {
   '@context': 'https://schema.org', '@type': 'AboutPage', url: `${site}/about`, name: 'About DigitalChiselCo',
   mainEntity: {
     '@type': 'Organization', '@id': `${site}#org`, name: 'DigitalChiselCo', url: site,
-    description: `Online library of ${DESIGNS} downloadable bas-relief STL files for CNC routers, 3D printers and laser engravers, for use in Aspire, VCarve, Carveco, ArtCAM and Fusion 360.`,
+    description: `Online library of ${DESIGNS} downloadable bas-relief STL files for CNC routers and 3D printers, and laser engraving via a depth map, for use in Aspire, VCarve, Carveco, ArtCAM and Fusion 360.`,
     email: 'jolly@digitalchiselco.com',
     founder: { '@type': 'Person', '@id': `${site}/about#jolly`, name: 'Jolly', jobTitle: 'Founder and designer', url: `${site}/about#jolly`,
       knowsAbout: ['bas-relief STL design', 'CNC relief carving', 'Vectric Aspire', 'VCarve Pro', 'ball nose toolpaths', 'rest machining', 'laser photo engraving'] },
@@ -31,7 +31,7 @@ const aboutLd = {
 ---
 <Shell
   title="Our Story · DigitalChiselCo — Premium STL Files for CNC, Laser & 3D Printing"
-  description="The story behind DigitalChiselCo — a one-person digital design studio building museum-grade bas-relief STL files for CNC routers, laser engravers, and 3D printers."
+  description="The story behind DigitalChiselCo — a one-person digital design studio building museum-grade bas-relief STL files for CNC routers and 3D printers, and laser engraving via a depth map."
   scrollPastBanner={true}
 >
   <Breadcrumbs crumbs={[{ label: 'Our Story' }]} />
@@ -66,7 +66,7 @@ const aboutLd = {
 
       <h2 id="jolly" class="font-serif text-2xl text-bronze-800 scroll-mt-24">Who's behind it</h2>
       <p>
-        DigitalChiselCo is a one-person studio — designer, support, and the person who checks every release. The shop is run by <strong>Jolly</strong>, its founder and only craftsman. When you email <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a>, you're emailing me. I read every message and reply within a day.
+        DigitalChiselCo is a one-person studio — designer, support, and the person who checks every release. The shop is run by <strong>Jolly</strong>, its founder and only craftsman, who brings more than {Number(s.experience_years)} years of hands-on craftsmanship to every design. When you email <a href="mailto:jolly@digitalchiselco.com" class="text-bronze-600">jolly@digitalchiselco.com</a>, you're emailing me. I read every message and reply within a day.
       </p>
       <p class="text-sm text-ink-700/70">
         Payments and tax compliance are handled by our Merchant of Record, <a href="https://www.paddle.com" class="text-bronze-600" rel="noopener" target="_blank">Paddle</a>, so we can deliver instant downloads to customers in over 40 countries. Paddle is the seller on every order: <strong>Paddle.com Inc.</strong> in the United States, <strong>Paddle.com (Canada) Ltd.</strong> in Canada, and <strong>Paddle.com Market Limited</strong> of London, registered in England and Wales, everywhere else.
@@ -76,7 +76,8 @@ const aboutLd = {
       <dl class="not-prose grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm my-4">
         <div><dt class="text-ink-700/60 text-xs uppercase tracking-wide">Designs</dt><dd class="text-ink-900">{DESIGNS} bas-relief STL files, new ones every month</dd></div>
         {measured > 0 && <div><dt class="text-ink-700/60 text-xs uppercase tracking-wide">Measured from the file</dt><dd class="text-ink-900">{measured.toLocaleString('en-US')} designs list their real size, relief depth, mesh and flat base on the product page</dd></div>}
-        <div><dt class="text-ink-700/60 text-xs uppercase tracking-wide">Customer rating</dt><dd class="text-ink-900">{Number(s.rating)} out of 5 from {s.reviews_count}+ reviews</dd></div>
+        <div><dt class="text-ink-700/60 text-xs uppercase tracking-wide">Experience</dt><dd class="text-ink-900">More than {Number(s.experience_years)} years of hands-on craftsmanship (Jolly's own)</dd></div>
+        <div><dt class="text-ink-700/60 text-xs uppercase tracking-wide">Customer rating</dt><dd class="text-ink-900">{Number(s.rating)} out of 5 from {s.reviews_count}+ reviews on our Etsy store</dd></div>
         <div><dt class="text-ink-700/60 text-xs uppercase tracking-wide">Software</dt><dd class="text-ink-900">Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360 and any STL-capable CAM</dd></div>
         <div><dt class="text-ink-700/60 text-xs uppercase tracking-wide">Free tools</dt><dd class="text-ink-900"><a href="/tools/will-it-cut" class="text-bronze-600">Will it cut?</a> STL checker, <a href="/lamp-studio" class="text-bronze-600">Lamp Studio</a>, <a href="/laser-studio" class="text-bronze-600">Laser Studio</a></dd></div>
         <div><dt class="text-ink-700/60 text-xs uppercase tracking-wide">Original research</dt><dd class="text-ink-900"><a href="/reports/state-of-cnc-relief-carving-2026" class="text-bronze-600">State of CNC Relief Carving 2026</a> and <a href="/blog/3mm-vs-1-5mm-ball-nose-relief-carving" class="text-bronze-600">a 3 mm vs 1.5 mm ball nose study</a></dd></div>

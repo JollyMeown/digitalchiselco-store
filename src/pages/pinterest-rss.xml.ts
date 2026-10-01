@@ -76,7 +76,7 @@ function clean(s: unknown): string {
 }
 
 const FALLBACK = (t: string) =>
-  `${t} is a high-detail 3D bas-relief STL for CNC routers, laser engravers and 3D printers. Instant download, commercial use included. Tested in Aspire, VCarve Pro, Carveco and Fusion 360.`;
+  `${t} is a high-detail 3D bas-relief STL for CNC routers and 3D printers, and laser engraving via a depth map. Instant download, commercial use included. Tested in Aspire, VCarve Pro, Carveco and Fusion 360.`;
 
 export async function GET() {
   const now = Date.now();
@@ -192,7 +192,7 @@ export async function GET() {
     }).map((x) => {
       const img = `${SITE}/pin/${encodeURIComponent(x.slug)}.jpg?variant=${x.v}`;
       const link = `${SITE}/product/${x.slug}?utm_source=pinterest&utm_medium=rss&utm_content=mockup-${x.v}`;
-      const desc = `${x.title}. Bas-relief STL for CNC routers, laser engravers and 3D printers. Instant download, `
+      const desc = `${x.title}. Bas-relief STL for CNC routers and 3D printers, and laser engraving via a depth map. Instant download, `
         + 'commercial use included.' + (makerCta ? ' No CNC or 3D printer? A vetted local maker can build it for you.' : '')
         + ' Grab 5 free STL files at digitalchiselco.com/free.';
       return `    <item>
@@ -225,7 +225,7 @@ export async function GET() {
     { key: 'get-paid', title: 'Own a CNC, laser or 3D printer? Get paid to build', to: '/become-a-maker',
       desc: 'Paid jobs near you with the design file already in hand. Free to join, the buyer pays you directly, and we take just 3% on completed jobs.' },
     { key: 'free-files', title: 'Five bas-relief STL files, free', to: '/free',
-      desc: 'Test how our reliefs carve on your own machine before you spend anything. Ready for CNC routers, laser engravers and 3D printers, commercial use included.' },
+      desc: 'Test how our reliefs carve on your own machine before you spend anything. Ready for CNC routers and 3D printers, and laser engraving via a depth map, commercial use included.' },
   ];
   const promoXml = (await Promise.all(promos.map(async (pr) => {
     const img = `${SITE}/pin/promo/${pr.key}.jpg?m=${month}`;
@@ -265,7 +265,7 @@ export async function GET() {
   <channel>
     <title>DigitalChiselCo — New STL Releases</title>
     <link>${xmlEscape(SITE)}</link>
-    <description>Fresh bas-relief STL files for CNC routers, laser engravers and 3D printers, released daily.</description>
+    <description>Fresh bas-relief STL files for CNC routers and 3D printers, and laser engraving via a depth map, released daily.</description>
     <language>en-us</language>
     <lastBuildDate>${new Date(now).toUTCString()}</lastBuildDate>
 ${guideXml}

@@ -21,7 +21,7 @@ const site = 'https://digitalchiselco.com';
 // it had breadcrumbs only, and the generic site description.
 const listLd = {
   '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'All bas-relief STL files', url: `${site}/catalog${page > 1 ? `?page=${page}` : ''}`,
-  description: `${total.toLocaleString('en-US')} bas-relief STL files for CNC routers, 3D printers and laser engravers.`,
+  description: `${total.toLocaleString('en-US')} bas-relief STL files for CNC routers and 3D printers, and laser engraving via a depth map.`,
   isPartOf: { '@type': 'WebSite', url: site, name: 'DigitalChiselCo' },
   mainEntity: { '@type': 'ItemList', numberOfItems: total,
     itemListElement: products.map((p: any, i: number) => ({ '@type': 'ListItem', position: (page - 1) * perPage + i + 1, name: String(p.title || '').split('|')[0].trim(), url: `${site}/product/${p.slug}` })) },
@@ -34,7 +34,7 @@ const listLd = {
   <h1 class="text-3xl mb-1">Every design, in one place</h1>
   <div class="mt-3"><SearchBar /></div>
   <div class="flex items-center justify-between gap-3 flex-wrap mb-6">
-    <p class="text-ink-700/70 text-sm">{total.toLocaleString()} premium bas-relief STL files · ready for CNC, 3D print &amp; laser.</p>
+    <p class="text-ink-700/70 text-sm">{total.toLocaleString()} premium bas-relief STL files · ready for CNC and 3D print, laser via a depth map.</p>
     <!-- Newest-first exists because alphabetical was the only order, which
          buried every new upload wherever its first letter fell. -->
     <div class="inline-flex rounded-lg border border-black/10 overflow-hidden text-sm" role="group" aria-label="Sort">

@@ -32,7 +32,7 @@ export const GET: APIRoute = async () => {
   const lines: string[] = [];
   lines.push('# DigitalChiselCo');
   lines.push('');
-  lines.push(`> Online shop of ${count} bas-relief STL files for CNC routers, 3D printers and lasers: wildlife, religious, hunting lodge, western, pets, nautical, gothic, floral and holiday designs, plus serving trays and signs. Instant download, commercial use included (sell what you carve), most designs $5 to $12. Files are sculpted and checked to machine cleanly in Aspire, VCarve, Carveco, ArtCAM and Fusion 360.`);
+  lines.push(`> Online shop of ${count} bas-relief STL files for CNC routers and 3D printers (lasers work from a depth map): wildlife, religious, hunting lodge, western, pets, nautical, gothic, floral and holiday designs, plus serving trays and signs. Instant download, commercial use included (sell what you carve), most designs $5 to $12. Files are sculpted and checked to machine cleanly in Aspire, VCarve, Carveco, ArtCAM and Fusion 360.`);
   lines.push('');
   lines.push('Key facts:');
   lines.push('- Format: binary STL, flat base, scale to any size; each product page lists the measured size, relief depth, board thickness, bits and an estimated carve time.');

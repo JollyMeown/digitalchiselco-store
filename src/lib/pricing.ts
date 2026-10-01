@@ -11,3 +11,10 @@ export function pricing(price: number | string, discountPercent: number = DEFAUL
 }
 
 export const money = (n: number) => `$${n.toFixed(2)}`;
+
+/** Memberships are never discounted (owner rule), so they never get the
+ *  site-wide "was" price either: pass the result as the discount. Found
+ *  2026-10-01: the 3-month membership showed "$24.99, was $27.77, 10% off" on
+ *  cards, its product page and in the shopping feeds. */
+export const saleDiscountFor = (p: { membership_plan_slug?: string | null } | null | undefined, discount: number | undefined) =>
+  p?.membership_plan_slug ? 0 : discount;

@@ -15,13 +15,13 @@ export const LANDING_TOPICS: LandingTopic[] = [
   { slug: 'for-cnc-router', h1: 'Bas-Relief STL Files for CNC Routers', title: 'CNC Router STL Files — Bas-Relief Designs for Carving',
     intro: 'Ready-to-carve 3D relief STL files built for CNC routers. Clean geometry and smooth toolpaths in Aspire, VCarve Pro, Carveco and Fusion 360. Instant download, carve on wood, acrylic or MDF.', keywords: [] },
   { slug: 'for-laser-engraver', h1: 'STL & Relief Designs for Laser Engravers', title: 'Laser Engraving Files — Relief & Grayscale Designs',
-    intro: 'Detailed relief designs suited to laser engraving and 3D laser carving. Grayscale-friendly depth and crisp edges. Download instantly and burn or carve on wood, slate and more.', keywords: [] },
+    intro: 'Detailed relief designs for laser engraving. Lasers burn from a greyscale depth map rather than an STL, so each relief is converted first (Laser Studio does this in one step). Grayscale-friendly depth and crisp edges for wood, slate and more.', keywords: [] },
   { slug: 'for-3d-printing', h1: 'Bas-Relief STL Files for 3D Printing', title: '3D Printing STL Files — Relief Wall Art & Plaques',
     intro: 'Watertight relief STL files that print beautifully on FDM and resin printers. Perfect for wall art, plaques and decor. Instant download, no supports headaches on flat-backed reliefs.', keywords: [] },
 
   // ── Theme intent ───────────────────────────────────────────────────
   { slug: 'skull-designs', h1: 'Skull CNC Relief STL Files', title: 'Skull STL Files for CNC & Laser — Bas-Relief Designs',
-    intro: 'Bold skull relief designs for CNC routers and laser engravers, from biker and western skulls to gothic and reaper art. Instant STL download, carve on wood or acrylic.',
+    intro: 'Bold skull relief designs for CNC routers and 3D printers, from biker and western skulls to gothic and reaper art. Instant STL download, carve on wood or acrylic.',
     keywords: ['skull', 'reaper', 'skeleton', 'grim'],
     faqs: [{ q: 'What software opens these skull STL files?', a: 'Any CAM software that imports STL, including Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360.' }] },
   { slug: 'religious-christian', h1: 'Christian & Religious Relief STL Files', title: 'Christian STL Files — Jesus, Cross & Faith CNC Designs',

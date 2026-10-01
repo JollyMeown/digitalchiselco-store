@@ -71,7 +71,7 @@ export async function GET() {
     const link = `${SITE}/collections/${cat.slug}?utm_source=pinterest&utm_medium=themes&utm_campaign=theme-${cat.slug}`;
     const name = String(cat.name || '').replace(/\s{2,}/g, ' ').trim();
     const title = `${name} bas-relief STL files for CNC carving`.slice(0, 100);
-    const desc = `Browse our ${name.toLowerCase()} collection: high-detail bas-relief STL files ready for CNC routers, laser engravers and 3D printers. `
+    const desc = `Browse our ${name.toLowerCase()} collection: high-detail bas-relief STL files ready for CNC routers and 3D printers, and laser engraving via a depth map. `
       + 'No modelling work, instant download, commercial use included. Tested in Aspire, VCarve Pro, Carveco and Fusion 360. '
       + 'Grab 5 free STL files at digitalchiselco.com/free.';
     return `    <item>
@@ -93,7 +93,7 @@ export async function GET() {
   <channel>
     <title>DigitalChiselCo — Design Collections</title>
     <link>${xmlEscape(SITE)}</link>
-    <description>Themed collections of bas-relief STL designs for CNC routers, laser engravers and 3D printers.</description>
+    <description>Themed collections of bas-relief STL designs for CNC routers and 3D printers, and laser engraving via a depth map.</description>
     <language>en-us</language>
     <lastBuildDate>${new Date(now).toUTCString()}</lastBuildDate>
 ${built.filter(Boolean).join('\n')}

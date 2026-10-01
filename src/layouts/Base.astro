@@ -15,7 +15,7 @@ interface Props { title?: string; description?: string; image?: string; noindex?
 const DESIGNS = await designCountLabel();
 const {
   title = 'DigitalChiselCo — Premium STL Files for CNC, Laser & 3D Printing',
-  description = `${DESIGNS} bas-relief STL files for CNC routers, 3D printers and laser engravers: wildlife, religious, western, hunting, floral and seasonal designs. Instant download, commercial use included.`,
+  description = `${DESIGNS} bas-relief STL files for CNC routers and 3D printers, and laser engraving via a depth map: wildlife, religious, western, hunting, floral and seasonal designs. Instant download, commercial use included.`,
   image = '/og-default.jpg',
   noindex = false,
   ogType = 'website',
@@ -309,7 +309,7 @@ const faviconType = settings.favicon_image_url
         <button id="dcc-exit-x" aria-label="Close" style="position:absolute;top:8px;right:10px;width:36px;height:36px;font-size:22px;color:#8a7a66;background:none;border:none;cursor:pointer;">×</button>
         <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#854F0B;font-weight:600;">Before you go</div>
         <h2 id="dcc-exit-h" class="font-serif" style="color:#5E380A;font-size:24px;line-height:1.2;margin:6px 0 6px;">5 bas-relief STL files, free</h2>
-        <p style="font-size:14px;color:#5b5145;margin:0 0 12px;line-height:1.5;">Full designs, not samples. CNC-tested and ready for your router, laser or 3D printer, and you can sell what you make from them.</p>
+        <p style="font-size:14px;color:#5b5145;margin:0 0 12px;line-height:1.5;">Full designs, not samples. CNC-tested and ready for your router or 3D printer (lasers work from a depth map), and you can sell what you make from them.</p>
         <ul style="list-style:none;padding:0;margin:0 0 14px;font-size:12.5px;color:#5b5145;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;">
           <li>✓ Instant download</li><li>✓ Commercial use</li><li>✓ Unsubscribe anytime</li>
         </ul>
@@ -418,7 +418,7 @@ const faviconType = settings.favicon_image_url
           // them to one entity (was empty until 2026-10-01). Only profiles the
           // owner runs; add Pinterest once its exact URL is confirmed.
           sameAs: ['https://digitalchiselco.etsy.com', 'https://www.youtube.com/@DigitalChiselco'],
-          description: `Online library of ${DESIGNS} downloadable bas-relief STL files for CNC routers, 3D printers and laser engravers, for use in Aspire, VCarve, Carveco, ArtCAM and Fusion 360, plus custom bas-relief STL from customer photos.`,
+          description: `Online library of ${DESIGNS} downloadable bas-relief STL files for CNC routers and 3D printers, and laser engraving via a depth map, for use in Aspire, VCarve, Carveco, ArtCAM and Fusion 360, plus custom bas-relief STL from customer photos.`,
           // Payment methods our Paddle checkout actually accepts. Google's Shop
           // quality scorecard grades "payment options", and these were not
           // declared anywhere machine-readable.

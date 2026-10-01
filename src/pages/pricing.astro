@@ -2,6 +2,10 @@
 import Shell from '../layouts/Shell.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { getSettings, designCountLabel, getMembershipPlans } from '../lib/queries';
+// The plan lines with numbers come from the one calculation in membership-facts
+// (2026-10-01): this page printed the plans' stored lines, "~$192 retail value,
+// about 90% off", while /membership said "$172, 85% off" for the same plan.
+import { planFeatureLines, planFacts } from '../lib/membership-facts';
 const s = await getSettings();
 const DESIGNS = await designCountLabel();
 const plans = await getMembershipPlans();
@@ -83,11 +87,11 @@ const fromLabel = cheapest && Number.isFinite(cheapest) ? `membership plans from
                 </div>
                 <div class="text-right">
                   <div class="font-serif text-3xl text-bronze-700">${Number(p.price_usd).toFixed(2)}</div>
-                  {p.original_price_usd && <div class="text-xs text-ink-700/40 line-through">${Number(p.original_price_usd).toFixed(2)} value</div>}
+                  {planFacts(p).retail > Number(p.price_usd) && <div class="text-xs text-ink-700/50">{planFacts(p).retailLabel} retail value</div>}
                 </div>
               </div>
               <ul class="text-sm text-ink-700 space-y-1.5 mt-3">
-                {p.features.map((f) => <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span>{f}</li>)}
+                {planFeatureLines(p).map((f) => <li class="flex gap-2"><span class="text-bronze-600">&#10003;</span>{f}</li>)}
               </ul>
             </div>
           ))}

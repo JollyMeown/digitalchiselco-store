@@ -20,14 +20,14 @@ const site = 'https://digitalchiselco.com';
 // carries CollectionPage + ItemList + FAQ; this index had no structured data at all.
 const listLd = {
   '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Bas-relief STL collections', url: `${site}/collections`,
-  description: `${DESIGNS} bas-relief STL files for CNC routers, 3D printers and laser engravers, grouped into ${categories.length} themed collections.`,
+  description: `${DESIGNS} bas-relief STL files for CNC routers and 3D printers, and laser engraving via a depth map, grouped into ${categories.length} themed collections.`,
   isPartOf: { '@type': 'WebSite', url: site, name: 'DigitalChiselCo' },
   mainEntity: { '@type': 'ItemList', numberOfItems: categories.length,
     itemListElement: categories.map((c: any, i: number) => ({ '@type': 'ListItem', position: i + 1, name: c.name, url: `${site}/collections/${c.slug}` })) },
 };
 ---
 <Shell title="Bas-Relief STL Collections: Wildlife, Religious, Western and More | DigitalChiselCo"
-  description={`Browse ${DESIGNS} bas-relief STL files by theme: wildlife, religious and Christian, western, hunting lodge, Norse, Tree of Life, Christmas, Halloween and more. CNC, 3D print and laser ready.`}
+  description={`Browse ${DESIGNS} bas-relief STL files by theme: wildlife, religious and Christian, western, hunting lodge, Norse, Tree of Life, Christmas, Halloween and more. Ready for CNC and 3D printing, and laser engraving via a depth map.`}
   scrollPastBanner={true}>
   {seasonal.length > 0 && (
     <section class="mb-8">
@@ -44,7 +44,7 @@ const listLd = {
     </section>
   )}
   <h1 class="text-3xl mb-2">Shop by collection</h1>
-  <p class="text-ink-700/75 text-sm mb-6 max-w-3xl">{DESIGNS} bas-relief STL files for CNC routers, 3D printers and laser engravers, in {categories.length} themed collections. Every file is an instant download with commercial use of what you carve, and opens in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360.</p>
+  <p class="text-ink-700/75 text-sm mb-6 max-w-3xl">{DESIGNS} bas-relief STL files for CNC routers and 3D printers, and laser engraving via a depth map, in {categories.length} themed collections. Every file is an instant download with commercial use of what you carve, and opens in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360.</p>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
     {categories.map((c) => (
       <a href={`/collections/${c.slug}`} class="block border border-black/10 rounded-lg overflow-hidden hover:shadow-md transition group">

@@ -8,7 +8,7 @@
 // we mark availability=in_stock and set the correct Arts & Crafts category.
 
 import { supabase } from '../lib/supabase';
-import { pricing } from '../lib/pricing';
+import { pricing, saleDiscountFor } from '../lib/pricing';
 import { img } from '../lib/img';
 
 export const prerender = false;
@@ -81,7 +81,7 @@ function shoppingTitle(raw: string): string {
 
 export async function GET() {
   const FALLBACK = (t: string) =>
-    `${t} is a high-detail 3D bas-relief STL for CNC routers, laser engravers and 3D printers. Instant download, commercial use included. Tested in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360.`;
+    `${t} is a high-detail 3D bas-relief STL for CNC routers and 3D printers, and laser engraving via a depth map. Instant download, commercial use included. Tested in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360.`;
 
   let discount = 20;
   try {
@@ -137,7 +137,7 @@ function labels(p: { price_usd: number | null; etsy_sales_365: number | null; is
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase
         .from('products')
-        .select('id, title, slug, price_usd, image_url, feed_image_url, gallery, mockup_url, mockup_status, mockup_b_url, mockup_b_status, seo_description, description, is_bundle, etsy_sales_365, product_categories(categories(name))')
+        .select('id, title, slug, price_usd, image_url, feed_image_url, gallery, mockup_url, mockup_status, mockup_b_url, mockup_b_status, seo_description, description, is_bundle, membership_plan_slug, etsy_sales_365, product_categories(categories(name))')
         .eq('active', true)
         // Google's weapons policy will never approve our rifle/scope hunting
         // scenes, so sending them only accrues violations. Excluded here only;
@@ -152,7 +152,7 @@ function labels(p: { price_usd: number | null; etsy_sales_365: number | null; is
         const title = shoppingTitle(String(p.title || ''));
         const L = labels(p);
         const desc = stripEmoji((p.seo_description || (p.description || '').slice(0, 4800) || FALLBACK(title))).slice(0, 5000);
-        const { price, original, percent } = pricing(p.price_usd, discount);
+        const { price, original, percent } = pricing(p.price_usd, saleDiscountFor(p, discount));
         const cats = (p.product_categories || []).map((pc: any) => pc.categories?.name).filter(Boolean).join(' > ');
         const gallery: string[] = Array.isArray(p.gallery) ? p.gallery.filter(Boolean) : [];
         // Approved room mockups ride along as ADDITIONAL images, never as the
@@ -212,7 +212,7 @@ function labels(p: { price_usd: number | null; etsy_sales_365: number | null; is
     `<channel>` +
     `<title>DigitalChiselCo - Bas-Relief STL Files</title>` +
     `<link>${xml(SITE)}</link>` +
-    `<description>Premium bas-relief STL files for CNC routers, laser engravers and 3D printers.</description>` +
+    `<description>Premium bas-relief STL files for CNC routers and 3D printers, and laser engraving via a depth map.</description>` +
     items.join('') +
     `</channel></rss>`;
 
