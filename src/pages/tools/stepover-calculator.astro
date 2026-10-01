@@ -1,0 +1,145 @@
+---
+// Stepover and scallop calculator (2026-10-01, AI-search plan item 6).
+// "What stepover for a 1/8 ball nose?" is asked of assistants word for word and
+// has an exact answer. Same geometry as Will it cut? and the stepover guide:
+//   scallop height h = r - sqrt(r^2 - (s/2)^2), r = ball radius, s = stepover
+// and the same "sands out" line, 0.05 mm (SANDING_MM in lib/stl-analyse.ts).
+// Everything runs in the browser; the FAQ answers are computed here at build
+// time with the same function, so the page and the calculator cannot disagree.
+import Shell from '../../layouts/Shell.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { jsonLd } from '../../lib/jsonld';
+import { SANDING_MM } from '../../lib/stl-analyse';
+
+const scallop = (dia: number, pct: number) => { const r = dia / 2, s = dia * pct / 100; return r - Math.sqrt(Math.max(0, r * r - (s / 2) * (s / 2))); };
+const coarsestFree = (dia: number) => { let best = 5; for (let p = 5; p <= 50; p++) if (scallop(dia, p) <= SANDING_MM) best = p; return best; };
+const f3 = (n: number) => n.toFixed(3);
+const BITS = [
+  { label: '1/8 inch (3.175 mm)', dia: 3.175 },
+  { label: '1/4 inch (6.35 mm)', dia: 6.35 },
+  { label: '1/16 inch (1.5875 mm)', dia: 1.5875 },
+  { label: '3 mm', dia: 3 },
+];
+const FAQ = [
+  ...BITS.slice(0, 3).map((b) => ({
+    q: `What stepover should I use with a ${b.label.split(' (')[0]} ball nose?`,
+    a: `At 10 percent stepover a ${b.label} ball nose leaves ridges ${f3(scallop(b.dia, 10))} mm high, too small to see. The ridges stay under ${SANDING_MM} mm, which fine sanding removes, up to about ${coarsestFree(b.dia)} percent stepover (${f3(b.dia * coarsestFree(b.dia) / 100)} mm). Going finer than that mostly adds hours, not detail.`,
+  })),
+  { q: 'How do I calculate scallop height?', a: 'Scallop height h = r minus the square root of (r squared minus (s/2) squared), where r is the ball radius and s is the stepover distance. Halving the stepover cuts the scallop to about a quarter and doubles the finishing time.' },
+  { q: 'Does a smaller stepover give more detail?', a: 'No. Stepover only changes the ridges between passes. The finest detail a ball nose can reach is set by its radius; for that, use a smaller bit or a rest-machining pass with one.' },
+  { q: 'What about a tapered ball nose?', a: 'Enter the tip diameter. The scallop is cut by the round tip, so the same formula applies as long as the stepover stays smaller than the tip.' },
+];
+const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: FAQ.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
+const appLd = {
+  '@context': 'https://schema.org', '@type': 'WebApplication', name: 'Stepover and scallop calculator', url: 'https://digitalchiselco.com/tools/stepover-calculator',
+  applicationCategory: 'DesignApplication', operatingSystem: 'Any (runs in the browser)', isAccessibleForFree: true,
+  offers: { '@type': 'Offer', price: 0, priceCurrency: 'USD' },
+  description: 'Scallop height, number of passes and finishing time for any ball nose and stepover, with the coarsest stepover whose ridges sand out.',
+  publisher: { '@type': 'Organization', '@id': 'https://digitalchiselco.com#org', name: 'DigitalChiselCo' },
+};
+---
+<Shell
+  title="Stepover and Scallop Calculator for Ball Nose Bits: Free CNC Tool | DigitalChiselCo"
+  description="What stepover for a 1/8 inch ball nose? Enter any bit and stepover: scallop height, number of passes, finishing time, and the coarsest stepover whose ridges sand out. Free, in your browser."
+>
+  <Breadcrumbs crumbs={[{ label: 'Tools', href: '/tools' }, { label: 'Stepover calculator' }]} />
+  <script type="application/ld+json" set:html={jsonLd(appLd)} />
+  <script type="application/ld+json" set:html={jsonLd(faqLd)} />
+
+  <article class="max-w-3xl mx-auto pb-20 text-ink-700">
+    <p class="text-xs uppercase tracking-[0.18em] text-bronze-600 mb-2">Free tool</p>
+    <h1 class="font-serif text-3xl sm:text-4xl text-bronze-800 leading-tight" style="text-wrap: balance">Stepover and scallop calculator</h1>
+    <p class="mt-4 text-[17px] leading-relaxed">
+      <strong>A ball nose leaves small ridges between passes, called scallops.</strong> Their height depends only on the ball's radius and the
+      stepover. Enter your bit and panel to see the ridge height, the number of passes, the finishing time, and the coarsest stepover whose ridges
+      a light sanding removes (under {SANDING_MM} mm).
+    </p>
+
+    <form id="soc" class="mt-8 grid sm:grid-cols-2 gap-4 rounded-xl border border-bronze-600/20 bg-white p-5" onsubmit="return false">
+      <label class="block text-sm"><span class="text-ink-900 font-medium">Units</span>
+        <select name="u" class="mt-1 w-full rounded-md border border-black/15 px-3 py-2 bg-white">
+          <option value="in">Inches</option><option value="mm">Millimetres</option>
+        </select></label>
+      <label class="block text-sm"><span class="text-ink-900 font-medium">Ball diameter <span class="u">(in)</span></span>
+        <input name="d" type="number" step="any" min="0.01" value="0.125" class="mt-1 w-full rounded-md border border-black/15 px-3 py-2" />
+        <span class="text-xs text-ink-700/60">Tapered ball nose: enter the tip diameter.</span></label>
+      <label class="block text-sm"><span class="text-ink-900 font-medium">Stepover (% of the diameter)</span>
+        <input name="p" type="number" step="any" min="1" max="90" value="10" class="mt-1 w-full rounded-md border border-black/15 px-3 py-2" /></label>
+      <label class="block text-sm"><span class="text-ink-900 font-medium">Feed rate <span class="u">(in/min)</span></span>
+        <input name="f" type="number" step="any" min="1" value="60" class="mt-1 w-full rounded-md border border-black/15 px-3 py-2" /></label>
+      <label class="block text-sm"><span class="text-ink-900 font-medium">Panel width <span class="u">(in)</span></span>
+        <input name="w" type="number" step="any" min="0.1" value="12" class="mt-1 w-full rounded-md border border-black/15 px-3 py-2" /></label>
+      <label class="block text-sm"><span class="text-ink-900 font-medium">Panel height <span class="u">(in)</span></span>
+        <input name="h" type="number" step="any" min="0.1" value="12" class="mt-1 w-full rounded-md border border-black/15 px-3 py-2" /></label>
+    </form>
+
+    <div id="out" class="mt-5 grid sm:grid-cols-4 gap-3" aria-live="polite"></div>
+    <p id="verdict" class="mt-3 text-sm leading-relaxed"></p>
+
+    <div class="mt-6 overflow-x-auto rounded-xl border border-bronze-600/20 bg-white">
+      <table class="w-full text-sm tabular-nums">
+        <thead class="bg-cream/70 text-left"><tr>
+          <th class="px-4 py-2 font-medium text-ink-900">Stepover</th><th class="px-4 py-2 font-medium text-ink-900">Distance</th>
+          <th class="px-4 py-2 font-medium text-ink-900">Ridge height</th><th class="px-4 py-2 font-medium text-ink-900">Passes</th>
+          <th class="px-4 py-2 font-medium text-ink-900">Finishing time</th></tr></thead>
+        <tbody id="tbl"></tbody>
+      </table>
+    </div>
+    <p class="mt-2 text-xs text-ink-700/60">Time is cutting distance divided by feed, for a raster finishing pass across the whole panel. Real jobs add acceleration and moves between passes, so allow more.</p>
+
+    <h2 class="font-serif text-2xl text-bronze-800 mt-12 mb-3">The formula</h2>
+    <p class="leading-relaxed">Scallop height <strong>h = r − √(r² − (s/2)²)</strong>, where <em>r</em> is the ball radius and <em>s</em> the stepover distance.
+      Halve the stepover and the ridge drops to about a quarter, while the finishing time doubles. That is why there is a stepover past which going
+      finer buys hours, not quality.</p>
+
+    <h2 class="font-serif text-2xl text-bronze-800 mt-10 mb-3">Common questions</h2>
+    <div class="space-y-4">
+      {FAQ.map((f) => (<div><h3 class="font-medium text-ink-900">{f.q}</h3><p class="mt-1 leading-relaxed">{f.a}</p></div>))}
+    </div>
+
+    <p class="mt-10 leading-relaxed">
+      More on the trade-off, with surfaces you can see: <a href="/blog/cnc-relief-stepover-guide" class="text-bronze-700 underline">What stepover buys you, and what it costs</a>.
+      What a smaller bit adds that a finer stepover cannot: <a href="/blog/3mm-vs-1-5mm-ball-nose-relief-carving" class="text-bronze-700 underline">3 mm vs 1.5 mm ball nose</a>.
+      Check a whole file at once: <a href="/tools/will-it-cut" class="text-bronze-700 underline">Will it cut?</a>
+    </p>
+  </article>
+
+  <script is:inline define:vars={{ SAND: SANDING_MM }}>
+    (function () {
+      var f = document.getElementById('soc'), out = document.getElementById('out'), tbl = document.getElementById('tbl'), verdict = document.getElementById('verdict');
+      var MM = 25.4, prevU = 'in';
+      function num(n) { return Number(f.elements[n].value); }
+      function sc(d, pct) { var r = d / 2, s = d * pct / 100; return r - Math.sqrt(Math.max(0, r * r - (s / 2) * (s / 2))); }
+      function fmtLen(mm, u) { return u === 'in' ? (mm / MM).toFixed(5) + ' in' : mm.toFixed(3) + ' mm'; }
+      // round once, then split: rounding the minutes separately gave "3 h 60 min"
+      function fmtT(min) { if (!isFinite(min)) return '-'; var t = Math.round(min); if (t < 60) return t + ' min'; var h = Math.floor(t / 60), m = t % 60; return h + ' h' + (m ? ' ' + m + ' min' : ''); }
+      function card(k, v) { return '<div class="rounded-lg border border-black/10 bg-cream/40 px-3 py-2"><div class="text-[11px] uppercase tracking-wide text-ink-700/55">' + k + '</div><div class="text-lg font-semibold text-ink-900 tabular-nums">' + v + '</div></div>'; }
+      function calc() {
+        var u = f.elements.u.value, k = u === 'in' ? MM : 1;
+        var d = num('d') * k, p = num('p'), feed = num('f') * k, w = num('w') * k, h = num('h') * k;
+        if (!(d > 0 && p > 0 && feed > 0 && w > 0 && h > 0)) { out.innerHTML = ''; tbl.innerHTML = ''; verdict.textContent = 'Enter positive numbers in every box.'; return; }
+        var s = d * p / 100, ridge = sc(d, p), passes = Math.ceil(h / s), mins = passes * w / feed;
+        var free = 5; for (var q = 5; q <= 50; q++) if (sc(d, q) <= SAND) free = q;
+        out.innerHTML = card('Ridge height', fmtLen(ridge, u)) + card('Stepover', fmtLen(s, u)) + card('Passes', passes.toLocaleString()) + card('Finishing time', fmtT(mins));
+        verdict.innerHTML = ridge <= SAND
+          ? 'The ridges are under ' + fmtLen(SAND, u) + ' and sand out. This bit stays there up to about <strong>' + free + '% stepover</strong> (' + fmtLen(d * free / 100, u) + '), which would finish in ' + fmtT(Math.ceil(h / (d * free / 100)) * w / feed) + '.'
+          : 'The ridges are taller than ' + fmtLen(SAND, u) + ' and will show after a light sanding. Up to about <strong>' + free + '% stepover</strong> they would sand out.';
+        var rows = '';
+        [5, 8, 10, 12, 15, 20, 25, 30, 40].forEach(function (q) {
+          var ss = d * q / 100, rr = sc(d, q), pp = Math.ceil(h / ss);
+          rows += '<tr class="border-t border-black/5' + (q === Math.round(p) ? ' bg-cream/60 font-medium' : '') + '"><td class="px-4 py-1.5">' + q + '%</td><td class="px-4 py-1.5">' + fmtLen(ss, u) + '</td><td class="px-4 py-1.5 ' + (rr <= SAND ? 'text-green-700' : 'text-amber-700') + '">' + fmtLen(rr, u) + (rr <= SAND ? ' · sands out' : ' · shows') + '</td><td class="px-4 py-1.5">' + pp.toLocaleString() + '</td><td class="px-4 py-1.5">' + fmtT(pp * w / feed) + '</td></tr>';
+        });
+        tbl.innerHTML = rows;
+      }
+      f.elements.u.addEventListener('change', function () {
+        var u = f.elements.u.value, k = u === 'mm' ? MM : 1 / MM;
+        if (u !== prevU) ['d', 'f', 'w', 'h'].forEach(function (n) { var v = num(n) * k; f.elements[n].value = String(Math.round(v * (u === 'mm' ? 100 : 10000)) / (u === 'mm' ? 100 : 10000)); });
+        prevU = u;
+        document.querySelectorAll('#soc .u').forEach(function (e) { e.textContent = e.parentNode.textContent.indexOf('Feed') >= 0 ? '(' + u + '/min)' : '(' + u + ')'; });
+        calc();
+      });
+      f.addEventListener('input', function (e) { if (e.target.name !== 'u') calc(); });
+      calc();
+    })();
+  </script>
+</Shell>

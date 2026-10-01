@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css';
-import { getSettings } from '../lib/queries';
+import { getSettings, designCountLabel } from '../lib/queries';
 import { jsonLd } from '../lib/jsonld';
 import AnnouncementBanner from '../components/AnnouncementBanner.astro';
 import { LANDINGS, landingPath } from '../lib/landing-i18n';
@@ -8,9 +8,14 @@ interface Props { title?: string; description?: string; image?: string; noindex?
   // Localised landing pages (/pl, /de): the page language and its hreflang
   // siblings, so Google shows each country the version in its own language.
   lang?: string; alternates?: { hreflang: string; href: string }[]; }
+// The fallback description carries the live design count (hourly cache), the
+// same number the homepage shows. It said "Hundreds of" while the homepage said
+// 2,200+, on every page without its own description (catalog, collections
+// index, search snippets): a mismatch AI answers and search engines both read.
+const DESIGNS = await designCountLabel();
 const {
   title = 'DigitalChiselCo — Premium STL Files for CNC, Laser & 3D Printing',
-  description = 'Hundreds of museum-grade bas-relief STL files for CNC routers, 3D printers and laser engravers. Instant download, commercial use included.',
+  description = `${DESIGNS} bas-relief STL files for CNC routers, 3D printers and laser engravers: wildlife, religious, western, hunting, floral and seasonal designs. Instant download, commercial use included.`,
   image = '/og-default.jpg',
   noindex = false,
   ogType = 'website',
@@ -404,8 +409,11 @@ const faviconType = settings.favicon_image_url
           url: site,
           logo: settings.logo_image_url || (site + '/og-default.jpg'),
           email: settings.admin_email || 'jolly@digitalchiselco.com',
-          sameAs: [],
-          description: 'Premium bas-relief STL files for CNC routers, laser engravers and 3D printers.',
+          // The brand's own profiles, so search engines and AI assistants tie
+          // them to one entity (was empty until 2026-10-01). Only profiles the
+          // owner runs; add Pinterest once its exact URL is confirmed.
+          sameAs: ['https://digitalchiselco.etsy.com', 'https://www.youtube.com/@DigitalChiselco'],
+          description: `Online library of ${DESIGNS} downloadable bas-relief STL files for CNC routers, 3D printers and laser engravers, for use in Aspire, VCarve, Carveco, ArtCAM and Fusion 360, plus custom bas-relief STL from customer photos.`,
           // Payment methods our Paddle checkout actually accepts. Google's Shop
           // quality scorecard grades "payment options", and these were not
           // declared anywhere machine-readable.

@@ -16,8 +16,20 @@ const around = Array.from({ length: pages }, (_, i) => i + 1)
   .filter((p) => p === 1 || p === pages || Math.abs(p - page) <= 2);
 const qs = (p: number) => `/catalog?${sort !== 'best' ? `sort=${sort}&` : ''}page=${p}`;
 const SORTS = [['best', 'Best sellers'], ['newest', 'Newest'], ['title', 'A to Z']] as const;
+const site = 'https://digitalchiselco.com';
+// The catalog as a CollectionPage with this page's designs listed (2026-10-01):
+// it had breadcrumbs only, and the generic site description.
+const listLd = {
+  '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'All bas-relief STL files', url: `${site}/catalog${page > 1 ? `?page=${page}` : ''}`,
+  description: `${total.toLocaleString('en-US')} bas-relief STL files for CNC routers, 3D printers and laser engravers.`,
+  isPartOf: { '@type': 'WebSite', url: site, name: 'DigitalChiselCo' },
+  mainEntity: { '@type': 'ItemList', numberOfItems: total,
+    itemListElement: products.map((p: any, i: number) => ({ '@type': 'ListItem', position: (page - 1) * perPage + i + 1, name: String(p.title || '').split('|')[0].trim(), url: `${site}/product/${p.slug}` })) },
+};
 ---
-<Shell title="Catalog — All STL Files | DigitalChiselCo" scrollPastBanner={true}>
+<Shell title="Catalog — All STL Files | DigitalChiselCo"
+  description={`All ${total.toLocaleString('en-US')} bas-relief STL files in one place: wildlife, religious, western, hunting, floral, seasonal and more, for CNC routers, 3D printers and lasers. Sort by best sellers or newest.`}
+  scrollPastBanner={true}>
   <Breadcrumbs crumbs={[{ label: 'Catalog' }]} />
   <h1 class="text-3xl mb-1">Every design, in one place</h1>
   <div class="mt-3"><SearchBar /></div>
@@ -54,4 +66,5 @@ const SORTS = [['best', 'Best sellers'], ['newest', 'Newest'], ['title', 'A to Z
   )}
 
   <FreePackInline variant="card" source="catalog" />
+  <script type="application/ld+json" set:html={JSON.stringify(listLd)} />
 </Shell>

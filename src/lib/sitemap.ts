@@ -66,10 +66,13 @@ export const STATIC_PATHS: Array<{ path: string; priority: number; changefreq: s
   { path: '/free',        priority: 0.6, changefreq: 'monthly' },
   { path: '/faq',         priority: 0.6, changefreq: 'monthly' },
   { path: '/license',     priority: 0.5, changefreq: 'monthly' },
+  { path: '/cam-software', priority: 0.6, changefreq: 'monthly' },
+  { path: '/carved-by-you', priority: 0.6, changefreq: 'weekly' },
   { path: '/about',       priority: 0.5, changefreq: 'monthly' },
   { path: '/blog',        priority: 0.6, changefreq: 'weekly' },
   { path: '/tools',       priority: 0.7, changefreq: 'monthly' },
   { path: '/tools/will-it-cut', priority: 0.8, changefreq: 'monthly' },
+  { path: '/tools/stepover-calculator', priority: 0.7, changefreq: 'monthly' },
   // The report is a citation asset rather than a shop page: high priority,
   // and it never changes once published, which is the point of it.
   { path: '/reports/state-of-cnc-relief-carving-2026', priority: 0.9, changefreq: 'yearly' },

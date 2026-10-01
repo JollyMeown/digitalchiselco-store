@@ -13,8 +13,22 @@ try {
     .eq('active', true).order('sort_order');
   seasonal = (data || []).filter((s: any) => (!s.starts_at || s.starts_at <= nowIso) && (!s.ends_at || s.ends_at >= nowIso));
 } catch { /* optional */ }
+import { designCountLabel } from '../../lib/queries';
+const DESIGNS = await designCountLabel();
+const site = 'https://digitalchiselco.com';
+// The collection hubs as one list (2026-10-01): each collection page already
+// carries CollectionPage + ItemList + FAQ; this index had no structured data at all.
+const listLd = {
+  '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Bas-relief STL collections', url: `${site}/collections`,
+  description: `${DESIGNS} bas-relief STL files for CNC routers, 3D printers and laser engravers, grouped into ${categories.length} themed collections.`,
+  isPartOf: { '@type': 'WebSite', url: site, name: 'DigitalChiselCo' },
+  mainEntity: { '@type': 'ItemList', numberOfItems: categories.length,
+    itemListElement: categories.map((c: any, i: number) => ({ '@type': 'ListItem', position: i + 1, name: c.name, url: `${site}/collections/${c.slug}` })) },
+};
 ---
-<Shell title="Collections | DigitalChiselCo" scrollPastBanner={true}>
+<Shell title="Bas-Relief STL Collections: Wildlife, Religious, Western and More | DigitalChiselCo"
+  description={`Browse ${DESIGNS} bas-relief STL files by theme: wildlife, religious and Christian, western, hunting lodge, Norse, Tree of Life, Christmas, Halloween and more. CNC, 3D print and laser ready.`}
+  scrollPastBanner={true}>
   {seasonal.length > 0 && (
     <section class="mb-8">
       <h2 class="text-xl mb-3">✨ Seasonal right now</h2>
@@ -29,7 +43,8 @@ try {
       </div>
     </section>
   )}
-  <h1 class="text-3xl mb-6">Shop by collection</h1>
+  <h1 class="text-3xl mb-2">Shop by collection</h1>
+  <p class="text-ink-700/75 text-sm mb-6 max-w-3xl">{DESIGNS} bas-relief STL files for CNC routers, 3D printers and laser engravers, in {categories.length} themed collections. Every file is an instant download with commercial use of what you carve, and opens in Aspire, VCarve Pro, Carveco, ArtCAM and Fusion 360.</p>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
     {categories.map((c) => (
       <a href={`/collections/${c.slug}`} class="block border border-black/10 rounded-lg overflow-hidden hover:shadow-md transition group">
@@ -42,4 +57,5 @@ try {
       </a>
     ))}
   </div>
+  <script type="application/ld+json" set:html={JSON.stringify(listLd)} />
 </Shell>

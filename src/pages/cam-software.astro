@@ -1,0 +1,158 @@
+---
+// "I bought the file, how do I open it?" for each CAM program (2026-10-01,
+// AI-search plan item 5). "Can VCarve use STL files?" and "can Aspire import
+// STL?" are questions people put to assistants word for word, and one plain
+// page per answer is what gets quoted. Which program to BUY is the comparison
+// article; this page is only about opening and cutting a file you already have.
+//
+// Facts checked 2026-10-01 against the makers' own help pages: Vectric "Import a
+// Component or 3D Model" (Aspire: any number of models, Orientate Model form;
+// VCarve Pro and Desktop: one third-party 3D model per job, cut but not edit);
+// Carveco: import, paste into the relief, Machine Relief toolpath; Fusion:
+// Insert Mesh, unitless STL, toolpaths on the mesh as a whole (3D Flat and
+// Scallop suit meshes best). Rest machining facts from 2026-09-28 (3mm vs 1.5mm
+// article). No external links, no menu paths we could not confirm.
+import Shell from '../layouts/Shell.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { jsonLd } from '../lib/jsonld';
+
+type Prog = { id: string; name: string; can: string; steps: string[]; note?: string };
+const PROGS: Prog[] = [
+  {
+    id: 'aspire', name: 'Vectric Aspire',
+    can: 'Yes. Aspire imports STL files as 3D models, as many as you like in one job, and can also edit and combine them.',
+    steps: [
+      'Set up your job with the board size and thickness you will cut, units in millimetres or inches.',
+      'Use "Import a Component or 3D Model" and pick the STL. The Orientate Model form opens: keep the flat base facing down, set the size you want (lock the proportions), and set where the model sits in the board.',
+      'The model becomes a component. Add a 3D Roughing toolpath, then a 3D Finishing toolpath.',
+      'For fine detail, add a smaller ball nose to the 3D Finishing toolpath: with more than one tool, Aspire machines only the areas the bigger tool could not reach (rest machining).',
+    ],
+  },
+  {
+    id: 'vcarve', name: 'Vectric VCarve Pro and VCarve Desktop',
+    can: 'Yes. VCarve Pro and VCarve Desktop open STL files and cut them with 3D roughing and finishing toolpaths. They cut a 3D model but do not edit it, and a job holds one STL (Aspire lifts both limits).',
+    steps: [
+      'Set up the job with your board size and thickness. VCarve Desktop cuts jobs up to 24 by 24 inches.',
+      'Use "Import a Component or 3D Model", pick the STL, and set its size and position. Keep the flat base facing down.',
+      'Add a 3D Roughing toolpath, then a 3D Finishing toolpath.',
+      'To limit the cut to the carving, choose a machining boundary from a selected vector instead of the whole board.',
+    ],
+    note: 'Our designs are single STL files, so the one-model limit rarely matters. If you want lettering or a second design in the same panel, that is what Aspire adds.',
+  },
+  {
+    id: 'carveco', name: 'Carveco and Carveco Maker',
+    can: 'Yes. Carveco imports an STL as a 3D model and turns it into a relief you can scale, position and combine.',
+    steps: [
+      'Create a model at your board size and resolution.',
+      'Import the STL as a 3D model, size it, and paste it into the relief.',
+      'Machine it with a Machine Relief toolpath: a roughing pass, then a finishing pass with a ball nose.',
+      'To cut only the carving, select a vector boundary around it before you create the toolpath.',
+    ],
+  },
+  {
+    id: 'fusion', name: 'Autodesk Fusion (Fusion 360)',
+    can: 'Yes. Fusion inserts an STL as a mesh body and can create toolpaths on the mesh as a whole.',
+    steps: [
+      'In the design workspace use Insert Mesh. STL files carry no units, so choose millimetres when you insert ours.',
+      'Our meshes are detailed (often 1 to 2 million triangles). If Fusion becomes slow, reduce the mesh before you machine it.',
+      'In the Manufacture workspace, set up the stock and select the mesh body as the model.',
+      'Rough it, then finish with a ball nose. Finishing strategies such as Scallop and Flat suit meshes best, because individual faces and edges of a mesh cannot be selected.',
+    ],
+  },
+  {
+    id: 'artcam', name: 'ArtCAM',
+    can: 'Yes. ArtCAM imports STL files into a relief and machines them. Autodesk stopped selling it in 2018, but many machines still run it.',
+    steps: [
+      'Create a model at your board size and import the STL into the relief.',
+      'ArtCAM sees the whole rectangle as the relief, so it will machine the entire board unless you give it a boundary around the carving.',
+      'Make that boundary with our free outline tool (below), save it as DXF, import it, and machine inside the selected vector.',
+    ],
+  },
+];
+
+const FAQ = [
+  { q: 'Can VCarve use STL files?', a: 'Yes. VCarve Pro and VCarve Desktop import an STL as a 3D model and cut it with 3D roughing and finishing toolpaths. They cut the model but cannot edit it, and one STL fits in a job.' },
+  { q: 'Can Aspire import STL files?', a: 'Yes. Aspire imports any number of STL files into a job as 3D components, lets you resize, combine and edit them, and machines them with 3D roughing and finishing toolpaths.' },
+  { q: 'Can I use DigitalChiselCo STL files in Carveco Maker?', a: 'Yes. Import the STL as a 3D model, paste it into the relief, and machine it with a Machine Relief toolpath.' },
+  { q: 'Can Fusion 360 machine an STL relief?', a: 'Yes. Insert the STL as a mesh body in millimetres and create toolpaths on the mesh. Our files are detailed, so reduce the mesh first if Fusion slows down.' },
+  { q: 'Why does my CAM software cut the whole board?', a: 'Every relief sits on a flat backplate, so the software sees the full rectangle as the model. Draw or import a boundary around the carving and machine inside it. Our free outline tool makes that boundary as a DXF from the STL.' },
+  { q: 'Do I need Aspire to carve these files?', a: 'No. Every design opens in VCarve Pro, VCarve Desktop, Carveco, Fusion 360 and ArtCAM. Aspire adds 3D modelling and more than one model per job, which you only need if you combine or edit designs.' },
+  { q: 'What bits do I need?', a: 'A flat end mill around 6 mm (1/4 inch) for roughing and a 3 mm (1/8 inch) ball nose for finishing at about 10 percent stepover. A 1.5 mm ball nose as a rest-machining pass brings out the finest detail.' },
+];
+
+const faqLd = {
+  '@context': 'https://schema.org', '@type': 'FAQPage',
+  mainEntity: FAQ.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+};
+---
+<Shell
+  title="Open Our STL Files in Aspire, VCarve, Carveco, Fusion 360 or ArtCAM | DigitalChiselCo"
+  description="Can VCarve use STL files? Can Aspire import them? Yes. How to open and cut a bas-relief STL in Aspire, VCarve Pro and Desktop, Carveco, Fusion 360 and ArtCAM, step by step."
+>
+  <Breadcrumbs crumbs={[{ label: 'Opening STL files in your CAM software' }]} />
+  <script type="application/ld+json" set:html={jsonLd(faqLd)} />
+
+  <article class="max-w-3xl mx-auto pb-20 text-ink-700">
+    <p class="text-xs uppercase tracking-[0.18em] text-bronze-600 mb-2">Using our files</p>
+    <h1 class="font-serif text-3xl sm:text-4xl text-bronze-800 leading-tight" style="text-wrap: balance">Open our STL files in Aspire, VCarve, Carveco, Fusion 360 or ArtCAM</h1>
+
+    <p class="mt-4 text-[17px] leading-relaxed">
+      <strong>Every DigitalChiselCo design is a single binary STL file that opens in Vectric Aspire, VCarve Pro, VCarve Desktop, Carveco,
+      Fusion 360 and ArtCAM.</strong> Each file has a flat base sitting at zero and a measured size listed on its product page, so it drops
+      onto your board ready for a roughing pass and a ball-nose finishing pass. Below is what to do in each program.
+    </p>
+
+    <nav class="mt-6 flex flex-wrap gap-2 text-sm" aria-label="Jump to your software">
+      {PROGS.map((p) => <a href={`#${p.id}`} class="rounded-full border border-bronze-600/30 px-3 py-1 hover:bg-cream">{p.name.replace('Vectric ', '').replace(' and VCarve Desktop', '').replace(' and Carveco Maker', '').replace('Autodesk ', '')}</a>)}
+    </nav>
+
+    <h2 class="font-serif text-2xl text-bronze-800 mt-10 mb-3">Before you open it, whichever program you use</h2>
+    <ul class="list-disc pl-5 space-y-1.5 leading-relaxed">
+      <li><strong>Units:</strong> our files are in millimetres. STL files carry no units, so tell your software "millimetres" when it asks.</li>
+      <li><strong>Size:</strong> the product page lists the model's size as supplied. Scale it to your board with the proportions locked.</li>
+      <li><strong>Depth scales too:</strong> making a relief smaller also makes it shallower. <a href="/blog/how-to-scale-stl-files-for-cnc-routers" class="text-bronze-700 underline">How to scale without losing detail</a>.</li>
+      <li><strong>Check it first:</strong> <a href="/tools/will-it-cut" class="text-bronze-700 underline">Will it cut?</a> shows, in your browser, whether it fits your machine, what your bit will lose and roughly how long it takes.</li>
+    </ul>
+
+    {PROGS.map((p) => (
+      <section id={p.id} class="scroll-mt-24">
+        <h2 class="font-serif text-2xl text-bronze-800 mt-10 mb-2">{p.name}</h2>
+        <p class="leading-relaxed"><strong>Can it open STL files?</strong> {p.can}</p>
+        <ol class="list-decimal pl-5 mt-3 space-y-1.5 leading-relaxed">
+          {p.steps.map((s) => <li>{s}</li>)}
+        </ol>
+        {p.note && <p class="mt-3 text-sm text-ink-700/75">{p.note}</p>}
+      </section>
+    ))}
+
+    <h2 class="font-serif text-2xl text-bronze-800 mt-12 mb-3">Bits and settings that suit these files</h2>
+    <ul class="list-disc pl-5 space-y-1.5 leading-relaxed">
+      <li><strong>Roughing:</strong> a flat end mill around 6 mm (1/4 inch), stepover about 40 percent.</li>
+      <li><strong>Finishing:</strong> a 3 mm (1/8 inch) ball nose at about 10 percent stepover. <a href="/blog/cnc-relief-stepover-guide" class="text-bronze-700 underline">What stepover buys you</a>.</li>
+      <li><strong>Finest detail:</strong> a 1.5 mm ball nose as a rest-machining pass, only where the 3 mm bit could not reach. <a href="/blog/3mm-vs-1-5mm-ball-nose-relief-carving" class="text-bronze-700 underline">3 mm vs 1.5 mm, measured</a>.</li>
+      <li><strong>Only the carving, not the whole board:</strong> make a boundary around it with the free <a href="/tools/will-it-cut#outlinePanel" class="text-bronze-700 underline">outline tool</a> and save it as DXF.</li>
+    </ul>
+    <p class="mt-3 text-sm text-ink-700/70">Feeds, speeds and depth of cut depend on your machine, spindle and wood; start from your bit maker's figures.</p>
+
+    <h2 class="font-serif text-2xl text-bronze-800 mt-12 mb-3">Common questions</h2>
+    <div class="space-y-4">
+      {FAQ.map((f) => (
+        <div>
+          <h3 class="font-medium text-ink-900">{f.q}</h3>
+          <p class="mt-1 leading-relaxed">{f.a}</p>
+        </div>
+      ))}
+    </div>
+
+    <p class="mt-10 leading-relaxed">
+      Choosing which program to buy is a different question, answered in
+      <a href="/blog/aspire-vcarve-carveco-fusion-360-comparison" class="text-bronze-700 underline">Aspire vs VCarve vs Carveco vs Fusion 360</a>.
+      New to relief carving? <a href="/blog/first-cnc-relief-carving-step-by-step" class="text-bronze-700 underline">Your first relief carving, start to finish</a>.
+    </p>
+
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a href="/catalog" class="inline-block bg-bronze-600 text-cream font-medium px-5 py-2.5 rounded-lg hover:bg-bronze-700">Browse the designs</a>
+      <a href="/free" class="inline-block border border-bronze-600/40 text-bronze-800 font-medium px-5 py-2.5 rounded-lg hover:bg-cream">Get 5 free STL files</a>
+    </div>
+  </article>
+</Shell>

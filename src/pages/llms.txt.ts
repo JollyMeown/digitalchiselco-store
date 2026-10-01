@@ -56,6 +56,7 @@ export const GET: APIRoute = async () => {
   lines.push('');
   lines.push('## Free tools');
   lines.push(`- [Will it cut?](${SITE}/tools/will-it-cut): check any STL in the browser before carving: depth, orientation, detail lost per bit, carve time, roughing and finishing simulation. Nothing is uploaded.`);
+  lines.push(`- [Stepover and scallop calculator](${SITE}/tools/stepover-calculator): ridge height, passes and finishing time for any ball nose and stepover, and the coarsest stepover whose ridges sand out.`);
   lines.push(`- [State of CNC Relief Carving 2026](${SITE}/reports/state-of-cnc-relief-carving-2026): data report on what carvers buy and make`);
   lines.push(`- [Laser Studio](${SITE}/laser-studio): Windows app that turns photos, STL models and star maps into laser files, and lines up a burn on a CNC carving (CNC Match)`);
   lines.push('');
@@ -66,6 +67,8 @@ export const GET: APIRoute = async () => {
   lines.push(`- [FAQ](${SITE}/faq)`);
   lines.push(`- [Refund policy](${SITE}/refunds)`);
   lines.push(`- [Commercial-use licence: what you can sell](${SITE}/license)`);
+  lines.push(`- [Opening our STL files in Aspire, VCarve, Carveco, Fusion 360 or ArtCAM](${SITE}/cam-software)`);
+  lines.push(`- [Carved by you](${SITE}/carved-by-you): real carvings makers made from our files, with their photos, clips and notes`);
   lines.push(`- [Terms and licence](${SITE}/terms)`);
   lines.push(`- [Contact](${SITE}/contact)`);
   lines.push('');

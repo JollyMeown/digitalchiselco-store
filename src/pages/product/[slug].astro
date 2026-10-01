@@ -168,6 +168,31 @@ const jsonld: any = {
   sku: p.etsy_listing_id, brand: { '@type': 'Brand', name: 'DigitalChiselCo' },
   offers: { '@type': 'Offer', price, priceCurrency: 'USD', availability: 'https://schema.org/InStock', url: Astro.url.href },
 };
+// The design facts printed on the page, as machine-readable properties
+// (2026-10-01): AI answers and shopping engines quote structured facts far more
+// readily than prose. Only values the page itself shows, from the measured
+// model_specs (1,471 of 2,266 designs); the rest get the facts true of every file.
+{
+  const s = p.model_specs, r1 = (n: any) => Math.round(Number(n) * 10) / 10;
+  const prop = (name: string, value: string) => ({ '@type': 'PropertyValue', name, value });
+  const props = [
+    prop('File format', 'STL (binary), digital download'),
+    prop('Compatible software', 'Aspire, VCarve Pro, Carveco, ArtCAM, Fusion 360 and any STL-capable CAM software'),
+    prop('Use', 'CNC router relief carving, 3D printing, laser engraving'),
+    prop('Licence', 'Commercial use of the physical pieces you make is included; the file itself may not be shared or resold'),
+  ];
+  if (s && s.width && s.height && s.depth) {
+    props.push(prop('Model size as supplied', `${r1(s.width)} x ${r1(s.height)} x ${r1(s.depth)} mm (scale to your panel)`));
+    if (s.depth_pct_of_width) props.push(prop('Relief depth', `${s.depth_pct_of_width}% of the width`));
+    if (s.triangles) props.push(prop('Mesh', `${Number(s.triangles).toLocaleString('en-US')} triangles`));
+    if (s.base_flat) props.push(prop('Base', 'Flat and sitting at zero, ready to machine'));
+    if (s.recommended_size_mm) props.push(prop('Smallest size worth carving', `${s.recommended_size_mm} mm${s.bit_mm ? ` with a ${s.bit_mm} mm ball nose` : ''}`));
+    const q = (v: any) => ({ '@type': 'QuantitativeValue', value: r1(v), unitCode: 'MMT' });
+    jsonld.width = q(s.width); jsonld.height = q(s.height); jsonld.depth = q(s.depth);
+  }
+  jsonld.additionalProperty = props;
+  jsonld.category = cat ? `${cat.name} > Bas-relief STL file` : 'Bas-relief STL file';
+}
 // Star-rating rich snippet — ONLY from genuine on-site reviews for THIS product
 // (Google-safe: reviews are visible on the page and product-specific). Stars
 // appear in search results as reviews accumulate.
@@ -542,6 +567,7 @@ const breadcrumbLd = {
             that reads STL. No OBJ or DXF: a DXF holds flat 2D outlines and cannot carry a three-dimensional relief at all.
             Scale it to whatever panel you are cutting. Scaling all three axes together keeps the depth in proportion;
             scale Z on its own for a shallower carve.
+            <a href="/cam-software" class="text-bronze-700 underline">How to open it in your software</a>.
           </p>
         </div>
       )}

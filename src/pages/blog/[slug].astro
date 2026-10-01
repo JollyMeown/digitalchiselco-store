@@ -130,7 +130,9 @@ const bodyParts = (safeBody.includes(CALC_MARK) ? safeBody.split(CALC_MARK, 2) :
     <header class="mb-8">
       <h1 class="font-serif text-3xl md:text-4xl text-bronze-800 leading-tight">{post.title}</h1>
       <div class="mt-3 text-sm text-ink-700/60">
-        {post.author && <span>{post.author}</span>}
+        {post.author && (/^jolly$/i.test(String(post.author).trim())
+          ? <a href="/about#jolly" rel="author" class="hover:underline">{post.author}</a>
+          : <span>{post.author}</span>)}
         {post.published_at && <span> · {fmt(post.published_at)}</span>}
         {revised && <span> · updated {fmt(post.updated_at)}</span>}
         <span> · {minutes} min read</span>
@@ -270,7 +272,10 @@ const bodyParts = (safeBody.includes(CALC_MARK) ? safeBody.split(CALC_MARK, 2) :
     wordCount: words,
     url: `https://digitalchiselco.com/blog/${post.slug}`,
     mainEntityOfPage: { '@type': 'WebPage', '@id': `https://digitalchiselco.com/blog/${post.slug}` },
-    author: { '@type': 'Person', name: post.author || 'DigitalChiselCo' },
-    publisher: { '@type': 'Organization', name: 'DigitalChiselCo', logo: { '@type': 'ImageObject', url: 'https://digitalchiselco.com/og-default.jpg' } },
+    // Jolly's byline points to one identity, the founder described on /about (2026-10-01)
+    author: /^jolly$/i.test(String(post.author || 'Jolly').trim())
+      ? { '@type': 'Person', '@id': 'https://digitalchiselco.com/about#jolly', name: 'Jolly', jobTitle: 'Founder and designer, DigitalChiselCo', url: 'https://digitalchiselco.com/about#jolly' }
+      : { '@type': 'Person', name: post.author },
+    publisher: { '@type': 'Organization', '@id': 'https://digitalchiselco.com#org', name: 'DigitalChiselCo', url: 'https://digitalchiselco.com', logo: { '@type': 'ImageObject', url: 'https://digitalchiselco.com/og-default.jpg' } },
   })} />
 </Shell>
