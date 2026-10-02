@@ -1,0 +1,710 @@
+---
+// Broken STL Auto-Repair: drop a broken STL, OBJ or 3MF, get it back repaired
+// for the machine that will make it (owner's brief, 2026-10-02).
+//
+// Same footing as "Will it cut?": free, no signup, works on any file from
+// anywhere, and runs entirely in the visitor's browser (a Web Worker), so the
+// file is never uploaded and the tool costs nothing to run.
+//
+// The innovation the brief asked for is repairing FOR A MACHINE: a router
+// needs a 2.5D relief, a printer a closed 3D solid, a laser a depth image.
+// Every "Ready" badge is earned by re-checking the repaired file with the same
+// checks that found the problems; what cannot be fixed automatically is shown.
+import Shell from '../../layouts/Shell.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { jsonLd } from '../../lib/jsonld';
+import ProductCard from '../../components/ProductCard.astro';
+import { getProducts } from '../../lib/queries';
+
+let picks: any[] = [];
+try { picks = (await getProducts(1, 8, 'best'))?.products ?? []; } catch {}
+
+const FAQ = [
+  { q: 'Is my file uploaded anywhere?', a: 'No. The repair runs inside this page, in your browser. There is no server to send it to. Load the page, switch off your wifi and it still works.' },
+  { q: 'Why does the result depend on the machine I pick?', a: 'Because each machine needs something different. A CNC router can only reach what it sees from above, so the file is rebuilt as a clean 2.5D relief with a flat back. A printer needs a closed 3D solid with the faces pointing outwards and a flat side on the bed. A laser burns from a greyscale image, not from an STL, so it gets a depth map.' },
+  { q: 'What does it fix automatically?', a: 'Holes, non-manifold edges, repeated and broken triangles, inside-out faces, hairline cracks, loose fragments, open surfaces with no thickness, wrong units, the wrong side facing down, and triangle counts too large for the job. For CNC and laser the rebuild also removes undercuts and faces that pass through each other.' },
+  { q: 'What does it not fix?', a: 'For printing, faces that pass through each other are left for the slicer, which merges overlapping volumes when it slices, and walls that are too thin are flagged rather than thickened, because thickening changes the design. Both are counted in the results so you know they are there.' },
+  { q: 'Can I trust "CNC ready" and "Slicer ready"?', a: 'They are only shown when the repaired file passes the same checks that found the problems: no holes, no bad edges, no broken or repeated triangles, every face pointing outwards. If something is still wrong, the badge is not shown and the row stays red.' },
+  { q: 'My file is in inches', a: 'STL files carry no units, which is why a model often arrives 25.4 times too small. If the size looks like inches, the tool converts it and says so; change it under Options. 3MF files do record their units, and those are used as they are.' },
+  { q: 'How big a file can it handle?', a: 'Files of about two million triangles work on an ordinary computer and take under a minute. The check for faces crossing each other is skipped above 700,000 triangles, and the results say when it was skipped.' },
+];
+
+const ld = jsonLd([
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'Broken STL Auto-Repair',
+    url: 'https://digitalchiselco.com/tools/stl-repair',
+    applicationCategory: 'DesignApplication',
+    operatingSystem: 'Any browser',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    description: 'Free STL, OBJ and 3MF repair that runs in your browser: finds and fixes holes, non-manifold edges, inside-out faces, loose fragments, wrong units and orientation, and repairs for the machine you will use: CNC router, FDM printer, resin printer or laser.',
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+  },
+]);
+---
+<Shell
+  title="Broken STL Auto-Repair: fix STL, OBJ and 3MF files free · DigitalChiselCo"
+  description="Repair a broken STL, OBJ or 3MF for the machine that will make it: CNC router, FDM printer, resin printer or laser. Fixes holes, bad edges, inside-out faces, units and orientation. Free, no signup, and your file never leaves your computer."
+  fullWidth={true}
+>
+  <script type="application/ld+json" set:html={ld} />
+
+  <div class="rep">
+    <div class="rep-wrap">
+      <Breadcrumbs crumbs={[{ label: 'Tools', href: '/tools' }, { label: 'STL Auto-Repair' }]} />
+
+      <header class="rep-hero">
+        <h1>Broken STL Auto-Repair</h1>
+        <p class="lede">
+          Drop in a broken STL, OBJ or 3MF. It finds the holes, bad edges, inside-out faces and loose bits,
+          then repairs the file <strong>for the machine that will make it</strong>.
+        </p>
+        <p class="privacy">
+          <strong>Your file never leaves your computer.</strong> Everything runs inside this page. There is
+          no upload and no signup.
+        </p>
+      </header>
+
+      <!-- ── step 1: machine ─────────────────────────────────────────── -->
+      <section class="step">
+        <h2><span class="n">1</span> What will make it?</h2>
+        <div class="modes" role="radiogroup" aria-label="Machine">
+          <button class="mode on" type="button" role="radio" aria-checked="true" data-mode="cnc">
+            <b>CNC router</b>
+            <span>Rebuilt as a clean 2.5D relief: watertight, no undercuts, flat back.</span>
+          </button>
+          <button class="mode" type="button" role="radio" aria-checked="false" data-mode="fdm">
+            <b>FDM print</b>
+            <span>Closed and manifold, faces outwards, flat side down, walls under 0.8 mm flagged.</span>
+          </button>
+          <button class="mode" type="button" role="radio" aria-checked="false" data-mode="resin">
+            <b>Resin print</b>
+            <span>The same repair with resin limits: walls under 0.3 mm flagged, up to 2 million triangles.</span>
+          </button>
+          <button class="mode" type="button" role="radio" aria-checked="false" data-mode="laser">
+            <b>Laser relief</b>
+            <span>A greyscale depth map your laser software burns in 3D, plus the solid STL.</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ── step 2: file ────────────────────────────────────────────── -->
+      <section class="step">
+        <h2><span class="n">2</span> Drop your file</h2>
+        <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose an STL, OBJ or 3MF file, or drop one here">
+          <input id="file" type="file" accept=".stl,.obj,.3mf,model/stl,model/obj,model/3mf" hidden />
+          <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke-linecap="round"/>
+          </svg>
+          <p class="drop-t">Drop an STL, OBJ or 3MF here, or click to choose</p>
+          <p class="drop-s">Up to about two million triangles on an ordinary computer.</p>
+        </div>
+        <div id="progress" class="progress" hidden><div id="bar"></div><span id="ptext">Reading…</span></div>
+        <p id="err" class="err" hidden></p>
+      </section>
+
+      <!-- ── results ─────────────────────────────────────────────────── -->
+      <div id="out" hidden>
+        <section class="score">
+          <div class="score-n">
+            <div><span class="lbl">Original</span><b id="nBefore">0</b><span id="nBeforeL" class="sub">issues</span></div>
+            <span class="arrow" aria-hidden="true">→</span>
+            <div><span class="lbl">Repaired</span><b id="nAfter">0</b><span id="nAfterL" class="sub">issues</span></div>
+          </div>
+          <ul id="badges" class="badges"></ul>
+          <div class="dl">
+            <a id="dlStl" class="btn" download>Download repaired STL</a>
+            <a id="dlPng" class="btn ghost" download hidden>Download depth map (PNG)</a>
+          </div>
+          <p id="fileLine" class="file-line"></p>
+        </section>
+
+        <section class="panel">
+          <div class="view-head">
+            <div class="seg" role="tablist" aria-label="Which model to show">
+              <button type="button" class="on" data-show="before" role="tab" aria-selected="true">Original</button>
+              <button type="button" data-show="after" role="tab" aria-selected="false">Repaired</button>
+            </div>
+            <label class="chk"><input id="showIssues" type="checkbox" checked /> Mark the problems</label>
+          </div>
+          <div class="viewer">
+            <canvas id="cv" aria-label="3D preview of the model. Drag to turn, scroll to zoom."></canvas>
+            <p id="noGl" class="nogl" hidden>Your browser cannot show the 3D preview, but the repair and the download work as normal.</p>
+          </div>
+          <p class="legend">
+            Drag to turn, scroll to zoom, double-click to reset.
+            <span><i style="background:#d62828"></i>holes</span>
+            <span><i style="background:#f08c00"></i>bad edges</span>
+            <span><i style="background:#7b2cbf"></i>crossing faces</span>
+            <span><i style="background:#f4a6c4"></i>inside-out or open (seen from behind)</span>
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2>What was found, and what is left</h2>
+          <div class="tbl-wrap">
+            <table class="issues">
+              <thead><tr><th>Check</th><th class="num">Original</th><th class="num">Repaired</th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel two-col">
+          <div>
+            <h2>What was done</h2>
+            <ul id="actions" class="ticks"></ul>
+          </div>
+          <div id="notesWrap">
+            <h2>Worth knowing</h2>
+            <ul id="notes" class="notes"></ul>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Options</h2>
+          <div class="fields">
+            <label class="f"><span>Units in the file
+              <button class="tip" type="button" data-tip="STL files do not record units. If your model came out 25.4 times too small, it was saved in inches.">?</button></span>
+              <select id="units">
+                <option value="1">Millimetres (as is)</option>
+                <option value="25.4">Inches (x25.4)</option>
+                <option value="10">Centimetres (x10)</option>
+                <option value="1000">Metres (x1000)</option>
+                <option value="0.1">Tenths of a mm (x0.1)</option>
+                <option value="0.001">Microns (x0.001)</option>
+              </select>
+            </label>
+            <label class="f only-relief"><span>Detail of the rebuild
+              <button class="tip" type="button" data-tip="How finely the surface is sampled when it is rebuilt as a relief. Finer keeps smaller details and takes longer. Flat areas are merged either way, so the file stays light.">?</button></span>
+              <select id="detail">
+                <option value="standard">Standard</option>
+                <option value="fine">Fine</option>
+                <option value="max">Maximum (slow)</option>
+              </select>
+            </label>
+            <label class="f only-relief"><span>Extra backing (mm)
+              <button class="tip" type="button" data-tip="Solid material added under the relief. Open surfaces with no back get 2 mm automatically.">?</button></span>
+              <input id="backing" type="number" min="0" max="50" step="0.5" value="0" />
+            </label>
+            <label class="f only-print"><span>Rebuild as a solid relief
+              <button class="tip" type="button" data-tip="For a plaque or panel that is only a surface, rebuilding gives a solid with a flat back. Auto does it only when the file is an open surface.">?</button></span>
+              <select id="relief">
+                <option value="auto">Auto</option>
+                <option value="on">Always</option>
+                <option value="off">Never</option>
+              </select>
+            </label>
+            <label class="f only-laser"><span>Depth map resolution</span>
+              <select id="dpi">
+                <option value="127">127 DPI (0.2 mm)</option>
+                <option value="254" selected>254 DPI (0.1 mm)</option>
+                <option value="318">318 DPI (0.08 mm)</option>
+                <option value="508">508 DPI (0.05 mm)</option>
+              </select>
+            </label>
+            <label class="f only-laser"><span>Around the design</span>
+              <select id="bg">
+                <option value="white">Leave unburned (white)</option>
+                <option value="black">Burn to the deepest level (black)</option>
+              </select>
+            </label>
+            <label class="chk only-laser"><input id="invert" type="checkbox" /> Invert (white burns deeper)</label>
+            <label class="chk"><input id="debris" type="checkbox" checked /> Remove loose fragments</label>
+          </div>
+          <button id="again" class="btn" type="button" disabled>Repair again with these options</button>
+        </section>
+
+        <p class="next">
+          Making it on a router? Check the repaired file in <a href="/tools/will-it-cut">Will it cut?</a> for bit sizes and
+          cut time. Burning it on a laser? <a href="/laser-studio">Laser Studio</a> turns depth maps and photos into finished
+          laser files.
+        </p>
+      </div>
+
+      <section class="panel faq">
+        <h2>Questions people ask</h2>
+        {FAQ.map((f) => <details><summary>{f.q}</summary><p>{f.a}</p></details>)}
+      </section>
+
+      {picks.length > 0 && (
+        <section class="shop">
+          <div class="shop-head">
+            <h2>Files that need no repair</h2>
+            <p>Every design here is checked watertight with a flat back before it is released. Drop any of them in above and see.</p>
+          </div>
+          <div class="shop-grid">
+            {picks.map((p: any) => <ProductCard product={p} />)}
+          </div>
+          <div class="shop-more">
+            <a class="btn" href="/catalog">Browse all designs</a>
+            <a class="btn ghost" href="/free">Free files</a>
+          </div>
+        </section>
+      )}
+
+      <p class="foot">
+        Built by <a href="/">DigitalChiselCo</a>. If it gets your file wrong, <a href="/contact">tell us</a> and we will
+        look at it. More free tools on the <a href="/tools">tools page</a>.
+      </p>
+    </div>
+  </div>
+  <div id="tipbox" class="tipbox" hidden role="tooltip"></div>
+</Shell>
+
+<script>
+  import type { Mode, Report } from '../../lib/stl-repair';
+
+  const $ = (id: string) => document.getElementById(id)!;
+  const fmt = (n: number) => n.toLocaleString('en-US');
+
+  // ── tooltips (same pattern as Will it cut?) ──────────────────────────
+  const tipbox = $('tipbox');
+  let openTip: HTMLElement | null = null;
+  const closeTip = () => { tipbox.hidden = true; openTip = null; };
+  document.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('.tip') as HTMLElement | null;
+    if (!b) { if (!tipbox.contains(e.target as Node)) closeTip(); return; }
+    e.preventDefault();
+    if (openTip === b) return closeTip();
+    tipbox.textContent = b.dataset.tip || '';
+    tipbox.hidden = false;
+    const r = b.getBoundingClientRect();
+    const w = Math.min(320, window.innerWidth - 24);
+    tipbox.style.width = w + 'px';
+    tipbox.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + 'px';
+    tipbox.style.top = (window.scrollY + r.bottom + 8) + 'px';
+    openTip = b;
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTip(); });
+
+  // ── state ────────────────────────────────────────────────────────────
+  let mode: Mode = 'cnc';
+  let loaded = false, running = false, pending = false;
+  let fileBase = 'model';
+  let meta: any = null;
+  let runId = 0;
+  // The engine (about 200 kB with the simplifier) loads with the first file,
+  // not with the page, so a visitor who only reads costs nothing.
+  let worker: Worker | null = null;
+  function engine() {
+    if (!worker) {
+      worker = new Worker(new URL('../../lib/stl-repair.worker.ts', import.meta.url), { type: 'module' });
+      worker.onmessage = onEngine;
+      worker.onerror = () => fail('The repair engine could not start in this browser. Try a current Chrome, Edge, Firefox or Safari.');
+    }
+    return worker;
+  }
+
+  const RELIEF = (m: Mode) => m === 'cnc' || m === 'laser';
+  function syncOptionVisibility() {
+    document.querySelectorAll<HTMLElement>('.only-relief').forEach((el) => (el.hidden = !RELIEF(mode)));
+    document.querySelectorAll<HTMLElement>('.only-print').forEach((el) => (el.hidden = RELIEF(mode)));
+    document.querySelectorAll<HTMLElement>('.only-laser').forEach((el) => (el.hidden = mode !== 'laser'));
+  }
+  syncOptionVisibility();
+
+  document.querySelectorAll<HTMLButtonElement>('.mode').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll<HTMLButtonElement>('.mode').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); });
+    mode = b.dataset.mode as Mode;
+    syncOptionVisibility();
+    if (loaded) run();
+  }));
+
+  function options() {
+    return {
+      mode,
+      unitFactor: Number(($('units') as HTMLSelectElement).value) || 1,
+      removeDebris: ($('debris') as HTMLInputElement).checked,
+      relief: ($('relief') as HTMLSelectElement).value,
+      detail: ($('detail') as HTMLSelectElement).value,
+      backing: Math.max(0, Number(($('backing') as HTMLInputElement).value) || 0),
+      laser: { dpi: Number(($('dpi') as HTMLSelectElement).value), background: ($('bg') as HTMLSelectElement).value, invert: ($('invert') as HTMLInputElement).checked },
+    };
+  }
+  document.querySelectorAll('#out .fields select, #out .fields input').forEach((el) => el.addEventListener('change', () => { ($('again') as HTMLButtonElement).disabled = !loaded; }));
+  $('again').addEventListener('click', () => { ($('again') as HTMLButtonElement).disabled = true; run(); });
+
+  // ── file intake ──────────────────────────────────────────────────────
+  const drop = $('drop'), input = $('file') as HTMLInputElement;
+  drop.addEventListener('click', () => input.click());
+  drop.addEventListener('keydown', (e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', (e: any) => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer?.files?.[0]) load(e.dataTransfer.files[0]); });
+  input.addEventListener('change', () => { if (input.files?.[0]) load(input.files[0]); input.value = ''; });
+
+  function setProgress(p: number, label?: string) {
+    $('progress').hidden = false;
+    ($('bar') as HTMLElement).style.width = Math.round(p * 100) + '%';
+    if (label) $('ptext').textContent = label;
+  }
+  function fail(message: string) {
+    running = false;
+    $('progress').hidden = true;
+    $('err').hidden = false;
+    $('err').textContent = message;
+  }
+
+  async function load(file: File) {
+    if (!/\.(stl|obj|3mf)$/i.test(file.name)) return fail('Choose an STL, OBJ or 3MF file.');
+    $('err').hidden = true;
+    $('out').hidden = true;
+    loaded = false;
+    fileBase = file.name.replace(/\.[^.]+$/, '') || 'model';
+    setProgress(0.01, `Reading ${file.name}…`);
+    const buf = await file.arrayBuffer();
+    engine().postMessage({ type: 'load', buf, name: file.name }, [buf]);
+  }
+
+  // units: suggested from the size, as the engine judges it
+  function suggestUnits(L: number) {
+    if (L < 1) return 1000;
+    if (L < 10) return 25.4;
+    if (L > 3000) return L / 1000 >= 10 ? 0.001 : 0.1;
+    return 1;
+  }
+
+  function run() {
+    if (!loaded) return;
+    if (running) { pending = true; return; }
+    running = true; pending = false;
+    $('err').hidden = true;
+    setProgress(0.01, 'Checking…');
+    engine().postMessage({ type: 'run', id: ++runId, opts: options() });
+  }
+
+  let previews: { before: any; after: any } = { before: null, after: null };
+  let overlays: { before: any; after: any } = { before: null, after: null };
+  let show: 'before' | 'after' = 'after';
+
+  function onEngine(e: MessageEvent) {
+    const m = e.data;
+    if (m.type === 'progress') { setProgress(m.p, m.label); return; }
+    if (m.type === 'error') { fail(m.message); return; }
+    if (m.type === 'loaded') {
+      meta = m.meta;
+      previews.before = m.preview;
+      loaded = true;
+      const unitSel = $('units') as HTMLSelectElement;
+      unitSel.value = meta.unit ? '1' : String(suggestUnits(meta.fileMaxDim));
+      if (!unitSel.value) unitSel.value = '1';
+      run();
+      return;
+    }
+    if (m.type === 'done') {
+      running = false;
+      $('progress').hidden = true;
+      previews.after = m.preview;
+      overlays = { before: m.beforeOverlay, after: m.afterOverlay };
+      render(m);
+      if (pending) run();
+    }
+  }
+
+  // ── results ──────────────────────────────────────────────────────────
+  type Row = { label: string; tip: string; val: (r: Report) => string; bad: (r: Report) => boolean; when?: (m: Mode) => boolean };
+  const n = (x: number) => (x === 0 ? 'none' : fmt(x));
+  const ROWS: Row[] = [
+    { label: 'Holes', tip: 'Gaps in the surface. A watertight model has none. Software can produce strange toolpaths or slices, or refuse the file.', val: (r) => n(r.holes), bad: (r) => r.holes > 0 },
+    { label: 'Non-manifold edges', tip: 'Edges shared by more than two triangles, usually where parts were joined badly. Software cannot tell inside from outside there.', val: (r) => n(r.nonManifold), bad: (r) => r.nonManifold > 0 },
+    { label: 'Repeated triangles', tip: 'The same triangle stored twice, or two triangles back to back with nothing between them.', val: (r) => n(r.duplicates), bad: (r) => r.duplicates > 0 },
+    { label: 'Broken triangles', tip: 'Triangles with no area: their corners sit on one line.', val: (r) => n(r.bad), bad: (r) => r.bad > 0 },
+    { label: 'Inside-out faces', tip: 'Faces pointing into the model instead of out of it. They show pink in the preview.', val: (r) => n(r.flipped), bad: (r) => r.flipped > 0 },
+    { label: 'Faces crossing each other', tip: 'Parts of the surface that pass through other parts. Rebuilt reliefs cannot have any. Slicers merge them when they slice.', val: (r) => (r.selfX < 0 ? 'not checked (file too large)' : n(r.selfX)), bad: (r) => r.selfX > 0 },
+    { label: 'Loose fragments', tip: 'Tiny separate bits too small to make, usually left over from editing.', val: (r) => n(r.debris), bad: (r) => r.debris > 0 },
+    { label: 'Zero thickness', tip: 'An open surface with nothing behind it, like a sheet of paper. It cannot be cut or printed as it is.', val: (r) => (r.sheet ? 'open surface' : 'none'), bad: (r) => r.sheet },
+    { label: 'Thin walls', tip: 'Share of the surface where the wall is thinner than this process can make reliably. Measured by casting rays inwards from the surface.', val: (r) => (r.thin.checked ? (r.thin.pct >= 0.1 ? `${r.thin.pct}% under ${r.thin.limit} mm` : `none under ${r.thin.limit} mm`) : 'n/a'), bad: (r) => r.thin.checked && r.thin.pct >= 1, when: (m) => !RELIEF(m) },
+    { label: 'Triangles', tip: 'More triangles than the job needs makes software slow or makes it fail. Limits used: 2 million for CNC, laser and resin, 1 million for FDM.', val: (r) => fmt(r.triangles) + (r.highPoly ? ' (too many)' : ''), bad: (r) => r.highPoly },
+    { label: 'Units', tip: 'STL files do not record units. A model under 10 mm or over 3 m was probably saved in inches, metres or microns.', val: (r) => (r.units.suspect ? 'probably not millimetres' : 'millimetres'), bad: (r) => r.units.suspect },
+    { label: 'Orientation', tip: 'For CNC and laser the flat back must face down. For printing the largest flat face goes on the bed.', val: (r) => (r.orient.ok ? 'right way up' : 'needs turning'), bad: (r) => !r.orient.ok },
+    { label: 'Base', tip: 'For CNC and laser: a flat back. For printing: enough of the model touching the bed.', val: (r) => (r.base.ok ? 'fine' : r.base.note || 'problem'), bad: (r) => !r.base.ok },
+  ];
+
+  const clean = (r: Report) => r.holes === 0 && r.nonManifold === 0 && r.duplicates === 0 && r.bad === 0 && r.flipped === 0 && !r.sheet;
+
+  function render(m: any) {
+    const b: Report = m.before, a: Report = m.after;
+    $('out').hidden = false;
+    $('nBefore').textContent = fmt(b.total);
+    $('nBeforeL').textContent = b.total === 1 ? 'issue' : 'issues';
+    $('nAfter').textContent = fmt(a.total);
+    $('nAfterL').textContent = a.total === 1 ? 'issue left' : 'issues left';
+    $('nAfter').className = a.total === 0 ? 'good' : '';
+
+    // badges: earned by the re-check, never assumed
+    const badges: [string, 'ok' | 'warn' | 'no'][] = [];
+    if (RELIEF(mode)) {
+      const ok = clean(a) && a.orient.ok && a.base.ok && !a.highPoly && a.selfX <= 0;
+      badges.push([ok ? 'CNC ready' : 'Not CNC ready yet', ok ? 'ok' : 'no']);
+      if (mode === 'laser') badges.push([m.png ? 'Laser depth map ready' : 'No depth map', m.png ? 'ok' : 'no']);
+    } else {
+      const ok = clean(a) && !a.highPoly;
+      badges.push([ok ? 'Slicer ready' : 'Not slicer ready yet', ok ? 'ok' : 'no']);
+      if (a.thin.checked && a.thin.pct >= 1) badges.push([`Check thin walls (${a.thin.pct}%)`, 'warn']);
+      if (!a.base.ok) badges.push(['Needs a brim or supports', 'warn']);
+      if (a.selfX > 0) badges.push(['Overlaps left for the slicer', 'warn']);
+    }
+    $('badges').innerHTML = badges.map(([t, k]) => `<li class="b-${k}">${k === 'ok' ? '✓ ' : k === 'warn' ? '! ' : ''}${t}</li>`).join('');
+
+    const rows = ROWS.filter((r) => !r.when || r.when(mode));
+    $('rows').innerHTML = rows.map((r) => {
+      const bb = r.bad(b), ab = r.bad(a);
+      return `<tr><th scope="row">${r.label} <button class="tip" type="button" data-tip="${r.tip.replace(/"/g, '&quot;')}">?</button></th>`
+        + `<td class="num ${bb ? 'is-bad' : ''}">${r.val(b)}</td>`
+        + `<td class="num ${ab ? 'is-bad' : bb ? 'is-fixed' : ''}">${ab ? '' : bb ? '✓ ' : ''}${r.val(a)}</td></tr>`;
+    }).join('');
+
+    $('actions').innerHTML = (m.actions.length ? m.actions : ['Nothing needed fixing.']).map((t: string) => `<li>${t}</li>`).join('');
+    $('notes').innerHTML = m.notes.map((t: string) => `<li>${t}</li>`).join('');
+    $('notesWrap').hidden = !m.notes.length;
+
+    // downloads
+    const tag = mode === 'cnc' ? 'cnc' : mode === 'laser' ? 'laser' : mode;
+    const stlUrl = URL.createObjectURL(new Blob([m.stl], { type: 'model/stl' }));
+    const dl = $('dlStl') as HTMLAnchorElement;
+    if (dl.href.startsWith('blob:')) URL.revokeObjectURL(dl.href);
+    dl.href = stlUrl; dl.download = `${fileBase}-repaired-${tag}.stl`;
+    const dp = $('dlPng') as HTMLAnchorElement;
+    if (dp.href.startsWith('blob:')) URL.revokeObjectURL(dp.href);
+    if (m.png) {
+      dp.hidden = false;
+      dp.href = URL.createObjectURL(new Blob([m.png.data], { type: 'image/png' }));
+      dp.download = `${fileBase}-depth-map-${Math.round(m.png.dpi)}dpi.png`;
+      dp.textContent = `Download depth map (${m.png.w} x ${m.png.h} PNG)`;
+    } else dp.hidden = true;
+    const s = a.size.map((v: number) => v.toFixed(1)).join(' x ');
+    $('fileLine').textContent = `${meta.name} (${meta.format}, ${fmt(meta.triangles)} triangles) → repaired: ${s} mm, ${fmt(a.triangles)} triangles${a.volume > 0 ? `, ${a.volume.toFixed(1)} cm³` : ''}.`;
+
+    setView(show);
+    $('out').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── 3D preview (plain WebGL, no library) ────────────────────────────
+  const cv = $('cv') as HTMLCanvasElement;
+  const gl = cv.getContext('webgl', { antialias: true }) as WebGLRenderingContext | null;
+  if (!gl) { $('noGl').hidden = false; cv.hidden = true; }
+
+  const VS = `attribute vec3 p; attribute vec3 n; uniform mat4 mvp; uniform mat4 rot; varying vec3 vn;
+    void main(){ vn = (rot * vec4(n, 0.0)).xyz; gl_Position = mvp * vec4(p, 1.0); }`;
+  const FS = `precision mediump float; varying vec3 vn; uniform vec3 base; uniform vec3 back;
+    void main(){ vec3 N = normalize(vn);
+      if (!gl_FrontFacing) { gl_FragColor = vec4(back * (0.75 + 0.25 * abs(N.z)), 1.0); return; }
+      float l = 0.28 + 0.62 * max(dot(N, normalize(vec3(-0.35, 0.55, 0.75))), 0.0) + 0.18 * max(dot(N, normalize(vec3(0.6, -0.4, 0.35))), 0.0);
+      gl_FragColor = vec4(base * l, 1.0); }`;
+  const LVS = `attribute vec3 p; uniform mat4 mvp; void main(){ gl_Position = mvp * vec4(p, 1.0); gl_Position.z -= 0.002 * gl_Position.w; }`;
+  const LFS = `precision mediump float; uniform vec3 col; void main(){ gl_FragColor = vec4(col, 1.0); }`;
+
+  function prog(vs: string, fs: string) {
+    const g = gl!;
+    const mk = (t: number, s: string) => { const sh = g.createShader(t)!; g.shaderSource(sh, s); g.compileShader(sh); return sh; };
+    const pr = g.createProgram()!;
+    g.attachShader(pr, mk(g.VERTEX_SHADER, vs)); g.attachShader(pr, mk(g.FRAGMENT_SHADER, fs)); g.linkProgram(pr);
+    return pr;
+  }
+  const P = gl ? prog(VS, FS) : null, L = gl ? prog(LVS, LFS) : null;
+  let bufs: { pos: WebGLBuffer; nrm: WebGLBuffer; count: number; lines: { buf: WebGLBuffer; count: number; col: number[] }[] } | null = null;
+  let center = [0, 0, 0], radius = 1;
+  let yaw = 0.5, pitch = 0.9, dist = 1;
+
+  function upload(which: 'before' | 'after') {
+    if (!gl) return;
+    const pv = previews[which];
+    if (!pv) return;
+    if (bufs) { gl.deleteBuffer(bufs.pos); gl.deleteBuffer(bufs.nrm); bufs.lines.forEach((l) => gl.deleteBuffer(l.buf)); }
+    const pos = gl.createBuffer()!, nrm = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, pos); gl.bufferData(gl.ARRAY_BUFFER, pv.pos, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, nrm); gl.bufferData(gl.ARRAY_BUFFER, pv.nrm, gl.STATIC_DRAW);
+    // the original is shown at the chosen units so the problem marks line up
+    let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < pv.pos.length; i += 3) for (let k = 0; k < 3; k++) { const v = pv.pos[i + k]; if (v < lo[k]) lo[k] = v; if (v > hi[k]) hi[k] = v; }
+    center = [0, 1, 2].map((k) => (lo[k] + hi[k]) / 2);
+    radius = Math.max(1e-6, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2);
+    const lines: { buf: WebGLBuffer; count: number; col: number[] }[] = [];
+    const ov = overlays[which];
+    const scale = which === 'before' ? Number(($('units') as HTMLSelectElement).value) || 1 : 1;
+    if (ov) for (const [key, col] of [['holes', [0.84, 0.16, 0.16]], ['nonManifold', [0.94, 0.55, 0]], ['selfX', [0.48, 0.17, 0.75]]] as const) {
+      let arr: Float32Array = ov[key];
+      if (!arr || !arr.length) continue;
+      if (scale !== 1) arr = arr.map((v: number) => v / scale);     // overlay was measured at the chosen units
+      const buf = gl.createBuffer()!;
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
+      lines.push({ buf, count: arr.length / 3, col: [...col] });
+    }
+    bufs = { pos, nrm, count: pv.pos.length / 3, lines };
+  }
+
+  // tiny matrix kit, column-major
+  const mul = (a: number[], b: number[]) => { const o = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]; return o; };
+  const persp = (f: number, asp: number, n: number, fa: number) => { const t = 1 / Math.tan(f / 2); return [t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (fa + n) / (n - fa), -1, 0, 0, (2 * fa * n) / (n - fa), 0]; };
+  const rx = (a: number) => [1, 0, 0, 0, 0, Math.cos(a), Math.sin(a), 0, 0, -Math.sin(a), Math.cos(a), 0, 0, 0, 0, 1];
+  const rz = (a: number) => [Math.cos(a), Math.sin(a), 0, 0, -Math.sin(a), Math.cos(a), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  const tr = (x: number, y: number, z: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
+  const sc = (s: number) => [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1];
+
+  function draw() {
+    if (!gl || !bufs || !P || !L) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.round(cv.clientWidth * dpr), h = Math.round(cv.clientHeight * dpr);
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    gl.viewport(0, 0, w, h);
+    gl.clearColor(0.98, 0.97, 0.94, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    // model (Z up) -> turn about its own vertical, tilt the camera, step back
+    const rot = mul(rx(-pitch), rz(yaw));
+    const model = mul(rot, mul(sc(1 / radius), tr(-center[0], -center[1], -center[2])));
+    // step back far enough that the whole model fits the NARROWER view, so a
+    // tall phone screen does not crop the sides
+    const fovY = 0.62, fovX = 2 * Math.atan(Math.tan(fovY / 2) * (w / h));
+    const fit = 1.08 / Math.sin(Math.min(fovY, fovX) / 2);
+    const mvp = mul(persp(fovY, w / h, 0.05, 200), mul(tr(0, 0, -dist * fit), model));
+    gl.useProgram(P);
+    gl.uniformMatrix4fv(gl.getUniformLocation(P, 'mvp'), false, new Float32Array(mvp));
+    gl.uniformMatrix4fv(gl.getUniformLocation(P, 'rot'), false, new Float32Array(rot));
+    gl.uniform3f(gl.getUniformLocation(P, 'base'), 0.80, 0.62, 0.40);
+    const showIssues = ($('showIssues') as HTMLInputElement).checked;
+    if (showIssues) gl.uniform3f(gl.getUniformLocation(P, 'back'), 0.96, 0.65, 0.77);
+    else gl.uniform3f(gl.getUniformLocation(P, 'back'), 0.55, 0.42, 0.28);
+    const ap = gl.getAttribLocation(P, 'p'), an = gl.getAttribLocation(P, 'n');
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufs.pos); gl.enableVertexAttribArray(ap); gl.vertexAttribPointer(ap, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufs.nrm); gl.enableVertexAttribArray(an); gl.vertexAttribPointer(an, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, bufs.count);
+    gl.disableVertexAttribArray(an);
+    if (showIssues && bufs.lines.length) {
+      gl.useProgram(L);
+      gl.uniformMatrix4fv(gl.getUniformLocation(L, 'mvp'), false, new Float32Array(mvp));
+      const lp = gl.getAttribLocation(L, 'p');
+      for (const l of bufs.lines) {
+        gl.uniform3f(gl.getUniformLocation(L, 'col'), l.col[0], l.col[1], l.col[2]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, l.buf); gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp, 3, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.LINES, 0, l.count);
+      }
+    }
+  }
+  let raf = 0;
+  const redraw = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); };
+  window.addEventListener('resize', redraw);
+  $('showIssues').addEventListener('change', redraw);
+
+  function setView(which: 'before' | 'after') {
+    show = which;
+    document.querySelectorAll<HTMLButtonElement>('.seg button').forEach((b) => { const on = b.dataset.show === which; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+    upload(which);
+    redraw();
+  }
+  document.querySelectorAll<HTMLButtonElement>('.seg button').forEach((b) => b.addEventListener('click', () => setView(b.dataset.show as 'before' | 'after')));
+
+  let drag: { x: number; y: number } | null = null;
+  cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    yaw += (e.clientX - drag.x) * 0.01;
+    pitch = Math.max(-0.2, Math.min(1.55, pitch + (e.clientY - drag.y) * 0.01));
+    drag = { x: e.clientX, y: e.clientY };
+    redraw();
+  });
+  cv.addEventListener('pointerup', () => { drag = null; });
+  cv.addEventListener('wheel', (e) => { e.preventDefault(); dist = Math.max(0.25, Math.min(4, dist * Math.exp(e.deltaY * 0.001))); redraw(); }, { passive: false });
+  cv.addEventListener('dblclick', () => { yaw = 0.5; pitch = 0.9; dist = 1; redraw(); });
+</script>
+
+<style is:global>
+  .rep { background: #FFFDF8; color: #2b1d10; }
+  .rep-wrap { max-width: 60rem; margin: 0 auto; padding: 0 1rem 5rem; }
+  .rep-hero { padding: 2rem 0 1rem; }
+  .rep-hero h1 { font-family: Fraunces, Georgia, serif; font-size: clamp(2rem, 6vw, 3.1rem); margin: 0 0 .75rem; line-height: 1.05; text-wrap: balance; }
+  .rep .lede { font-size: 1.1rem; line-height: 1.6; margin: 0 0 1rem; max-width: 42rem; }
+  .rep .privacy { font-size: .9rem; background: #F3F7F1; border-left: 3px solid #2f7d32; border-radius: .3rem; padding: .7rem .9rem; margin: 0; max-width: 42rem; }
+  .rep .step { margin-top: 1.6rem; }
+  .rep .step h2 { font-family: Fraunces, Georgia, serif; font-size: 1.3rem; margin: 0 0 .75rem; display: flex; align-items: center; gap: .55rem; }
+  .rep .step h2 .n { width: 1.7rem; height: 1.7rem; border-radius: 50%; background: #854F0B; color: #fff; font: 600 .9rem system-ui, sans-serif; display: inline-grid; place-items: center; }
+  .rep .modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: .65rem; }
+  @media (max-width: 760px) { .rep .modes { grid-template-columns: 1fr 1fr; } }
+  .rep .mode { text-align: left; background: #fff; border: 1.5px solid rgba(43,29,16,.18); border-radius: .7rem; padding: .85rem .9rem; cursor: pointer; font: inherit; color: inherit; display: flex; flex-direction: column; gap: .3rem; transition: border-color .15s, background .15s; }
+  .rep .mode b { font-size: .98rem; letter-spacing: .01em; }
+  .rep .mode span { font-size: .8rem; line-height: 1.45; color: #5c4a38; }
+  .rep .mode:hover { border-color: #b88746; }
+  .rep .mode.on { border-color: #854F0B; background: #FFF7EA; box-shadow: inset 0 0 0 1px #854F0B; }
+  .rep .mode.on b::before { content: '✓ '; color: #854F0B; }
+  .rep .mode:focus-visible, .rep .drop:focus-visible, .rep .btn:focus-visible, .rep .seg button:focus-visible { outline: 2px solid #854F0B; outline-offset: 2px; }
+  .rep .drop { border: 2px dashed rgba(43,29,16,.28); border-radius: .8rem; background: #fff; padding: 2.2rem 1rem; text-align: center; cursor: pointer; transition: .15s; }
+  .rep .drop:hover, .rep .drop.over { border-color: #854F0B; background: #FFFBF4; }
+  .rep .drop svg { color: #854F0B; }
+  .rep .drop-t { font-size: 1.05rem; margin: .6rem 0 .2rem; font-weight: 600; }
+  .rep .drop-s { font-size: .82rem; color: #5c4a38; margin: 0; }
+  .rep .progress { margin-top: 1rem; background: #efe7da; border-radius: 999px; height: 26px; position: relative; overflow: hidden; }
+  .rep .progress #bar { height: 100%; width: 0; background: #854F0B; transition: width .2s; }
+  .rep .progress span { position: absolute; inset: 0; display: grid; place-items: center; font-size: .78rem; color: #2b1d10; }
+  .rep .err { background: #fdecec; border-left: 3px solid #c0392b; padding: .7rem .9rem; border-radius: .3rem; margin-top: 1rem; }
+  .rep .score { margin-top: 1.6rem; background: #fff; border: 1px solid rgba(43,29,16,.14); border-radius: .8rem; padding: 1.2rem; display: grid; gap: .9rem; }
+  .rep .score-n { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+  .rep .score-n > div { display: flex; flex-direction: column; }
+  .rep .score-n .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: #5c4a38; }
+  .rep .score-n b { font-family: Fraunces, Georgia, serif; font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1.05; font-variant-numeric: tabular-nums; color: #a4361f; }
+  .rep .score-n b.good { color: #2f7d32; }
+  .rep .score-n .sub { font-size: .82rem; color: #5c4a38; }
+  .rep .score-n .arrow { font-size: 1.6rem; color: #b88746; }
+  .rep .badges { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .45rem; }
+  .rep .badges li { font-size: .85rem; font-weight: 600; padding: .35rem .7rem; border-radius: 999px; }
+  .rep .badges .b-ok { background: #E6F2E4; color: #1f5e22; }
+  .rep .badges .b-warn { background: #FFF1D6; color: #7a4b00; }
+  .rep .badges .b-no { background: #FBE4DF; color: #8a2a17; }
+  .rep .dl { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .rep .file-line { font-size: .8rem; color: #5c4a38; margin: 0; }
+  .rep .panel { background: #fff; border: 1px solid rgba(43,29,16,.14); border-radius: .7rem; padding: 1.1rem 1.2rem; margin-top: 1rem; }
+  .rep .panel h2 { font-family: Fraunces, Georgia, serif; font-size: 1.2rem; margin: 0 0 .8rem; }
+  .rep .view-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .6rem; margin-bottom: .6rem; }
+  .rep .seg { display: inline-flex; border: 1px solid #854F0B; border-radius: .45rem; overflow: hidden; }
+  .rep .seg button { background: #fff; color: #854F0B; border: 0; padding: .4rem .9rem; font: inherit; font-size: .88rem; cursor: pointer; }
+  .rep .seg button.on { background: #854F0B; color: #fff; }
+  .rep .chk { display: inline-flex; align-items: center; gap: .4rem; font-size: .88rem; cursor: pointer; }
+  .rep .viewer { position: relative; border-radius: .5rem; overflow: hidden; background: #FAF7F0; }
+  .rep #cv { width: 100%; height: clamp(260px, 60vw, 520px); display: block; touch-action: none; cursor: grab; }
+  .rep #cv:active { cursor: grabbing; }
+  .rep .nogl { padding: 2rem 1rem; text-align: center; color: #5c4a38; margin: 0; }
+  .rep .legend { font-size: .78rem; color: #5c4a38; margin: .6rem 0 0; display: flex; flex-wrap: wrap; gap: .3rem .9rem; align-items: center; }
+  .rep .legend i { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .3rem; vertical-align: -1px; }
+  .rep .tbl-wrap { overflow-x: auto; }
+  .rep table.issues { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  .rep .issues th, .rep .issues td { padding: .5rem .4rem; border-top: 1px solid rgba(43,29,16,.09); text-align: left; vertical-align: middle; }
+  .rep .issues thead th { border-top: 0; font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; color: #5c4a38; font-weight: 600; }
+  .rep .issues tbody th { font-weight: 500; white-space: nowrap; }
+  .rep .issues .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rep .issues td.is-bad { color: #a4361f; font-weight: 600; }
+  .rep .issues td.is-fixed { color: #2f7d32; font-weight: 600; }
+  .rep .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+  @media (max-width: 760px) { .rep .two-col { grid-template-columns: 1fr; } }
+  .rep .ticks, .rep .notes { margin: 0; padding-left: 1.1rem; display: grid; gap: .4rem; font-size: .9rem; line-height: 1.5; }
+  .rep .notes li::marker { color: #b88746; }
+  .rep .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .8rem 1rem; margin-bottom: 1rem; align-items: end; }
+  .rep .f { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
+  .rep .f > span { display: flex; align-items: center; gap: .35rem; }
+  .rep .f select, .rep .f input { font: inherit; padding: .45rem .5rem; border: 1px solid rgba(43,29,16,.25); border-radius: .4rem; background: #fff; }
+  .rep [hidden] { display: none !important; }
+  .rep .tip { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #854F0B; color: #854F0B; background: #fff; font-size: 11px; line-height: 1; cursor: pointer; flex: 0 0 auto; padding: 0; }
+  .rep .tip:hover { background: #854F0B; color: #fff; }
+  .tipbox { position: absolute; z-index: 60; background: #2b1d10; color: #fff; font-size: .82rem; line-height: 1.45; padding: .7rem .8rem; border-radius: .45rem; box-shadow: 0 8px 24px rgba(0,0,0,.24); }
+  .rep .btn { display: inline-block; background: #854F0B; color: #fff; border: 0; padding: .6rem 1rem; border-radius: .45rem; font: inherit; cursor: pointer; text-decoration: none; }
+  .rep .btn:hover { background: #633806; }
+  .rep .btn:disabled { opacity: .45; cursor: default; }
+  .rep .btn.ghost { background: #fff; color: #854F0B; border: 1px solid #854F0B; }
+  .rep .next { font-size: .9rem; line-height: 1.6; margin: 1rem 0 0; color: #3a2a1a; }
+  .rep .faq { margin-top: 2rem; }
+  .rep .faq details { border-top: 1px solid rgba(43,29,16,.1); padding: .6rem 0; }
+  .rep .faq summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
+  .rep .faq p { margin: .5rem 0 0; font-size: .9rem; line-height: 1.6; color: #3a2a1a; }
+  .rep .shop { margin-top: 2.5rem; }
+  .rep .shop-head h2 { font-family: Fraunces, Georgia, serif; font-size: 1.4rem; margin: 0 0 .4rem; }
+  .rep .shop-head p { margin: 0 0 1rem; font-size: .92rem; color: #3a2a1a; max-width: 42rem; }
+  .rep .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .9rem; }
+  .rep .shop-more { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
+  .rep .foot { font-size: .85rem; color: #5c4a38; margin-top: 1.5rem; }
+  .rep a:not(.btn) { color: #854F0B; text-decoration: underline; }
+  .rep a.btn.ghost { color: #854F0B; }
+</style>

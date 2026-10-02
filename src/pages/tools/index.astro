@@ -18,6 +18,13 @@ const TOOLS = [
     note: 'Runs in your browser. Your file is never uploaded.',
   },
   {
+    href: '/tools/stl-repair',
+    name: 'Broken STL Auto-Repair',
+    blurb: 'Drop in a broken STL, OBJ or 3MF and get it back repaired for the machine that will make it: a clean 2.5D relief for a CNC router, a closed solid for an FDM or resin printer, or a depth map for a laser. Holes, bad edges, inside-out faces, units and orientation are fixed, and the result is checked again before it says ready.',
+    tag: 'Free, no signup',
+    note: 'Runs in your browser. Your file is never uploaded.',
+  },
+  {
     href: '/tools/stepover-calculator',
     name: 'Stepover and scallop calculator',
     blurb: 'Enter any ball nose and stepover to see the ridge height between passes, the number of passes and the finishing time, and the coarsest stepover whose ridges a light sanding removes.',
@@ -35,7 +42,7 @@ const TOOLS = [
 ---
 <Shell
   title="Free CNC and 3D printing tools · DigitalChiselCo"
-  description="Free browser tools for CNC routers and 3D printing: check whether an STL will cut on your machine, and design a printable lampshade. No signup, and nothing is uploaded."
+  description="Free browser tools for CNC routers and 3D printing: check whether an STL will cut on your machine, repair a broken STL for your router, printer or laser, and design a printable lampshade. No signup, and nothing is uploaded."
 >
   <Breadcrumbs crumbs={[{ label: 'Tools' }]} />
   <div class="max-w-3xl">

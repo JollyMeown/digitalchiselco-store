@@ -85,3 +85,4 @@ _devsess.json
 
 # local test data for the outline tool, never committed
 public/_test/
+scripts/stl-repair/.*.mjs

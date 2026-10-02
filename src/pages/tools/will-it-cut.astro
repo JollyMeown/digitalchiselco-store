@@ -664,7 +664,7 @@ const ld = jsonLd({
       ? 'Not checked, this mesh is very large'
       : A.openEdges === 0
         ? 'Watertight, no holes'
-        : `${A.openEdges.toLocaleString()} open edges${openPct < 1 ? ', probably fine' : ', this file is damaged'}`;
+        : `${A.openEdges.toLocaleString()} open edges${openPct < 1 ? ', probably fine' : ', this file is damaged'}. <a href="/tools/stl-repair">Repair it free</a>`;
     const meshTone = A.openEdges < 0 ? '' : A.openEdges === 0 ? 'good' : openPct < 1 ? '' : 'warn';
     $('facts').innerHTML = `
       <div class="fact"><div class="fk">Size</div><div class="fv">${both(sx)} <span class="x">×</span> ${both(sy)}</div></div>

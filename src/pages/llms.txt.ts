@@ -56,6 +56,7 @@ export const GET: APIRoute = async () => {
   lines.push('');
   lines.push('## Free tools');
   lines.push(`- [Will it cut?](${SITE}/tools/will-it-cut): check any STL in the browser before carving: depth, orientation, detail lost per bit, carve time, roughing and finishing simulation. Nothing is uploaded.`);
+  lines.push(`- [Broken STL Auto-Repair](${SITE}/tools/stl-repair): repairs a broken STL, OBJ or 3MF in the browser for a chosen machine: CNC router (rebuilt watertight 2.5D relief), FDM or resin printer (closed, manifold, outward normals), or laser (greyscale depth map). Re-checks the result before calling it ready. Nothing is uploaded.`);
   lines.push(`- [Stepover and scallop calculator](${SITE}/tools/stepover-calculator): ridge height, passes and finishing time for any ball nose and stepover, and the coarsest stepover whose ridges sand out.`);
   lines.push(`- [State of CNC Relief Carving 2026](${SITE}/reports/state-of-cnc-relief-carving-2026): data report on what carvers buy and make`);
   lines.push(`- [Laser Studio](${SITE}/laser-studio): Windows app that turns photos, STL models and star maps into laser files, and lines up a burn on a CNC carving (CNC Match)`);

@@ -74,6 +74,7 @@ export const STATIC_PATHS: Array<{ path: string; priority: number; changefreq: s
   { path: '/tools',       priority: 0.7, changefreq: 'monthly' },
   { path: '/tools/will-it-cut', priority: 0.8, changefreq: 'monthly' },
   { path: '/tools/stepover-calculator', priority: 0.7, changefreq: 'monthly' },
+  { path: '/tools/stl-repair', priority: 0.8, changefreq: 'monthly' },
   // The report is a citation asset rather than a shop page: high priority,
   // and it never changes once published, which is the point of it.
   { path: '/reports/state-of-cnc-relief-carving-2026', priority: 0.9, changefreq: 'yearly' },
