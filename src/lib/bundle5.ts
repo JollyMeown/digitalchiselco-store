@@ -31,6 +31,24 @@ export function bundle5Price(prices: number[]): number {
 //  - gift cards, catalogues, and other bundles (deal is for singles)
 // The builder's query, checkout-init's validation, and this predicate must
 // stay in sync; checkout-init is the enforcement point.
+/** The same rule as a database filter, for the builder's design lists. */
+export function bundle5Filter<Q>(q: Q): Q {
+  return (q as any)
+    .eq('active', true)
+    .gt('price_usd', 0)
+    .not('slug', 'like', 'gift-card-%')
+    .not('slug', 'like', 'catalogue-%')
+    .not('slug', 'like', 'software-%')
+    .not('title', 'ilike', '%bundle%')
+    .not('title', 'ilike', '%membership%')
+    .not('title', 'ilike', '%personalized%')
+    .not('title', 'ilike', '%made to order%')
+    .not('title', 'ilike', '%made-to-order%')
+    .not('title', 'ilike', '%from your picture%')
+    .not('title', 'ilike', '%from your photo%')
+    .not('is_customizable', 'is', true);
+}
+
 export function bundle5Eligible(p: { active?: boolean; price_usd?: number | string; slug?: string; title?: string; is_customizable?: boolean }): boolean {
   return !!p.active && Number(p.price_usd) > 0 &&
     !p.is_customizable &&

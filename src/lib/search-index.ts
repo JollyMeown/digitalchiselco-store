@@ -215,13 +215,13 @@ const DAY = 86_400_000;
  *  Synonyms and translations only widen a word the catalog rarely uses in
  *  titles: "kitty" or "caballo" expand, "deer" and "tree" do not, so a common
  *  subject stays precise instead of pulling in every forest scene. */
-function scoreAll(entries: Entry[], q: string, mode: 'all' | 'any'): Map<Entry, number> {
+function scoreAll(entries: Entry[], q: string, mode: 'all' | 'any', widenAll = false): Map<Entry, number> {
   const words = tokens(q);
   const out = new Map<Entry, number>();
   if (!words.length) { for (const e of entries) out.set(e, 0); return out; }
   const groups = words.map((w) => {
     const lit = forms(w);
-    const common = entries.reduce((n, e) => n + (hasAny(e.title_n, lit) ? 1 : 0), 0) >= 8;
+    const common = !widenAll && entries.reduce((n, e) => n + (hasAny(e.title_n, lit) ? 1 : 0), 0) >= 8;
     const alts = common ? [] : expand(w).map(normalise).filter((t) => t && t !== w).map(forms);
     return { lit, alts };
   });
@@ -256,8 +256,23 @@ export async function search(params: Params): Promise<Result> {
     if (hit) { brand = hit; q = ws.map((w) => BRANDS[w] ?? w).filter((w, i, a) => a.indexOf(w) === i).join(' '); }
   }
   let scores = scoreAll(entries, q, 'all');
+  // Almost nothing found: widen every word, even common ones. "old" is in
+  // plenty of titles ("Old West"), so it was never widened, and "old trains"
+  // found 1 design while 8 are "Vintage ... Steam Train" (2026-10-03). The
+  // strict matches keep the top places.
+  if (q && scores.size < 3) {
+    const wide = scoreAll(entries, q, 'all', true);
+    if (wide.size > scores.size) { for (const [e, s] of scores) wide.set(e, Math.max(wide.get(e) || 0, s + 20)); scores = wide; }
+  }
   // a translated phrase ("droga krzyzowa", "ultima cena") as the catalog says it
-  if (q && scores.size === 0) { const c = canonical(q); if (c !== q) { const s2 = scoreAll(entries, c, 'all'); if (s2.size) { scores = s2; q = c; } } }
+  if (q && scores.size < 3) {
+    const c = canonical(q);
+    if (c !== q) {
+      let s2 = scoreAll(entries, c, 'all');
+      if (s2.size < 3) { const w2 = scoreAll(entries, c, 'all', true); if (w2.size > s2.size) s2 = w2; }
+      if (s2.size > scores.size) { scores = s2; q = c; }
+    }
+  }
   let partial = false, dym: string | null = null;
   if (q && scores.size === 0) {
     const vocab = new Map<string, number>();

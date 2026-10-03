@@ -315,8 +315,23 @@ try {
         + '<a href="/search" class="block px-3 py-2 text-sm text-bronze-700 font-medium border-t border-black/5 hover:bg-cream">Browse every design with filters →</a>';
       show();
     };
+    // What was typed here is a search too, even when the visitor only reads
+    // the suggestions and never presses Enter (owner, 2026-10-03: "log
+    // whatever the user searches"). Recorded once, when they leave the box or
+    // the page, and not at all when they press Enter: /search records that.
+    let pendingQ = '', pendingN = 0, sentQ = '', submitted = false;
+    const flushTyped = () => {
+      const q = pendingQ.toLowerCase();
+      if (!q || submitted || q === sentQ) return;
+      sentQ = q; pendingQ = '';
+      try { navigator.sendBeacon('/api/search-log', new Blob([JSON.stringify({ t: 'search', q, n: pendingN, p: '/dropdown#typed' })], { type: 'application/json' })); } catch {}
+    };
+    form.addEventListener('submit', () => { submitted = true; });
+    input.addEventListener('blur', () => setTimeout(flushTyped, 400));
+    window.addEventListener('pagehide', flushTyped);
     const render = (d, q) => {
       const items = d.items || [], cats = d.cats || [];
+      pendingQ = q; pendingN = Number.isFinite(Number(d.total)) ? Number(d.total) : items.length;
       if (!items.length && !cats.length) { box.innerHTML = `<div class="px-3 py-2 text-sm text-ink-700/60">No exact match. Press Enter to see the closest designs.</div>`; show(); return; }
       const via = d.via ? `<div class="px-3 pt-2 text-xs text-ink-700/60">Showing results for <b>${escH(d.via)}</b></div>` : '';
       const catHtml = cats.length ? '<div class="px-3 pt-2 pb-1 flex flex-wrap gap-1.5">' + cats.map((c) => `<a href="/search?cat=${encodeURIComponent(c.slug)}" class="text-xs px-2.5 py-1 rounded-full bg-cream text-bronze-800 hover:bg-[#FAEEDA]">📁 ${escH(c.name)}</a>`).join('') + '</div>' : '';

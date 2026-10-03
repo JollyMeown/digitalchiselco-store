@@ -13,6 +13,8 @@ import Footer from '../components/Footer.astro';
 import { img } from '../lib/img';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { supabaseAdmin } from '../lib/supabase';
+import { bundle5Filter } from '../lib/bundle5';
+import { GROUPS } from '../lib/search-smart';
 
 export const prerender = false;
 
@@ -23,18 +25,7 @@ const BUNDLE_OVERAGE = 0.70;      // above it, each extra $1 of value adds $0.70
 // price from DB values and its number is the one actually charged)
 // Eligible = active single designs. Bundles/catalogues/gift cards are excluded —
 // the deal is for singles only (same filter is re-checked in checkout-init).
-const eligible = (q: any) => q
-  .eq('active', true)
-  .gt('price_usd', 0)
-  .not('slug', 'like', 'gift-card-%')
-  .not('slug', 'like', 'catalogue-%')
-  .not('slug', 'like', 'software-%')   // kept in sync with bundle5Eligible
-  .not('title', 'ilike', '%bundle%')
-  .not('title', 'ilike', '%membership%')
-  .not('title', 'ilike', '%personalized%')
-  .not('title', 'ilike', '%from your picture%')
-  .not('title', 'ilike', '%from your photo%')
-  .not('is_customizable', 'is', true);
+const eligible = (q: any) => bundle5Filter(q);
 const { data: prods } = await eligible(supabaseAdmin().from('products').select('id, slug, title, price_usd, image_url'))
   .order('created_at', { ascending: false })
   .limit(600);
@@ -105,7 +96,7 @@ const avgFive = products.length
   </main>
   <Footer />
 
-  <script is:inline define:vars={{ PRODUCTS: products, BUNDLE_PRICE, BUNDLE_VALUE_CAP, BUNDLE_OVERAGE, PRESELECT }}>
+  <script is:inline define:vars={{ PRODUCTS: products, BUNDLE_PRICE, BUNDLE_VALUE_CAP, BUNDLE_OVERAGE, PRESELECT, GROUPS }}>
     const grid = document.getElementById('bb-grid');
     const slotsEl = document.getElementById('bb-slots');
     const statusEl = document.getElementById('bb-status');
@@ -128,12 +119,42 @@ const avgFive = products.length
         </button>`;
     }
 
+    // Every word must appear in the title, plurals forgiven, and through the
+    // same synonym groups as /search (lib/search-smart): "old trains" finds
+    // "Vintage Christmas Steam Train". Before, the whole phrase had to match.
+    // Same rules as /search (lib/search-index): whole words only ("cat" is
+    // not "Cathedral"), synonyms only for a word few titles use (so "deer"
+    // stays deer), and every word widened when almost nothing is found.
+    const SYN = new Map();
+    for (const g of GROUPS) for (const w of g) SYN.set(w, g);
+    const normT = (p) => p._n || (p._n = ' ' + p.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ');
+    const has = (p, a) => { const s = normT(p); return s.includes(' ' + a + ' ') || s.includes(' ' + a + 's ') || s.includes(' ' + a + 'es '); };
+    // two-word synonyms first ("stream engine" -> train), as /search does
+    const PHRASES = [...SYN.keys()].filter((k) => k.includes(' ')).sort((a, b) => b.length - a.length);
+    const canon = (q) => { let s = ' ' + q.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' '; for (const ph of PHRASES) if (s.includes(' ' + ph + ' ')) s = s.split(' ' + ph + ' ').join(' ' + SYN.get(ph)[0] + ' '); return s.trim(); };
+    const words = (q) => canon(q).split(' ').filter(Boolean).map((w) => {
+      const one = w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w;
+      return { lit: [...new Set([w, one])], alts: [...(SYN.get(w) || SYN.get(one) || [])] };
+    });
+    function find(q) {
+      const ws = words(q);
+      if (!ws.length) return PRODUCTS;
+      const litHit = (p, x) => x.lit.some((a) => has(p, a));
+      const altHit = (p, x) => x.alts.some((a) => has(p, a));
+      const rare = ws.map((x) => PRODUCTS.reduce((n, p) => n + (litHit(p, x) ? 1 : 0), 0) < 8);
+      const strict = PRODUCTS.filter((p) => ws.every((x, i) => litHit(p, x) || (rare[i] && altHit(p, x))));
+      if (strict.length >= 3) return strict;
+      const inStrict = new Set(strict);
+      const wide = PRODUCTS.filter((p) => !inStrict.has(p) && ws.every((x) => litHit(p, x) || altHit(p, x)));
+      return [...strict, ...wide];
+    }
+
     function render() {
       const q = (document.getElementById('bb-search').value || '').trim().toLowerCase();
       // with no search: what is picked first, then the rest of the cart, so a
       // swap is one tap away
       const fromCart = new Set(PRESELECT);
-      const pool = q ? PRODUCTS.filter((p) => p.title.toLowerCase().includes(q))
+      const pool = q ? find(q)
         : [...picked.values(),
            ...PRODUCTS.filter((p) => !picked.has(p.id) && fromCart.has(p.id)),
            ...PRODUCTS.filter((p) => !picked.has(p.id) && !fromCart.has(p.id))];
@@ -225,7 +246,46 @@ const avgFive = products.length
         : `<strong>Your ${n} cart design${n === 1 ? ' is' : 's are'} picked.</strong> Add ${5 - n} more to make five. When you add the 5-pack, ${n === 1 ? 'it comes' : 'they come'} out of your cart as single designs, so nothing is paid twice.`;
       note.hidden = false;
     }
-    document.getElementById('bb-search').addEventListener('input', render);
+    // The page opens with the 600 newest; the first search pulls in the rest of
+    // the catalogue so "any five from the whole catalogue" is true.
+    const searchEl = document.getElementById('bb-search');
+    let fullLoaded = false, fullLoading = null;
+    function loadFull() {
+      if (fullLoaded || fullLoading) return fullLoading;
+      // ?v= changes whenever the reply's shape does, so a cached copy never mismatches
+      fullLoading = fetch('/api/bundle-products?v=2').then((r) => r.json()).then((d) => {
+        const have = new Set(PRODUCTS.map((p) => p.id));
+        for (const [id, title, price, im] of (d && d.rows) || []) {
+          if (have.has(id)) continue;
+          PRODUCTS.push({ id, title, price, img: !im ? '' : /^https?:/.test(im) ? im : d.pre + im + d.suf });
+        }
+        fullLoaded = true;
+        searchEl.placeholder = 'Search all ' + PRODUCTS.length.toLocaleString('en-US') + ' designs…';
+        if (searchEl.value.trim()) render();
+      }).catch(() => { fullLoading = null; });
+      return fullLoading;
+    }
+    searchEl.addEventListener('focus', loadFull, { once: true });
+
+    // Record each search once it settles (owner, 2026-10-03: "log whatever
+    // the user searches"), with how many designs it found. Same log as /search.
+    let logT, loggedQ = '';
+    function logSearch() {
+      const q = searchEl.value.trim().toLowerCase();
+      if (q.length < 2 || q === loggedQ) return;
+      loggedQ = q;
+      const n = find(q).length;
+      try { navigator.sendBeacon('/api/search-log', new Blob([JSON.stringify({ t: 'search', q, n, p: '/bundle-builder#typed' })], { type: 'application/json' })); } catch {}
+    }
+    searchEl.addEventListener('input', () => {
+      render();
+      loadFull();
+      clearTimeout(logT);
+      // wait until they stop typing, and until the full catalogue is in, so the count is true
+      logT = setTimeout(() => Promise.resolve(loadFull()).then(logSearch), 1500);
+    });
+    searchEl.addEventListener('blur', () => { clearTimeout(logT); Promise.resolve(loadFull()).then(logSearch); });
+    window.addEventListener('pagehide', logSearch);
     render(); renderBar();
   </script>
 </Base>

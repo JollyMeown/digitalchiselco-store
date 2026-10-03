@@ -11,7 +11,7 @@
 // The zero-result search itself is STILL logged (Design Scout feeds on it),
 // so a suggestion never hides real demand.
 
-const GROUPS: string[][] = [
+export const GROUPS: string[][] = [
   ['christmas', 'xmas', 'noel', 'santa', 'holiday'],
   ['halloween', 'spooky', 'pumpkin', 'jack o lantern', 'jackolantern'],
   ['easter', 'bunny', 'rabbit'],
@@ -46,6 +46,10 @@ const GROUPS: string[][] = [
   ['plane', 'airplane', 'aircraft', 'ww2', 'wwii', 'warbird', 'aviation'],
   ['car', 'cars', 'classic car', 'hot rod', 'sedan', 'truck', 'pickup', 'semi', 'lorry', 'camion'],
   ['motorcycle', 'motorbike', 'harley', 'biker', 'chopper'],
+  // 2026-10-03: a visitor searched "old trains", "old train" and "old stream
+  // engine" and got nothing, while 8 designs are "Vintage ... Steam Train"
+  ['train', 'trains', 'locomotive', 'locomotives', 'steam train', 'steam engine', 'stream engine', 'railroad', 'railway', 'caboose'],
+  ['vintage', 'old', 'antique', 'retro', 'old fashioned', 'old time', 'nostalgic'],
   ['guitar', 'music', 'musical', 'piano', 'violin', 'notes'],
   ['baseball', 'softball', 'pitcher', 'catcher', 'mlb'],
   ['football', 'nfl', 'quarterback', 'gridiron'],

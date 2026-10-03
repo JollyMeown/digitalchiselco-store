@@ -61,7 +61,7 @@ function TopList({ title, rows, total }: { title: string; rows: [string, number]
   );
 }
 
-type Ev = { day: string; type: string; product_id: string | null; q: string | null; n: number | null; visitor_hash: string | null; ts?: string };
+type Ev = { day: string; type: string; product_id: string | null; q: string | null; n: number | null; visitor_hash: string | null; ts?: string; path?: string | null };
 
 export default function Traffic() {
   const [days, setDays] = useState<number>(30);
@@ -125,7 +125,7 @@ export default function Traffic() {
       let cur: string | null = null;
       for (let page = 0; page < MAX_PAGES; page++) {
         let q = supabase.from('site_events')
-          .select('day, type, product_id, q, n, visitor_hash, ts')
+          .select('day, type, product_id, q, n, visitor_hash, ts, path')
           .gte('day', evSince).order('ts', { ascending: false }).limit(1000);
         if (cur) q = q.lt('ts', cur);
         const { data } = await q;
@@ -248,7 +248,7 @@ export default function Traffic() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <HeatList events={events} names={prodNames} sales={salesByProduct} />
-            <SearchTerms events={events} />
+            <div className="md:col-span-2"><SearchTerms events={events} /></div>
             <TopList title="Top pages" rows={stats.topPages} total={stats.pv} />
             <TopList title="Referrer sources" rows={stats.topRefs} total={stats.pv} />
             <TopList title="Campaigns (?src= links)" rows={stats.campaigns} total={stats.pv} />
@@ -692,23 +692,91 @@ function HeatList({ events, names, sales }: { events: Ev[]; names: Record<string
   );
 }
 
+// Where a search was typed, read from the logged path (src/lib/search-log.ts).
+function searchWhere(path?: string | null) {
+  const p = path || '';
+  if (p.startsWith('/bundle-builder')) return 'Pick 5 page';
+  if (p.startsWith('/dropdown')) return 'Header box, not submitted';
+  if (p.endsWith('#filter')) return 'Search page, filter changed';
+  if (p.endsWith('#typed')) return 'Search page, typed';
+  return 'Search page';
+}
+const searchFilters = (path?: string | null) => {
+  const m = String(path || '').match(/\?([^#]*)/);
+  return m ? decodeURIComponent(m[1]).replace(/&/g, ' · ').replace(/=/g, ' ') : '';
+};
+
+// Every search, not only the most common ones (owner, 2026-10-03: a visitor
+// searched "trains" and "old trains" and the card, which showed only the top
+// 12 terms, made it look as if nothing had been recorded). The one-off and the
+// found-nothing searches are the ones worth reading, so they get their own lists.
 function SearchTerms({ events }: { events: Ev[] }) {
-  const terms: Record<string, { n: number; zero: boolean }> = {};
-  for (const e of events) if (e.type === 'search' && e.q) {
-    const t = terms[e.q] || { n: 0, zero: false };
+  const [find, setFind] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const all = events.filter((e) => e.type === 'search' && e.q)
+    .sort((a, b) => String(b.ts || b.day).localeCompare(String(a.ts || a.day)));
+  const f = find.trim().toLowerCase();
+  const rows = f ? all.filter((e) => String(e.q).includes(f)) : all;
+  const terms: Record<string, { n: number; zero: boolean; last: string }> = {};
+  for (const e of rows) {
+    const t = terms[e.q!] || { n: 0, zero: false, last: String(e.ts || e.day) };
     t.n++; if ((e.n ?? 0) === 0) t.zero = true;
-    terms[e.q] = t;
+    terms[e.q!] = t;
   }
-  const top = Object.entries(terms).sort((a, b) => b[1].n - a[1].n).slice(0, 12);
+  const zero = Object.entries(terms).filter(([, t]) => t.zero).sort((a, b) => b[1].n - a[1].n || b[1].last.localeCompare(a[1].last));
+  const top = Object.entries(terms).sort((a, b) => b[1].n - a[1].n).slice(0, 20);
+  const latest = showAll ? rows : rows.slice(0, 40);
+  const when = (e: Ev) => e.ts ? new Date(e.ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : e.day;
+  const chip = (q: string, t: { n: number; zero: boolean }) => (
+    <button key={q} type="button" onClick={() => setFind(q)} title="Show every time this was searched"
+      className={`text-xs px-2 py-0.5 rounded border ${t.zero ? 'border-red-300 text-red-700 bg-red-50' : 'border-black/10 text-ink-700 bg-cream/50'} hover:shadow-sm`}>{q} · {t.n}</button>
+  );
   return (
     <Card>
-      <div className="text-sm font-medium text-ink-900 mb-1">Search terms</div>
-      <p className="text-[11px] text-ink-700/50 mb-2"><span className="text-red-600 font-medium">Red</span> = searched but found nothing → a design you should make.</p>
-      {top.length === 0 ? <p className="text-xs text-ink-700/50">No searches recorded yet.</p> : (
-        <div className="flex flex-wrap gap-1.5">
-          {top.map(([q, t]) => (
-            <span key={q} className={`text-xs px-2 py-0.5 rounded border ${t.zero ? 'border-red-300 text-red-700 bg-red-50' : 'border-black/10 text-ink-700 bg-cream/50'}`}>{q} · {t.n}</span>
-          ))}
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+        <div className="text-sm font-medium text-ink-900">Searches <span className="text-xs font-normal text-ink-700/60">· {all.length.toLocaleString()} in this period · {Object.keys(terms).length.toLocaleString()} different{f ? ` matching "${f}"` : ''}</span></div>
+        <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find a word…" className="text-xs px-2 py-1 border border-black/15 rounded w-40" />
+      </div>
+      <p className="text-[11px] text-ink-700/50 mb-3">Every search typed on the site: the search page, the header box (even when not submitted) and the Pick 5 page. <span className="text-red-600 font-medium">Red</span> = found nothing → a design you could make. Click a term to see each time it was searched.</p>
+      {all.length === 0 ? <p className="text-xs text-ink-700/50">No searches recorded yet.</p> : (
+        <div className="space-y-3">
+          {zero.length > 0 && (
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-red-700/80 mb-1">Found nothing ({zero.length})</div>
+              <div className="flex flex-wrap gap-1.5">{zero.map(([q, t]) => chip(q, t))}</div>
+            </div>
+          )}
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-ink-700/50 mb-1">Most searched</div>
+            <div className="flex flex-wrap gap-1.5">{top.map(([q, t]) => chip(q, t))}</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-ink-700/50 mb-1">Latest searches</div>
+            <div className="overflow-x-auto max-h-80 overflow-y-auto border border-black/5 rounded">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-white"><tr className="text-left text-ink-700/50">
+                  <th className="px-2 py-1 font-medium">When</th><th className="px-2 py-1 font-medium">Words</th>
+                  <th className="px-2 py-1 font-medium text-right">Found</th><th className="px-2 py-1 font-medium">Where</th><th className="px-2 py-1 font-medium">Filters</th>
+                </tr></thead>
+                <tbody>
+                  {latest.map((e, i) => (
+                    <tr key={i} className="border-t border-black/5">
+                      <td className="px-2 py-1 whitespace-nowrap text-ink-700/70">{when(e)}</td>
+                      <td className="px-2 py-1 text-ink-900">{e.q}</td>
+                      <td className={`px-2 py-1 text-right tabular-nums ${(e.n ?? 0) === 0 ? 'text-red-600 font-medium' : 'text-ink-700'}`}>{e.n ?? 0}</td>
+                      <td className="px-2 py-1 whitespace-nowrap text-ink-700/70">{searchWhere(e.path)}</td>
+                      <td className="px-2 py-1 text-ink-700/60">{searchFilters(e.path)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {rows.length > 40 && (
+              <button type="button" onClick={() => setShowAll((s) => !s)} className="mt-1 text-xs text-bronze-700 underline">
+                {showAll ? 'Show the latest 40' : `Show all ${rows.length.toLocaleString()}`}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </Card>
