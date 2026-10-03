@@ -23,9 +23,7 @@ const BUNDLE_OVERAGE = 0.70;      // above it, each extra $1 of value adds $0.70
 // price from DB values and its number is the one actually charged)
 // Eligible = active single designs. Bundles/catalogues/gift cards are excluded —
 // the deal is for singles only (same filter is re-checked in checkout-init).
-const { data: prods } = await supabaseAdmin()
-  .from('products')
-  .select('id, slug, title, price_usd, image_url')
+const eligible = (q: any) => q
   .eq('active', true)
   .gt('price_usd', 0)
   .not('slug', 'like', 'gift-card-%')
@@ -36,10 +34,24 @@ const { data: prods } = await supabaseAdmin()
   .not('title', 'ilike', '%personalized%')
   .not('title', 'ilike', '%from your picture%')
   .not('title', 'ilike', '%from your photo%')
-  .not('is_customizable', 'is', true)
+  .not('is_customizable', 'is', true);
+const { data: prods } = await eligible(supabaseAdmin().from('products').select('id, slug, title, price_usd, image_url'))
   .order('created_at', { ascending: false })
   .limit(600);
-const products = (prods || []).map((p) => ({
+
+// Arriving from the cart (?cart=<ids>): the designs already in the cart are
+// loaded by id, so they can be picked even when they are older than the 600
+// listed, and the page opens with them picked (owner, 2026-10-03, after a
+// buyer put 7 designs in her cart and could not see where the 5-for-$25 went).
+const cartIds = [...new Set((Astro.url.searchParams.get('cart') || '').split(',')
+  .map((s) => s.trim()).filter((s) => /^[0-9a-f-]{36}$/i.test(s)))].slice(0, 40);
+let fromCart: any[] = [];
+if (cartIds.length) {
+  const { data } = await eligible(supabaseAdmin().from('products').select('id, slug, title, price_usd, image_url')).in('id', cartIds);
+  fromCart = data || [];
+}
+const listed = new Set((prods || []).map((p: any) => p.id));
+const products = [...fromCart.filter((p) => !listed.has(p.id)), ...(prods || [])].map((p) => ({
   id: p.id,
   slug: p.slug,
   title: String(p.title || '').split('|')[0].trim(),
@@ -48,6 +60,8 @@ const products = (prods || []).map((p) => ({
   // designs, and the raw pictures are 1 to 3 MB each (found 2026-09-25).
   img: p.image_url ? img(p.image_url, { w: 300, square: true, q: 75 }) : '',
 }));
+// in the cart's order; only designs that can go in a 5-pack
+const PRESELECT = cartIds.filter((id) => fromCart.some((p) => p.id === id));
 const avgFive = products.length
   ? (products.slice(0, 200).reduce((s, p) => s + p.price, 0) / Math.min(200, products.length)) * 5
   : 0;
@@ -81,6 +95,8 @@ const avgFive = products.length
       </div>
     </div>
 
+    <p id="bb-from-cart" hidden class="mb-4 rounded-md border border-[#FAC775] bg-[#FFF8EC] px-4 py-3 text-sm text-bronze-800"></p>
+
     <input id="bb-search" type="search" placeholder={`Search ${products.length} designs…`}
       class="w-full sm:max-w-sm px-4 py-2.5 text-sm border border-black/15 rounded-md mb-4 focus:outline-none focus:border-bronze-600" />
 
@@ -89,7 +105,7 @@ const avgFive = products.length
   </main>
   <Footer />
 
-  <script is:inline define:vars={{ PRODUCTS: products, BUNDLE_PRICE, BUNDLE_VALUE_CAP, BUNDLE_OVERAGE }}>
+  <script is:inline define:vars={{ PRODUCTS: products, BUNDLE_PRICE, BUNDLE_VALUE_CAP, BUNDLE_OVERAGE, PRESELECT }}>
     const grid = document.getElementById('bb-grid');
     const slotsEl = document.getElementById('bb-slots');
     const statusEl = document.getElementById('bb-status');
@@ -114,7 +130,13 @@ const avgFive = products.length
 
     function render() {
       const q = (document.getElementById('bb-search').value || '').trim().toLowerCase();
-      const pool = q ? PRODUCTS.filter((p) => p.title.toLowerCase().includes(q)) : PRODUCTS;
+      // with no search: what is picked first, then the rest of the cart, so a
+      // swap is one tap away
+      const fromCart = new Set(PRESELECT);
+      const pool = q ? PRODUCTS.filter((p) => p.title.toLowerCase().includes(q))
+        : [...picked.values(),
+           ...PRODUCTS.filter((p) => !picked.has(p.id) && fromCart.has(p.id)),
+           ...PRODUCTS.filter((p) => !picked.has(p.id) && !fromCart.has(p.id))];
       const show = pool.slice(0, 100);
       grid.innerHTML = show.map(card).join('') || '<p class="col-span-full text-sm text-ink-700/60 py-8 text-center">No designs match that search.</p>';
       moreEl.classList.toggle('hidden', pool.length <= 100);
@@ -173,15 +195,36 @@ const avgFive = products.length
         qty: 1,
         img: arr[0].img || '',
       };
-      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      // The picked designs that were already in the cart as single lines come
+      // out of it, so nothing is paid for twice.
+      const inBundle = new Set(ids);
+      const before = cart.length;
+      cart = cart.filter((x) => !inBundle.has(String(x.id)));
+      const moved = before - cart.length;
       // one bundle per cart line; a second visit replaces nothing — it adds another
       cart.push(item);
+      try { if (moved) sessionStorage.setItem('dcc-pick5-moved', String(moved)); } catch {}
       localStorage.setItem('cart', JSON.stringify(cart));
       window.dispatchEvent(new Event('cart-changed'));
       if (window.dccAction) window.dccAction('add_to_cart');
       window.location.href = '/cart';
     });
 
+    // From the cart: pick the five that save the most. The bundle price rises
+    // 70 cents per dollar of value above $40, so a dearer five always saves
+    // more: the five highest-priced cart designs are the best pick.
+    if (PRESELECT.length) {
+      const inCart = PRESELECT.map((id) => PRODUCTS.find((p) => p.id === id)).filter(Boolean);
+      const best = [...inCart].sort((a, b) => b.price - a.price).slice(0, 5);
+      for (const p of best) picked.set(p.id, p);
+      const note = document.getElementById('bb-from-cart');
+      const n = inCart.length;
+      note.innerHTML = n >= 5
+        ? `<strong>We picked the ${n > 5 ? '5 designs from your cart that save you the most' : '5 designs from your cart'}.</strong> Swap any of them if you like. When you add the 5-pack, these come out of your cart as single designs, so nothing is paid twice.${n > 5 ? ` Your other ${n - 5} stay in the cart at their normal price.` : ''}`
+        : `<strong>Your ${n} cart design${n === 1 ? ' is' : 's are'} picked.</strong> Add ${5 - n} more to make five. When you add the 5-pack, ${n === 1 ? 'it comes' : 'they come'} out of your cart as single designs, so nothing is paid twice.`;
+      note.hidden = false;
+    }
     document.getElementById('bb-search').addEventListener('input', render);
     render(); renderBar();
   </script>

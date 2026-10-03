@@ -52,6 +52,16 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
 
     <div class="cart-grid">
       <section aria-label="Designs in your cart" class="min-w-0">
+        <!-- Pick-5 from the cart (2026-10-03): a buyer with 7 designs in her
+             cart wrote in asking why "5 for $25" did not change the price. The
+             deal lives on the builder, so the cart says what it would save and
+             hands its designs over, already picked. Above the list, where a
+             buyer with a long cart still sees it. -->
+        <p id="cart-moved" hidden class="mb-3 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900"></p>
+        <a id="cart-pick5" hidden href="/bundle-builder?src=cart"
+           class="mb-3 flex items-center justify-between gap-3 rounded-lg border border-[#FAC775] bg-[#FAEEDA] px-4 py-3 text-sm text-bronze-800 hover:shadow-sm transition">
+          <span id="cart-pick5-text"></span><span aria-hidden="true" class="shrink-0">→</span>
+        </a>
         <div id="items" class="cart-items"></div>
         <p id="tier-hint" class="hidden cart-hint"><span id="tier-hint-text"></span> <a href="/catalog">Add designs</a></p>
       </section>
@@ -267,6 +277,46 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
       // 2026OFF15) would leave the discount applied stale. Debounced via a
       // simple in-flight flag so rapid cart edits collapse into one round-trip.
       revalidatePromoSoon(c, promo);
+
+      // ── Pick-5 from the cart ──────────────────────────────────────
+      // Same price rule as src/lib/bundle5.ts (checkout-init re-computes it):
+      // $25 while the five are worth $40 or less, then 70c per extra dollar.
+      // A dearer five always saves more, so the five highest-priced go in.
+      {
+        const p5 = document.getElementById('cart-pick5');
+        const p5t = document.getElementById('cart-pick5-text');
+        const singles = c.filter((x) => /^[0-9a-f-]{36}$/i.test(String(x.id || ''))
+          && !/^(software-|gift-card-|catalogue-)/.test(String(x.slug || ''))
+          && !/bundle|membership|personalized|from your (picture|photo)/i.test(String(x.title || '')));
+        const hasBundle = c.some((x) => String(x.id).startsWith('bundle5:'));
+        let show = false;
+        if (p5 && p5t && !hasBundle && singles.length >= 2) {
+          const ids = singles.map((x) => x.id).join(',');
+          p5.href = '/bundle-builder?src=cart&cart=' + ids;
+          if (singles.length >= 5) {
+            const five = [...singles].sort((a, b) => Number(b.price) - Number(a.price)).slice(0, 5);
+            const value = five.reduce((s, x) => s + (Number(x.price) || 0), 0);
+            const price = Math.max(25, Math.round((25 + 0.7 * (value - 40)) * 100) / 100);
+            const save = value - price;
+            if (save >= 0.5) {
+              p5t.innerHTML = '<strong>Pick any 5 for ' + fmt(price) + ':</strong> make five of these a bundle and save ' + fmt(save) + '. We pick the five that save most; you can swap them.';
+              show = true;
+            }
+          } else {
+            const need = 5 - singles.length;
+            p5t.innerHTML = 'Add ' + need + ' more design' + (need === 1 ? '' : 's') + ' and get <strong>all five from ' + fmt(25) + '</strong> with Pick any 5. Your ' + singles.length + ' come along, already picked.';
+            show = true;
+          }
+        }
+        if (p5) p5.hidden = !show;
+        const moved = document.getElementById('cart-moved');
+        let n = 0; try { n = Number(sessionStorage.getItem('dcc-pick5-moved') || 0); } catch {}
+        if (moved && n) {
+          moved.textContent = '✓ ' + n + ' design' + (n === 1 ? ' is' : 's are') + ' now in your Pick 5 bundle, so ' + (n === 1 ? 'it was' : 'they were') + ' taken off as single designs.';
+          moved.hidden = false;
+          try { sessionStorage.removeItem('dcc-pick5-moved'); } catch {}
+        }
+      }
 
       // ── Bulk-discount upsell hint ─────────────────────────────────
       // Tiers must mirror seed_bulk_promos.mjs. Find the next tier the

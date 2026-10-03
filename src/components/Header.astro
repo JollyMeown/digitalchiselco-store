@@ -260,7 +260,12 @@ try {
     // Two or more single designs adding up past the bundle price: the buyer
     // is better off with Pick-5, and the shop with a bigger order. Only then.
     const nudge = document.getElementById('dcc-cart-pick5');
-    if (nudge) nudge.hidden = !(items.length >= 2 && total > 25 && !items.some((p) => /bundle|mega pack/i.test(p.title || '')));
+    if (nudge) {
+      nudge.hidden = !(items.length >= 2 && total > 25 && !items.some((p) => /bundle|mega pack/i.test(p.title || '')));
+      // carry the cart's designs over, so the builder opens with them picked
+      const ids = items.map((p) => String(p.id || '')).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+      nudge.href = '/bundle-builder?src=cart' + (ids.length ? '&cart=' + ids.join(',') : '');
+    }
   }
   function openCart() { renderMiniCart(); cartDrawer?.classList.remove('translate-x-full'); cartOverlay?.classList.remove('hidden'); document.documentElement.style.overflow = 'hidden'; }
   function closeCart() { cartDrawer?.classList.add('translate-x-full'); cartOverlay?.classList.add('hidden'); document.documentElement.style.overflow = ''; }
