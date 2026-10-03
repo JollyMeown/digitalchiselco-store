@@ -248,7 +248,7 @@ export default function Traffic() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <HeatList events={events} names={prodNames} sales={salesByProduct} />
-            <div className="md:col-span-2"><SearchTerms events={events} /></div>
+            <div className="md:col-span-2"><SearchTerms events={events} days={days} /></div>
             <TopList title="Top pages" rows={stats.topPages} total={stats.pv} />
             <TopList title="Referrer sources" rows={stats.topRefs} total={stats.pv} />
             <TopList title="Campaigns (?src= links)" rows={stats.campaigns} total={stats.pv} />
@@ -710,9 +710,69 @@ const searchFilters = (path?: string | null) => {
 // searched "trains" and "old trains" and the card, which showed only the top
 // 12 terms, made it look as if nothing had been recorded). The one-off and the
 // found-nothing searches are the ones worth reading, so they get their own lists.
-function SearchTerms({ events }: { events: Ev[] }) {
+function SearchTerms({ events, days }: { events: Ev[]; days: number }) {
   const [find, setFind] = useState('');
   const [showAll, setShowAll] = useState(false);
+  const [busyXlsx, setBusyXlsx] = useState(false);
+
+  // Excel download of the period shown (owner, 2026-10-03). Four sheets: every
+  // search, one row per term, the found-nothing terms, and the designs clicked.
+  async function downloadExcel() {
+    setBusyXlsx(true);
+    try {
+      const { downloadXlsx } = await import('../../../lib/xlsx-lite');
+      const searches = events.filter((e) => e.type === 'search' && e.q)
+        .sort((a, b) => String(b.ts || b.day).localeCompare(String(a.ts || a.day)));
+      const clicks = events.filter((e) => e.type === 'search_click')
+        .sort((a, b) => String(b.ts || b.day).localeCompare(String(a.ts || a.day)));
+      const stamp = (e: Ev) => {
+        if (!e.ts) return e.day;
+        const d = new Date(e.ts);
+        const p = (n: number) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+      };
+      const by = new Map<string, { n: number; zero: number; people: Set<string>; first: string; last: string; maxFound: number }>();
+      for (const e of searches) {
+        const t = by.get(e.q!) || { n: 0, zero: 0, people: new Set<string>(), first: stamp(e), last: stamp(e), maxFound: 0 };
+        t.n++; if ((e.n ?? 0) === 0) t.zero++;
+        if (e.visitor_hash) t.people.add(e.visitor_hash);
+        const s = stamp(e); if (s < t.first) t.first = s; if (s > t.last) t.last = s;
+        t.maxFound = Math.max(t.maxFound, e.n ?? 0);
+        by.set(e.q!, t);
+      }
+      const termRows = [...by.entries()].sort((a, b) => b[1].n - a[1].n || b[1].last.localeCompare(a[1].last))
+        .map(([q, t]) => [q, t.n, t.people.size, t.zero, t.maxFound, t.first, t.last]);
+      // design names for the clicks
+      const ids = [...new Set(clicks.map((e) => e.product_id).filter(Boolean))] as string[];
+      const title: Record<string, string> = {};
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data } = await supabase.from('products').select('id, title').in('id', ids.slice(i, i + 200));
+        for (const p of data || []) title[p.id] = String(p.title || '').split('|')[0].trim();
+      }
+      const termCols = [
+        { header: 'Words', width: 30 }, { header: 'Times searched', width: 15 }, { header: 'Different visitors', width: 17 },
+        { header: 'Times found nothing', width: 19 }, { header: 'Most designs found', width: 18 }, { header: 'First searched', width: 17 }, { header: 'Last searched', width: 17 },
+      ];
+      const today = new Date().toISOString().slice(0, 10);
+      downloadXlsx(`searches-last-${days}-days-${today}.xlsx`, [
+        {
+          name: 'Searches',
+          columns: [{ header: 'When', width: 17 }, { header: 'Words', width: 30 }, { header: 'Designs found', width: 14 }, { header: 'Found nothing', width: 14 }, { header: 'Where typed', width: 26 }, { header: 'Filters', width: 30 }, { header: 'Visitor', width: 12 }],
+          rows: searches.map((e) => [stamp(e), e.q, e.n ?? 0, (e.n ?? 0) === 0 ? 'Yes' : 'No', searchWhere(e.path), searchFilters(e.path), (e.visitor_hash || '').slice(0, 8)]),
+        },
+        { name: 'By term', columns: termCols, rows: termRows },
+        { name: 'Found nothing', columns: termCols, rows: termRows.filter((r) => (r[3] as number) > 0) },
+        {
+          name: 'Clicks',
+          columns: [{ header: 'When', width: 17 }, { header: 'Words', width: 30 }, { header: 'Design clicked', width: 60 }, { header: 'Position in list', width: 16 }, { header: 'From', width: 18 }, { header: 'Visitor', width: 12 }],
+          rows: clicks.map((e) => [stamp(e), e.q || '', title[e.product_id || ''] || e.product_id || '', e.n ?? null, String(e.path || '').startsWith('/dropdown') ? 'Header suggestions' : 'Search page', (e.visitor_hash || '').slice(0, 8)]),
+        },
+      ]);
+    } catch (err: any) {
+      alert('Could not build the Excel file: ' + (err?.message || err));
+    }
+    setBusyXlsx(false);
+  }
   const all = events.filter((e) => e.type === 'search' && e.q)
     .sort((a, b) => String(b.ts || b.day).localeCompare(String(a.ts || a.day)));
   const f = find.trim().toLowerCase();
@@ -735,7 +795,14 @@ function SearchTerms({ events }: { events: Ev[] }) {
     <Card>
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
         <div className="text-sm font-medium text-ink-900">Searches <span className="text-xs font-normal text-ink-700/60">· {all.length.toLocaleString()} in this period · {Object.keys(terms).length.toLocaleString()} different{f ? ` matching "${f}"` : ''}</span></div>
-        <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find a word…" className="text-xs px-2 py-1 border border-black/15 rounded w-40" />
+        <div className="flex items-center gap-2">
+          <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find a word…" className="text-xs px-2 py-1 border border-black/15 rounded w-40" />
+          <button type="button" onClick={downloadExcel} disabled={busyXlsx || !events.some((e) => e.type === 'search' || e.type === 'search_click')}
+            title={`Every search and click in the last ${days} days, as an Excel workbook`}
+            className="text-xs px-2.5 py-1 rounded border border-green-700 text-green-800 bg-green-50 hover:bg-green-100 disabled:opacity-40">
+            {busyXlsx ? 'Preparing…' : '⬇ Download Excel'}
+          </button>
+        </div>
       </div>
       <p className="text-[11px] text-ink-700/50 mb-3">Every search typed on the site: the search page, the header box (even when not submitted) and the Pick 5 page. <span className="text-red-600 font-medium">Red</span> = found nothing → a design you could make. Click a term to see each time it was searched.</p>
       {all.length === 0 ? <p className="text-xs text-ink-700/50">No searches recorded yet.</p> : (
